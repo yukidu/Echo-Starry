@@ -343,7 +343,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             {c.isAdmin || displayAuthorBadge === '貢獻者' ? <span className="rainbow-admin-text font-bold text-base leading-tight break-words">{displayAuthorName}</span> : isClickable ? <span className="font-bold text-slate-800 dark:text-slate-100 text-base underline decoration-dotted underline-offset-2 hover:text-rose-600 transition-colors leading-tight break-words">{displayAuthorName}</span> : <span className="font-bold text-slate-700 dark:text-slate-300 text-base select-none leading-tight break-words">{displayAuthorName}</span>}
             <div className="flex items-center gap-1 min-w-0">
               {isVisitor && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium select-none leading-tight">訪客</span>}
-              {showBadge && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium whitespace-normal leading-tight">{displayAuthorBadge}</span>}
+              {showBadge && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium whitespace-nowrap shrink-0 leading-tight">{displayAuthorBadge}</span>}
             </div>
           </div>
         </div>

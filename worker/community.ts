@@ -1,4 +1,5 @@
 import { legacyData } from '../shared/legacyData';
+import { formatCommentTimestamp } from '../shared/commentTime';
 import type { Env } from './index';
 
 // These endpoints share one persistent contract with the development server.
@@ -143,7 +144,7 @@ function recoverTrackIdentityFromAudioUrl(audioUrl: string, coverObjects: any[])
       : ''
   };
 }
-const normalizeComment = (row: any) => ({ ...row, isAdmin: Boolean(row.isAdmin), likedBy: parse(row.likedBy, []) });
+const normalizeComment = (row: any) => ({ ...row, timestamp: formatCommentTimestamp(row), isAdmin: Boolean(row.isAdmin), likedBy: parse(row.likedBy, []) });
 const keysFor = (body: any) => [...new Set([body.identifier, body.userEmail, body.userId, body.deviceId].filter(x => typeof x === 'string' && x.trim()).map(x => x.includes('@') ? x.toLowerCase().trim() : x))];
 
 async function seedTracks(db: any, defaults: any[]) {
@@ -381,7 +382,8 @@ export async function communityApi(request: Request, env: Env, defaults: any[]):
       if (!target || !body.content?.trim()) return json({ error: '請輸入心得內容與音檔' }, 400);
       if (!await db.prepare('SELECT id FROM tracks WHERE id = ?').bind(target).first()) return json({ error: '找不到音檔' }, 404);
       if (body.replyToId && !await db.prepare('SELECT id FROM comments WHERE id = ? AND trackId = ?').bind(body.replyToId, target).first()) return json({ error: '回覆的心得已不存在' }, 400);
-      const comment = { id: `c-${crypto.randomUUID()}`, trackId: target, authorName: body.authorName || '訪客', authorAvatar: body.authorAvatar || '👤', authorBadge: body.authorBadge || '', authorEmail: body.authorEmail || '', deviceId: body.deviceId || '', content: body.content.trim(), timestamp: '剛剛', createdAt: Date.now(), replyToId: body.replyToId || null, replyToAuthor: body.replyToAuthor || null, isAdmin: !!body.isAdmin, likes: 0, likedBy: [] };
+      const createdAt = Date.now();
+      const comment = { id: `c-${crypto.randomUUID()}`, trackId: target, authorName: body.authorName || '訪客', authorAvatar: body.authorAvatar || '👤', authorBadge: body.authorBadge || '', authorEmail: body.authorEmail || '', deviceId: body.deviceId || '', content: body.content.trim(), timestamp: formatCommentTimestamp({ createdAt }), createdAt, replyToId: body.replyToId || null, replyToAuthor: body.replyToAuthor || null, isAdmin: !!body.isAdmin, likes: 0, likedBy: [] };
       const columns = Object.keys(comment);
       await db.batch([
         db.prepare(`INSERT INTO comments (${columns.join(',')}) VALUES (${columns.map(() => '?').join(',')})`).bind(...columns.map(k => k === 'likedBy' ? '[]' : k === 'isAdmin' ? (comment.isAdmin ? 1 : 0) : (comment as any)[k])),

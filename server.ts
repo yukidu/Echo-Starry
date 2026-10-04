@@ -1,5 +1,6 @@
 import { uploadedAudioKey } from './shared/r2Files';
 import { shareMetadata } from './shared/shareMetadata';
+import { formatCommentTimestamp } from './shared/commentTime';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -1076,8 +1077,9 @@ app.post('/api/tracks/:id/comments', (req, res) => {
     return res.status(422).json({ error: '心得經 Cloudflare Workers AI 智慧審核未通過（含不當或攻擊性言論），請使用友善用詞。' });
   }
 
+  const createdAt = Date.now();
   const newComment: Comment = {
-    id: `c-${Date.now()}`,
+    id: `c-${createdAt}`,
     trackId: req.params.id,
     authorName: authorName || '訪客',
     authorAvatar: authorAvatar || '💬',
@@ -1086,8 +1088,8 @@ app.post('/api/tracks/:id/comments', (req, res) => {
     deviceId,
     isAdmin: !!isAdmin,
     content: content.trim(),
-    timestamp: '剛剛',
-    createdAt: Date.now(),
+    timestamp: formatCommentTimestamp({ createdAt }),
+    createdAt,
     isAiModerated: true,
     likes: 0,
     likedBy: [],
