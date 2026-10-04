@@ -6,151 +6,151 @@ TAP version 13
 # Subtest: member list renders permanent delete only for the exact super-admin email and protects the super-admin row
 ok 1 - member list renders permanent delete only for the exact super-admin email and protects the super-admin row
   ---
-  duration_ms: 4.288031
+  duration_ms: 1.246195
   type: 'test'
   ...
 # Subtest: member deletion API independently verifies a live session and exact super-admin email
 ok 2 - member deletion API independently verifies a live session and exact super-admin email
   ---
-  duration_ms: 0.235942
+  duration_ms: 0.247904
   type: 'test'
   ...
 # Subtest: deleting an account removes member-bound sessions and learning identity data before the user row
 ok 3 - deleting an account removes member-bound sessions and learning identity data before the user row
   ---
-  duration_ms: 0.235602
+  duration_ms: 0.199805
   type: 'test'
   ...
 # Subtest: privacy entrypoint routes requests through the member deletion guard
 ok 4 - privacy entrypoint routes requests through the member deletion guard
   ---
-  duration_ms: 0.177241
+  duration_ms: 0.147276
   type: 'test'
   ...
 # Subtest: track title uses palette primary color and remains the only bold text
 ok 5 - track title uses palette primary color and remains the only bold text
   ---
-  duration_ms: 1.677142
+  duration_ms: 2.335035
   type: 'test'
   ...
 # Subtest: track title grows further on larger screens
 ok 6 - track title grows further on larger screens
   ---
-  duration_ms: 1.122954
+  duration_ms: 0.297257
   type: 'test'
   ...
 # Subtest: like count text inherits the same feedback-row color without overriding the heart icon
 ok 7 - like count text inherits the same feedback-row color without overriding the heart icon
   ---
-  duration_ms: 0.28819
+  duration_ms: 0.249818
   type: 'test'
   ...
 # Subtest: v71 scrubs deleted categories from persisted tracks without inventing a fallback
 ok 8 - v71 scrubs deleted categories from persisted tracks without inventing a fallback
   ---
-  duration_ms: 1.561956
+  duration_ms: 1.556847
   type: 'test'
   ...
 # Subtest: D1 categories is the only category authority, including an empty list
 ok 9 - D1 categories is the only category authority, including an empty list
   ---
-  duration_ms: 0.255479
+  duration_ms: 0.287659
   type: 'test'
   ...
 # Subtest: browser startup reconciles stale or missing home cache before React mounts
 ok 10 - browser startup reconciles stale or missing home cache before React mounts
   ---
-  duration_ms: 0.248676
+  duration_ms: 0.233508
   type: 'test'
   ...
 # Subtest: client track writes and track-list reads are sanitized against live categories
 ok 11 - client track writes and track-list reads are sanitized against live categories
   ---
-  duration_ms: 0.254817
+  duration_ms: 0.222106
   type: 'test'
   ...
 # Subtest: home cards keep a valid empty category list instead of showing a made-up category
 ok 12 - home cards keep a valid empty category list instead of showing a made-up category
   ---
-  duration_ms: 0.219872
+  duration_ms: 0.257232
   type: 'test'
   ...
 # Subtest: schema reruns cannot recreate categories deleted by an administrator
 ok 13 - schema reruns cannot recreate categories deleted by an administrator
   ---
-  duration_ms: 0.288741
+  duration_ms: 0.293961
   type: 'test'
   ...
 # Subtest: upload/edit modal exposes category selection only
 ok 14 - upload/edit modal exposes category selection only
   ---
-  duration_ms: 1.289987
+  duration_ms: 1.336244
   type: 'test'
   ...
 # Subtest: admin category deletion requires a second click before React delete handler can run
 ok 15 - admin category deletion requires a second click before React delete handler can run
   ---
-  duration_ms: 0.285394
+  duration_ms: 0.291466
   type: 'test'
   ...
 # Subtest: category UI policy loads before the React bootstrap
 ok 16 - category UI policy loads before the React bootstrap
   ---
-  duration_ms: 0.240962
+  duration_ms: 0.236604
   type: 'test'
   ...
 # Subtest: v3.9 explains the full-site healthcheck in plain language
 ok 17 - v3.9 explains the full-site healthcheck in plain language
   ---
-  duration_ms: 1.639791
+  duration_ms: 1.505681
   type: 'test'
   ...
 # Subtest: v3.8 cumulative changelog remains available for recent user-facing releases
 ok 18 - v3.8 cumulative changelog remains available for recent user-facing releases
   ---
-  duration_ms: 0.301735
+  duration_ms: 0.319869
   type: 'test'
   ...
 # Subtest: changelog release patch merges both maintained releases and only intercepts GET changelog requests
 ok 19 - changelog release patch merges both maintained releases and only intercepts GET changelog requests
   ---
-  duration_ms: 0.200306
+  duration_ms: 0.270106
   type: 'test'
   ...
 # Subtest: release notes patch loads before the other runtime policies
 ok 20 - release notes patch loads before the other runtime policies
   ---
-  duration_ms: 0.228498
+  duration_ms: 0.257853
   type: 'test'
   ...
 # Subtest: v3.7 public changelog removes implementation jargon and keeps user-facing meaning
 ok 21 - v3.7 public changelog removes implementation jargon and keeps user-facing meaning
   ---
-  duration_ms: 4.63899
+  duration_ms: 2.411608
   type: 'test'
   ...
 # Subtest: v3.7 changelog is normalized in data before React renders the modal
 ok 22 - v3.7 changelog is normalized in data before React renders the modal
   ---
-  duration_ms: 0.272561
+  duration_ms: 0.234029
   type: 'test'
   ...
 # Subtest: public changelog policy is loaded before the main application policies
 ok 23 - public changelog policy is loaded before the main application policies
   ---
-  duration_ms: 0.249056
+  duration_ms: 0.242024
   type: 'test'
   ...
 # Subtest: long web comments collapse to three lines and can expand/collapse
 ok 24 - long web comments collapse to three lines and can expand/collapse
   ---
-  duration_ms: 4.215016
+  duration_ms: 1.315526
   type: 'test'
   ...
 # Subtest: all requested web comment surfaces use the shared collapsible renderer
 not ok 25 - all requested web comment surfaces use the shared collapsible renderer
   ---
-  duration_ms: 8.623725
+  duration_ms: 8.046938
   type: 'test'
   location: '/home/runner/work/echostars/echostars/tests/commentCollapse.test.ts:1:1110'
   failureType: 'testCodeFailure'
@@ -844,797 +844,797 @@ not ok 25 - all requested web comment surfaces use the shared collapsible render
 # Subtest: personal learning card export keeps the full comment instead of truncating it
 ok 26 - personal learning card export keeps the full comment instead of truncating it
   ---
-  duration_ms: 0.230742
+  duration_ms: 0.413986
   type: 'test'
   ...
 # Subtest: comment forms do not block text with the retired moderation word list
 ok 27 - comment forms do not block text with the retired moderation word list
   ---
-  duration_ms: 1.446149
+  duration_ms: 1.780627
   type: 'test'
   ...
 # Subtest: comment submit buttons describe sending rather than moderation
 ok 28 - comment submit buttons describe sending rather than moderation
   ---
-  duration_ms: 0.18646
+  duration_ms: 0.207098
   type: 'test'
   ...
 # Subtest: VIP links use the short S-sequence plus numeric password contract
 ok 29 - VIP links use the short S-sequence plus numeric password contract
   ---
-  duration_ms: 0.289342
+  duration_ms: 0.348223
   type: 'test'
   ...
 # Subtest: comment timestamps use canonical createdAt in Taiwan time instead of a frozen just-now label
 ok 30 - comment timestamps use canonical createdAt in Taiwan time instead of a frozen just-now label
   ---
-  duration_ms: 2.444007
+  duration_ms: 2.516526
   type: 'test'
   ...
 # Subtest: production comment API derives every returned timestamp from createdAt
 ok 31 - production comment API derives every returned timestamp from createdAt
   ---
-  duration_ms: 0.594448
+  duration_ms: 0.628648
   type: 'test'
   ...
 # Subtest: comment rank badge is forced onto one line
 ok 32 - comment rank badge is forced onto one line
   ---
-  duration_ms: 0.463272
+  duration_ms: 0.516608
   type: 'test'
   ...
 # Subtest: comment time, badge, actions and body follow the compact mobile layout
 ok 33 - comment time, badge, actions and body follow the compact mobile layout
   ---
-  duration_ms: 0.606689
+  duration_ms: 0.454722
   type: 'test'
   ...
-# (node:2604) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (node:2587) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 # (Use `node --trace-warnings ...` to show where the warning was created)
 # Subtest: legacy member schema upgrades without losing edited profile fields
 ok 34 - legacy member schema upgrades without losing edited profile fields
   ---
-  duration_ms: 88.344485
+  duration_ms: 71.280495
   type: 'test'
   ...
 # Subtest: visitor likes and ratings persist with the frontend response contract
 ok 35 - visitor likes and ratings persist with the frontend response contract
   ---
-  duration_ms: 12.310732
+  duration_ms: 13.497371
   type: 'test'
   ...
 # Subtest: comments support replies, likes, owner edits, deletion and 2000-character posts
 ok 36 - comments support replies, likes, owner edits, deletion and 2000-character posts
   ---
-  duration_ms: 10.652103
+  duration_ms: 12.305908
   type: 'test'
   ...
 # Subtest: regular admins may delete visitor comments but not another registered member comment
 ok 37 - regular admins may delete visitor comments but not another registered member comment
   ---
-  duration_ms: 14.783208
+  duration_ms: 11.763713
   type: 'test'
   ...
 # Subtest: keywords preserve creator ownership and ranking
 ok 38 - keywords preserve creator ownership and ranking
   ---
-  duration_ms: 13.724262
+  duration_ms: 17.659296
   type: 'test'
   ...
 # Subtest: rank approval requires an authorized auditor
 ok 39 - rank approval requires an authorized auditor
   ---
-  duration_ms: 18.933812
+  duration_ms: 8.3842
   type: 'test'
   ...
 # Subtest: D1 categories can legitimately start empty and then preserve administrator CRUD order
 ok 40 - D1 categories can legitimately start empty and then preserve administrator CRUD order
   ---
-  duration_ms: 25.985129
+  duration_ms: 28.460579
   type: 'test'
   ...
 # Subtest: track metadata partial edits preserve unrelated fields and honestly fail for missing records
 ok 41 - track metadata partial edits preserve unrelated fields and honestly fail for missing records
   ---
-  duration_ms: 6.564195
+  duration_ms: 20.772393
   type: 'test'
   ...
 # Subtest: VIP metadata persists through duration changes and token reset
 ok 42 - VIP metadata persists through duration changes and token reset
   ---
-  duration_ms: 11.503623
+  duration_ms: 14.091745
   type: 'test'
   ...
 # Subtest: offline audio cleanup removes completed and stale cached objects
 ok 43 - offline audio cleanup removes completed and stale cached objects
   ---
-  duration_ms: 20.58692
+  duration_ms: 20.70685
   type: 'test'
   ...
 # Subtest: comment threading keeps nested and orphan replies visible exactly once
 ok 44 - comment threading keeps nested and orphan replies visible exactly once
   ---
-  duration_ms: 0.961165
+  duration_ms: 0.397394
   type: 'test'
   ...
 # Subtest: numerology rings stay inside square cells
 ok 45 - numerology rings stay inside square cells
   ---
-  duration_ms: 16.769977
+  duration_ms: 16.802093
   type: 'test'
   ...
 # Subtest: missing database binding never pretends to save successfully
 ok 46 - missing database binding never pretends to save successfully
   ---
-  duration_ms: 0.426456
+  duration_ms: 0.448841
   type: 'test'
   ...
 # Subtest: detail page mobile interaction rules
 ok 47 - detail page mobile interaction rules
   ---
-  duration_ms: 1.310834
+  duration_ms: 3.769714
   type: 'test'
   ...
 # Subtest: comment composer and rows are compact and readable
 ok 48 - comment composer and rows are compact and readable
   ---
-  duration_ms: 0.326466
+  duration_ms: 0.29356
   type: 'test'
   ...
 # Subtest: detail keywords keep toggle position and use title-sized regular text
 ok 49 - detail keywords keep toggle position and use title-sized regular text
   ---
-  duration_ms: 0.209746
+  duration_ms: 0.216796
   type: 'test'
   ...
 # Subtest: main navigation is fixed to the viewport on every page
 ok 50 - main navigation is fixed to the viewport on every page
   ---
-  duration_ms: 1.484595
+  duration_ms: 5.563585
   type: 'test'
   ...
 # Subtest: page reserves the navbar height so fixed navigation does not cover content
 ok 51 - page reserves the navbar height so fixed navigation does not cover content
   ---
-  duration_ms: 0.246072
+  duration_ms: 0.176661
   type: 'test'
   ...
 # Subtest: global navigation policy is loaded by every app entry
 ok 52 - global navigation policy is loaded by every app entry
   ---
-  duration_ms: 0.226546
+  duration_ms: 0.160591
   type: 'test'
   ...
 # Subtest: Google identity is verified server-side instead of trusting a submitted email
 ok 53 - Google identity is verified server-side instead of trusting a submitted email
   ---
-  duration_ms: 1.70436
+  duration_ms: 1.632048
   type: 'test'
   ...
 # Subtest: super admin is anchored to the single verified Google email
 ok 54 - super admin is anchored to the single verified Google email
   ---
-  duration_ms: 0.243447
+  duration_ms: 0.236242
   type: 'test'
   ...
 # Subtest: browser uses Google Identity Services credential flow and authenticated API sessions
 ok 55 - browser uses Google Identity Services credential flow and authenticated API sessions
   ---
-  duration_ms: 0.244579
+  duration_ms: 0.223389
   type: 'test'
   ...
 # Subtest: first-party session cookie is secure and never placed in a share URL
 ok 56 - first-party session cookie is secure and never placed in a share URL
   ---
-  duration_ms: 0.417179
+  duration_ms: 0.367419
   type: 'test'
   ...
 # Subtest: site-defined auth lifetime is persistent instead of expiring after 30 days
 ok 57 - site-defined auth lifetime is persistent instead of expiring after 30 days
   ---
-  duration_ms: 0.346753
+  duration_ms: 0.327824
   type: 'test'
   ...
 # Subtest: expired sessions are not resurrected when existing sessions are upgraded
 ok 58 - expired sessions are not resurrected when existing sessions are upgraded
   ---
-  duration_ms: 0.2342
+  duration_ms: 0.225383
   type: 'test'
   ...
 # Subtest: share entry can restore a verified member session and only then falls back to Google
 ok 59 - share entry can restore a verified member session and only then falls back to Google
   ---
-  duration_ms: 0.398004
+  duration_ms: 0.462226
   type: 'test'
   ...
 # Subtest: sensitive write routes bind identity to the verified session
 ok 60 - sensitive write routes bind identity to the verified session
   ---
-  duration_ms: 0.369364
+  duration_ms: 0.350807
   type: 'test'
   ...
 # Subtest: wrapper order preserves privacy, member deletion, categories, cookie continuity, playback and auth security
 ok 61 - wrapper order preserves privacy, member deletion, categories, cookie continuity, playback and auth security
   ---
-  duration_ms: 0.811938
+  duration_ms: 0.604402
   type: 'test'
   ...
 # Subtest: no Google OAuth client secret is embedded in the auth implementation
 ok 62 - no Google OAuth client secret is embedded in the auth implementation
   ---
-  duration_ms: 1.06409
+  duration_ms: 0.788398
   type: 'test'
   ...
 # Subtest: listening progress badges use the current palette primary color
 ok 63 - listening progress badges use the current palette primary color
   ---
-  duration_ms: 2.009999
+  duration_ms: 2.604411
   type: 'test'
   ...
 # Subtest: portrait access label text is always white
 ok 64 - portrait access label text is always white
   ---
-  duration_ms: 0.231827
+  duration_ms: 0.21359
   type: 'test'
   ...
 # Subtest: home density policy only activates when the audio card grid is present
 ok 65 - home density policy only activates when the audio card grid is present
   ---
-  duration_ms: 2.37846
+  duration_ms: 1.157046
   type: 'test'
   ...
 # Subtest: homepage spacing and audio card vertical density are tightened
 ok 66 - homepage spacing and audio card vertical density are tightened
   ---
-  duration_ms: 0.276988
+  duration_ms: 0.196862
   type: 'test'
   ...
 # Subtest: home density policy is loaded globally but scopes itself to the homepage
 ok 67 - home density policy is loaded globally but scopes itself to the homepage
   ---
-  duration_ms: 0.174353
+  duration_ms: 0.154702
   type: 'test'
   ...
 # Subtest: home keyword drawer explains multi-select and uses larger keyword text
 ok 68 - home keyword drawer explains multi-select and uses larger keyword text
   ---
-  duration_ms: 1.409353
+  duration_ms: 1.451462
   type: 'test'
   ...
 # Subtest: keyword counts are computed from the same home filters and update with selected intersections
 ok 69 - keyword counts are computed from the same home filters and update with selected intersections
   ---
-  duration_ms: 0.287787
+  duration_ms: 0.332408
   type: 'test'
   ...
 # Subtest: the playlist and keyword counters share one keyword matching rule
 ok 70 - the playlist and keyword counters share one keyword matching rule
   ---
-  duration_ms: 0.202959
+  duration_ms: 0.230586
   type: 'test'
   ...
 # Subtest: zero-result keyword choices disappear while selected chips remain removable
 ok 71 - zero-result keyword choices disappear while selected chips remain removable
   ---
-  duration_ms: 0.362647
+  duration_ms: 0.400367
   type: 'test'
   ...
 # Subtest: keyword controls use consistent readable sizing and an oversized close control
 ok 72 - keyword controls use consistent readable sizing and an oversized close control
   ---
-  duration_ms: 0.682345
+  duration_ms: 0.722385
   type: 'test'
   ...
 # Subtest: keyword chips stay regular weight, close button follows palette, and sort controls match search height
 ok 73 - keyword chips stay regular weight, close button follows palette, and sort controls match search height
   ---
-  duration_ms: 2.283815
+  duration_ms: 0.53996
   type: 'test'
   ...
 # Subtest: personal learning record export uses the dedicated 1280px JPEG module and rejects empty output
 ok 74 - personal learning record export uses the dedicated 1280px JPEG module and rejects empty output
   ---
-  duration_ms: 1.433848
+  duration_ms: 1.552923
   type: 'test'
   ...
 # Subtest: profile export loads canonical playback history before drawing and merges ratings/comments
 ok 75 - profile export loads canonical playback history before drawing and merges ratings/comments
   ---
-  duration_ms: 0.210833
+  duration_ms: 0.24898
   type: 'test'
   ...
 # Subtest: exported numerology grid matches the web ring colors and is enlarged dynamically
 ok 76 - exported numerology grid matches the web ring colors and is enlarged dynamically
   ---
-  duration_ms: 0.214922
+  duration_ms: 0.201841
   type: 'test'
   ...
 # Subtest: learning record titles wrap instead of being truncated and cards use dynamic compact height
 ok 77 - learning record titles wrap instead of being truncated and cards use dynamic compact height
   ---
-  duration_ms: 0.227275
+  duration_ms: 0.219435
   type: 'test'
   ...
 # Subtest: learning-card backend canonicalizes old identity aliases and preserves completed progress
 ok 78 - learning-card backend canonicalizes old identity aliases and preserves completed progress
   ---
-  duration_ms: 0.373097
+  duration_ms: 0.342457
   type: 'test'
   ...
 # Subtest: large JPEG canvas exports keep the shared 1280px / 95 percent quality policy
 ok 79 - large JPEG canvas exports keep the shared 1280px / 95 percent quality policy
   ---
-  duration_ms: 0.23581
+  duration_ms: 0.191271
   type: 'test'
   ...
 # Subtest: JPEG export policy loads before the bootstrap that mounts React
 ok 80 - JPEG export policy loads before the bootstrap that mounts React
   ---
-  duration_ms: 0.40676
+  duration_ms: 0.385568
   type: 'test'
   ...
 # Subtest: share-card modal releases preview URLs and surfaces generation failures
 ok 81 - share-card modal releases preview URLs and surfaces generation failures
   ---
-  duration_ms: 0.228787
+  duration_ms: 0.194778
   type: 'test'
   ...
 # Subtest: detail page exposes and enforces a 50-keyword limit
 ok 82 - detail page exposes and enforces a 50-keyword limit
   ---
-  duration_ms: 1.353529
+  duration_ms: 1.32889
   type: 'test'
   ...
 # Subtest: production keyword API accepts up to 50 keywords and rejects the 51st
 ok 83 - production keyword API accepts up to 50 keywords and rejects the 51st
   ---
-  duration_ms: 0.257021
+  duration_ms: 0.241877
   type: 'test'
   ...
 # Subtest: public visitor viewing B and C resolves each selected member aliases
 ok 84 - public visitor viewing B and C resolves each selected member aliases
   ---
-  duration_ms: 2.221639
+  duration_ms: 2.249178
   type: 'test'
   ...
 # Subtest: public member lookup may use member id and still resolves email plus id
 ok 85 - public member lookup may use member id and still resolves email plus id
   ---
-  duration_ms: 0.225281
+  duration_ms: 0.226969
   type: 'test'
   ...
 # Subtest: public lookup rejects a missing or mismatched target
 ok 86 - public lookup rejects a missing or mismatched target
   ---
-  duration_ms: 0.199302
+  duration_ms: 0.189738
   type: 'test'
   ...
 # Subtest: authenticated self-service scope still resolves only the actor for destructive actions
 ok 87 - authenticated self-service scope still resolves only the actor for destructive actions
   ---
-  duration_ms: 0.35341
+  duration_ms: 0.329933
   type: 'test'
   ...
 # Subtest: administrator cannot clear another member history through the self-service delete route
 ok 88 - administrator cannot clear another member history through the self-service delete route
   ---
-  duration_ms: 0.227455
+  duration_ms: 0.242107
   type: 'test'
   ...
 # Subtest: learning history matches legacy identities stored only in playback key
 ok 89 - learning history matches legacy identities stored only in playback key
   ---
-  duration_ms: 2.661511
+  duration_ms: 1.256043
   type: 'test'
   ...
 # Subtest: canonical history and history deletion use the same legacy-compatible filter
 ok 90 - canonical history and history deletion use the same legacy-compatible filter
   ---
-  duration_ms: 0.47124
+  duration_ms: 0.544549
   type: 'test'
   ...
 # Subtest: same member and track keeps completed 100 percent across legacy email/id rows
 ok 91 - same member and track keeps completed 100 percent across legacy email/id rows
   ---
-  duration_ms: 1.929925
+  duration_ms: 1.764824
   type: 'test'
   ...
 # Subtest: summary counts each track once and uses canonical highest progress
 ok 92 - summary counts each track once and uses canonical highest progress
   ---
-  duration_ms: 0.571437
+  duration_ms: 0.560749
   type: 'test'
   ...
 # Subtest: finish date always makes a legacy row canonical 100 percent
 ok 93 - finish date always makes a legacy row canonical 100 percent
   ---
-  duration_ms: 0.336859
+  duration_ms: 0.318792
   type: 'test'
   ...
 # Subtest: mini player exposes current track metadata to the system media policy
 ok 94 - mini player exposes current track metadata to the system media policy
   ---
-  duration_ms: 1.335344
+  duration_ms: 1.365189
   type: 'test'
   ...
 # Subtest: media session publishes title, speaker, artwork and app album name
 ok 95 - media session publishes title, speaker, artwork and app album name
   ---
-  duration_ms: 0.232273
+  duration_ms: 0.443397
   type: 'test'
   ...
 # Subtest: real speaker portrait is the only artwork candidate so OS cannot prefer app icons
 ok 96 - real speaker portrait is the only artwork candidate so OS cannot prefer app icons
   ---
-  duration_ms: 0.168945
+  duration_ms: 0.194968
   type: 'test'
   ...
 # Subtest: system playback controls support play pause and seeking without desyncing React state
 ok 97 - system playback controls support play pause and seeking without desyncing React state
   ---
-  duration_ms: 0.234999
+  duration_ms: 0.219174
   type: 'test'
   ...
 # Subtest: media session loads before the React bootstrap and PWA exposes monochrome icon
 ok 98 - media session loads before the React bootstrap and PWA exposes monochrome icon
   ---
-  duration_ms: 0.291715
+  duration_ms: 0.311869
   type: 'test'
   ...
 # Subtest: mini player has left shortcuts, themed title and close control
 ok 99 - mini player has left shortcuts, themed title and close control
   ---
-  duration_ms: 1.560966
+  duration_ms: 1.578342
   type: 'test'
   ...
 # Subtest: comment identity layout keeps avatar, time, name and badge readable
 ok 100 - comment identity layout keeps avatar, time, name and badge readable
   ---
-  duration_ms: 0.489555
+  duration_ms: 0.478644
   type: 'test'
   ...
 # Subtest: collapsed comments show triangle direction cues
 ok 101 - collapsed comments show triangle direction cues
   ---
-  duration_ms: 0.189384
+  duration_ms: 0.195098
   type: 'test'
   ...
 # Subtest: mobile menu layout policy is loaded after the base stylesheet
 ok 102 - mobile menu layout policy is loaded after the base stylesheet
   ---
-  duration_ms: 1.341455
+  duration_ms: 1.363005
   type: 'test'
   ...
 # Subtest: mobile drawer stays right aligned, half width, and out of document flow
 ok 103 - mobile drawer stays right aligned, half width, and out of document flow
   ---
-  duration_ms: 0.436846
+  duration_ms: 0.484966
   type: 'test'
   ...
 # Subtest: dark mobile drawer is visually separated from the dark page
 ok 104 - dark mobile drawer is visually separated from the dark page
   ---
-  duration_ms: 0.259224
+  duration_ms: 0.326647
   type: 'test'
   ...
 # Subtest: menu labels are larger while still wrapping as whole Chinese words
 ok 105 - menu labels are larger while still wrapping as whole Chinese words
   ---
-  duration_ms: 0.306643
+  duration_ms: 0.30175
   type: 'test'
   ...
 # Subtest: notification pending badge is placed on its own row
 ok 106 - notification pending badge is placed on its own row
   ---
-  duration_ms: 0.237103
+  duration_ms: 0.330875
   type: 'test'
   ...
 # Subtest: install status is positioned under the install label
 ok 107 - install status is positioned under the install label
   ---
-  duration_ms: 0.232254
+  duration_ms: 0.272675
   type: 'test'
   ...
 # Subtest: mobile install entry always keeps a download arrow on the left
 ok 108 - mobile install entry always keeps a download arrow on the left
   ---
-  duration_ms: 0.368759
+  duration_ms: 0.368496
   type: 'test'
   ...
 # Subtest: palette primary color is synced to browser and standalone PWA chrome
 ok 109 - palette primary color is synced to browser and standalone PWA chrome
   ---
-  duration_ms: 0.19253
+  duration_ms: 0.254561
   type: 'test'
   ...
 # Subtest: mobile hamburger drawer remains the existing React drawer
 ok 110 - mobile hamburger drawer remains the existing React drawer
   ---
-  duration_ms: 1.064889
+  duration_ms: 1.560699
   type: 'test'
   ...
 # Subtest: mobile hamburger drawer uses the right half of the viewport
 ok 111 - mobile hamburger drawer uses the right half of the viewport
   ---
-  duration_ms: 0.318544
+  duration_ms: 0.286682
   type: 'test'
   ...
 # Subtest: only the 新人 category tag receives the rainbow border class
 ok 112 - only the 新人 category tag receives the rainbow border class
   ---
-  duration_ms: 1.255495
+  duration_ms: 0.904318
   type: 'test'
   ...
 # Subtest: newcomer border shows a simultaneous 45-degree seven-color gradient that flows left to right
 ok 113 - newcomer border shows a simultaneous 45-degree seven-color gradient that flows left to right
   ---
-  duration_ms: 0.509422
+  duration_ms: 0.462494
   type: 'test'
   ...
 # Subtest: newcomer keeps its original fill and paints only a true 1px rainbow border
 ok 114 - newcomer keeps its original fill and paints only a true 1px rainbow border
   ---
-  duration_ms: 0.424042
+  duration_ms: 0.502069
   type: 'test'
   ...
 # Subtest: playback memories use stable memberId ownership with legacy aliases kept only for recovery
 ok 115 - playback memories use stable memberId ownership with legacy aliases kept only for recovery
   ---
-  duration_ms: 1.71885
+  duration_ms: 1.678491
   type: 'test'
   ...
 # Subtest: public history resolves the selected member and is independent from the viewer session
 ok 116 - public history resolves the selected member and is independent from the viewer session
   ---
-  duration_ms: 0.306723
+  duration_ms: 0.327699
   type: 'test'
   ...
 # Subtest: legacy device ownership is recovered only when one device maps to one member
 ok 117 - legacy device ownership is recovered only when one device maps to one member
   ---
-  duration_ms: 0.51416
+  duration_ms: 0.502409
   type: 'test'
   ...
 # Subtest: backfill is non-destructive and only fills missing memberId
 ok 118 - backfill is non-destructive and only fills missing memberId
   ---
-  duration_ms: 0.255948
+  duration_ms: 0.267375
   type: 'test'
   ...
 # Subtest: future playback writes canonicalize registered email or id to users.id
 ok 119 - future playback writes canonicalize registered email or id to users.id
   ---
-  duration_ms: 0.262962
+  duration_ms: 0.326557
   type: 'test'
   ...
 # Subtest: local playback claim requires the verified bearer session and cannot trust body email
 ok 120 - local playback claim requires the verified bearer session and cannot trust body email
   ---
-  duration_ms: 0.249626
+  duration_ms: 0.269599
   type: 'test'
   ...
 # Subtest: a device already owned by another member is never transferred
 ok 121 - a device already owned by another member is never transferred
   ---
-  duration_ms: 0.282427
+  duration_ms: 0.369327
   type: 'test'
   ...
 # Subtest: verified device claim imports localStorage progress into canonical member keys
 ok 122 - verified device claim imports localStorage progress into canonical member keys
   ---
-  duration_ms: 0.221603
+  duration_ms: 0.222991
   type: 'test'
   ...
 # Subtest: the browser imports local history after secure login and for an existing verified session
 ok 123 - the browser imports local history after secure login and for an existing verified session
   ---
-  duration_ms: 0.524049
+  duration_ms: 0.663524
   type: 'test'
   ...
 # Subtest: changed local progress is eligible for another safe import instead of a permanent one-time skip
 ok 124 - changed local progress is eligible for another safe import instead of a permanent one-time skip
   ---
-  duration_ms: 0.540731
+  duration_ms: 0.598791
   type: 'test'
   ...
 # Subtest: playback owner stays in the active privacy/member-delete/category/session wrapper chain
 ok 125 - playback owner stays in the active privacy/member-delete/category/session wrapper chain
   ---
-  duration_ms: 0.201085
+  duration_ms: 3.264436
   type: 'test'
   ...
 # Subtest: site declares global noindex and nofollow directives
 ok 126 - site declares global noindex and nofollow directives
   ---
-  duration_ms: 1.180705
+  duration_ms: 1.158518
   type: 'test'
   ...
 # Subtest: robots.txt denies all crawlers and explicitly names major AI crawlers
 ok 127 - robots.txt denies all crawlers and explicitly names major AI crawlers
   ---
-  duration_ms: 0.328474
+  duration_ms: 0.363657
   type: 'test'
   ...
 # Subtest: worker blocks known search and AI crawler user agents
 ok 128 - worker blocks known search and AI crawler user agents
   ---
-  duration_ms: 0.189153
+  duration_ms: 0.220155
   type: 'test'
   ...
 # Subtest: all site requests run through privacy crawler router
 ok 129 - all site requests run through privacy crawler router
   ---
-  duration_ms: 0.201036
+  duration_ms: 0.178136
   type: 'test'
   ...
 # Subtest: new and existing members with any missing basic profile field reopen directly in edit mode on each page entry
 ok 130 - new and existing members with any missing basic profile field reopen directly in edit mode on each page entry
   ---
-  duration_ms: 1.469775
+  duration_ms: 1.051547
   type: 'test'
   ...
 # Subtest: profile edit save decoration is one-time so the mutation observer cannot freeze the page
 ok 131 - profile edit save decoration is one-time so the mutation observer cannot freeze the page
   ---
-  duration_ms: 0.344133
+  duration_ms: 0.168438
   type: 'test'
   ...
 # Subtest: Google sign-in keeps the large animated loading message and hides redundant login copy without removing React nodes
 ok 132 - Google sign-in keeps the large animated loading message and hides redundant login copy without removing React nodes
   ---
-  duration_ms: 0.242603
+  duration_ms: 0.163859
   type: 'test'
   ...
 # Subtest: mobile hamburger owns logout and profile modal logout stays hidden from the rendered UI
 ok 133 - mobile hamburger owns logout and profile modal logout stays hidden from the rendered UI
   ---
-  duration_ms: 0.213439
+  duration_ms: 0.158109
   type: 'test'
   ...
 # Subtest: profile save action remains a high-contrast emerald call to action
 ok 134 - profile save action remains a high-contrast emerald call to action
   ---
-  duration_ms: 0.281686
+  duration_ms: 0.237088
   type: 'test'
   ...
 # Subtest: profile modal receives the loaded member list so upline autocomplete is not empty
 ok 135 - profile modal receives the loaded member list so upline autocomplete is not empty
   ---
-  duration_ms: 1.744348
+  duration_ms: 1.770966
   type: 'test'
   ...
 # Subtest: platinum and diamond fields show related member and existing-upline suggestions while typing or focusing
 ok 136 - platinum and diamond fields show related member and existing-upline suggestions while typing or focusing
   ---
-  duration_ms: 1.47168
+  duration_ms: 1.228831
   type: 'test'
   ...
 # Subtest: public GET history resolves the requested member and never the viewer session
 ok 137 - public GET history resolves the requested member and never the viewer session
   ---
-  duration_ms: 1.34907
+  duration_ms: 7.054035
   type: 'test'
   ...
 # Subtest: public resolver looks up the requested registered member by email or user id
 ok 138 - public resolver looks up the requested registered member by email or user id
   ---
-  duration_ms: 0.266769
+  duration_ms: 0.298554
   type: 'test'
   ...
 # Subtest: v90 is the single current PWA cache version
 ok 139 - v90 is the single current PWA cache version
   ---
-  duration_ms: 2.872385
+  duration_ms: 1.867458
   type: 'test'
   ...
 # Subtest: service worker never caches API responses or personalized share HTML as app shell
 ok 140 - service worker never caches API responses or personalized share HTML as app shell
   ---
-  duration_ms: 0.263211
+  duration_ms: 0.219695
   type: 'test'
   ...
 # Subtest: release verification keeps regression tests and the production build as explicit gates
 ok 141 - release verification keeps regression tests and the production build as explicit gates
   ---
-  duration_ms: 0.323835
+  duration_ms: 0.205938
   type: 'test'
   ...
 # Subtest: preview configuration stays isolated from production storage bindings
 ok 142 - preview configuration stays isolated from production storage bindings
   ---
-  duration_ms: 0.176079
+  duration_ms: 0.118032
   type: 'test'
   ...
-# (node:3007) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (node:2994) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 # (Use `node --trace-warnings ...` to show where the warning was created)
 # Subtest: speaker names use uppercase Hanyu Pinyin with surname pronunciation and hyphens
 ok 143 - speaker names use uppercase Hanyu Pinyin with surname pronunciation and hyphens
   ---
-  duration_ms: 28.471965
+  duration_ms: 28.034759
   type: 'test'
   ...
 # Subtest: public share slug is remembered per track and increments within the same romanized speaker name
 ok 144 - public share slug is remembered per track and increments within the same romanized speaker name
   ---
-  duration_ms: 33.983086
+  duration_ms: 26.721469
   type: 'test'
   ...
 # Subtest: public share route serves the app shell and old t-id routes stay retired
 ok 145 - public share route serves the app shell and old t-id routes stay retired
   ---
-  duration_ms: 3.299683
+  duration_ms: 3.197941
   type: 'test'
   ...
 # Subtest: VIP links use NAME-S001 with a durable 4-digit default password and 4-12 digit custom password
 ok 146 - VIP links use NAME-S001 with a durable 4-digit default password and 4-12 digit custom password
   ---
-  duration_ms: 8.022956
+  duration_ms: 7.701248
   type: 'test'
   ...
 # Subtest: upload modal top controls use cover, audio, permission, VIP order
 ok 147 - upload modal top controls use cover, audio, permission, VIP order
   ---
-  duration_ms: 1.398903
+  duration_ms: 1.521755
   type: 'test'
   ...
 # Subtest: mobile upload controls preserve cover, audio, permission, VIP sequence
 ok 148 - mobile upload controls preserve cover, audio, permission, VIP sequence
   ---
-  duration_ms: 0.510052
+  duration_ms: 0.666419
   type: 'test'
   ...
 # Subtest: R2 cover names stay complete and shrink to fit
 ok 149 - R2 cover names stay complete and shrink to fit
   ---
-  duration_ms: 0.263191
+  duration_ms: 0.3018
   type: 'test'
   ...
 # Subtest: keyword input filters related database candidates and add button is compact
 ok 150 - keyword input filters related database candidates and add button is compact
   ---
-  duration_ms: 0.20335
+  duration_ms: 0.224024
   type: 'test'
   ...
 # Subtest: keyword presentation keeps plain words without check, hash and plus prefixes
 ok 151 - keyword presentation keeps plain words without check, hash and plus prefixes
   ---
-  duration_ms: 0.25173
+  duration_ms: 0.341395
   type: 'test'
   ...
 # Subtest: new uploads clear speech date and series order defaults without affecting edits
 ok 152 - new uploads clear speech date and series order defaults without affecting edits
   ---
-  duration_ms: 0.240549
+  duration_ms: 0.198495
   type: 'test'
   ...
 # Subtest: non VIP explanatory notes are hidden while VIP copy is exempt
 ok 153 - non VIP explanatory notes are hidden while VIP copy is exempt
   ---
-  duration_ms: 0.350215
+  duration_ms: 0.299535
   type: 'test'
   ...
 # Subtest: presentation policy is loaded before the React bootstrap
 ok 154 - presentation policy is loaded before the React bootstrap
   ---
-  duration_ms: 0.282668
+  duration_ms: 0.275009
   type: 'test'
   ...
 # Subtest: VIP share pages retry real audio playback after React selects the shared track
 ok 155 - VIP share pages retry real audio playback after React selects the shared track
   ---
-  duration_ms: 1.275843
+  duration_ms: 1.343898
   type: 'test'
   ...
 # Subtest: blocked audible autoplay never leaves a fake playing animation
 ok 156 - blocked audible autoplay never leaves a fake playing animation
   ---
-  duration_ms: 0.199733
+  duration_ms: 0.208443
   type: 'test'
   ...
 # Subtest: VIP autoplay fallback performs play directly inside the real click handler
 ok 157 - VIP autoplay fallback performs play directly inside the real click handler
   ---
-  duration_ms: 0.298117
+  duration_ms: 0.316298
   type: 'test'
   ...
 1..157
@@ -1645,4 +1645,4 @@ ok 157 - VIP autoplay fallback performs play directly inside the real click hand
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 4342.722968
+# duration_ms 4127.0017
