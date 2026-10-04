@@ -1,0 +1,78 @@
+name: One-off v78 home comment preview
+
+on:
+  push:
+    branches: [feat/home-comment-preview-collapse-v78]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/home-comment-preview-collapse-v78
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply focused patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          preview = Path('src/components/CommentPreviewModal.tsx')
+          text = preview.read_text()
+          anchor = "import { VisitorIdentity } from '../utils/visitor';\n"
+          if "./CollapsibleCommentText" not in text:
+              assert anchor in text, 'CommentPreviewModal import anchor not found'
+              text = text.replace(anchor, anchor + "import { CollapsibleCommentText } from './CollapsibleCommentText';\n", 1)
+          old = '''                  <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed pl-6 whitespace-pre-wrap break-words">{c.replyToAuthor && <span className="text-[11px] text-[var(--color-primary,#c06c84)] font-bold mr-1.5">回覆 @{c.replyToAuthor}：</span>}{renderFormattedContent(c.content)}</div>'''
+          new = '''                  <CollapsibleCommentText
+                    className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed pl-6 whitespace-pre-wrap break-words"
+                    resetKey={`${c.id}:${c.content}`}
+                  >
+                    {c.replyToAuthor && <span className="text-[11px] text-[var(--color-primary,#c06c84)] font-bold mr-1.5">回覆 @{c.replyToAuthor}：</span>}
+                    {renderFormattedContent(c.content)}
+                  </CollapsibleCommentText>'''
+          assert old in text, 'CommentPreviewModal comment display block not found'
+          preview.write_text(text.replace(old, new, 1))
+
+          test = Path('tests/commentCollapse.test.ts')
+          text = test.read_text()
+          member_line = "const member = readFileSync(new URL('../src/components/MemberPreviewModal.tsx', import.meta.url), 'utf8');\n"
+          if "CommentPreviewModal.tsx" not in text:
+              assert member_line in text, 'test member anchor not found'
+              text = text.replace(member_line, member_line + "const homePreview = readFileSync(new URL('../src/components/CommentPreviewModal.tsx', import.meta.url), 'utf8');\n", 1)
+          text = text.replace("test('all three requested web comment surfaces use the shared collapsible renderer'", "test('all requested web comment surfaces use the shared collapsible renderer'")
+          text = text.replace("for (const source of [comments, profile, member])", "for (const source of [comments, profile, member, homePreview])")
+          test.write_text(text)
+
+          changelog = Path('src/changelogReleaseNotes.ts')
+          text = changelog.read_text()
+          old_phrase = '心得留言過長時，音檔詳細頁、自己的個人中心與查閱他人學習資料卡都先顯示前三行'
+          new_phrase = '心得留言過長時，首頁心得快速預覽、音檔詳細頁、自己的個人中心與查閱他人學習資料卡都先顯示前三行'
+          assert old_phrase in text, 'changelog note not found'
+          changelog.write_text(text.replace(old_phrase, new_phrase, 1))
+
+          sw = Path('public/sw.js')
+          text = sw.read_text()
+          assert 'echostars-shell-v77' in text, 'expected v77 cache not found'
+          sw.write_text(text.replace('echostars-shell-v77', 'echostars-shell-v78', 1))
+
+          release = Path('tests/releaseIntegrity.test.ts')
+          text = release.read_text()
+          text = text.replace("test('v77 is the single current PWA cache version'", "test('v78 is the single current PWA cache version'")
+          text = text.replace('echostars-shell-v77', 'echostars-shell-v78')
+          release.write_text(text)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name 'echostars-release-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/components/CommentPreviewModal.tsx tests/commentCollapse.test.ts src/changelogReleaseNotes.ts public/sw.js tests/releaseIntegrity.test.ts
+          git diff --cached --check
+          git commit -m '首頁心得快速預覽同步三行收合'
+          git push origin HEAD:feat/home-comment-preview-collapse-v78
