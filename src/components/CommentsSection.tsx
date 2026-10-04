@@ -257,8 +257,8 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   };
 
   return (
-    <div className="w-full bg-white/70 dark:bg-slate-900/60 rounded-3xl p-5 sm:p-7 border border-rose-100/60 dark:border-slate-800 shadow-xs relative">
-      <div className="flex items-center justify-between mb-4">
+    <div className="w-full bg-white/70 dark:bg-slate-900/60 rounded-3xl p-4 sm:p-5 border border-rose-100/60 dark:border-slate-800 shadow-xs relative leading-snug">
+      <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg sm:text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
           <MessageSquare className="w-5 h-5 text-rose-500" />
           <span>心得收穫</span>
@@ -266,8 +266,8 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
         </h3>
       </div>
 
-      <form onSubmit={handleSubmit} className="mb-8 relative">
-        <div className="bg-slate-50/80 dark:bg-slate-800/60 rounded-2xl p-4 border border-slate-200/70 dark:border-slate-700/60 focus-within:border-rose-400 dark:focus-within:border-rose-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-all relative">
+      <form onSubmit={handleSubmit} className="mb-5 relative">
+        <div className="bg-slate-50/80 dark:bg-slate-800/60 rounded-2xl p-3.5 border border-slate-200/70 dark:border-slate-700/60 focus-within:border-rose-400 dark:focus-within:border-rose-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-all relative">
           {replyingTo && (
             <div className="flex items-center justify-between bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 px-3 py-1.5 rounded-xl text-xs mb-2 border border-rose-200/60 dark:border-rose-900 font-medium">
               <span className="flex items-center gap-1.5"><Reply className="w-3.5 h-3.5" /><span>回覆 @{replyingTo.authorName}</span></span>
@@ -297,28 +297,12 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             </div>
           )}
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200/50 dark:border-slate-700/50 mt-2">
-            <div className="flex items-center gap-2 text-xs sm:text-sm">
-              {currentUser ? (
-                <div className="flex items-center gap-1.5">
-                  <img src={currentUser.avatar} alt={currentUser.name} className="w-5 h-5 rounded-full object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700" />
-                  <span className={`font-bold text-sm ${isAdmin || currentUser.isContributor ? 'rainbow-admin-text' : 'text-slate-800 dark:text-slate-100'}`}>{currentUser.name}</span>
-                  <span className="text-xs text-rose-600 dark:text-rose-400 font-medium">· {currentUser.rank}</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 font-medium">
-                  <span className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-950/60 flex items-center justify-center text-sm shadow-2xs">{visitor.emoji}</span>
-                  <span>{visitor.fullName}</span><span className="text-slate-400 text-xs">· 訪客稱號</span>
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-slate-400 font-mono">{inputText.length}/2000</span>
-              <button type="submit" disabled={isSubmitting || !inputText.trim()} className="px-5 py-2 rounded-xl text-white font-medium text-sm transition-all shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer" style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}>
-                {isSubmitting ? '送出中...' : '送出心得'}
-              </button>
-            </div>
-          </div>
+          <div className="flex items-center justify-end gap-3 pt-2.5 border-t border-slate-200/50 dark:border-slate-700/50 mt-1.5">
+  <span className="text-xs text-slate-400 font-mono">{inputText.length}/2000</span>
+  <button type="submit" disabled={isSubmitting || !inputText.trim()} className="px-5 py-2 rounded-xl text-white font-medium text-sm transition-all shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer" style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}>
+    {isSubmitting ? '送出中…' : '送出'}
+  </button>
+</div>
         </div>
 
         {errorMessage && (
@@ -341,7 +325,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             const displayAuthorName = registeredAuthor?.name || c.authorName;
             const displayAuthorAvatar = registeredAuthor?.avatar || c.authorAvatar;
             const displayAuthorBadge = registeredAuthor ? (registeredAuthor.rank || '無') : null;
-            const showBadge = !!displayAuthorBadge && displayAuthorBadge !== '訪客稱號' && displayAuthorBadge !== '訪客' && displayAuthorBadge !== '無';
+            const showBadge = !!registeredAuthor;
             const userLiked = likeStats[c.id] !== undefined ? likeStats[c.id].hasLiked : (c.likedBy || []).some(k => myKeys.includes(k));
             const userLikesCount = likeStats[c.id] !== undefined ? likeStats[c.id].likes : (c.likes || 0);
             const isAvatarUrl = displayAuthorAvatar && (displayAuthorAvatar.startsWith('http') || displayAuthorAvatar.startsWith('data:'));
@@ -349,15 +333,19 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
 
             return (
               <div id={`comment-${c.id}`} key={c.id} className={`space-y-1 ${isReply ? 'pt-2' : 'pt-3 first:pt-0'}`}>
-                <div className="flex items-center justify-between gap-2 text-xs">
-                  <div onClick={isClickable ? () => handleAuthorClick(c) : undefined} className={`flex items-center gap-1.5 flex-wrap ${isClickable ? 'cursor-pointer hover:opacity-85 transition-opacity' : 'cursor-default pointer-events-none'}`} title={isClickable ? `點擊查看【${displayAuthorName}】會員個人檔案` : undefined}>
-                    {isAvatarUrl ? <img src={displayAuthorAvatar} alt={displayAuthorName} className="w-5 h-5 rounded-full object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700" /> : <span className="text-sm shrink-0">{displayAuthorAvatar || '👤'}</span>}
-                    {c.isAdmin || displayAuthorBadge === '貢獻者' ? <span className="rainbow-admin-text font-bold text-xs">{displayAuthorName}</span> : isClickable ? <span className="font-bold text-slate-800 dark:text-slate-100 text-xs underline decoration-dotted underline-offset-2 hover:text-rose-600 transition-colors">{displayAuthorName}</span> : <span className="font-bold text-slate-700 dark:text-slate-300 text-xs select-none">{displayAuthorName}</span>}
-                    {isVisitor && <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium select-none">訪客</span>}
-                    {showBadge && <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium">{displayAuthorBadge}</span>}
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">{c.timestamp}</span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-start justify-between gap-2">
+        <div onClick={isClickable ? () => handleAuthorClick(c) : undefined} className={`flex items-center gap-2 min-w-0 ${isClickable ? 'cursor-pointer hover:opacity-85 transition-opacity' : 'cursor-default pointer-events-none'}`} title={isClickable ? `點擊查看【${displayAuthorName}】會員個人檔案` : undefined}>
+          {isAvatarUrl ? <img src={displayAuthorAvatar} alt={displayAuthorName} className="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700" /> : <span className="w-10 h-10 rounded-full flex items-center justify-center text-2xl shrink-0">{displayAuthorAvatar || '👤'}</span>}
+          <div className="h-10 min-w-0 flex flex-col justify-center gap-0.5 leading-none">
+            {c.isAdmin || displayAuthorBadge === '貢獻者' ? <span className="rainbow-admin-text font-bold text-sm truncate">{displayAuthorName}</span> : isClickable ? <span className="font-bold text-slate-800 dark:text-slate-100 text-sm underline decoration-dotted underline-offset-2 hover:text-rose-600 transition-colors truncate">{displayAuthorName}</span> : <span className="font-bold text-slate-700 dark:text-slate-300 text-sm select-none truncate">{displayAuthorName}</span>}
+            <div className="flex items-center gap-1 min-w-0">
+              {isVisitor && <span className="text-xs px-1.5 py-0.5 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium select-none">訪客</span>}
+              {showBadge && <span className="text-xs px-1.5 py-0.5 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium truncate">{displayAuthorBadge}</span>}
+              <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono whitespace-nowrap">{c.timestamp}</span>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 shrink-0 pt-0.5">
                     <button type="button" onClick={() => handleLikeComment(c)} className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-lg transition-colors cursor-pointer ${userLiked ? 'text-rose-600 bg-rose-50 dark:bg-rose-950/60 font-bold' : 'text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`} title={userLiked ? '取消讚' : '按讚這則心得'}>
                       <Heart className={`w-3 h-3 ${userLiked ? 'fill-rose-500 text-rose-500' : ''}`} /><span>{userLikesCount > 0 ? userLikesCount : ''}</span>
                     </button>
@@ -368,8 +356,8 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                 </div>
 
                 {editingId === c.id ? (
-                  <div className="mt-1.5 space-y-1.5 pl-5">
-                    <textarea maxLength={2000} value={editContent} onChange={e => setEditContent(e.target.value)} className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/60 text-xs text-slate-800 dark:text-slate-100 outline-hidden" rows={2} />
+                  <div className="mt-1.5 space-y-1.5 pl-12">
+                    <textarea maxLength={2000} value={editContent} onChange={e => setEditContent(e.target.value)} className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/60 text-sm text-slate-800 dark:text-slate-100 outline-hidden" rows={2} />
                     <div className="flex justify-end gap-1.5">
                       <button onClick={() => setEditingId(null)} className="px-2 py-1 rounded-lg text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-1 cursor-pointer"><X className="w-3 h-3" /> 取消</button>
                       <button onClick={() => handleSaveEdit(c.id)} className="px-2.5 py-1 rounded-lg text-xs bg-rose-600 text-white flex items-center gap-1 shadow-2xs font-bold cursor-pointer"><Check className="w-3 h-3" /> 儲存修改</button>
@@ -377,7 +365,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                   </div>
                 ) : (
                   <CollapsibleCommentText
-                    className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed pl-6 whitespace-pre-wrap mt-0.5 break-words"
+                    className="text-base text-slate-700 dark:text-slate-300 leading-snug pl-12 whitespace-pre-wrap mt-1 break-words"
                     resetKey={`${c.id}:${c.content}`}
                   >
                     {c.replyToAuthor && <span className="text-[11px] text-[var(--color-primary,#c06c84)] font-bold mr-1.5">回覆 @{c.replyToAuthor}：</span>}

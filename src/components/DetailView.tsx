@@ -177,11 +177,17 @@ export const DetailView: React.FC<DetailViewProps> = ({
   const [editingKeywordOld, setEditingKeywordOld] = useState<string | null>(null);
   const [editingKeywordNew, setEditingKeywordNew] = useState('');
   const [keywordError, setKeywordError] = useState<string | null>(null);
+  const [showDetailKeywords, setShowDetailKeywords] = useState(false);
 
   useEffect(() => {
     setTrackKeywords(track.keywords || []);
     setKeywordMeta(track.keywordMeta || {});
   }, [track.id, track.keywords, track.keywordMeta]);
+
+  useEffect(() => {
+    setShowDetailKeywords(false);
+    setIsAddingKeyword(false);
+  }, [track.id]);
 
   const loadDbKeywords = async () => {
     try {
@@ -404,6 +410,27 @@ export const DetailView: React.FC<DetailViewProps> = ({
   };
 
   const safeDuration = duration > 0 ? duration : (track.durationSeconds || 600);
+  const scrubberDragAllowedRef = useRef(false);
+
+  const handleScrubberPointerDown = (event: React.PointerEvent<HTMLInputElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const ratio = safeDuration > 0 ? Math.min(1, Math.max(0, currentTime / safeDuration)) : 0;
+    const thumbX = rect.left + rect.width * ratio;
+    const thumbTouchRadius = 28;
+    if (Math.abs(event.clientX - thumbX) > thumbTouchRadius) {
+      scrubberDragAllowedRef.current = false;
+      event.preventDefault();
+      return;
+    }
+    scrubberDragAllowedRef.current = true;
+  };
+
+  const handleScrubberChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!scrubberDragAllowedRef.current) return;
+    onSeek(Number(event.target.value));
+  };
+
+  const finishScrubberDrag = () => { scrubberDragAllowedRef.current = false; };
 
   // v3.7: 五星評價只接受 1~5 星；再次點擊同星級不再取消，避免評價被歸零。
   const handleStarClick = async (score: number) => {
@@ -427,33 +454,32 @@ export const DetailView: React.FC<DetailViewProps> = ({
 
   const categories = track.categories && track.categories.length > 0
     ? track.categories
-    : track.category ? [track.category] : ['未分類'];
+    : track.category ? [track.category] : [];
 
   const displayField = (value?: string | null) => {
     const text = String(value || '').trim();
-    return text || '未填寫';
+    return text;
   };
 
   const formatChineseDate = (value?: string | null) => {
     const raw = String(value || '').trim();
-    if (!raw) return '未填寫';
+    if (!raw) return '';
     const match = raw.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
     if (!match) return raw;
     return `${Number(match[1])}年${Number(match[2])}月${Number(match[3])}日`;
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-3.5 py-3 sm:px-6 space-y-4 pb-28">
+    <div className="max-w-2xl mx-auto px-3.5 py-3 sm:px-6 space-y-3 pb-28 leading-snug">
       {/* Requirement 5.7 (v2.7): 「網友關鍵字」往上移動到頁面的最上面 */}
       <div className="relative rounded-2xl p-3 sm:p-4 bg-white/80 dark:bg-slate-900/80 border border-amber-200/70 dark:border-slate-800 shadow-2xs backdrop-blur-xs">
         <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800 dark:text-slate-200">
-            <span>網友關鍵字</span>
-            <span className="text-[10px] text-slate-400 font-normal">
-              ({trackKeywords.length}/50 組)
-            </span>
-          </div>
-          {canAddKeywords && !isAddingKeyword && (
+          <button type="button" onClick={() => setShowDetailKeywords(prev => !prev)} className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-bold text-sm text-slate-800 dark:text-slate-200 text-left cursor-pointer">
+  <span>網友關鍵字</span>
+  <span className="text-xs text-slate-400 font-normal">({trackKeywords.length}/50 組)</span>
+  <span className="text-sm font-bold text-slate-400">{showDetailKeywords ? '▲ 收起' : '▼ 展開'}</span>
+</button>
+{showDetailKeywords && canAddKeywords && !isAddingKeyword && (
             <button
               type="button"
               onClick={() => {
@@ -469,7 +495,7 @@ export const DetailView: React.FC<DetailViewProps> = ({
         </div>
 
         {/* Keywords Tag Chips List */}
-        <div className="flex flex-wrap gap-x-1 gap-y-0.5 items-center">
+        <div className={`${showDetailKeywords ? 'flex' : 'hidden'} flex-wrap gap-x-1 gap-y-0.5 items-center`}>
           {trackKeywords.length === 0 ? (
             <span className="text-[11px] text-slate-400 italic">尚未設定網友關鍵字</span>
           ) : (
@@ -564,9 +590,9 @@ export const DetailView: React.FC<DetailViewProps> = ({
           )}
         </div>
 
-        {keywordError && !isAddingKeyword && <p role="alert" className="text-xs text-rose-600 mt-1">{keywordError}</p>}
+        {showDetailKeywords && keywordError && !isAddingKeyword && <p role="alert" className="text-xs text-rose-600 mt-1">{keywordError}</p>}
         {/* Inline Add Keyword Box - Requirement 5.10 (v2.7): 手機小裝置確保輸入框與 X 按鈕良好點擊而不被擠壓溢出 */}
-        {isAddingKeyword && (
+        {showDetailKeywords && isAddingKeyword && (
           <div className="mt-2.5 p-2 sm:p-2.5 rounded-2xl bg-amber-50/90 dark:bg-slate-800/90 border border-amber-200 dark:border-slate-700 space-y-2 animate-in fade-in max-w-full overflow-hidden">
             <div className="flex items-center gap-1.5 w-full min-w-0">
               <input
@@ -789,15 +815,20 @@ export const DetailView: React.FC<DetailViewProps> = ({
             max={safeDuration}
             step={0.5}
             value={currentTime}
-            onChange={e => onSeek(Number(e.target.value))}
-            className="audio-scrubber w-full h-1.5 cursor-pointer"
+            onPointerDown={handleScrubberPointerDown}
+            onPointerUp={finishScrubberDrag}
+            onPointerCancel={finishScrubberDrag}
+            onBlur={finishScrubberDrag}
+            onKeyDown={event => event.preventDefault()}
+            onChange={handleScrubberChange}
+            className="audio-scrubber w-full h-1.5 cursor-grab active:cursor-grabbing"
+            aria-label="播放進度，請拖曳目前播放位置的圓點調整"
           />
-          <div className="flex justify-between items-center text-xs font-mono text-slate-500 dark:text-slate-400 px-0.5">
-            <span>{formatTime(currentTime)} / {formatTime(safeDuration)}</span>
-            <span className="text-[11px] text-slate-400">
-              {Math.round((currentTime / safeDuration) * 100)}%
-            </span>
-          </div>
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center text-xs font-mono text-slate-500 dark:text-slate-400 px-0.5">
+  <span aria-hidden="true" />
+  <span className="justify-self-center text-center">{formatTime(currentTime)} / {formatTime(safeDuration)}</span>
+  <span className="justify-self-end text-[11px] text-slate-400">{Math.round((currentTime / safeDuration) * 100)}%</span>
+</div>
         </div>
 
         {/* Controls: 倒退30/10秒、播放/暫停、快轉10/30秒 */}
@@ -907,13 +938,10 @@ export const DetailView: React.FC<DetailViewProps> = ({
       )}
 
       {/* Description & Metadata Card */}
-      <div className="relative bg-white/80 dark:bg-slate-900/80 rounded-2xl p-4 border border-rose-100/60 dark:border-slate-800 shadow-xs space-y-2.5 text-xs overflow-hidden">
+      <div className="relative bg-white/80 dark:bg-slate-900/80 rounded-2xl p-3.5 border border-rose-100/60 dark:border-slate-800 shadow-xs space-y-2 text-xs overflow-hidden">
         <TwinklingStars density="subtle" className="opacity-40 dark:opacity-60" />
-        <div className="relative z-10 space-y-2.5">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-              演講資訊與備註
-            </h3>
+        <div className="relative z-10 space-y-2">
+          <div className="flex items-center justify-end">
             {/* Requirement 5.13: 按下編輯按鈕時，非原地編輯，改成跳轉「後台管理」 > 「編輯音檔」的相同視窗介面 */}
             {canEditTrack && (
               <button
@@ -929,15 +957,15 @@ export const DetailView: React.FC<DetailViewProps> = ({
                 title="跳轉編輯音檔視窗介面"
               >
                 <Edit3 className="w-3.5 h-3.5 text-rose-500" />
-                <span>編輯演講資訊與連結</span>
+                <span>編輯</span>
               </button>
             )}
           </div>
-          <p className="text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+          <p className="text-slate-600 dark:text-slate-300 leading-snug whitespace-pre-wrap">
             {displayField(track.description)}
           </p>
 
-          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500">
+          <div className="grid grid-cols-2 gap-x-2 gap-y-1 pt-1.5 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500">
             {/* Requirement 5.9 (v2.7): 演講資訊與備註新增：上傳者的名字 */}
             <div>
               <span className="text-slate-400">上傳者：</span>
@@ -947,11 +975,11 @@ export const DetailView: React.FC<DetailViewProps> = ({
               <span className="text-slate-400">系列：</span>
               <span className="font-medium text-slate-700 dark:text-slate-300">{displayField(track.series)}</span>
             </div>
-            <div className="col-start-2 row-start-1 text-right whitespace-nowrap">
+            <div className="col-start-2 row-start-1 flex items-baseline gap-1 whitespace-nowrap">
               <span className="text-slate-400">演講日期：</span>
               <span className="font-medium text-slate-700 dark:text-slate-300">{formatChineseDate(track.speechDate)}</span>
             </div>
-            <div className="col-start-2 row-start-2 text-right whitespace-nowrap">
+            <div className="col-start-2 row-start-2 flex items-baseline gap-1 whitespace-nowrap">
               <span className="text-slate-400">上傳日期：</span>
               <span className="font-medium text-slate-700 dark:text-slate-300">{formatChineseDate(track.uploadDate)}</span>
             </div>
