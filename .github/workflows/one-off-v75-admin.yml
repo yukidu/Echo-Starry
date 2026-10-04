@@ -1,0 +1,70 @@
+name: One-off v75 admin patch
+
+on:
+  push:
+    branches:
+      - fix/profile-autoedit-member-delete-v75
+    paths:
+      - .github/workflows/one-off-v75-admin.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/profile-autoedit-member-delete-v75
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Patch AdminModal directly in React
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/AdminModal.tsx')
+          s = p.read_text()
+
+          s = s.replace(
+          """  const isEffectiveAdmin =\n    isAdmin ||\n    cleanEmail === 'yukidu@gmail.com' ||\n    currentUser?.role === '超級管理員' ||\n    currentUser?.id === 'u-admin';\n""",
+          """  const isEffectiveAdmin =\n    isAdmin ||\n    cleanEmail === 'yukidu@gmail.com' ||\n    currentUser?.role === '超級管理員' ||\n    currentUser?.id === 'u-admin';\n  // Destructive member deletion is intentionally stricter than the broader admin UI.\n  // Only the single verified super-admin email may even see the control.\n  const isSuperAdminAccount = cleanEmail === 'yukidu@gmail.com';\n""")
+
+          s = s.replace(
+          """  const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null);\n  const [isDeleting, setIsDeleting] = useState(false);\n""",
+          """  const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null);\n  const [isDeleting, setIsDeleting] = useState(false);\n  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);\n  const [isDeletingUser, setIsDeletingUser] = useState(false);\n""")
+
+          marker = """  // Batch Selection Handlers\n"""
+          handler = """  const handleDeleteUser = async (user: UserProfile) => {\n    if (!isSuperAdminAccount || isDeletingUser) return;\n    if (user.email?.toLowerCase().trim() === 'yukidu@gmail.com') return;\n    setIsDeletingUser(true);\n    try {\n      const res = await fetch(`/api/admin/users/${encodeURIComponent(user.id)}`, {\n        method: 'DELETE',\n        cache: 'no-store'\n      });\n      const data = await res.json().catch(() => ({}));\n      if (!res.ok) throw new Error(data.error || '刪除會員失敗');\n      setDeletingUserId(null);\n      window.location.reload();\n    } catch (error) {\n      alert(error instanceof Error ? error.message : '刪除會員失敗，請稍後再試');\n    } finally {\n      setIsDeletingUser(false);\n    }\n  };\n\n"""
+          if handler not in s:
+              s = s.replace(marker, handler + marker)
+
+          anchor = """                              <button\n                                onClick={e => {\n                                  e.stopPropagation();\n                                  onToggleBlockUser(u.id);\n                                }}\n                                className={`px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-colors ${\n                                  u.isBlocked\n                                    ? 'bg-emerald-500 text-white font-bold'\n                                    : 'bg-white/20 text-white hover:bg-white/30'\n                                }`}\n                              >\n                                {u.isBlocked ? <Unlock className=\"w-3.5 h-3.5\" /> : <Lock className=\"w-3.5 h-3.5\" />}\n                                <span>{u.isBlocked ? '解鎖' : '封鎖'}</span>\n                              </button>\n"""
+          addition = anchor + """\n                              {/* Permanent member deletion - exact super-admin account only. */}\n                              {isSuperAdminAccount && u.email?.toLowerCase().trim() !== 'yukidu@gmail.com' && (\n                                deletingUserId === u.id ? (\n                                  <div\n                                    className=\"flex items-center gap-1 bg-rose-950/55 p-1 rounded-xl border border-white/30\"\n                                    onClick={e => e.stopPropagation()}\n                                  >\n                                    <span className=\"text-[10px] text-white font-black\">確定刪除會員？</span>\n                                    <button\n                                      type=\"button\"\n                                      disabled={isDeletingUser}\n                                      onClick={e => {\n                                        e.stopPropagation();\n                                        void handleDeleteUser(u);\n                                      }}\n                                      className=\"px-2 py-0.5 rounded-lg bg-rose-700 hover:bg-rose-800 text-white text-[10px] font-black disabled:opacity-50\"\n                                    >\n                                      {isDeletingUser ? '刪除中…' : '確認'}\n                                    </button>\n                                    <button\n                                      type=\"button\"\n                                      disabled={isDeletingUser}\n                                      onClick={e => {\n                                        e.stopPropagation();\n                                        setDeletingUserId(null);\n                                      }}\n                                      className=\"px-1.5 py-0.5 rounded-lg bg-white/20 text-white text-[10px] font-bold disabled:opacity-50\"\n                                    >\n                                      取消\n                                    </button>\n                                  </div>\n                                ) : (\n                                  <button\n                                    type=\"button\"\n                                    onClick={e => {\n                                      e.stopPropagation();\n                                      setDeletingUserId(u.id);\n                                    }}\n                                    title=\"永久刪除此會員帳號（僅超級管理員）\"\n                                    className=\"px-2 py-1 rounded-lg bg-rose-700 hover:bg-rose-800 text-white flex items-center gap-1 text-[11px] font-black transition-colors\"\n                                  >\n                                    <Trash2 className=\"w-3.5 h-3.5\" />\n                                    <span>刪除</span>\n                                  </button>\n                                )\n                              )}\n"""
+          if "確定刪除會員？" not in s:
+              if anchor not in s:
+                  raise SystemExit('block-button anchor not found')
+              s = s.replace(anchor, addition, 1)
+
+          required = [
+              "const isSuperAdminAccount = cleanEmail === 'yukidu@gmail.com'",
+              'const [deletingUserId, setDeletingUserId]',
+              'const handleDeleteUser = async (user: UserProfile)',
+              '確定刪除會員？',
+              '/api/admin/users/'
+          ]
+          for text in required:
+              if text not in s:
+                  raise SystemExit(f'missing expected patch: {text}')
+          p.write_text(s)
+          PY
+      - name: Remove one-off workflow and commit patch
+        run: |
+          git rm .github/workflows/one-off-v75-admin.yml
+          git config user.name "echostars-release-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/components/AdminModal.tsx
+          git commit -m "新增超級管理員刪除會員按鈕"
+          git push origin HEAD:fix/profile-autoedit-member-delete-v75
