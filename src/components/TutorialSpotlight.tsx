@@ -147,12 +147,12 @@ export const TutorialSpotlight: React.FC<TutorialSpotlightProps> = ({
   const edge = isPhone ? 8 : 12;
 
   const widthFor = (key: string) => {
-    if (key === 'visitor') return isPhone ? 190 : isTablet ? 238 : 286;
+    if (key === 'visitor') return isPhone ? 226 : isTablet ? 250 : 286;
     return isPhone ? 134 : isTablet ? 154 : 170;
   };
 
   const heightFor = (key: string) => {
-    if (key === 'visitor') return isPhone ? 94 : isTablet ? 82 : 78;
+    if (key === 'visitor') return isPhone ? 176 : isTablet ? 160 : 150;
     return isPhone ? 54 : 56;
   };
 
@@ -196,34 +196,28 @@ export const TutorialSpotlight: React.FC<TutorialSpotlightProps> = ({
   const controlWidth = Math.min(isPhone ? 278 : 286, viewport.width - 24);
   const controlHeight = isPhone ? 134 : 124;
 
-  let controlTop = isPhone
-    ? viewport.height - controlHeight - 12
-    : viewport.height / 2 - controlHeight / 2;
+  let controlTop = viewport.height / 2 - controlHeight / 2;
 
-  // On small phones the shared control must not cover the first photo or its callout.
+  // On phones the shared control follows the photo instruction instead of
+  // sticking to the bottom of the viewport. Resize/orientation updates above
+  // recalculate both positions together whenever the visible height changes.
   if (isPhone) {
     const photo = positions.find(item => item.target.key === 'photo');
     if (photo) {
-      const avoid = {
-        left: Math.min(photo.rect.left, photo.position.left) - 8,
-        top: Math.min(photo.rect.top, photo.position.top) - 8,
-        right: Math.max(photo.rect.right, photo.position.left + photo.position.width) + 8,
-        bottom: Math.max(photo.rect.bottom, photo.position.top + photo.position.height) + 8
-      };
-      const controlBox = {
-        left: viewport.width / 2 - controlWidth / 2,
-        top: controlTop,
-        right: viewport.width / 2 + controlWidth / 2,
-        bottom: controlTop + controlHeight
-      };
-
-      if (overlaps(controlBox, avoid, 6)) {
-        controlTop = clamp(
-          avoid.top - controlHeight - 14,
-          12,
-          viewport.height - controlHeight - 12
-        );
-      }
+      const belowPhotoCallout = photo.position.top + photo.position.height + 16;
+      const abovePhotoCallout = photo.position.top - controlHeight - 16;
+      const roomBelow = belowPhotoCallout + controlHeight <= viewport.height - 12;
+      controlTop = clamp(
+        roomBelow ? belowPhotoCallout : abovePhotoCallout,
+        12,
+        viewport.height - controlHeight - 12
+      );
+    } else {
+      controlTop = clamp(
+        viewport.height * 0.56,
+        12,
+        viewport.height - controlHeight - 12
+      );
     }
   }
 
@@ -369,7 +363,7 @@ export const TutorialSpotlight: React.FC<TutorialSpotlightProps> = ({
             style={{
               fontSize: isPhone ? 13 : 14,
               lineHeight: 1.3,
-              whiteSpace: 'normal',
+              whiteSpace: 'pre-line',
               wordBreak: 'keep-all',
               overflowWrap: 'break-word'
             }}
@@ -393,7 +387,7 @@ export const TutorialSpotlight: React.FC<TutorialSpotlightProps> = ({
             onChange={event => onNeverRemindChange(event.target.checked)}
             className="w-8 h-8 rounded-lg border-white/70 accent-white cursor-pointer shrink-0"
           />
-          <span className="font-black text-sm sm:text-base">打勾不再提醒</span>
+          <span className="font-black text-sm sm:text-base">打勾不再顯示新手教學</span>
         </label>
         <button
           type="button"
