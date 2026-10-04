@@ -126,6 +126,65 @@ function writeHomeCache(tracks: Track[], categories: string[], savedAt = Date.no
   }
 }
 
+
+function trackMatchesHomeKeyword(track: Track, rawKeyword: string) {
+  const clean = rawKeyword.toLowerCase().trim();
+  if (!clean) return true;
+  const allKeywords = [...(track.keywords || []), ...(track.tags || [])].map(keyword => keyword.toLowerCase().trim());
+  return (
+    allKeywords.some(keyword => keyword.includes(clean)) ||
+    track.title.toLowerCase().includes(clean) ||
+    (track.speaker || '').toLowerCase().includes(clean) ||
+    (track.description || '').toLowerCase().includes(clean) ||
+    (track.series || '').toLowerCase().includes(clean)
+  );
+}
+
+function trackMatchesHomeSearch(track: Track, rawQuery: string) {
+  const tokens = rawQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+  const allKeywords = [...(track.keywords || []), ...(track.tags || [])].map(keyword => keyword.toLowerCase());
+  return tokens.every(token => (
+    track.title.toLowerCase().includes(token) ||
+    (track.speaker || '').toLowerCase().includes(token) ||
+    (track.speakerRank || '').toLowerCase().includes(token) ||
+    (track.series || '').toLowerCase().includes(token) ||
+    (track.description || '').toLowerCase().includes(token) ||
+    (track.remarks || '').toLowerCase().includes(token) ||
+    (track.category || '').toLowerCase().includes(token) ||
+    (track.categories || []).some(category => category.toLowerCase().includes(token)) ||
+    [
+      track.speechDate,
+      track.uploadDate,
+      track.seriesOrder,
+      track.requiredRank,
+      track.uploaderName,
+      track.uploaderEmail,
+      track.audioUrl,
+      track.duration,
+      ...(track.externalFiles || []).flatMap(file => [file.name, file.url]),
+      ...(track.externalVideos || []).flatMap(file => [file.name, file.url]),
+      ...(track.externalPpts || []).flatMap(file => [file.name, file.url])
+    ].some(value => value?.toLowerCase().includes(token)) ||
+    allKeywords.some(keyword => keyword.includes(token))
+  ));
+}
+
+function trackMatchesHomeBaseFilters(
+  track: Track,
+  selectedCategory: string,
+  selectedSpeakerRank: string,
+  searchQuery: string
+) {
+  if (selectedCategory !== '全部') {
+    const matchPrimary = track.category === selectedCategory;
+    const matchMultiple = Boolean(track.categories?.includes(selectedCategory));
+    if (!matchPrimary && !matchMultiple) return false;
+  }
+  if (selectedSpeakerRank !== '全部' && baseSpeakerRank(track.speakerRank || '') !== selectedSpeakerRank) return false;
+  return trackMatchesHomeSearch(track, searchQuery);
+}
+
 export default function App() {
   // Navigation & View States
   const [currentTab, setCurrentTab] = useState<NavTab>('home');
@@ -1636,54 +1695,32 @@ export default function App() {
     }
   };
 
+  // Dynamic keyword result counts: selected keywords are AND conditions.
+  // For an unselected keyword, show how many tracks would remain if the user adds it.
+  // For a selected keyword, show the current intersection result count.
+  const keywordMatchCounts = useMemo(() => {
+    const baseTracks = (Array.isArray(tracks) ? tracks : []).filter(track =>
+      trackMatchesHomeBaseFilters(track, selectedCategory, selectedSpeakerRank, searchQuery)
+    );
+
+    return allAvailableKeywords.reduce<Record<string, number>>((counts, keyword) => {
+      const activeKeywords = selectedKeywords.includes(keyword)
+        ? selectedKeywords
+        : [...selectedKeywords, keyword];
+      counts[keyword] = baseTracks.filter(track =>
+        activeKeywords.every(activeKeyword => trackMatchesHomeKeyword(track, activeKeyword))
+      ).length;
+      return counts;
+    }, {});
+  }, [tracks, allAvailableKeywords, selectedCategory, selectedSpeakerRank, selectedKeywords, searchQuery]);
+
   // Filtered & Sorted Tracks List (Requirement 18 & 19 & Requirement 6: 多組網友關鍵字交叉複合搜尋)
   const filteredTracks = useMemo(() => {
     const trackList = Array.isArray(tracks) ? tracks : [];
     return trackList
       .filter(t => {
-        if (selectedCategory !== '全部') {
-          const matchPrimary = t.category === selectedCategory;
-          const matchMultiple = t.categories && t.categories.includes(selectedCategory);
-          if (!matchPrimary && !matchMultiple) return false;
-        }
-
-        if (selectedSpeakerRank !== '全部' && baseSpeakerRank(t.speakerRank || '') !== selectedSpeakerRank) return false;
-
-        // Multi-keyword intersection cross-search (Requirement 6)
-        if (selectedKeywords.length > 0) {
-          const allKeywords = [...(t.keywords || []), ...(t.tags || [])].map(k => k.toLowerCase().trim());
-          const matchesAll = selectedKeywords.every(sk => {
-            const clean = sk.toLowerCase().trim();
-            return (
-              allKeywords.some(k => k.includes(clean)) ||
-              t.title.toLowerCase().includes(clean) ||
-              (t.speaker || '').toLowerCase().includes(clean) ||
-              (t.description || '').toLowerCase().includes(clean) ||
-              (t.series || '').toLowerCase().includes(clean)
-            );
-          });
-          if (!matchesAll) return false;
-        }
-
-        if (searchQuery.trim()) {
-          const tokens = searchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
-          const allKeywords = [...(t.keywords || []), ...(t.tags || [])].map(k => k.toLowerCase());
-          const matchAllTokens = tokens.every(token => {
-            return (
-              t.title.toLowerCase().includes(token) ||
-              t.speaker.toLowerCase().includes(token) ||
-              (t.speakerRank || '').toLowerCase().includes(token) ||
-              (t.series || '').toLowerCase().includes(token) ||
-              (t.description || '').toLowerCase().includes(token) ||
-              (t.remarks || '').toLowerCase().includes(token) ||
-              (t.category || '').toLowerCase().includes(token) ||
-              (t.categories || []).some(c => c.toLowerCase().includes(token)) ||
-              [t.speechDate, t.uploadDate, t.seriesOrder, t.requiredRank, t.uploaderName, t.uploaderEmail, t.audioUrl, t.duration, ...(t.externalFiles||[]).flatMap(f=>[f.name,f.url]), ...(t.externalVideos||[]).flatMap(f=>[f.name,f.url]), ...(t.externalPpts||[]).flatMap(f=>[f.name,f.url])].some(value=>value?.toLowerCase().includes(token)) ||
-              allKeywords.some(k => k.includes(token))
-            );
-          });
-          if (!matchAllTokens) return false;
-        }
+        if (!trackMatchesHomeBaseFilters(t, selectedCategory, selectedSpeakerRank, searchQuery)) return false;
+        if (selectedKeywords.length > 0 && !selectedKeywords.every(keyword => trackMatchesHomeKeyword(t, keyword))) return false;
         return true;
       })
       .sort((a, b) => {
@@ -2087,13 +2124,13 @@ export default function App() {
                                   setSelectedKeywords(prev => isSelected ? prev.filter(k => k !== kw) : [...prev, kw]);
                                   setIsSearchFocused(false);
                                 }}
-                                className={`px-2.5 py-1 rounded-xl text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                                className={`px-2.5 py-1 rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center gap-1 ${
                                   isSelected
                                     ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 font-bold'
                                     : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-slate-700'
                                 }`}
                               >
-                                <span>🔍 {kw}</span>
+                                <span>🔍 {kw}({keywordMatchCounts[kw] ?? 0})</span>
                                 {isSelected && <span className="text-[10px] text-amber-600 font-bold">✓</span>}
                               </button>
                             );
@@ -2124,9 +2161,9 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setShowKeywordsDrawer(prev => !prev)}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 transition-colors cursor-pointer"
+                  className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm font-bold text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 transition-colors cursor-pointer text-left"
                 >
-                  <span>網友關鍵字</span>
+                  <span>網友關鍵字（可複選多個條件）</span>
                   <span className="text-[10px] text-slate-400">
                     {showKeywordsDrawer ? '▲ 收起' : '▼ 展開'}
                   </span>
@@ -2169,13 +2206,13 @@ export default function App() {
                                 isSelected ? prev.filter(k => k !== kw) : [...prev, kw]
                               );
                             }}
-                            className={`px-1.5 py-0.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer border ${
+                            className={`px-2 py-1 rounded-lg text-sm font-semibold transition-colors cursor-pointer border ${
                               isSelected
                                 ? 'bg-amber-600 text-white border-amber-600'
                                 : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-amber-50 dark:hover:bg-slate-800'
                             }`}
                           >
-                            <span>{kw}</span>
+                            <span>{kw}({keywordMatchCounts[kw] ?? 0})</span>
                           </button>
                         );
                       })
@@ -2190,9 +2227,9 @@ export default function App() {
                   {selectedKeywords.map(kw => (
                     <span
                       key={kw}
-                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-200 border border-amber-300/80 dark:border-amber-700"
+                      className="inline-flex items-center gap-0.5 px-2 py-1 rounded-full text-sm font-semibold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-200 border border-amber-300/80 dark:border-amber-700"
                     >
-                      <span>{kw}</span>
+                      <span>{kw}({keywordMatchCounts[kw] ?? 0})</span>
                       <button
                         type="button"
                         onClick={() => setSelectedKeywords(prev => prev.filter(k => k !== kw))}
