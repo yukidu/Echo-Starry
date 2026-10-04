@@ -36,3 +36,5 @@ jobs:
           git add -A
           git commit -m "修復上傳封面圖庫與 R2 同步"
           git push origin HEAD:fix/upload-cover-library-r2-v95
+
+# retry: parser-safe cover library assertions
