@@ -15,6 +15,7 @@ test('long web comments collapse to three lines and can expand/collapse', () => 
   assert.match(collapsible, /moreLabel = '更多'/);
   assert.match(collapsible, /lessLabel = '收起'/);
   assert.match(collapsible, /aria-expanded=\{expanded\}/);
+  assert.match(collapsible, /mt-1 ml-auto block w-fit/);
 });
 
 test('all requested web comment surfaces use the shared collapsible renderer', () => {
