@@ -1,0 +1,36 @@
+name: One-off v88 comment layout
+
+on:
+  push:
+    branches: [fix/comment-time-layout-v88]
+    paths:
+      - .github/workflows/one-off-v88-comment-layout.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/comment-time-layout-v88
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply source patch
+        run: python scripts/patch-v88-comment-layout.py
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Full regression suite
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Commit patch
+        run: |
+          git config user.name echostars-release-bot
+          git config user.email actions@users.noreply.github.com
+          git add shared/commentTime.ts src/components/CommentsSection.tsx tests/commentTimestamp.test.ts public/sw.js tests/releaseIntegrity.test.ts src/changelogReleaseNotes.ts
+          git commit -m "調整留言時間版面與按讚操作" || exit 0
+          git push
