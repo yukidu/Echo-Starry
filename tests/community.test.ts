@@ -280,7 +280,7 @@ test('VIP metadata persists through duration changes and token reset', async () 
   db.sqlite.close();
 });
 
-test('offline audio cleanup removes completed and stale cached objects', async () => {
+test('offline audio cleanup keeps completed files and removes only stale cached objects', async () => {
   const offline = await import('../src/utils/offlineAudio');
   const previous = { window: globalThis.window, localStorage: globalThis.localStorage, caches: globalThis.caches };
   const memory = new Map<string, string>();
@@ -299,14 +299,15 @@ test('offline audio cleanup removes completed and stale cached objects', async (
     });
     offline.handleTrackProgressOffline('a', 96, 100);
     await Promise.resolve(); await Promise.resolve();
-    assert.deepEqual(removed, ['https://audio.example/a.mp3']);
+    assert.deepEqual(removed, []);
+    assert.equal(offline.getOfflineRegistry().a.completed, true);
 
     offline.saveOfflineRegistry({
       b: { trackId: 'b', audioUrl: 'https://audio.example/b.mp3', cachedAt: 0, lastListenedAt: Date.now() - 16 * 86400000 }
     });
     assert.equal(offline.purgeStaleOfflineTracks(), 1);
     await Promise.resolve(); await Promise.resolve();
-    assert.equal(removed[1], 'https://audio.example/b.mp3');
+    assert.equal(removed[0], 'https://audio.example/b.mp3');
   } finally {
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) delete (globalThis as any)[key];
