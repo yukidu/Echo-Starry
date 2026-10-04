@@ -1,0 +1,39 @@
+name: One-off v92 type fix
+
+on:
+  push:
+    branches: [feat/home-default-random-lucky-draw-v92]
+    paths:
+      - .github/workflows/one-off-v92-type-fix.yml
+      - scripts/patch-v92-type-fix.py
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/home-default-random-lucky-draw-v92
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply type fix
+        run: python scripts/patch-v92-type-fix.py
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Full regression suite
+        run: npm test
+      - name: TypeScript diagnostic
+        run: npx tsc --noEmit --pretty false
+      - name: Production build
+        run: npm run build
+      - name: Commit patch
+        run: |
+          git config user.name echostars-release-bot
+          git config user.email actions@users.noreply.github.com
+          git add src/App.tsx
+          git commit -m "修正首頁預設排序時間參數型別" || exit 0
+          git push
