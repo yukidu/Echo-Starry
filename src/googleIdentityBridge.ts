@@ -309,7 +309,7 @@ function simplifyLoginPanel(legacyButton: HTMLButtonElement) {
   if (!actionCard || !loginContainer) return;
 
   Array.from(loginContainer.children).forEach(child => {
-    if (child !== actionCard) child.remove();
+    if (child !== actionCard) (child as HTMLElement).style.display = 'none';
   });
   Array.from(actionCard.children).forEach(child => {
     if (child === legacyButton || (child as HTMLElement).dataset?.echostarsGoogleIdentity === '1') return;
@@ -317,7 +317,7 @@ function simplifyLoginPanel(legacyButton: HTMLButtonElement) {
     if (
       text.includes('使用 Google 官方帳號進行安全驗證與身分綁定') ||
       text.includes('初次登入將自動建立專屬帳號')
-    ) child.remove();
+    ) (child as HTMLElement).style.display = 'none';
   });
   actionCard.style.padding = '16px';
   loginContainer.style.paddingTop = '24px';
@@ -401,12 +401,12 @@ function normalizeProfileModalUx() {
   const profileRoot = roots.find(root => root.querySelector('h2')?.textContent?.trim() === '個人中心');
   if (!profileRoot) return;
 
-  profileRoot.querySelector<HTMLButtonElement>('button[title="登出目前帳號"]')?.remove();
+  const logoutButton = profileRoot.querySelector<HTMLButtonElement>('button[title="登出目前帳號"]');
+  if (logoutButton) logoutButton.style.display = 'none';
 
   const headerButtons = Array.from(profileRoot.querySelectorAll<HTMLButtonElement>('button'));
-  const saveButton = headerButtons.find(button => button.textContent?.trim() === '儲存');
-  if (saveButton && saveButton.dataset.echostarsProminentSave !== '1') {
-    saveButton.dataset.echostarsProminentSave = '1';
+  const saveButton = headerButtons.find(button => ['儲存', '儲存資料'].includes(button.textContent?.trim() || ''));
+  if (saveButton) {
     saveButton.textContent = '儲存資料';
     saveButton.style.background = '#10b981';
     saveButton.style.color = '#ffffff';
