@@ -2569,6 +2569,7 @@ export default function App() {
         }}
         onRateTrack={(trackId, score) => handleRateTrack(trackId, score)}
         onClearListeningHistory={handleClearListeningHistory}
+        allUsers={allUsers}
       />
       </Suspense>}
 
