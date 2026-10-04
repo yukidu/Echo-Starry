@@ -384,3 +384,82 @@ input[type="range"].audio-scrubber::-moz-range-thumb {
     min-width: 0;
   }
 }
+
+
+/* Home lucky draw v92 */
+.audio-card-grid > .lucky-card {
+  transition: filter 150ms ease, opacity 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+  border-radius: 1.5rem;
+}
+
+.audio-card-grid.lucky-spin-active > .lucky-card {
+  filter: brightness(0.34) saturate(0.55);
+  opacity: 0.48;
+  transform: scale(0.975);
+}
+
+.audio-card-grid.lucky-spin-active > .lucky-card:nth-child(2) {
+  filter: brightness(1.18) saturate(1.2);
+  opacity: 1;
+  transform: scale(1.025);
+  z-index: 20;
+  box-shadow: 0 0 0 3px var(--color-primary, #c06c84), 0 0 30px var(--color-primary, #c06c84);
+  animation: echostars-lucky-scan 240ms ease-in-out infinite alternate;
+}
+
+.audio-card-grid.lucky-win-active > .lucky-card {
+  filter: brightness(0.48) saturate(0.7);
+  opacity: 0.58;
+}
+
+.audio-card-grid.lucky-win-active > .lucky-card[data-lucky-winner="true"] {
+  filter: brightness(1.2) saturate(1.28);
+  opacity: 1;
+  transform: scale(1.035);
+  z-index: 30;
+  box-shadow: 0 0 0 4px var(--color-primary, #c06c84), 0 0 40px var(--color-primary, #c06c84);
+  animation: echostars-lucky-win 620ms cubic-bezier(.2,.9,.25,1.3) 3;
+}
+
+.lucky-winner-badge {
+  position: absolute;
+  z-index: 40;
+  top: -0.6rem;
+  right: 0.75rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 9999px;
+  background: var(--color-primary, #c06c84);
+  color: white;
+  font-weight: 900;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.28);
+  pointer-events: none;
+  animation: echostars-lucky-badge 420ms cubic-bezier(.2,.9,.25,1.4) both;
+}
+
+@keyframes echostars-lucky-scan {
+  from { transform: scale(1.015); }
+  to { transform: scale(1.04); }
+}
+
+@keyframes echostars-lucky-win {
+  0% { transform: scale(1.01) rotate(-0.25deg); }
+  45% { transform: scale(1.055) rotate(0.25deg); }
+  100% { transform: scale(1.035) rotate(0deg); }
+}
+
+@keyframes echostars-lucky-badge {
+  from { opacity: 0; transform: translateY(8px) scale(0.75); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .audio-card-grid > .lucky-card,
+  .audio-card-grid.lucky-spin-active > .lucky-card:nth-child(2),
+  .audio-card-grid.lucky-win-active > .lucky-card[data-lucky-winner="true"],
+  .lucky-winner-badge {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}
