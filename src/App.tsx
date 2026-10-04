@@ -6,6 +6,7 @@ import { baseSpeakerRank } from './utils/ranks';
 
 import { apiJson, identityKeys } from './utils/api';
 import { keywordRanking } from './utils/keywords';
+import { moveTrackIdToSecondSlot, sortDefaultHomeTracks } from './homePlaylistPolicy';
 import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import { Search, ChevronDown, Check, X, ShieldAlert, UploadCloud, Mic, ArrowDown, ArrowUp } from 'lucide-react';
 import {
@@ -480,6 +481,35 @@ export default function App() {
 
   const [sortField, setSortField] = useState<SortField>('權限');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [useDefaultHomeOrder, setUseDefaultHomeOrder] = useState(true);
+  const [homeShuffleSeed, setHomeShuffleSeed] = useState(() =>
+    ((Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0)
+  );
+  const [luckyPhase, setLuckyPhase] = useState<'idle' | 'spin' | 'win'>('idle');
+  const [luckyOrderIds, setLuckyOrderIds] = useState<string[] | null>(null);
+  const [luckyWinnerId, setLuckyWinnerId] = useState<string | null>(null);
+  const luckyTimersRef = useRef<number[]>([]);
+  const luckyAudioContextRef = useRef<AudioContext | null>(null);
+
+  const clearLuckyTimers = useCallback(() => {
+    luckyTimersRef.current.forEach(timer => window.clearTimeout(timer));
+    luckyTimersRef.current = [];
+  }, []);
+
+  const resetLuckyDrawState = useCallback(() => {
+    clearLuckyTimers();
+    setLuckyPhase('idle');
+    setLuckyOrderIds(null);
+    setLuckyWinnerId(null);
+  }, [clearLuckyTimers]);
+
+  useEffect(() => () => {
+    clearLuckyTimers();
+    const context = luckyAudioContextRef.current;
+    luckyAudioContextRef.current = null;
+    if (context && context.state !== 'closed') void context.close().catch(() => {});
+  }, [clearLuckyTimers]);
+
   const [trackToEdit, setTrackToEdit] = useState<Track | null>(null);
 
   // Audio Playback Engine
@@ -584,6 +614,14 @@ export default function App() {
     };
 
     const showHomeFromHistory = () => {
+      clearLuckyTimers();
+      setLuckyPhase('idle');
+      setLuckyOrderIds(null);
+      setLuckyWinnerId(null);
+      setUseDefaultHomeOrder(true);
+      setSortField('權限');
+      setSortDirection('asc');
+      setHomeShuffleSeed(((Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0));
       setCurrentTab('home');
       setSelectedDetailTrack(null);
       setPlayerModeState(savedPreferredModeHistoryRef.current);
@@ -725,6 +763,11 @@ export default function App() {
 
   // 任何情況下，只要按主選單的logo或網站名稱，就會返回到首頁播放清單的「全部分類」，清空搜尋條件
   const handleReturnToHomePlaylist = useCallback(() => {
+    resetLuckyDrawState();
+    setUseDefaultHomeOrder(true);
+    setSortField('權限');
+    setSortDirection('asc');
+    setHomeShuffleSeed(((Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0));
     setCurrentTab('home');
     setSelectedDetailTrack(null);
     setSelectedCategory('全部');
@@ -747,7 +790,7 @@ export default function App() {
       setPlayerMode(savedPreferredMode);
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [playerMode, savedPreferredMode, setPlayerMode]);
+  }, [playerMode, savedPreferredMode, setPlayerMode, resetLuckyDrawState]);
 
   // 1. Fast home bootstrap: show local cache immediately, then refresh only when stale.
   useEffect(() => {
@@ -1687,6 +1730,8 @@ export default function App() {
 
   // Requirement 19: 時間排序固定以「音檔上傳時間」為準。
   const handleSortClick = (field: SortField) => {
+    resetLuckyDrawState();
+    setUseDefaultHomeOrder(false);
     if (sortField === field) {
       setSortDirection(prev => (prev === 'desc' ? 'asc' : 'desc'));
     } else {
@@ -1718,57 +1763,203 @@ export default function App() {
   const visibleAvailableKeywords = useMemo(() => allAvailableKeywords.filter(keyword => (keywordMatchCounts[keyword] ?? 0) > 0), [allAvailableKeywords, keywordMatchCounts]);
   const visibleSearchSuggestionKeywords = useMemo(() => searchSuggestions.keywords.filter(keyword => (keywordMatchCounts[keyword] ?? 0) > 0), [searchSuggestions.keywords, keywordMatchCounts]);
 
-  // Filtered & Sorted Tracks List (Requirement 18 & 19 & Requirement 6: 多組網友關鍵字交叉複合搜尋)
+  // Filtered & Sorted Tracks List. Entering home uses the personalized three-tier
+  // default order; pressing a sort button switches to the requested manual sort.
   const filteredTracks = useMemo(() => {
     const trackList = Array.isArray(tracks) ? tracks : [];
-    return trackList
-      .filter(t => {
-        if (!trackMatchesHomeBaseFilters(t, selectedCategory, selectedSpeakerRank, searchQuery)) return false;
-        if (selectedKeywords.length > 0 && !selectedKeywords.every(keyword => trackMatchesHomeKeyword(t, keyword))) return false;
-        return true;
-      })
-      .sort((a, b) => {
-        let diff = 0;
-        switch (sortField) {
-          case '時間': {
-            diff = getUploadTimestamp(a.uploadDate) - getUploadTimestamp(b.uploadDate);
-            // Legacy rows only stored YYYY/MM/DD. For same-day uploads, the
-            // durable ES sequence in the R2 audio filename preserves upload order.
-            if (diff === 0) diff = getUploadSequence(a) - getUploadSequence(b);
-            break;
-          }
-          case '權限': {
-            // Primary: permission from public/low to high. Secondary: newest upload first.
-            const permissionDiff = getRequiredRankSortIndex(a) - getRequiredRankSortIndex(b);
-            if (permissionDiff !== 0) {
-              return sortDirection === 'desc' ? -permissionDiff : permissionDiff;
-            }
-            let timeDiff = getUploadTimestamp(b.uploadDate) - getUploadTimestamp(a.uploadDate);
-            if (timeDiff === 0) timeDiff = getUploadSequence(b) - getUploadSequence(a);
-            return timeDiff;
-          }
-          case '評價': {
-            diff = (a.rating || 0) - (b.rating || 0);
-            break;
-          }
-          case '留言': {
-            diff = (a.commentsCount || 0) - (b.commentsCount || 0);
-            break;
-          }
-          case '按讚': {
-            diff = (a.likes || 0) - (b.likes || 0);
-            break;
-          }
-          case '演講人': {
-            diff = (a.speaker || '').localeCompare(b.speaker || '', 'zh-Hant');
-            break;
-          }
-          default:
-            diff = 0;
-        }
-        return sortDirection === 'desc' ? -diff : diff;
+    const filtered = trackList.filter(t => {
+      if (!trackMatchesHomeBaseFilters(t, selectedCategory, selectedSpeakerRank, searchQuery)) return false;
+      if (selectedKeywords.length > 0 && !selectedKeywords.every(keyword => trackMatchesHomeKeyword(t, keyword))) return false;
+      return true;
+    });
+
+    if (useDefaultHomeOrder) {
+      return sortDefaultHomeTracks(filtered, {
+        canAccess: checkCanAccess,
+        getRequiredRankIndex: getRequiredRankSortIndex,
+        getUploadTimestamp: track => getUploadTimestamp(track.uploadDate),
+        getUploadSequence,
+        shuffleSeed: homeShuffleSeed
       });
-  }, [tracks, selectedCategory, selectedSpeakerRank, selectedKeywords, searchQuery, sortField, sortDirection]);
+    }
+
+    return filtered.sort((a, b) => {
+      let diff = 0;
+      switch (sortField) {
+        case '時間': {
+          diff = getUploadTimestamp(a.uploadDate) - getUploadTimestamp(b.uploadDate);
+          if (diff === 0) diff = getUploadSequence(a) - getUploadSequence(b);
+          break;
+        }
+        case '權限': {
+          const permissionDiff = getRequiredRankSortIndex(a) - getRequiredRankSortIndex(b);
+          if (permissionDiff !== 0) {
+            return sortDirection === 'desc' ? -permissionDiff : permissionDiff;
+          }
+          let timeDiff = getUploadTimestamp(b.uploadDate) - getUploadTimestamp(a.uploadDate);
+          if (timeDiff === 0) timeDiff = getUploadSequence(b) - getUploadSequence(a);
+          return timeDiff;
+        }
+        case '評價': {
+          diff = (a.rating || 0) - (b.rating || 0);
+          break;
+        }
+        case '留言': {
+          diff = (a.commentsCount || 0) - (b.commentsCount || 0);
+          break;
+        }
+        case '按讚': {
+          diff = (a.likes || 0) - (b.likes || 0);
+          break;
+        }
+        case '演講人': {
+          diff = (a.speaker || '').localeCompare(b.speaker || '', 'zh-Hant');
+          break;
+        }
+        default:
+          diff = 0;
+      }
+      return sortDirection === 'desc' ? -diff : diff;
+    });
+  }, [
+    tracks,
+    selectedCategory,
+    selectedSpeakerRank,
+    selectedKeywords,
+    searchQuery,
+    sortField,
+    sortDirection,
+    useDefaultHomeOrder,
+    homeShuffleSeed,
+    currentUser,
+    isSuperAdmin,
+    isAdministrator
+  ]);
+
+  useEffect(() => {
+    resetLuckyDrawState();
+  }, [
+    selectedCategory,
+    selectedSpeakerRank,
+    selectedKeywords,
+    searchQuery,
+    sortField,
+    sortDirection,
+    useDefaultHomeOrder,
+    homeShuffleSeed,
+    resetLuckyDrawState
+  ]);
+
+  const displayedTracks = useMemo(() => {
+    if (!luckyOrderIds) return filteredTracks;
+    const byId = new Map(filteredTracks.map(track => [track.id, track]));
+    const ordered = luckyOrderIds.map(id => byId.get(id)).filter((track): track is Track => Boolean(track));
+    const included = new Set(ordered.map(track => track.id));
+    return [...ordered, ...filteredTracks.filter(track => !included.has(track.id))];
+  }, [filteredTracks, luckyOrderIds]);
+
+  const getLuckyAudioContext = () => {
+    if (typeof window === 'undefined') return null;
+    const Context = window.AudioContext || (window as any).webkitAudioContext;
+    if (!Context) return null;
+    if (!luckyAudioContextRef.current || luckyAudioContextRef.current.state === 'closed') {
+      luckyAudioContextRef.current = new Context();
+    }
+    const context = luckyAudioContextRef.current;
+    if (context.state === 'suspended') void context.resume().catch(() => {});
+    return context;
+  };
+
+  const playLuckyTone = (frequency: number, durationSeconds: number, delaySeconds = 0, volume = 0.035) => {
+    const context = getLuckyAudioContext();
+    if (!context) return;
+    try {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const startAt = context.currentTime + delaySeconds;
+      oscillator.type = 'square';
+      oscillator.frequency.setValueAtTime(frequency, startAt);
+      gain.gain.setValueAtTime(0.0001, startAt);
+      gain.gain.exponentialRampToValueAtTime(volume, startAt + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startAt + durationSeconds);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(startAt);
+      oscillator.stop(startAt + durationSeconds + 0.02);
+    } catch {}
+  };
+
+  const playLuckyTick = (step: number) => {
+    playLuckyTone(300 + (step % 7) * 34, 0.045, 0, 0.025);
+  };
+
+  const playLuckyWin = () => {
+    [523.25, 659.25, 783.99, 1046.5].forEach((frequency, index) =>
+      playLuckyTone(frequency, 0.16, index * 0.085, 0.045)
+    );
+  };
+
+  const handleLuckyDraw = (anchor: HTMLElement) => {
+    if (luckyPhase === 'spin') return;
+    setIsSearchFocused(false);
+    clearLuckyTimers();
+
+    // Private VIP stays a separate third group and is never surfaced by random discovery.
+    const candidates = filteredTracks.filter(track => !track.isPrivateVip && checkCanAccess(track));
+    if (candidates.length === 0) {
+      showPermissionAlert('目前條件下沒有可播放的音檔可以抽選。', anchor);
+      return;
+    }
+
+    // Initial call happens directly inside the user click, so mobile browsers allow Web Audio.
+    getLuckyAudioContext();
+    const baseIds = filteredTracks.map(track => track.id);
+    const winner = candidates[Math.floor(Math.random() * candidates.length)];
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const finish = () => {
+      setLuckyOrderIds(moveTrackIdToSecondSlot(baseIds, winner.id));
+      setLuckyWinnerId(winner.id);
+      setLuckyPhase('win');
+      playLuckyWin();
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        const winnerElement = Array.from(document.querySelectorAll<HTMLElement>('[data-track-card-id]'))
+          .find(element => element.dataset.trackCardId === winner.id);
+        winnerElement?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center' });
+      }));
+      const settleTimer = window.setTimeout(() => setLuckyPhase('idle'), 2400);
+      luckyTimersRef.current.push(settleTimer);
+    };
+
+    if (reducedMotion || candidates.length === 1 || filteredTracks.length === 1) {
+      finish();
+      return;
+    }
+
+    const spinSteps = Math.max(16, Math.min(26, candidates.length * 4));
+    const reel = Array.from({ length: spinSteps - 1 }, () =>
+      candidates[Math.floor(Math.random() * candidates.length)]
+    );
+    reel.push(winner);
+
+    const spin = (index: number) => {
+      if (index >= reel.length - 1) {
+        finish();
+        return;
+      }
+      const candidate = reel[index];
+      setLuckyOrderIds(moveTrackIdToSecondSlot(baseIds, candidate.id));
+      setLuckyWinnerId(null);
+      setLuckyPhase('spin');
+      playLuckyTick(index);
+      const progress = index / Math.max(1, reel.length - 1);
+      const delay = Math.round(58 + progress * progress * 190);
+      const timer = window.setTimeout(() => spin(index + 1), delay);
+      luckyTimersRef.current.push(timer);
+    };
+
+    spin(0);
+  };
 
   // Rated tracks by current user for BW export
   const userRatedTracks = useMemo(() => {
@@ -2146,16 +2337,15 @@ export default function App() {
                 )}
               </div>
 
-              {/* Requirement 10 (v2.7): 同一排增加「搜尋」按鈕 */}
               <button
                 type="button"
-                onClick={() => setIsSearchFocused(false)}
-                className="h-[46px] px-3.5 sm:px-4 py-0 rounded-2xl text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-2xs hover:brightness-105 shrink-0 active:scale-95 transition-all cursor-pointer"
+                onClick={event => handleLuckyDraw(event.currentTarget)}
+                disabled={luckyPhase === 'spin'}
+                className="h-[46px] px-3.5 sm:px-4 py-0 rounded-2xl text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1 shadow-2xs hover:brightness-105 shrink-0 active:scale-95 transition-all cursor-pointer disabled:cursor-wait disabled:opacity-80"
                 style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
-                title="執行搜尋"
+                title="從目前條件下可播放的音檔中抽一張好手氣"
               >
-                <Search className="w-4 h-4" />
-                <span>搜尋</span>
+                <span>{luckyPhase === 'spin' ? '🫵轉運中' : '🫵好手氣'}</span>
               </button>
             </div>
 
@@ -2400,15 +2590,15 @@ export default function App() {
             </div>
 
             {/* Audio Cards List - Requirement 14 (v2.7): 刪除包圍所有音檔的更大區塊框線，騰出更多版面空間 */}
-            <div className="audio-card-grid relative grid grid-cols-1 gap-2 pt-1">
-              {filteredTracks.length === 0 ? (
+            <div className={`audio-card-grid relative grid grid-cols-1 gap-2 pt-1 ${luckyPhase === 'spin' ? 'lucky-spin-active' : ''} ${luckyPhase === 'win' ? 'lucky-win-active' : ''}`}>
+              {displayedTracks.length === 0 ? (
                 <div className="text-center py-16 bg-white/60 dark:bg-slate-800/40 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700">
                   <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
                     找不到符合條件的演講音檔
                   </p>
                 </div>
               ) : (
-                filteredTracks.map((track, trackIndex) => {
+                displayedTracks.map((track, trackIndex) => {
                   const isCurrent = currentTrack?.id === track.id;
                   const canAccess = checkCanAccess(track);
                   const isVipUnlocked = isTrackVipUnlocked(track);
@@ -2421,7 +2611,15 @@ export default function App() {
                   const hasLiked = Boolean(track?.likedBy && Array.isArray(track.likedBy) && track.likedBy.some(k => currentIdentityKeys.includes(k)));
 
                   return (
-                    <div key={track.id} className="relative">
+                    <div
+                      key={track.id}
+                      className="lucky-card relative"
+                      data-track-card-id={track.id}
+                      data-lucky-winner={luckyWinnerId === track.id ? 'true' : undefined}
+                    >
+                    {luckyPhase === 'win' && luckyWinnerId === track.id && (
+                      <div className="lucky-winner-badge" aria-live="polite">✨ 好手氣！✨</div>
+                    )}
                     <AudioCard
                       track={track}
                       isPlaying={isPlaying && isCurrent}
