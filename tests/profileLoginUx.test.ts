@@ -15,21 +15,22 @@ test('new Google registrations reopen profile and enter edit mode after the secu
   assert.match(bridge, /editButton\.click\(\)/);
 });
 
-test('Google sign-in shows a large animated loading message and removes redundant login copy', () => {
+test('Google sign-in shows a large animated loading message and hides redundant login copy without removing React nodes', () => {
   assert.match(bridge, /setStatus\('登入中請稍後'\)/);
   assert.match(bridge, /fontSize = isLoading \? '26px' : '13px'/);
   assert.match(bridge, /spinner\.className = 'animate-spin'/);
   assert.match(bridge, /text\.includes\('使用 Google 官方帳號進行安全驗證與身分綁定'\)/);
   assert.match(bridge, /text\.includes\('初次登入將自動建立專屬帳號'\)/);
-  assert.match(bridge, /if \(child !== actionCard\) child\.remove\(\)/);
+  assert.match(bridge, /style\.display = 'none'/);
+  assert.doesNotMatch(bridge, /child\.remove\(\)/);
 });
 
-test('mobile hamburger owns logout and profile modal logout is removed from the rendered UI', () => {
+test('mobile hamburger owns logout and profile modal logout is hidden from the rendered UI', () => {
   assert.match(navbar, /<LogOut className="w-4 h-4" \/>/);
   assert.match(navbar, /<span>登出<\/span>/);
   assert.match(navbar, /const handleLogout = \(\) =>/);
   assert.match(bridge, /button\[title="登出目前帳號"\]/);
-  assert.match(bridge, /\?\.remove\(\)/);
+  assert.match(bridge, /logoutButton\.style\.display = 'none'/);
 });
 
 test('profile save action is promoted to a high-contrast emerald call to action', () => {
