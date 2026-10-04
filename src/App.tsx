@@ -503,6 +503,20 @@ export default function App() {
     setLuckyWinnerId(null);
   }, [clearLuckyTimers]);
 
+  useEffect(() => {
+    if (luckyPhase !== 'win') return;
+
+    const dismissLuckyWinnerOnBlank = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest('button, a, input, select, textarea, [role="button"], [data-track-card-id]')) return;
+      resetLuckyDrawState();
+    };
+
+    document.addEventListener('pointerdown', dismissLuckyWinnerOnBlank, { passive: true });
+    return () => document.removeEventListener('pointerdown', dismissLuckyWinnerOnBlank);
+  }, [luckyPhase, resetLuckyDrawState]);
+
   useEffect(() => () => {
     clearLuckyTimers();
     const context = luckyAudioContextRef.current;
@@ -1922,13 +1936,6 @@ export default function App() {
       setLuckyWinnerId(winner.id);
       setLuckyPhase('win');
       playLuckyWin();
-      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
-        const winnerElement = Array.from(document.querySelectorAll<HTMLElement>('[data-track-card-id]'))
-          .find(element => element.dataset.trackCardId === winner.id);
-        winnerElement?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center' });
-      }));
-      const settleTimer = window.setTimeout(() => setLuckyPhase('idle'), 2400);
-      luckyTimersRef.current.push(settleTimer);
     };
 
     if (reducedMotion || candidates.length === 1 || filteredTracks.length === 1) {
@@ -2351,27 +2358,30 @@ export default function App() {
 
             {/* Requirement 6 (v2.8): 多組網友關鍵字交叉複合搜尋 (Selected Keywords Chips & Tag Drawer) */}
             <div className="space-y-1">
-              <div className="flex items-center justify-between gap-1 px-0.5">
-                <button
-                  type="button"
-                  onClick={() => setShowKeywordsDrawer(prev => !prev)}
-                  className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm font-bold text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 transition-colors cursor-pointer text-left"
-                >
-                  <span>網友關鍵字(可複選多個)</span>
-                  <span className="text-sm font-bold text-slate-400">
-                    {showKeywordsDrawer ? '▲ 收起' : '▼ 展開'}
-                  </span>
-                </button>
+              <div className="flex items-center gap-2 px-0.5">
+                <span className="text-sm font-bold text-amber-700 dark:text-amber-300">
+                  網友關鍵字(可複選多個)
+                </span>
 
-                {selectedKeywords.length > 0 && (
+                <div className="ml-auto flex items-center gap-2">
+                  {selectedKeywords.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedKeywords([])}
+                      className="text-sm font-bold text-slate-500 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-300 underline cursor-pointer"
+                    >
+                      重設
+                    </button>
+                  )}
+
                   <button
                     type="button"
-                    onClick={() => setSelectedKeywords([])}
-                    className="text-sm font-bold text-slate-500 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-300 underline cursor-pointer"
+                    onClick={() => setShowKeywordsDrawer(prev => !prev)}
+                    className="inline-flex items-center justify-end gap-1 text-sm font-bold text-slate-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors cursor-pointer text-right whitespace-nowrap"
                   >
-                    重設
+                    <span>{showKeywordsDrawer ? '▲ 收起' : '▼ 展開'}</span>
                   </button>
-                )}
+                </div>
               </div>
 
               {/* Expandable Keywords Tag Cloud Drawer for Multi-selection */}
