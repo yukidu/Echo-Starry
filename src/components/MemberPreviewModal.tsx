@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, Track, Comment, UserListeningRecord } from '../types';
 import { NumerologyGrid } from './NumerologyGrid';
+import { CollapsibleCommentText } from './CollapsibleCommentText';
 import { calculateNumerology } from '../utils/numerology';
 import {
   exportMemberProfileAndListeningImage,
@@ -391,9 +392,12 @@ export const MemberPreviewModal: React.FC<MemberPreviewModalProps> = ({
                         </span>
                         <span className="font-mono text-[10px]">{c.timestamp}</span>
                       </div>
-                      <p className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap pl-2 border-l-2 border-[var(--color-primary,#c06c84)]">
+                      <CollapsibleCommentText
+                        className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap pl-2 border-l-2 border-[var(--color-primary,#c06c84)]"
+                        resetKey={`${c.id}:${c.content}`}
+                      >
                         {c.content}
-                      </p>
+                      </CollapsibleCommentText>
                     </div>
                   );
                 })
