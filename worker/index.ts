@@ -214,6 +214,7 @@ export default {
 
     // 3.1 R2 封面圖庫：列出 cover/ 內既有講者照片，供上傳介面快速選取
     if (path === '/api/r2/covers' && method === 'GET') {
+      const forceCoverRefresh = url.searchParams.has('refresh');
       if (!env.R2_BUCKET) {
         return errorResponse('Cloudflare R2 儲存桶未綁定', 503);
       }
@@ -244,7 +245,7 @@ export default {
           headers: {
             ...CORS_HEADERS,
             'Content-Type': 'application/json; charset=utf-8',
-            'Cache-Control': 'public, max-age=300'
+            'Cache-Control': forceCoverRefresh ? 'no-store, max-age=0' : 'private, max-age=60'
           }
         });
       } catch (err: any) {

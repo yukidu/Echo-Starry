@@ -282,42 +282,9 @@ function hideExplanatoryNotes(form: HTMLFormElement) {
     }
   });
 
-  form.querySelectorAll<HTMLElement>('[data-upload-cover-library="1"] span').forEach(span => {
-    if (span.closest('button')) return;
-    const text = normalizeText(span.textContent);
-    const count = text.match(/(\d+)\s*張/);
-    if (count && text.includes('點照片可快速套用')) span.textContent = `${count[1]} 張`;
-  });
-
-  form.querySelectorAll<HTMLElement>('[data-upload-cover-library="1"] div').forEach(div => {
-    const text = normalizeText(div.textContent);
-    if (text === '正在讀取 R2 cover/ 圖庫…') div.textContent = '讀取中…';
-    if (text.includes('R2 cover/ 目前沒有可選照片')) div.textContent = '尚無照片';
-  });
-}
-
-function fitCoverLibraryNames(coverLibrary: HTMLElement) {
-  requestAnimationFrame(() => {
-    coverLibrary.querySelectorAll<HTMLElement>('button[title^="使用 "] span:last-child').forEach(label => {
-      const clean = normalizeText(label.textContent).replace(/^✓\s*/, '');
-      if (label.textContent !== clean) label.textContent = clean;
-
-      label.style.whiteSpace = 'nowrap';
-      label.style.wordBreak = 'normal';
-      label.style.fontSize = '10px';
-
-      let size = 10;
-      while (label.clientWidth > 0 && label.scrollWidth > label.clientWidth && size > 6) {
-        size -= 0.5;
-        label.style.fontSize = `${size}px`;
-      }
-
-      if (label.clientWidth > 0 && label.scrollWidth > label.clientWidth) {
-        label.style.whiteSpace = 'normal';
-        label.style.wordBreak = 'break-all';
-      }
-    });
-  });
+  // IMPORTANT: never rewrite text nodes inside the React-owned R2 cover library.
+  // Selecting a thumbnail or refreshing the list causes React reconciliation; direct
+  // textContent mutations here used to corrupt that subtree and could blank the modal.
 }
 
 function updateKeywordCandidates(keywordSection: HTMLElement) {
@@ -418,8 +385,8 @@ function markUploadForm(form: HTMLFormElement) {
     if (coverLabel) coverLabel.dataset.uploadCoverLabel = '1';
     if (coverSelected) coverSelected.dataset.uploadCoverSelected = '1';
     if (coverLibrary) {
+      // Mark for CSS/layout only. Do not mutate its React-owned child text/content.
       coverLibrary.dataset.uploadCoverLibrary = '1';
-      fitCoverLibraryNames(coverLibrary);
     }
   }
 

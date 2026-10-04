@@ -176,11 +176,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   const loadCoverLibrary = async (force = false) => {
-    // Cloudflare-saving strategy:
-    // - First open in a browser session: fetch R2 once.
-    // - Later opens: reuse sessionStorage without a timed re-list.
-    // - Manual refresh: do one fresh R2 ListObjects request.
-    // - Successful uploads update this cache locally, so no extra R2 list is needed.
+    // First open reuses a session cache to save R2 list requests. Manual refresh is
+    // different: it must always ask the Worker/R2 again and replace the local list.
     if (!force && typeof sessionStorage !== 'undefined') {
       try {
         const cached = JSON.parse(sessionStorage.getItem(COVER_LIBRARY_CACHE_KEY) || 'null');
@@ -191,24 +188,47 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       } catch {}
     }
 
+    if (force && typeof sessionStorage !== 'undefined') {
+      try { sessionStorage.removeItem(COVER_LIBRARY_CACHE_KEY); } catch {}
+    }
+
     setIsCoverLibraryLoading(true);
     try {
-      const url = force
+      const requestUrl = force
         ? `/api/r2/covers?refresh=${Date.now()}`
         : '/api/r2/covers';
-      const res = await fetch(url, force ? { cache: 'no-store' } : undefined);
+      const res = await fetch(requestUrl, force ? {
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache'
+        }
+      } : { headers: { Accept: 'application/json' } });
       if (!res.ok) {
-        if (force) setErrorMessage('封面圖庫重新整理失敗，請稍後再試。');
+        if (force) setErrorMessage('R2 照片同步失敗，請稍後再試。');
         return;
       }
       const data = await res.json();
-      const covers = Array.isArray(data?.covers) ? data.covers : [];
+      const covers = (Array.isArray(data?.covers) ? data.covers : [])
+        .map((item: any): CoverLibraryItem | null => {
+          const key = typeof item?.key === 'string' ? item.key.trim() : '';
+          const url = typeof item?.url === 'string' ? item.url.trim() : '';
+          if (!key || !url) return null;
+          return {
+            key,
+            url,
+            name: typeof item?.name === 'string' && item.name.trim() ? item.name.trim() : '未命名講者',
+            size: typeof item?.size === 'number' ? item.size : undefined,
+            uploaded: typeof item?.uploaded === 'string' ? item.uploaded : null
+          };
+        })
+        .filter((item: CoverLibraryItem | null): item is CoverLibraryItem => item !== null);
       setCoverLibrary(covers);
       saveCoverLibraryCache(covers);
       if (force) setErrorMessage(null);
     } catch {
-      if (force) setErrorMessage('封面圖庫重新整理失敗，請檢查網路連線。');
-      // R2 cover library is optional; manual upload remains available.
+      if (force) setErrorMessage('R2 照片同步失敗，請檢查網路連線。');
     } finally {
       setIsCoverLibraryLoading(false);
     }
@@ -529,10 +549,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   const handleSelectCoverFromLibrary = (item: CoverLibraryItem) => {
+    const nextUrl = typeof item?.url === 'string' ? item.url.trim() : '';
+    if (!nextUrl) {
+      setErrorMessage('這張 R2 封面已失效，請按「同步 R2」重新整理照片清單。');
+      return;
+    }
     setErrorMessage(null);
     setCoverFile(null);
-    setCoverPreview(item.url);
-    if (!speaker.trim()) setSpeaker(item.name);
+    setCoverPreview(nextUrl);
+    const nextName = typeof item?.name === 'string' ? item.name.trim() : '';
+    if (!speaker.trim() && nextName) setSpeaker(nextName);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -847,17 +873,17 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-slate-400">
-                    {isCoverLibraryLoading ? '讀取中…' : `${coverLibrary.length} 張・點照片可快速套用`}
+                    {isCoverLibraryLoading ? '同步中…' : `${coverLibrary.length} 張`}
                   </span>
                   <button
                     type="button"
                     onClick={() => void loadCoverLibrary(true)}
                     disabled={isCoverLibraryLoading}
                     className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:border-rose-300 hover:text-rose-600 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                    title="重新讀取 R2 cover/，同步已新增或已刪除的封面"
+                    title="直接重新讀取 R2 cover/，同步已新增或已刪除的封面"
                   >
                     <RefreshCw className={`h-3 w-3 ${isCoverLibraryLoading ? 'animate-spin' : ''}`} />
-                    重新整理
+                    同步 R2
                   </button>
                 </div>
               </div>

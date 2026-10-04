@@ -25,11 +25,11 @@ test('mobile upload controls preserve cover, audio, permission, VIP sequence', (
   assert.match(policy, /data-upload-vip[^}]*[\s\S]*grid-row: 6/);
 });
 
-test('R2 cover names stay complete and shrink to fit', () => {
-  assert.match(policy, /fitCoverLibraryNames/);
-  assert.match(policy, /while \(label\.clientWidth > 0 && label\.scrollWidth > label\.clientWidth && size > 6\)/);
-  assert.match(policy, /label\.style\.whiteSpace = 'normal'/);
-  assert.match(policy, /label\.style\.wordBreak = 'break-all'/);
+test('R2 cover library stays React-owned and presentation policy never rewrites its text', () => {
+  assert.doesNotMatch(policy, /fitCoverLibraryNames/);
+  assert.match(policy, /Do not mutate its React-owned child text\/content/);
+  assert.doesNotMatch(policy, /點照片可快速套用[\s\S]{0,180}textContent/);
+  assert.equal(policy.includes('正在讀取 R2 cover/ 圖庫…'), false);
   assert.doesNotMatch(policy, /button\[title\^="使用 "\] span:last-child[^}]*text-overflow:\s*ellipsis/);
 });
 
