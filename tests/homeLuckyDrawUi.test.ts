@@ -17,7 +17,20 @@ test('lucky draw acts directly on the home card grid with a spotlight and winner
   assert.match(app, /lucky-spin-active/);
   assert.match(app, /lucky-win-active/);
   assert.match(app, /data-lucky-winner/);
+  assert.match(css, /\.audio-card-grid\.lucky-spin-active > \.lucky-card \{[\s\S]*animation: echostars-lucky-reel/);
   assert.match(css, /\.audio-card-grid\.lucky-spin-active > \.lucky-card:nth-child\(2\)/);
   assert.match(css, /\.audio-card-grid\.lucky-win-active > \.lucky-card\[data-lucky-winner="true"\]/);
+  assert.match(css, /\.lucky-winner-badge \{[\s\S]*top: -1\.25rem/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+});
+
+test('lucky winner stays pinned without scrolling and dismisses from blank space', () => {
+  assert.match(app, /if \(luckyPhase !== 'win'\) return/);
+  assert.match(app, /document\.addEventListener\('pointerdown', dismissLuckyWinnerOnBlank/);
+  assert.doesNotMatch(app, /winnerElement\?\.scrollIntoView/);
+  assert.doesNotMatch(app, /setLuckyPhase\('idle'\), 2400/);
+});
+
+test('home keyword expand and collapse control is right aligned', () => {
+  assert.match(app, /className="ml-auto flex items-center gap-2"[\s\S]*showKeywordsDrawer \? '▲ 收起' : '▼ 展開'/);
 });
