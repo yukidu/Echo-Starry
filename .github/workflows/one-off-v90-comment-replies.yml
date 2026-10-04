@@ -46,6 +46,7 @@ jobs:
         run: |
           git config user.name echostars-release-bot
           git config user.email actions@users.noreply.github.com
-          git add src/components/CommentsSection.tsx tests/commentTimestamp.test.ts public/sw.js tests/releaseIntegrity.test.ts src/changelogReleaseNotes.ts
+          git add src/components/CommentsSection.tsx tests/commentTimestamp.test.ts tests/commentCollapse.test.ts public/sw.js tests/releaseIntegrity.test.ts src/changelogReleaseNotes.ts
+          git add -A test-output-v90.txt || true
           git commit -m "精簡留言回覆顯示與時間字體" || exit 0
           git push
