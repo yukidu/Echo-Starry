@@ -1,12 +1,13 @@
 name: One-off v85 detail keyword layout
 on:
   push:
-    branches: [ui/detail-keywords-layout-v85]
+    branches:
+      - ui/detail-keywords-layout-v85
 permissions:
   contents: write
 jobs:
   patch:
-    if: github.actor != 'github-actions[bot]'
+    if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,59 +20,10 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-
           detail = Path('src/components/DetailView.tsx')
           d = detail.read_text()
-          old = '''        <div className="flex items-center justify-between gap-2 mb-2">
-          <button type="button" onClick={() => setShowDetailKeywords(prev => !prev)} className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-bold text-sm text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 transition-colors text-left cursor-pointer">
-  <span>網友關鍵字</span>
-  <span className="text-xs text-slate-400 font-normal">({trackKeywords.length}/50 組)</span>
-  <span className="text-sm font-bold text-slate-400">{showDetailKeywords ? '▲ 收起' : '▼ 展開'}</span>
-</button>
-{showDetailKeywords && canAddKeywords && !isAddingKeyword && (
-            <button
-              type="button"
-              onClick={() => {
-                setIsAddingKeyword(true);
-                setKeywordError(null);
-              }}
-              className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-0.5 cursor-pointer shrink-0"
-            >
-              <Plus className="w-3 h-3" />
-              <span>新增關鍵字</span>
-            </button>
-          )}
-        </div>
-'''
-          new = '''        <div className="mb-2 space-y-1.5">
-          <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-bold text-sm text-amber-700 dark:text-amber-300">
-              <span>網友關鍵字</span>
-              <span className="text-xs text-slate-400 font-normal">({trackKeywords.length}/50 組)</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowDetailKeywords(prev => !prev)}
-              className="w-[4.75rem] justify-self-end text-left text-sm font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
-            >
-              {showDetailKeywords ? '▲ 收起' : '▼ 展開'}
-            </button>
-          </div>
-          {showDetailKeywords && canAddKeywords && !isAddingKeyword && (
-            <button
-              type="button"
-              onClick={() => {
-                setIsAddingKeyword(true);
-                setKeywordError(null);
-              }}
-              className="text-sm font-normal text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer w-fit"
-            >
-              <Plus className="w-4 h-4" />
-              <span>新增關鍵字</span>
-            </button>
-          )}
-        </div>
-'''
+          old = "        <div className=\"flex items-center justify-between gap-2 mb-2\">\n          <button type=\"button\" onClick={() => setShowDetailKeywords(prev => !prev)} className=\"flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-bold text-sm text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 transition-colors text-left cursor-pointer\">\n  <span>網友關鍵字</span>\n  <span className=\"text-xs text-slate-400 font-normal\">({trackKeywords.length}/50 組)</span>\n  <span className=\"text-sm font-bold text-slate-400\">{showDetailKeywords ? '▲ 收起' : '▼ 展開'}</span>\n</button>\n{showDetailKeywords && canAddKeywords && !isAddingKeyword && (\n            <button\n              type=\"button\"\n              onClick={() => {\n                setIsAddingKeyword(true);\n                setKeywordError(null);\n              }}\n              className=\"text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-0.5 cursor-pointer shrink-0\"\n            >\n              <Plus className=\"w-3 h-3\" />\n              <span>新增關鍵字</span>\n            </button>\n          )}\n        </div>\n"
+          new = "        <div className=\"mb-2 space-y-1.5\">\n          <div className=\"grid grid-cols-[1fr_auto] items-center gap-2\">\n            <div className=\"flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-bold text-sm text-amber-700 dark:text-amber-300\">\n              <span>網友關鍵字</span>\n              <span className=\"text-xs text-slate-400 font-normal\">({trackKeywords.length}/50 組)</span>\n            </div>\n            <button\n              type=\"button\"\n              onClick={() => setShowDetailKeywords(prev => !prev)}\n              className=\"w-[4.75rem] justify-self-end text-left text-sm font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer whitespace-nowrap\"\n            >\n              {showDetailKeywords ? '▲ 收起' : '▼ 展開'}\n            </button>\n          </div>\n          {showDetailKeywords && canAddKeywords && !isAddingKeyword && (\n            <button\n              type=\"button\"\n              onClick={() => {\n                setIsAddingKeyword(true);\n                setKeywordError(null);\n              }}\n              className=\"text-sm font-normal text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer w-fit\"\n            >\n              <Plus className=\"w-4 h-4\" />\n              <span>新增關鍵字</span>\n            </button>\n          )}\n        </div>\n"
           assert old in d
           d = d.replace(old, new, 1)
           old_chip = 'className="group inline-flex items-center gap-0.5 px-1 py-0 rounded-md text-xs font-semibold bg-amber-50/90 dark:bg-slate-800 text-amber-900 dark:text-amber-200 border border-amber-200/80 dark:border-slate-700 shadow-2xs hover:border-amber-400 transition-all"'
@@ -79,26 +31,22 @@ jobs:
           assert old_chip in d
           d = d.replace(old_chip, new_chip, 1)
           detail.write_text(d)
-
           test = Path('tests/detailPageUx.test.ts')
           t = test.read_text()
-          marker = "test('comment composer and rows are compact and readable'"
-          assert marker in t
+          assert "detail keywords keep toggle position" not in t
           t += "test('detail keywords keep toggle position and use title-sized regular text', () => { assert.match(detail, /grid grid-cols-\\[1fr_auto\\]/); assert.match(detail, /w-\\[4\\.75rem\\]/); assert.match(detail, /text-sm font-normal text-amber-600/); assert.match(detail, /text-sm font-normal bg-amber-50/); assert.doesNotMatch(detail, /text-xs font-semibold bg-amber-50/); });\n"
           test.write_text(t)
-
           sw = Path('public/sw.js')
           s = sw.read_text()
-          assert "echostars-shell-v84" in s
-          sw.write_text(s.replace("echostars-shell-v84", "echostars-shell-v85", 1))
-
+          assert 'echostars-shell-v84' in s
+          sw.write_text(s.replace('echostars-shell-v84', 'echostars-shell-v85', 1))
           release = Path('tests/releaseIntegrity.test.ts')
           r = release.read_text()
-          assert "v84 is the single current PWA cache version" in r and "echostars-shell-v84" in r
-          r = r.replace("v84 is the single current PWA cache version", "v85 is the single current PWA cache version", 1)
-          r = r.replace("echostars-shell-v84", "echostars-shell-v85", 1)
+          assert 'v84 is the single current PWA cache version' in r
+          assert 'echostars-shell-v84' in r
+          r = r.replace('v84 is the single current PWA cache version', 'v85 is the single current PWA cache version', 1)
+          r = r.replace('echostars-shell-v84', 'echostars-shell-v85', 1)
           release.write_text(r)
-
           changelog = Path('src/changelogReleaseNotes.ts')
           c = changelog.read_text()
           anchor = "    '音檔詳細頁操作整理：播放時間軸改成只能從目前播放圓點按住拖曳，避免誤點跳段；時間置中。演講資訊空白欄位不再顯示「未填寫」，編輯按鈕簡化為「編輯」，關鍵字預設收起並可展開；心得輸入移除姓名獎銜、送出按鈕簡化，留言頭像放大、姓名與獎銜上下排列，全文字體與頁面行距同步優化。',"
