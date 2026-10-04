@@ -22,10 +22,18 @@ test('mobile drawer stays right aligned, half width, and out of document flow', 
   assert.match(css, /max-height:\s*calc\(100dvh - 64px\)/);
 });
 
-test('menu labels wrap as whole Chinese words instead of one-character columns', () => {
+test('dark mobile drawer is visually separated from the dark page', () => {
+  assert.match(css, /background:\s*linear-gradient\(180deg, rgba\(51, 65, 85, 0\.99\), rgba\(30, 41, 59, 0\.99\)\)\s*!important/);
+  assert.match(css, /border-left-color:\s*rgba\(148, 163, 184, 0\.30\)\s*!important/);
+  assert.match(css, /-18px 18px 42px rgba\(0, 0, 0, 0\.52\)/);
+  assert.match(css, /inset 1px 0 0 rgba\(255, 255, 255, 0\.045\)/);
+});
+
+test('menu labels are larger while still wrapping as whole Chinese words', () => {
   assert.match(css, /word-break:\s*keep-all/);
   assert.match(css, /white-space:\s*normal\s*!important/);
-  assert.match(css, /font-size:\s*0\.875rem\s*!important/);
+  assert.match(css, /font-size:\s*1rem\s*!important/);
+  assert.match(css, /@media \(max-width: 360px\)[\s\S]*font-size:\s*0\.9rem\s*!important/);
 });
 
 test('notification pending badge is placed on its own row', () => {
