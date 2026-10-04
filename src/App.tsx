@@ -38,7 +38,8 @@ import {
   recordOfflineTrack,
   getOfflineAudioUrl,
   handleTrackProgressOffline,
-  purgeStaleOfflineTracks
+  purgeStaleOfflineTracks,
+  requestPersistentOfflineStorage
 } from './utils/offlineAudio';
 
 import { Navbar, NavTab } from './components/Navbar';
@@ -555,8 +556,33 @@ export default function App() {
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [playbackMemories, setPlaybackMemories] = useState<Record<string, AudioMemory>>({});
 
-  // Requirement 26: Fullscreen loading state when downloading/buffering audio
+  // Fullscreen loading is reserved for the initial source load only.
+  // Short buffering caused by dragging/seeking must never keep covering the page.
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const audioInitialLoadRef = useRef(false);
+  const audioLoadingTimerRef = useRef<number | null>(null);
+
+  const clearAudioLoadingTimer = useCallback(() => {
+    if (audioLoadingTimerRef.current !== null) {
+      window.clearTimeout(audioLoadingTimerRef.current);
+      audioLoadingTimerRef.current = null;
+    }
+  }, []);
+
+  const beginInitialAudioLoad = useCallback(() => {
+    clearAudioLoadingTimer();
+    audioInitialLoadRef.current = true;
+    audioLoadingTimerRef.current = window.setTimeout(() => {
+      audioLoadingTimerRef.current = null;
+      if (audioInitialLoadRef.current) setIsLoadingAudio(true);
+    }, 350);
+  }, [clearAudioLoadingTimer]);
+
+  const finishInitialAudioLoad = useCallback(() => {
+    clearAudioLoadingTimer();
+    audioInitialLoadRef.current = false;
+    setIsLoadingAudio(false);
+  }, [clearAudioLoadingTimer]);
 
   // Requirement 15: Floating comment preview popup modal & member preview modal
   const [commentPreviewSnapshot, setCommentPreviewTrack] = useState<Track | null>(null);
@@ -1057,11 +1083,14 @@ export default function App() {
       })
     }).catch(() => {});
 
-    // Record to offline cache registry
+    // Real offline storage stays enabled. Ask the browser for persistent storage
+    // when possible, then schedule the full-file Cache Storage write in background.
+    void requestPersistentOfflineStorage();
     recordOfflineTrack(track.id, track.audioUrl);
 
-    // Show huge loading overlay until audio starts playing
-    setIsLoadingAudio(true);
+    // Only a genuinely slow initial source load may show the blocking overlay.
+    // Seek-time buffering after playback has started stays non-blocking.
+    beginInitialAudioLoad();
 
     const saved = getStoredPlayback(track.id);
     const resumeTime = saved && !saved.completed ? saved.currentTime : 0;
@@ -1076,11 +1105,11 @@ export default function App() {
         .play()
         .then(() => {
           setIsPlaying(true);
-          setIsLoadingAudio(false);
+          finishInitialAudioLoad();
         })
         .catch(() => {
           setIsPlaying(true);
-          setIsLoadingAudio(false);
+          finishInitialAudioLoad();
         });
     }
   };
@@ -2004,11 +2033,18 @@ export default function App() {
           syncPlaybackToCloud(true);
           setIsPlaying(false);
         }}
-        onWaiting={() => setIsLoadingAudio(true)}
-        onCanPlay={() => setIsLoadingAudio(false)}
+        onWaiting={() => {
+          // waiting fires frequently after timeline seeks. Once playback has already
+          // started, keep the player visible instead of reopening a fullscreen modal.
+          if (audioInitialLoadRef.current && audioLoadingTimerRef.current === null) {
+            beginInitialAudioLoad();
+          }
+        }}
+        onCanPlay={finishInitialAudioLoad}
+        onPlaying={finishInitialAudioLoad}
         onError={() => {
           setIsPlaying(false);
-          setIsLoadingAudio(false);
+          finishInitialAudioLoad();
         }}
       />
 
@@ -2023,8 +2059,8 @@ export default function App() {
           <h2 className="text-2xl sm:text-4xl font-black text-white tracking-widest animate-pulse">
             讀取中請稍候...
           </h2>
-          <p className="text-sm text-rose-200 mt-2 font-medium">
-            正在下載音訊檔案並進行離線儲存
+          <p className="text-sm text-rose-200 mt-2 font-medium text-center px-6">
+            正在準備音訊播放<br />離線儲存會在背景自動完成
           </p>
         </div>
       )}
