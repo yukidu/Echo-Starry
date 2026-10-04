@@ -2167,8 +2167,8 @@ export default function App() {
                   onClick={() => setShowKeywordsDrawer(prev => !prev)}
                   className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm font-bold text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 transition-colors cursor-pointer text-left"
                 >
-                  <span>網友關鍵字（可複選多個條件）</span>
-                  <span className="text-[10px] text-slate-400">
+                  <span>網友關鍵字(可複選多個)</span>
+                  <span className="text-sm font-bold text-slate-400">
                     {showKeywordsDrawer ? '▲ 收起' : '▼ 展開'}
                   </span>
                 </button>
@@ -2177,9 +2177,9 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setSelectedKeywords([])}
-                    className="text-[11px] text-slate-400 hover:text-rose-500 underline cursor-pointer"
+                    className="text-sm font-bold text-slate-500 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-300 underline cursor-pointer"
                   >
-                    清除條件
+                    重設
                   </button>
                 )}
               </div>
@@ -2190,7 +2190,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setShowKeywordsDrawer(false)}
-                    className="absolute top-1 right-1 z-10 text-slate-400 hover:text-slate-600 text-xs px-1"
+                    className="absolute top-1 right-1 z-10 w-11 h-11 rounded-full flex items-center justify-center bg-rose-100/95 dark:bg-rose-950/90 text-rose-600 dark:text-rose-300 hover:bg-rose-200 dark:hover:bg-rose-900 hover:text-rose-700 dark:hover:text-rose-200 text-4xl font-black leading-none shadow-md border-2 border-rose-300 dark:border-rose-700 cursor-pointer"
                     aria-label="收起網友關鍵字"
                   >
                     ✕
