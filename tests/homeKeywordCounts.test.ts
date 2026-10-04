@@ -23,3 +23,13 @@ test('the playlist and keyword counters share one keyword matching rule', () => 
   assert.match(app, /function trackMatchesHomeKeyword/);
   assert.match(app, /function trackMatchesHomeSearch/);
 });
+
+
+test('zero-result keyword choices disappear while selected chips remain removable', () => {
+  assert.match(app, /const visibleAvailableKeywords = useMemo/);
+  assert.match(app, /allAvailableKeywords\.filter\(keyword => \(keywordMatchCounts\[keyword\] \?\? 0\) > 0\)/);
+  assert.match(app, /const visibleSearchSuggestionKeywords = useMemo/);
+  assert.match(app, /visibleAvailableKeywords\.map\(kw =>/);
+  assert.match(app, /visibleSearchSuggestionKeywords\.map\(kw =>/);
+  assert.match(app, /selectedKeywords\.map\(kw =>/);
+});
