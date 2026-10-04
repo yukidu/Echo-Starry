@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Home, BarChart3, Bell, User, UploadCloud, Settings, Palette, Moon, Sun, Mic, Menu, X, ShieldAlert } from 'lucide-react';
+import { Home, BarChart3, Bell, User, UploadCloud, Settings, Palette, Moon, Sun, Mic, Menu, X, ShieldAlert, LogOut } from 'lucide-react';
 import { UserProfile, RANK_ORDER } from '../types';
 import { VisitorIdentity } from '../utils/visitor';
 import { TwinklingStars } from './TwinklingStars';
@@ -93,6 +93,15 @@ export const Navbar: React.FC<NavbarProps> = ({
       handleMobileNav('home');
     }
     setIsMobileMenuOpen(false);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('sq_current_user_v1');
+    sessionStorage.removeItem('echostars_auth_session_checked_at');
+    sessionStorage.removeItem('echostars_first_profile_edit_v1');
+    sessionStorage.removeItem('echostars_first_profile_edit_opened_v1');
+    setIsMobileMenuOpen(false);
+    window.location.reload();
   };
 
   return (
@@ -258,8 +267,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Divider */}
           <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-0.5" />
 
-
-
           {/* Dynamic Light Theme Generator */}
           <button
             onClick={onRandomPalette}
@@ -337,8 +344,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           {/* Quick theme toggle on mobile */}
-
-
           <button
             onClick={onToggleTheme}
             className="p-2 sm:p-2.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -456,6 +461,21 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Settings className="w-4 h-4" />
               <span>後台管理</span>
             </button>
+          )}
+
+          {currentUser && (
+            <>
+              <div className="my-1 h-px bg-slate-200 dark:bg-slate-800" />
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-black text-rose-600 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/60 transition-colors"
+                title="登出目前帳號"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>登出</span>
+              </button>
+            </>
           )}
         </div>
       )}
