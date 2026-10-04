@@ -23,7 +23,7 @@ test('mobile drawer stays right aligned, half width, and out of document flow', 
 });
 
 test('dark mobile drawer is visually separated from the dark page', () => {
-  assert.match(css, /background:\s*linear-gradient\(180deg, rgba\(30, 41, 59, 0\.99\), rgba\(17, 24, 39, 0\.99\)\)\s*!important/);
+  assert.match(css, /background:\s*linear-gradient\(180deg, rgba\(51, 65, 85, 0\.99\), rgba\(30, 41, 59, 0\.99\)\)\s*!important/);
   assert.match(css, /border-left-color:\s*rgba\(148, 163, 184, 0\.30\)\s*!important/);
   assert.match(css, /-18px 18px 42px rgba\(0, 0, 0, 0\.52\)/);
   assert.match(css, /inset 1px 0 0 rgba\(255, 255, 255, 0\.045\)/);
