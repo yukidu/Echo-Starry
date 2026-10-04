@@ -27,10 +27,15 @@ test('comment rank badge is forced onto one line', () => {
 });
 
 
-test('comment time layout and actions follow the mobile presentation rules', () => {
+test('comment time, badge, actions and body follow the compact mobile layout', () => {
   const comments = readFileSync(new URL('../src/components/CommentsSection.tsx', import.meta.url), 'utf8');
   assert.match(comments, /formatCommentTimestampDisplay\(c\)/);
   assert.match(comments, /timestampLines\.map/);
+  assert.match(comments, /grid grid-cols-\[3\.5rem_minmax\(0,1fr\)\]/);
+  assert.match(comments, /ml-auto flex items-center justify-end gap-0\.5 shrink-0/);
   assert.match(comments, /Heart className=\{`w-5 h-5/);
-  assert.match(comments, /flex items-center gap-0 shrink-0 pt-0\.5/);
+  assert.match(comments, /Reply className="w-5 h-5"/);
+  assert.match(comments, /className="flex items-center gap-0\.5 text-base leading-none[^\n]*<Reply/);
+  assert.match(comments, /className="text-base[^\n]*whitespace-pre-wrap mt-1\.5 break-words"/);
+  assert.doesNotMatch(comments, /pl-16 whitespace-pre-wrap/);
 });
