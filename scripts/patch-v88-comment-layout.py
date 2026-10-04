@@ -88,6 +88,12 @@ test('comment time layout and actions follow the mobile presentation rules', () 
 """
     p.write_text(text)
 
+replace(
+    'tests/miniPlayerCommentLayout.test.ts',
+    "assert.match(comments, /text-\\[10px\\][^\\n]*\\{c\\.timestamp\\}/);",
+    "assert.match(comments, /formatCommentTimestampDisplay\\(c\\)/); assert.match(comments, /timestampLines\\.map/);"
+)
+
 # Release note and PWA cache bump.
 replace('public/sw.js', "echostars-shell-v87", "echostars-shell-v88")
 replace('tests/releaseIntegrity.test.ts', "test('v87 is the single current PWA cache version'", "test('v88 is the single current PWA cache version'")
