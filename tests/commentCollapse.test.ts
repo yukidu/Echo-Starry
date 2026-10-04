@@ -23,7 +23,8 @@ test('all requested web comment surfaces use the shared collapsible renderer', (
     assert.match(source, /CollapsibleCommentText/);
     assert.match(source, /resetKey=\{`\$\{c\.id\}:\$\{c\.content\}`\}/);
   }
-  assert.match(comments, /renderFormattedContent\(c\.content\)/);
+  assert.match(comments, /stripLegacyAutoReplyMention\(c\.content, c\.replyToAuthor\)/);
+  assert.match(comments, /renderFormattedContent\(displayContent\)/);
 });
 
 test('personal learning card export keeps the full comment instead of truncating it', () => {
