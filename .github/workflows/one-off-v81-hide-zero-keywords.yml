@@ -1,0 +1,121 @@
+name: One-off v81 hide zero keyword results
+
+on:
+  push:
+    branches: [fix/hide-zero-keyword-results-v81]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/hide-zero-keyword-results-v81
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply zero-result keyword hiding
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          app = Path('src/App.tsx')
+          text = app.read_text()
+
+          anchor = "  }, [tracks, allAvailableKeywords, selectedCategory, selectedSpeakerRank, selectedKeywords, searchQuery]);\n\n  // Filtered & Sorted Tracks List"
+          insert = """  }, [tracks, allAvailableKeywords, selectedCategory, selectedSpeakerRank, selectedKeywords, searchQuery]);
+
+  // Hide unavailable keyword choices immediately. Selected chips stay visible so
+  // users can always remove a filter if another home condition makes the result zero.
+  const visibleAvailableKeywords = useMemo(
+    () => allAvailableKeywords.filter(keyword => (keywordMatchCounts[keyword] ?? 0) > 0),
+    [allAvailableKeywords, keywordMatchCounts]
+  );
+  const visibleSearchSuggestionKeywords = useMemo(
+    () => searchSuggestions.keywords.filter(keyword => (keywordMatchCounts[keyword] ?? 0) > 0),
+    [searchSuggestions.keywords, keywordMatchCounts]
+  );
+
+  // Filtered & Sorted Tracks List"""
+          assert anchor in text, 'keyword count anchor missing'
+          text = text.replace(anchor, insert, 1)
+
+          text = text.replace(
+            "{isSearchFocused && (searchSuggestions.categories.length > 0 || searchSuggestions.keywords.length > 0) && (",
+            "{isSearchFocused && (searchSuggestions.categories.length > 0 || visibleSearchSuggestionKeywords.length > 0) && (",
+            1,
+          )
+          text = text.replace(
+            "{searchSuggestions.keywords.length > 0 && (",
+            "{visibleSearchSuggestionKeywords.length > 0 && (",
+            1,
+          )
+          text = text.replace(
+            "{searchSuggestions.keywords.map(kw => {",
+            "{visibleSearchSuggestionKeywords.map(kw => {",
+            1,
+          )
+          text = text.replace(
+            "{allAvailableKeywords.length === 0 ? (",
+            "{visibleAvailableKeywords.length === 0 ? (",
+            1,
+          )
+          text = text.replace(
+            '<span className="text-xs text-slate-400 italic">尚無網友關鍵字</span>',
+            '<span className="text-xs text-slate-400 italic">目前條件下沒有其他符合的關鍵字</span>',
+            1,
+          )
+          text = text.replace(
+            "allAvailableKeywords.map(kw => {",
+            "visibleAvailableKeywords.map(kw => {",
+            1,
+          )
+          app.write_text(text)
+
+          test = Path('tests/homeKeywordCounts.test.ts')
+          text = test.read_text()
+          text += r'''
+
+test('zero-result keyword choices disappear while selected chips remain removable', () => {
+  assert.match(app, /const visibleAvailableKeywords = useMemo/);
+  assert.match(app, /allAvailableKeywords\.filter\(keyword => \(keywordMatchCounts\[keyword\] \?\? 0\) > 0\)/);
+  assert.match(app, /const visibleSearchSuggestionKeywords = useMemo/);
+  assert.match(app, /searchSuggestions\.keywords\.filter\(keyword => \(keywordMatchCounts\[keyword\] \?\? 0\) > 0\)/);
+  assert.match(app, /visibleAvailableKeywords\.map\(kw =>/);
+  assert.match(app, /visibleSearchSuggestionKeywords\.map\(kw =>/);
+  assert.match(app, /selectedKeywords\.map\(kw =>/);
+});
+'''
+          test.write_text(text)
+
+          changelog = Path('src/changelogReleaseNotes.ts')
+          text = changelog.read_text()
+          anchor = "    '首頁「網友關鍵字」改成可複選條件提示，關鍵字字體放大；每個關鍵字後方新增即時音檔數量，例如 (3)。選取多個關鍵字時，數量會依目前分類、獎銜、搜尋與已選關鍵字交叉條件立即重新計算，不增加額外雲端查詢。',\n"
+          note = "    '首頁網友關鍵字再最佳化：交叉篩選後結果為 0 的候選關鍵字會立即隱藏；取消條件後只要重新有符合音檔就會自動出現。已選條件仍保留可移除入口，避免使用者被鎖在零結果狀態。',\n"
+          assert anchor in text, 'changelog anchor missing'
+          changelog.write_text(text.replace(anchor, anchor + note, 1))
+
+          sw = Path('public/sw.js')
+          text = sw.read_text()
+          assert 'echostars-shell-v80' in text, 'expected v80 cache missing'
+          sw.write_text(text.replace('echostars-shell-v80', 'echostars-shell-v81', 1))
+
+          release = Path('tests/releaseIntegrity.test.ts')
+          text = release.read_text()
+          assert "test('v80 is the single current PWA cache version'" in text
+          text = text.replace("test('v80 is the single current PWA cache version'", "test('v81 is the single current PWA cache version'")
+          text = text.replace('echostars-shell-v80', 'echostars-shell-v81')
+          release.write_text(text)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name 'echostars-release-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/App.tsx tests/homeKeywordCounts.test.ts src/changelogReleaseNotes.ts public/sw.js tests/releaseIntegrity.test.ts
+          git diff --cached --check
+          git commit -m '零結果關鍵字自動隱藏'
+          git push origin HEAD:fix/hide-zero-keyword-results-v81
