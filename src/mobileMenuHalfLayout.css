@@ -1,4 +1,4 @@
-/* v70: Mobile hamburger menu is intentionally half-width and right-aligned.
+/* v72: Mobile hamburger menu is intentionally half-width and right-aligned.
    Keep it out of document flow so opening the drawer never pushes down or
    hides the left half of the current page. */
 @media (max-width: 767px) {
@@ -21,26 +21,41 @@
     box-shadow: -10px 14px 30px rgba(15, 23, 42, 0.14);
   }
 
+  /* Dark mode must read as a separate floating panel instead of visually
+     merging into the dark page underneath. */
   .dark header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] {
-    border-left-color: #1e293b;
-    box-shadow: -10px 14px 30px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.99), rgba(17, 24, 39, 0.99)) !important;
+    border-top-color: rgba(148, 163, 184, 0.18) !important;
+    border-left-color: rgba(148, 163, 184, 0.30) !important;
+    box-shadow:
+      -18px 18px 42px rgba(0, 0, 0, 0.52),
+      inset 1px 0 0 rgba(255, 255, 255, 0.045);
   }
 
-  /* Keep every menu item compact and left aligned. */
+  /* Keep every menu item compact and left aligned, but make the labels easier
+     to read on a phone than the previous 14px treatment. */
   header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button {
-    min-height: 46px;
+    min-height: 48px;
     padding: 0.5rem 0.55rem !important;
     gap: 0.5rem !important;
     justify-content: flex-start !important;
     text-align: left !important;
-    font-size: 0.875rem !important;
+    font-size: 1rem !important;
     line-height: 1.25 !important;
   }
 
   header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button > svg {
-    width: 18px !important;
-    height: 18px !important;
-    flex: 0 0 18px;
+    width: 20px !important;
+    height: 20px !important;
+    flex: 0 0 20px;
+  }
+
+  .dark header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button {
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
+  }
+
+  .dark header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button:hover {
+    background-color: rgba(51, 65, 85, 0.72) !important;
   }
 
   header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button > span,
@@ -72,17 +87,17 @@
   }
 
   header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button > div > svg {
-    width: 18px !important;
-    height: 18px !important;
-    flex: 0 0 18px;
+    width: 20px !important;
+    height: 20px !important;
+    flex: 0 0 20px;
   }
 
   header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button > div + span {
-    margin-left: 26px !important;
+    margin-left: 28px !important;
     margin-right: 0 !important;
     justify-self: start;
     align-self: start;
-    font-size: 0.7rem !important;
+    font-size: 0.75rem !important;
     line-height: 1.15 !important;
     white-space: nowrap !important;
   }
@@ -93,7 +108,7 @@
   header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button[aria-label="繁星回聲已安裝"],
   header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button[aria-label="安裝到桌面"] {
     display: grid !important;
-    grid-template-columns: 18px minmax(0, 1fr);
+    grid-template-columns: 20px minmax(0, 1fr);
     grid-template-rows: auto auto;
     column-gap: 0.5rem !important;
     row-gap: 0.1rem !important;
@@ -106,8 +121,8 @@
     grid-column: 1;
     grid-row: 1 / span 2;
     align-self: center;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     background-color: currentColor;
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M11 3h2v8.17l3.59-3.58L18 9l-6 6-6-6 1.41-1.41L11 11.17V3zM5 19h14v2H5z'/%3E%3C/svg%3E") center / contain no-repeat;
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M11 3h2v8.17l3.59-3.58L18 9l-6 6-6-6 1.41-1.41L11 11.17V3zM5 19h14v2H5z'/%3E%3C/svg%3E") center / contain no-repeat;
@@ -123,7 +138,7 @@
     grid-column: 2;
     grid-row: 1;
     margin: 0 !important;
-    font-size: 0.875rem !important;
+    font-size: 1rem !important;
     line-height: 1.2 !important;
   }
 
@@ -133,24 +148,25 @@
     grid-row: 2;
     justify-self: start;
     margin: 0 !important;
-    font-size: 0.68rem !important;
+    font-size: 0.75rem !important;
     line-height: 1.15 !important;
     white-space: nowrap !important;
   }
 
   header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button[aria-label="繁星回聲已安裝"] > span:nth-of-type(2) svg,
   header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button[aria-label="安裝到桌面"] > span:nth-of-type(2) svg {
-    width: 12px !important;
-    height: 12px !important;
+    width: 13px !important;
+    height: 13px !important;
   }
 
-  /* Prevent awkward one-character wrapping on the smallest supported phones. */
+  /* Prevent awkward one-character wrapping on the smallest supported phones
+     without shrinking all the way back to the old 13px menu text. */
   @media (max-width: 360px) {
     header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button {
       padding-left: 0.4rem !important;
       padding-right: 0.4rem !important;
       gap: 0.4rem !important;
-      font-size: 0.8125rem !important;
+      font-size: 0.9rem !important;
     }
   }
 }
