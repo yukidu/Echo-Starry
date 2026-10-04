@@ -12,10 +12,23 @@ const VISITOR_KEY = 'sq_visitor_identity_v1';
 const PLAYBACK_PREFIX = 'sq_audio_progress_v1_';
 const CLAIM_MARKER_PREFIX = 'echostars_playback_claim_v1';
 const SESSION_CHECK_KEY = 'echostars_auth_session_checked_at';
-const FIRST_PROFILE_EDIT_KEY = 'echostars_first_profile_edit_v1';
-const FIRST_PROFILE_EDIT_OPENED_KEY = 'echostars_first_profile_edit_opened_v1';
 const SESSION_CHECK_TTL = 10 * 60 * 1000;
 const originalFetch = window.fetch.bind(window);
+
+const REQUIRED_PROFILE_FIELDS = [
+  'name',
+  'amwayId',
+  'phone',
+  'residence',
+  'center',
+  'rank',
+  'joinReason',
+  'stayReason',
+  'sponsor',
+  'platinumUpline',
+  'diamondUpline',
+  'birthday'
+] as const;
 
 type LocalPlaybackRow = {
   trackId: string;
@@ -32,6 +45,11 @@ function readCachedUser(): any | null {
   } catch {
     return null;
   }
+}
+
+function profileNeedsCompletion(user: any | null) {
+  if (!user) return false;
+  return REQUIRED_PROFILE_FIELDS.some(field => String(user?.[field] ?? '').trim() === '');
 }
 
 function authToken() {
@@ -197,6 +215,8 @@ async function validateCachedSession() {
 
 let initialized = false;
 let activeStatus: HTMLElement | null = null;
+let incompleteProfilePromptedThisLoad = false;
+let incompleteProfileEditStartedThisLoad = false;
 
 function setStatus(message: string, isError = false) {
   if (!activeStatus) return;
@@ -267,11 +287,7 @@ async function handleGoogleCredential(response: any) {
     };
     localStorage.setItem(USER_KEY, JSON.stringify(user));
     sessionStorage.setItem(SESSION_CHECK_KEY, String(Date.now()));
-    if (data.isNewUser) {
-      sessionStorage.setItem(FIRST_PROFILE_EDIT_KEY, String(user.id || 'new'));
-      sessionStorage.removeItem(FIRST_PROFILE_EDIT_OPENED_KEY);
-    }
-    setStatus(data.isNewUser ? '登入成功，正在開啟個人資料…' : '登入成功，正在同步學習紀錄…');
+    setStatus(profileNeedsCompletion(user) ? '登入成功，正在開啟個人資料…' : '登入成功，正在同步學習紀錄…');
     await claimLocalPlayback(user);
     window.location.reload();
   } catch (error) {
@@ -381,18 +397,17 @@ function renderOfficialButton(legacyButton: HTMLButtonElement) {
   render();
 }
 
-function resumeFirstProfileEdit() {
-  const marker = sessionStorage.getItem(FIRST_PROFILE_EDIT_KEY);
+function resumeIncompleteProfileEdit() {
   const cachedUser = readCachedUser();
-  if (!marker || !cachedUser?.id || String(cachedUser.id) !== marker) return;
-  if (sessionStorage.getItem(FIRST_PROFILE_EDIT_OPENED_KEY) === '1') return;
+  if (!profileNeedsCompletion(cachedUser) || incompleteProfilePromptedThisLoad) return;
 
   const profileButtons = Array.from(
     document.querySelectorAll<HTMLButtonElement>('[data-tutorial-target="visitor-profile"]')
   );
   const profileButton = profileButtons.find(button => button.offsetParent !== null) || profileButtons[0];
   if (!profileButton) return;
-  sessionStorage.setItem(FIRST_PROFILE_EDIT_OPENED_KEY, '1');
+
+  incompleteProfilePromptedThisLoad = true;
   profileButton.click();
 }
 
@@ -402,11 +417,18 @@ function normalizeProfileModalUx() {
   if (!profileRoot) return;
 
   const logoutButton = profileRoot.querySelector<HTMLButtonElement>('button[title="登出目前帳號"]');
-  if (logoutButton) logoutButton.style.display = 'none';
+  if (logoutButton && logoutButton.dataset.echostarsHiddenLogout !== '1') {
+    logoutButton.dataset.echostarsHiddenLogout = '1';
+    logoutButton.style.display = 'none';
+  }
 
   const headerButtons = Array.from(profileRoot.querySelectorAll<HTMLButtonElement>('button'));
   const saveButton = headerButtons.find(button => ['儲存', '儲存資料'].includes(button.textContent?.trim() || ''));
-  if (saveButton) {
+  if (saveButton && saveButton.dataset.echostarsProminentSave !== '1') {
+    // This must be strictly one-time. Changing textContent triggers the same
+    // childList observer; reapplying it on every callback caused v74's edit-mode
+    // infinite mutation loop and made the modal look completely frozen.
+    saveButton.dataset.echostarsProminentSave = '1';
     saveButton.textContent = '儲存資料';
     saveButton.style.background = '#10b981';
     saveButton.style.color = '#ffffff';
@@ -418,13 +440,12 @@ function normalizeProfileModalUx() {
     saveButton.style.boxShadow = '0 8px 22px rgba(16,185,129,0.35)';
   }
 
-  const marker = sessionStorage.getItem(FIRST_PROFILE_EDIT_KEY);
-  if (!marker || sessionStorage.getItem(FIRST_PROFILE_EDIT_OPENED_KEY) !== '1') return;
+  if (!incompleteProfilePromptedThisLoad || incompleteProfileEditStartedThisLoad) return;
   const editButton = headerButtons.find(button => button.textContent?.trim() === '修改');
   if (!editButton) return;
+
+  incompleteProfileEditStartedThisLoad = true;
   editButton.click();
-  sessionStorage.removeItem(FIRST_PROFILE_EDIT_KEY);
-  sessionStorage.removeItem(FIRST_PROFILE_EDIT_OPENED_KEY);
 }
 
 function scanUi() {
@@ -434,7 +455,7 @@ function scanUi() {
       if (isLegacyGoogleButton(button)) renderOfficialButton(button);
     });
   }
-  resumeFirstProfileEdit();
+  resumeIncompleteProfileEdit();
   normalizeProfileModalUx();
 }
 
