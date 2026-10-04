@@ -66,7 +66,7 @@ export const CollapsibleCommentText: React.FC<CollapsibleCommentTextProps> = ({
           className="mt-1 ml-auto block w-fit text-xs font-extrabold text-[var(--color-primary,#c06c84)] hover:underline cursor-pointer"
           aria-expanded={expanded}
         >
-          {expanded ? lessLabel : moreLabel}
+          {expanded ? `▲ ${lessLabel}` : `▼ ${moreLabel}`}
         </button>
       )}
     </div>

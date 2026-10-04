@@ -2497,6 +2497,19 @@ export default function App() {
           }}
           onScrollToTop={() => { window.scrollTo({top:0,behavior:'smooth'}); document.getElementById('detail-view-container')?.scrollTo({top:0,behavior:'smooth'}); }}
           onReturnHome={handleReturnToHomePlaylist}
+          onClose={() => {
+            audioRef.current?.pause();
+            setIsPlaying(false);
+            setCurrentTrack(null);
+            setCurrentTime(0);
+            setDuration(0);
+            if ('mediaSession' in navigator) {
+              try {
+                navigator.mediaSession.playbackState = 'none';
+                navigator.mediaSession.metadata = null;
+              } catch {}
+            }
+          }}
           onTogglePlay={handleTogglePlay}
           onSeek={handleSeek}
           onSkip={handleSkip}

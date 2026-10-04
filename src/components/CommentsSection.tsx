@@ -333,15 +333,17 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
 
             return (
               <div id={`comment-${c.id}`} key={c.id} className={`space-y-1 ${isReply ? 'pt-2' : 'pt-3 first:pt-0'}`}>
-                <div className="flex items-start justify-between gap-2">
-        <div onClick={isClickable ? () => handleAuthorClick(c) : undefined} className={`flex items-center gap-2 min-w-0 ${isClickable ? 'cursor-pointer hover:opacity-85 transition-opacity' : 'cursor-default pointer-events-none'}`} title={isClickable ? `點擊查看【${displayAuthorName}】會員個人檔案` : undefined}>
-          {isAvatarUrl ? <img src={displayAuthorAvatar} alt={displayAuthorName} className="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700" /> : <span className="w-10 h-10 rounded-full flex items-center justify-center text-2xl shrink-0">{displayAuthorAvatar || '👤'}</span>}
-          <div className="h-10 min-w-0 flex flex-col justify-center gap-0.5 leading-none">
-            {c.isAdmin || displayAuthorBadge === '貢獻者' ? <span className="rainbow-admin-text font-bold text-sm truncate">{displayAuthorName}</span> : isClickable ? <span className="font-bold text-slate-800 dark:text-slate-100 text-sm underline decoration-dotted underline-offset-2 hover:text-rose-600 transition-colors truncate">{displayAuthorName}</span> : <span className="font-bold text-slate-700 dark:text-slate-300 text-sm select-none truncate">{displayAuthorName}</span>}
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+        <div onClick={isClickable ? () => handleAuthorClick(c) : undefined} className={`flex items-start gap-2 min-w-0 ${isClickable ? 'cursor-pointer hover:opacity-85 transition-opacity' : 'cursor-default pointer-events-none'}`} title={isClickable ? `點擊查看【${displayAuthorName}】會員個人檔案` : undefined}>
+          <div className="w-14 shrink-0 flex flex-col items-center gap-1">
+            {isAvatarUrl ? <img src={displayAuthorAvatar} alt={displayAuthorName} className="w-14 h-14 rounded-full object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700" /> : <span className="w-14 h-14 rounded-full flex items-center justify-center text-3xl shrink-0">{displayAuthorAvatar || '👤'}</span>}
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono whitespace-nowrap leading-none">{c.timestamp}</span>
+          </div>
+          <div className="min-h-14 min-w-0 flex flex-col justify-center gap-1 leading-none">
+            {c.isAdmin || displayAuthorBadge === '貢獻者' ? <span className="rainbow-admin-text font-bold text-base leading-tight break-words">{displayAuthorName}</span> : isClickable ? <span className="font-bold text-slate-800 dark:text-slate-100 text-base underline decoration-dotted underline-offset-2 hover:text-rose-600 transition-colors leading-tight break-words">{displayAuthorName}</span> : <span className="font-bold text-slate-700 dark:text-slate-300 text-base select-none leading-tight break-words">{displayAuthorName}</span>}
             <div className="flex items-center gap-1 min-w-0">
-              {isVisitor && <span className="text-xs px-1.5 py-0.5 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium select-none">訪客</span>}
-              {showBadge && <span className="text-xs px-1.5 py-0.5 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium truncate">{displayAuthorBadge}</span>}
-              <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono whitespace-nowrap">{c.timestamp}</span>
+              {isVisitor && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium select-none leading-tight">訪客</span>}
+              {showBadge && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium whitespace-normal leading-tight">{displayAuthorBadge}</span>}
             </div>
           </div>
         </div>
@@ -356,7 +358,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                 </div>
 
                 {editingId === c.id ? (
-                  <div className="mt-1.5 space-y-1.5 pl-12">
+                  <div className="mt-1.5 space-y-1.5 pl-16">
                     <textarea maxLength={2000} value={editContent} onChange={e => setEditContent(e.target.value)} className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/60 text-sm text-slate-800 dark:text-slate-100 outline-hidden" rows={2} />
                     <div className="flex justify-end gap-1.5">
                       <button onClick={() => setEditingId(null)} className="px-2 py-1 rounded-lg text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-1 cursor-pointer"><X className="w-3 h-3" /> 取消</button>
@@ -365,7 +367,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                   </div>
                 ) : (
                   <CollapsibleCommentText
-                    className="text-base text-slate-700 dark:text-slate-300 leading-snug pl-12 whitespace-pre-wrap mt-1 break-words"
+                    className="text-base text-slate-700 dark:text-slate-300 leading-snug pl-16 whitespace-pre-wrap mt-1 break-words"
                     resetKey={`${c.id}:${c.content}`}
                   >
                     {c.replyToAuthor && <span className="text-[11px] text-[var(--color-primary,#c06c84)] font-bold mr-1.5">回覆 @{c.replyToAuthor}：</span>}
