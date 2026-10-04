@@ -19,6 +19,19 @@ import { VisitorIdentity } from '../utils/visitor';
 import { CollapsibleCommentText } from './CollapsibleCommentText';
 import { formatCommentTimestampDisplay } from '../../shared/commentTime';
 
+const stripLegacyAutoReplyMention = (content: string, replyToAuthor?: string) => {
+  const value = typeof content === 'string' ? content : '';
+  const author = replyToAuthor?.trim();
+  if (!author) return value;
+  for (const prefix of [`@${author}`, `＠${author}`]) {
+    if (!value.startsWith(prefix)) continue;
+    const nextChar = value.slice(prefix.length, prefix.length + 1);
+    if (nextChar && !/\s/.test(nextChar)) continue;
+    return value.slice(prefix.length).trimStart();
+  }
+  return value;
+};
+
 interface CommentsSectionProps {
   trackId: string;
   comments: Comment[];
@@ -191,7 +204,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
-      await onAddComment(inputText.trim(), replyingTo?.id, replyingTo?.authorName);
+      await onAddComment(inputText.trim(), replyingTo?.id);
       setInputText('');
       setReplyingTo(null);
       setIsMentionOpen(false);
@@ -271,12 +284,12 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
         <div className="bg-slate-50/80 dark:bg-slate-800/60 rounded-2xl p-3.5 border border-slate-200/70 dark:border-slate-700/60 focus-within:border-rose-400 dark:focus-within:border-rose-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-all relative">
           {replyingTo && (
             <div className="flex items-center justify-between bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 px-3 py-1.5 rounded-xl text-xs mb-2 border border-rose-200/60 dark:border-rose-900 font-medium">
-              <span className="flex items-center gap-1.5"><Reply className="w-3.5 h-3.5" /><span>回覆 @{replyingTo.authorName}</span></span>
+              <span className="flex items-center gap-1.5"><Reply className="w-3.5 h-3.5" /><span>正在回覆這則留言</span></span>
               <button type="button" onClick={() => setReplyingTo(null)} className="p-0.5 hover:text-rose-900 dark:hover:text-rose-100"><X className="w-3.5 h-3.5" /></button>
             </div>
           )}
 
-          <textarea ref={textareaRef} value={inputText} onChange={handleTextareaChange} maxLength={2000} rows={3} placeholder={replyingTo ? `回覆 @${replyingTo.authorName}...` : '寫下您的心得收穫...'} className="w-full bg-transparent resize-none outline-hidden text-sm sm:text-base text-slate-800 dark:text-slate-100 placeholder:text-slate-400" />
+          <textarea ref={textareaRef} value={inputText} onChange={handleTextareaChange} maxLength={2000} rows={3} placeholder={replyingTo ? '寫下回覆內容...' : '寫下您的心得收穫...'} className="w-full bg-transparent resize-none outline-hidden text-sm sm:text-base text-slate-800 dark:text-slate-100 placeholder:text-slate-400" />
 
           {isMentionOpen && (
             <div className="absolute left-2 top-full mt-1 z-40 w-64 max-w-[calc(100vw-32px)] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95">
@@ -332,6 +345,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             const isAvatarUrl = displayAuthorAvatar && (displayAuthorAvatar.startsWith('http') || displayAuthorAvatar.startsWith('data:'));
             const isClickable = !!registeredAuthor;
             const timestampLines = formatCommentTimestampDisplay(c);
+            const displayContent = stripLegacyAutoReplyMention(c.content, c.replyToAuthor);
 
             return (
               <div id={`comment-${c.id}`} key={c.id} className={`${isReply ? 'pt-2' : 'pt-3 first:pt-0'}`}>
@@ -342,7 +356,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                     title={isClickable ? `點擊查看【${displayAuthorName}】會員個人檔案` : undefined}
                   >
                     {isAvatarUrl ? <img src={displayAuthorAvatar} alt={displayAuthorName} className="w-14 h-14 rounded-full object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700" /> : <span className="w-14 h-14 rounded-full flex items-center justify-center text-3xl shrink-0">{displayAuthorAvatar || '👤'}</span>}
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono leading-[1.15] text-center">{timestampLines.map((line, index) => <span key={`${c.id}-time-${index}`} className="block whitespace-nowrap">{line}</span>)}</span>
+                    <span className="text-[8px] text-slate-400 dark:text-slate-500 font-mono leading-[1.05] text-center">{timestampLines.map((line, index) => <span key={`${c.id}-time-${index}`} className="block whitespace-nowrap">{line}</span>)}</span>
                   </div>
 
                   <div className="min-w-0">
@@ -364,7 +378,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                         <button type="button" onClick={() => handleLikeComment(c)} className={`flex items-center gap-0.5 text-sm px-0.5 py-0.5 rounded-lg transition-colors cursor-pointer ${userLiked ? 'text-rose-600 bg-rose-50 dark:bg-rose-950/60 font-bold' : 'text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`} title={userLiked ? '取消讚' : '按讚這則心得'}>
                           <Heart className={`w-5 h-5 ${userLiked ? 'fill-rose-500 text-rose-500' : ''}`} /><span>{userLikesCount > 0 ? userLikesCount : ''}</span>
                         </button>
-                        <button type="button" onClick={() => { setReplyingTo(c); setInputText(`@${displayAuthorName} `); textareaRef.current?.focus(); }} className="flex items-center gap-0.5 text-base leading-none text-slate-400 hover:text-[var(--color-primary,#c06c84)] px-0.5 py-0.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap" title="回覆此心得"><Reply className="w-5 h-5" /><span>回覆</span></button>
+                        <button type="button" onClick={() => { setReplyingTo(c); textareaRef.current?.focus(); }} className="flex items-center gap-0.5 text-base leading-none text-slate-400 hover:text-[var(--color-primary,#c06c84)] px-0.5 py-0.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap" title="回覆此心得"><Reply className="w-5 h-5" /><span>回覆</span></button>
                         {isAuthor && editingId !== c.id && <button onClick={() => handleStartEdit(c)} title="編輯心得" className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"><Edit3 className="w-4 h-4" /></button>}
                         {(isAuthor || isSuperAdminModerator || (isAdminModerator && isVisitor)) && editingId !== c.id && <button onClick={() => onDeleteComment(c.id)} title="刪除心得" className="p-0.5 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"><Trash2 className="w-4 h-4" /></button>}
                       </div>
@@ -383,8 +397,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                         className="text-base text-slate-700 dark:text-slate-300 leading-snug whitespace-pre-wrap mt-1.5 break-words"
                         resetKey={`${c.id}:${c.content}`}
                       >
-                        {c.replyToAuthor && <span className="text-[11px] text-[var(--color-primary,#c06c84)] font-bold mr-1.5">回覆 @{c.replyToAuthor}：</span>}
-                        {renderFormattedContent(c.content)}
+                        {renderFormattedContent(displayContent)}
                       </CollapsibleCommentText>
                     )}
                   </div>
