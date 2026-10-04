@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Comment, UserProfile, Track } from '../types';
 import { VisitorIdentity } from '../utils/visitor';
+import { CollapsibleCommentText } from './CollapsibleCommentText';
 
 interface CommentsSectionProps {
   trackId: string;
@@ -375,10 +376,13 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed pl-6 whitespace-pre-wrap mt-0.5 break-words">
+                  <CollapsibleCommentText
+                    className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed pl-6 whitespace-pre-wrap mt-0.5 break-words"
+                    resetKey={`${c.id}:${c.content}`}
+                  >
                     {c.replyToAuthor && <span className="text-[11px] text-[var(--color-primary,#c06c84)] font-bold mr-1.5">回覆 @{c.replyToAuthor}：</span>}
                     {renderFormattedContent(c.content)}
-                  </div>
+                  </CollapsibleCommentText>
                 )}
               </div>
             );

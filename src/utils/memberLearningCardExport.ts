@@ -199,21 +199,26 @@ function recordTitle(item: Item, no: number) {
 function measureRecordHeight(ctx: CanvasRenderingContext2D, item: Item, no: number, w: number) {
   ctx.font = `bold 14.5px ${font}`;
   const titleLines = wrapText(ctx, recordTitle(item, no), w - 20);
-  const hasComment = Boolean(item.record.comment?.trim());
-  return 10 + titleLines.length * 17 + 16 + 16 + (hasComment ? 17 : 0) + 7;
+  const comment = String(item.record.comment || '').trim();
+  ctx.font = `12px ${font}`;
+  const commentLines = comment ? wrapText(ctx, `心得：${comment}`, w - 20) : [];
+  return 10 + titleLines.length * 17 + 16 + 16 + (commentLines.length ? commentLines.length * 15 + 2 : 0) + 7;
 }
 
 function drawRecord(ctx: CanvasRenderingContext2D, item: Item, no: number, x: number, y: number, w: number) {
   const { track, record } = item;
   ctx.font = `bold 14.5px ${font}`;
   const titleLines = wrapText(ctx, recordTitle(item, no), w - 20);
-  const hasComment = Boolean(record.comment?.trim());
-  const h = 10 + titleLines.length * 17 + 16 + 16 + (hasComment ? 17 : 0) + 7;
+  const comment = String(record.comment || '').trim();
+  ctx.font = `12px ${font}`;
+  const commentLines = comment ? wrapText(ctx, `心得：${comment}`, w - 20) : [];
+  const h = 10 + titleLines.length * 17 + 16 + 16 + (commentLines.length ? commentLines.length * 15 + 2 : 0) + 7;
 
   ctx.strokeStyle = '#d6d6d6';
   ctx.lineWidth = 1;
   ctx.strokeRect(x, y, w, h);
   ctx.fillStyle = '#000';
+  ctx.font = `bold 14.5px ${font}`;
   titleLines.forEach((line, index) => ctx.fillText(line, x + 10, y + 17 + index * 17));
 
   let cursor = y + 17 + titleLines.length * 17;
@@ -237,9 +242,9 @@ function drawRecord(ctx: CanvasRenderingContext2D, item: Item, no: number, x: nu
   ctx.fillText(`進度：${done ? 100 : progress}%   評價：${rating}`, x + 10, cursor);
   cursor += 16;
 
-  if (hasComment) {
+  if (commentLines.length) {
     ctx.fillStyle = '#555';
-    ctx.fillText(`心得：${short(record.comment, 42)}`, x + 10, cursor);
+    commentLines.forEach((line, index) => ctx.fillText(line, x + 10, cursor + index * 15));
   }
   return h;
 }

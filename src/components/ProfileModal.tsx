@@ -48,6 +48,7 @@ import { exportMemberProfileAndListeningImage, shareOrDownloadImage } from '../u
 import { GOOGLE_CLIENT_ID } from '../config/auth';
 import { NumerologyGrid } from './NumerologyGrid';
 import { AvatarCropModal } from './AvatarCropModal';
+import { CollapsibleCommentText } from './CollapsibleCommentText';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -1163,14 +1164,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                             ))}
                           </div>
 
-                          <div className="bg-white/80 dark:bg-slate-900/60 p-2 rounded-xl border border-slate-100 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+                          <CollapsibleCommentText
+                            className="bg-white/80 dark:bg-slate-900/60 p-2 rounded-xl border border-slate-100 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap"
+                            resetKey={`${c.id}:${c.content}`}
+                          >
                             {c.replyToAuthor && (
                               <span className="text-[11px] text-[var(--color-primary,#c06c84)] font-bold mr-1">
                                 回覆 @{c.replyToAuthor}：
                               </span>
                             )}
                             {c.content}
-                          </div>
+                          </CollapsibleCommentText>
                         </div>
                       );
                     })
