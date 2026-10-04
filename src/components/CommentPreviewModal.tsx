@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Track, Comment, UserProfile } from '../types';
 import { VisitorIdentity } from '../utils/visitor';
+import { CollapsibleCommentText } from './CollapsibleCommentText';
 
 interface CommentPreviewModalProps {
   isOpen: boolean;
@@ -342,7 +343,13 @@ export const CommentPreviewModal: React.FC<CommentPreviewModalProps> = ({
                       {(isAuthor || isSuperAdminModerator || (isAdminModerator && isVisitor)) && onDeleteComment && <button type="button" onClick={async () => { try { await onDeleteComment(c.id); setComments(prev => prev.filter(item => item.id !== c.id)); } catch (error) { setErrorMsg(error instanceof Error ? error.message : '刪除心得失敗'); } }} className="p-1 text-slate-400 hover:text-rose-600 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer" title="刪除心得" aria-label="刪除心得"><Trash2 className="w-3.5 h-3.5" /></button>}
                     </div>
                   </div>
-                  <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed pl-6 whitespace-pre-wrap break-words">{c.replyToAuthor && <span className="text-[11px] text-[var(--color-primary,#c06c84)] font-bold mr-1.5">回覆 @{c.replyToAuthor}：</span>}{renderFormattedContent(c.content)}</div>
+                  <CollapsibleCommentText
+          className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed pl-6 whitespace-pre-wrap break-words"
+          resetKey={`${c.id}:${c.content}`}
+        >
+          {c.replyToAuthor && <span className="text-[11px] text-[var(--color-primary,#c06c84)] font-bold mr-1.5">回覆 @{c.replyToAuthor}：</span>}
+          {renderFormattedContent(c.content)}
+        </CollapsibleCommentText>
                 </div>
               );
             };

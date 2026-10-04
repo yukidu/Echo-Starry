@@ -6,6 +6,7 @@ const collapsible = readFileSync(new URL('../src/components/CollapsibleCommentTe
 const comments = readFileSync(new URL('../src/components/CommentsSection.tsx', import.meta.url), 'utf8');
 const profile = readFileSync(new URL('../src/components/ProfileModal.tsx', import.meta.url), 'utf8');
 const member = readFileSync(new URL('../src/components/MemberPreviewModal.tsx', import.meta.url), 'utf8');
+const homePreview = readFileSync(new URL('../src/components/CommentPreviewModal.tsx', import.meta.url), 'utf8');
 const learningExport = readFileSync(new URL('../src/utils/memberLearningCardExport.ts', import.meta.url), 'utf8');
 
 test('long web comments collapse to three lines and can expand/collapse', () => {
@@ -16,8 +17,8 @@ test('long web comments collapse to three lines and can expand/collapse', () => 
   assert.match(collapsible, /aria-expanded=\{expanded\}/);
 });
 
-test('all three requested web comment surfaces use the shared collapsible renderer', () => {
-  for (const source of [comments, profile, member]) {
+test('all requested web comment surfaces use the shared collapsible renderer', () => {
+  for (const source of [comments, profile, member, homePreview]) {
     assert.match(source, /CollapsibleCommentText/);
     assert.match(source, /resetKey=\{`\$\{c\.id\}:\$\{c\.content\}`\}/);
   }
