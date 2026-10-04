@@ -1,0 +1,37 @@
+name: One-off v94 lucky draw visible motion
+
+on:
+  push:
+    branches: [fix/lucky-draw-visible-motion-v94]
+    paths:
+      - .github/workflows/one-off-v94-lucky-draw-visible-motion.yml
+      - scripts/patch-v94-lucky-draw-visible-motion.py
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/lucky-draw-visible-motion-v94
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply visible lucky draw motion polish
+        run: python scripts/patch-v94-lucky-draw-visible-motion.py
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Full regression suite
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Commit patch
+        run: |
+          git config user.name echostars-release-bot
+          git config user.email actions@users.noreply.github.com
+          git add src/App.tsx src/index.css src/changelogReleaseNotes.ts public/sw.js tests/homeLuckyDrawUi.test.ts tests/releaseIntegrity.test.ts
+          git commit -m "強化好手氣全部卡片轉輪與標籤位置" || exit 0
+          git push
