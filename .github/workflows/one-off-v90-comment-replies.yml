@@ -25,7 +25,21 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Full regression suite
-        run: npm test
+        run: |
+          set +e
+          npm test > test-output-v90.txt 2>&1
+          status=$?
+          set -e
+          cat test-output-v90.txt
+          if [ "$status" -ne 0 ]; then
+            git config user.name echostars-release-bot
+            git config user.email actions@users.noreply.github.com
+            git add test-output-v90.txt
+            git commit -m "記錄 v90 回歸失敗輸出" || true
+            git push
+            exit "$status"
+          fi
+          rm -f test-output-v90.txt
       - name: Production build
         run: npm run build
       - name: Commit patch
