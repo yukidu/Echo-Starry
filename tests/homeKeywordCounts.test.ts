@@ -6,7 +6,7 @@ const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 
 test('home keyword drawer explains multi-select and uses larger keyword text', () => {
   assert.match(app, /網友關鍵字\(可複選多個\)/);
-  assert.match(app, /px-2 py-1 rounded-lg text-sm font-semibold/);
+  assert.match(app, /px-2 py-1 rounded-lg text-sm font-normal/);
   assert.match(app, /\{kw\}\(\{keywordMatchCounts\[kw\] \?\? 0\}\)/);
 });
 
@@ -39,4 +39,17 @@ test('keyword controls use consistent readable sizing and an oversized close con
   assert.match(app, /showKeywordsDrawer \? '▲ 收起' : '▼ 展開'/);
   assert.match(app, /text-sm font-bold text-slate-400/);
   assert.match(app, /w-11 h-11[\s\S]*text-4xl font-black/);
+});
+
+
+test('keyword chips stay regular weight, close button follows palette, and sort controls match search height', () => {
+  assert.match(app, /px-2 py-1 rounded-lg text-sm font-normal/);
+  assert.match(app, /rounded-full text-sm font-normal bg-amber-100/);
+  assert.match(app, /px-2\.5 py-1 rounded-xl text-sm font-normal/);
+  assert.match(app, /backgroundColor: 'var\(--color-light-pill, #ffffff\)'/);
+  assert.match(app, /color: 'var\(--color-primary, #c06c84\)'/);
+  assert.match(app, /borderColor: 'var\(--color-primary, #c06c84\)'/);
+  assert.match(app, /pl-10 pr-9 h-\[46px\] py-0 rounded-2xl/);
+  assert.match(app, /h-\[46px\] px-3\.5 sm:px-4 py-0 rounded-2xl/);
+  assert.ok((app.match(/w-full h-\[46px\] min-w-0/g) || []).length >= 3);
 });
