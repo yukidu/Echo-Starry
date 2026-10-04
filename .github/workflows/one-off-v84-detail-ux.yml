@@ -1,0 +1,206 @@
+name: One-off v84 detail page UX
+
+on:
+  push:
+    branches: [ui/detail-page-ux-v84]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ui/detail-page-ux-v84
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply detail page UX patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          detail = Path('src/components/DetailView.tsx')
+          text = detail.read_text()
+
+          old = "  const [keywordError, setKeywordError] = useState<string | null>(null);\n\n  useEffect(() => {\n    setTrackKeywords(track.keywords || []);\n    setKeywordMeta(track.keywordMeta || {});\n  }, [track.id, track.keywords, track.keywordMeta]);"
+          new = "  const [keywordError, setKeywordError] = useState<string | null>(null);\n  const [showDetailKeywords, setShowDetailKeywords] = useState(false);\n\n  useEffect(() => {\n    setTrackKeywords(track.keywords || []);\n    setKeywordMeta(track.keywordMeta || {});\n  }, [track.id, track.keywords, track.keywordMeta]);\n\n  useEffect(() => {\n    setShowDetailKeywords(false);\n    setIsAddingKeyword(false);\n  }, [track.id]);"
+          assert old in text
+          text = text.replace(old, new, 1)
+
+          old = "  const categories = track.categories && track.categories.length > 0\n    ? track.categories\n    : track.category ? [track.category] : ['未分類'];\n\n  const displayField = (value?: string | null) => {\n    const text = String(value || '').trim();\n    return text || '未填寫';\n  };\n\n  const formatChineseDate = (value?: string | null) => {\n    const raw = String(value || '').trim();\n    if (!raw) return '未填寫';"
+          new = "  const categories = track.categories && track.categories.length > 0\n    ? track.categories\n    : track.category ? [track.category] : [];\n\n  const displayField = (value?: string | null) => {\n    const text = String(value || '').trim();\n    return text;\n  };\n\n  const formatChineseDate = (value?: string | null) => {\n    const raw = String(value || '').trim();\n    if (!raw) return '';"
+          assert old in text
+          text = text.replace(old, new, 1)
+
+          old = "  const safeDuration = duration > 0 ? duration : (track.durationSeconds || 600);\n\n  // v3.7: 五星評價只接受 1~5 星；再次點擊同星級不再取消，避免評價被歸零。"
+          new = "  const safeDuration = duration > 0 ? duration : (track.durationSeconds || 600);\n  const scrubberDragAllowedRef = useRef(false);\n\n  const handleScrubberPointerDown = (event: React.PointerEvent<HTMLInputElement>) => {\n    const rect = event.currentTarget.getBoundingClientRect();\n    const ratio = safeDuration > 0 ? Math.min(1, Math.max(0, currentTime / safeDuration)) : 0;\n    const thumbX = rect.left + rect.width * ratio;\n    const thumbTouchRadius = 28;\n    if (Math.abs(event.clientX - thumbX) > thumbTouchRadius) {\n      scrubberDragAllowedRef.current = false;\n      event.preventDefault();\n      return;\n    }\n    scrubberDragAllowedRef.current = true;\n  };\n\n  const handleScrubberChange = (event: React.ChangeEvent<HTMLInputElement>) => {\n    if (!scrubberDragAllowedRef.current) return;\n    onSeek(Number(event.target.value));\n  };\n\n  const finishScrubberDrag = () => {\n    scrubberDragAllowedRef.current = false;\n  };\n\n  // v3.7: 五星評價只接受 1~5 星；再次點擊同星級不再取消，避免評價被歸零。"
+          assert old in text
+          text = text.replace(old, new, 1)
+
+          text = text.replace('    <div className="max-w-2xl mx-auto px-3.5 py-3 sm:px-6 space-y-4 pb-28">', '    <div className="max-w-2xl mx-auto px-3.5 py-3 sm:px-6 space-y-3 pb-28 leading-snug">', 1)
+
+          old = '''          <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800 dark:text-slate-200">
+            <span>網友關鍵字</span>
+            <span className="text-[10px] text-slate-400 font-normal">
+              ({trackKeywords.length}/50 組)
+            </span>
+          </div>
+          {canAddKeywords && !isAddingKeyword && ('''
+          new = '''          <button
+            type="button"
+            onClick={() => setShowDetailKeywords(prev => !prev)}
+            className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-bold text-sm text-slate-800 dark:text-slate-200 text-left cursor-pointer"
+          >
+            <span>網友關鍵字</span>
+            <span className="text-xs text-slate-400 font-normal">({trackKeywords.length}/50 組)</span>
+            <span className="text-sm font-bold text-slate-400">{showDetailKeywords ? '▲ 收起' : '▼ 展開'}</span>
+          </button>
+          {showDetailKeywords && canAddKeywords && !isAddingKeyword && ('''
+          assert old in text
+          text = text.replace(old, new, 1)
+          text = text.replace('<div className="flex flex-wrap gap-x-1 gap-y-0.5 items-center">', '<div className={`${showDetailKeywords ? \'flex\' : \'hidden\'} flex-wrap gap-x-1 gap-y-0.5 items-center`}>', 1)
+          text = text.replace('{keywordError && !isAddingKeyword && <p role="alert"', '{showDetailKeywords && keywordError && !isAddingKeyword && <p role="alert"', 1)
+          text = text.replace('{isAddingKeyword && (\n          <div className="mt-2.5', '{showDetailKeywords && isAddingKeyword && (\n          <div className="mt-2.5', 1)
+
+          old = '''            value={currentTime}
+            onChange={e => onSeek(Number(e.target.value))}
+            className="audio-scrubber w-full h-1.5 cursor-pointer"
+          />
+          <div className="flex justify-between items-center text-xs font-mono text-slate-500 dark:text-slate-400 px-0.5">
+            <span>{formatTime(currentTime)} / {formatTime(safeDuration)}</span>
+            <span className="text-[11px] text-slate-400">
+              {Math.round((currentTime / safeDuration) * 100)}%
+            </span>
+          </div>'''
+          new = '''            value={currentTime}
+            onPointerDown={handleScrubberPointerDown}
+            onPointerUp={finishScrubberDrag}
+            onPointerCancel={finishScrubberDrag}
+            onBlur={finishScrubberDrag}
+            onKeyDown={event => event.preventDefault()}
+            onChange={handleScrubberChange}
+            className="audio-scrubber w-full h-1.5 cursor-grab active:cursor-grabbing"
+            aria-label="播放進度，請拖曳目前播放位置的圓點調整"
+          />
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center text-xs font-mono text-slate-500 dark:text-slate-400 px-0.5">
+            <span aria-hidden="true" />
+            <span className="justify-self-center text-center">{formatTime(currentTime)} / {formatTime(safeDuration)}</span>
+            <span className="justify-self-end text-[11px] text-slate-400">
+              {Math.round((currentTime / safeDuration) * 100)}%
+            </span>
+          </div>'''
+          assert old in text
+          text = text.replace(old, new, 1)
+
+          text = text.replace('rounded-2xl p-4 border border-rose-100/60 dark:border-slate-800 shadow-xs space-y-2.5 text-xs overflow-hidden', 'rounded-2xl p-3.5 border border-rose-100/60 dark:border-slate-800 shadow-xs space-y-2 text-xs overflow-hidden', 1)
+          text = text.replace('<div className="relative z-10 space-y-2.5">\n          <div className="flex items-center justify-between">\n            <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">\n              演講資訊與備註\n            </h3>', '<div className="relative z-10 space-y-2">\n          <div className="flex items-center justify-end">', 1)
+          text = text.replace('<span>編輯演講資訊與連結</span>', '<span>編輯</span>', 1)
+          text = text.replace('className="text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap"', 'className="text-slate-600 dark:text-slate-300 leading-snug whitespace-pre-wrap"', 1)
+          text = text.replace('className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500"', 'className="grid grid-cols-2 gap-x-2 gap-y-1 pt-1.5 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500"', 1)
+          text = text.replace('className="col-start-2 row-start-1 text-right whitespace-nowrap"', 'className="col-start-2 row-start-1 flex items-baseline gap-1 whitespace-nowrap"', 1)
+          text = text.replace('className="col-start-2 row-start-2 text-right whitespace-nowrap"', 'className="col-start-2 row-start-2 flex items-baseline gap-1 whitespace-nowrap"', 1)
+          detail.write_text(text)
+
+          comments = Path('src/components/CommentsSection.tsx')
+          c = comments.read_text()
+          c = c.replace("const showBadge = !!displayAuthorBadge && displayAuthorBadge !== '訪客稱號' && displayAuthorBadge !== '訪客' && displayAuthorBadge !== '無';", 'const showBadge = !!registeredAuthor;', 1)
+          c = c.replace('className="w-full bg-white/70 dark:bg-slate-900/60 rounded-3xl p-5 sm:p-7 border border-rose-100/60 dark:border-slate-800 shadow-xs relative"', 'className="w-full bg-white/70 dark:bg-slate-900/60 rounded-3xl p-4 sm:p-5 border border-rose-100/60 dark:border-slate-800 shadow-xs relative leading-snug"', 1)
+          c = c.replace('className="flex items-center justify-between mb-4"', 'className="flex items-center justify-between mb-3"', 1)
+          c = c.replace('<form onSubmit={handleSubmit} className="mb-8 relative">', '<form onSubmit={handleSubmit} className="mb-5 relative">', 1)
+          c = c.replace('rounded-2xl p-4 border border-slate-200/70', 'rounded-2xl p-3.5 border border-slate-200/70', 1)
+
+          old = '''          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200/50 dark:border-slate-700/50 mt-2">
+            <div className="flex items-center gap-2 text-xs sm:text-sm">
+              {currentUser ? (
+                <div className="flex items-center gap-1.5">
+                  <img src={currentUser.avatar} alt={currentUser.name} className="w-5 h-5 rounded-full object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700" />
+                  <span className={`font-bold text-sm ${isAdmin || currentUser.isContributor ? 'rainbow-admin-text' : 'text-slate-800 dark:text-slate-100'}`}>{currentUser.name}</span>
+                  <span className="text-xs text-rose-600 dark:text-rose-400 font-medium">· {currentUser.rank}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 font-medium">
+                  <span className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-950/60 flex items-center justify-center text-sm shadow-2xs">{visitor.emoji}</span>
+                  <span>{visitor.fullName}</span><span className="text-slate-400 text-xs">· 訪客稱號</span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-slate-400 font-mono">{inputText.length}/2000</span>
+              <button type="submit" disabled={isSubmitting || !inputText.trim()} className="px-5 py-2 rounded-xl text-white font-medium text-sm transition-all shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer" style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}>
+                {isSubmitting ? '送出中...' : '送出心得'}
+              </button>
+            </div>
+          </div>'''
+          new = '''          <div className="flex items-center justify-end gap-3 pt-2.5 border-t border-slate-200/50 dark:border-slate-700/50 mt-1.5">
+            <span className="text-xs text-slate-400 font-mono">{inputText.length}/2000</span>
+            <button type="submit" disabled={isSubmitting || !inputText.trim()} className="px-5 py-2 rounded-xl text-white font-medium text-sm transition-all shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer" style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}>
+              {isSubmitting ? '送出中…' : '送出'}
+            </button>
+          </div>'''
+          assert old in c
+          c = c.replace(old, new, 1)
+
+          old = '''                <div className="flex items-center justify-between gap-2 text-xs">
+                  <div onClick={isClickable ? () => handleAuthorClick(c) : undefined} className={`flex items-center gap-1.5 flex-wrap ${isClickable ? 'cursor-pointer hover:opacity-85 transition-opacity' : 'cursor-default pointer-events-none'}`} title={isClickable ? `點擊查看【${displayAuthorName}】會員個人檔案` : undefined}>
+                    {isAvatarUrl ? <img src={displayAuthorAvatar} alt={displayAuthorName} className="w-5 h-5 rounded-full object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700" /> : <span className="text-sm shrink-0">{displayAuthorAvatar || '👤'}</span>}
+                    {c.isAdmin || displayAuthorBadge === '貢獻者' ? <span className="rainbow-admin-text font-bold text-xs">{displayAuthorName}</span> : isClickable ? <span className="font-bold text-slate-800 dark:text-slate-100 text-xs underline decoration-dotted underline-offset-2 hover:text-rose-600 transition-colors">{displayAuthorName}</span> : <span className="font-bold text-slate-700 dark:text-slate-300 text-xs select-none">{displayAuthorName}</span>}
+                    {isVisitor && <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium select-none">訪客</span>}
+                    {showBadge && <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium">{displayAuthorBadge}</span>}
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">{c.timestamp}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">'''
+          new = '''                <div className="flex items-start justify-between gap-2">
+                  <div onClick={isClickable ? () => handleAuthorClick(c) : undefined} className={`flex items-center gap-2 min-w-0 ${isClickable ? 'cursor-pointer hover:opacity-85 transition-opacity' : 'cursor-default pointer-events-none'}`} title={isClickable ? `點擊查看【${displayAuthorName}】會員個人檔案` : undefined}>
+                    {isAvatarUrl ? <img src={displayAuthorAvatar} alt={displayAuthorName} className="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700" /> : <span className="w-10 h-10 rounded-full flex items-center justify-center text-2xl shrink-0">{displayAuthorAvatar || '👤'}</span>}
+                    <div className="h-10 min-w-0 flex flex-col justify-center gap-0.5 leading-none">
+                      {c.isAdmin || displayAuthorBadge === '貢獻者' ? <span className="rainbow-admin-text font-bold text-sm truncate">{displayAuthorName}</span> : isClickable ? <span className="font-bold text-slate-800 dark:text-slate-100 text-sm underline decoration-dotted underline-offset-2 hover:text-rose-600 transition-colors truncate">{displayAuthorName}</span> : <span className="font-bold text-slate-700 dark:text-slate-300 text-sm select-none truncate">{displayAuthorName}</span>}
+                      <div className="flex items-center gap-1 min-w-0">
+                        {isVisitor && <span className="text-xs px-1.5 py-0.5 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium select-none">訪客</span>}
+                        {showBadge && <span className="text-xs px-1.5 py-0.5 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium truncate">{displayAuthorBadge}</span>}
+                        <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono whitespace-nowrap">{c.timestamp}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 pt-0.5">'''
+          assert old in c
+          c = c.replace(old, new, 1)
+
+          c = c.replace('className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed pl-6 whitespace-pre-wrap mt-0.5 break-words"', 'className="text-base text-slate-700 dark:text-slate-300 leading-snug pl-12 whitespace-pre-wrap mt-1 break-words"', 1)
+          c = c.replace('className="mt-1.5 space-y-1.5 pl-5"', 'className="mt-1.5 space-y-1.5 pl-12"', 1)
+          c = c.replace('className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/60 text-xs', 'className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/60 text-sm', 1)
+          comments.write_text(c)
+
+          test = Path('tests/detailPageUx.test.ts')
+          test.write_text("""import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { readFileSync } from 'node:fs';\n\nconst detail = readFileSync(new URL('../src/components/DetailView.tsx', import.meta.url), 'utf8');\nconst comments = readFileSync(new URL('../src/components/CommentsSection.tsx', import.meta.url), 'utf8');\n\ntest('detail scrubber only seeks from the current thumb and centers time', () => {\n  assert.match(detail, /thumbTouchRadius = 28/);\n  assert.match(detail, /onPointerDown=\\{handleScrubberPointerDown\\}/);\n  assert.match(detail, /onChange=\\{handleScrubberChange\\}/);\n  assert.doesNotMatch(detail, /onChange=\\{e => onSeek\\(Number\\(e\\.target\\.value\\)\\)\\}/);\n  assert.match(detail, /grid-cols-\\[1fr_auto_1fr\\]/);\n  assert.match(detail, /justify-self-center text-center/);\n});\n\ntest('detail metadata stays blank when missing and keyword panel defaults collapsed', () => {\n  assert.match(detail, /showDetailKeywords, setShowDetailKeywords\\] = useState\\(false\\)/);\n  assert.match(detail, /showDetailKeywords \\? '▲ 收起' : '▼ 展開'/);\n  assert.match(detail, /return text;/);\n  assert.match(detail, /if \\(!raw\\) return '';/);\n  assert.doesNotMatch(detail, />演講資訊與備註</);\n  assert.match(detail, /<span>編輯<\\/span>/);\n});\n\ntest('comment composer is compact and comment identity is enlarged', () => {\n  assert.doesNotMatch(comments, /送出心得/);\n  assert.match(comments, /'送出'/);\n  assert.match(comments, /w-10 h-10 rounded-full object-cover/);\n  assert.match(comments, /h-10 min-w-0 flex flex-col justify-center/);\n  assert.match(comments, /className=\"text-base text-slate-700[\\s\\S]*leading-snug pl-12/);\n  const footerStart = comments.indexOf('flex items-center justify-end gap-3 pt-2.5');\n  assert.ok(footerStart >= 0);\n  const footer = comments.slice(footerStart, footerStart + 900);\n  assert.doesNotMatch(footer, /currentUser\\.name|currentUser\\.rank|currentUser\\.avatar/);\n});\n""")
+
+          changelog = Path('src/changelogReleaseNotes.ts')
+          notes = changelog.read_text()
+          anchor = "    '首頁網友關鍵字視覺再統一：關閉 X 會跟著目前調色盤主色同步；展開清單與已選條件中的關鍵字都改為一般字重；排序整排按鈕與上方搜尋框統一高度，切換排序時不再因縮放造成高度跳動。',\n"
+          note = "    '音檔詳細頁操作整理：播放時間軸改成只能從目前播放圓點按住拖曳，避免誤點跳段；時間置中。演講資訊空白欄位不再顯示「未填寫」，編輯按鈕簡化為「編輯」，關鍵字預設收起並可展開；心得輸入移除姓名獎銜、送出按鈕簡化，留言頭像放大、姓名與獎銜上下排列，全文字體與頁面行距同步優化。',\n"
+          assert anchor in notes
+          changelog.write_text(notes.replace(anchor, anchor + note, 1))
+
+          sw = Path('public/sw.js')
+          s = sw.read_text()
+          assert 'echostars-shell-v83' in s
+          sw.write_text(s.replace('echostars-shell-v83', 'echostars-shell-v84', 1))
+
+          release = Path('tests/releaseIntegrity.test.ts')
+          r = release.read_text()
+          assert "test('v83 is the single current PWA cache version'" in r
+          r = r.replace("test('v83 is the single current PWA cache version'", "test('v84 is the single current PWA cache version'", 1)
+          r = r.replace('echostars-shell-v83', 'echostars-shell-v84')
+          release.write_text(r)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name 'echostars-release-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/components/DetailView.tsx src/components/CommentsSection.tsx tests/detailPageUx.test.ts src/changelogReleaseNotes.ts public/sw.js tests/releaseIntegrity.test.ts
+          git diff --cached --check
+          git commit -m '整理音檔詳細頁播放器資訊與心得介面'
+          git push origin HEAD:ui/detail-page-ux-v84
