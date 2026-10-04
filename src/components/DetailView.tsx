@@ -474,7 +474,7 @@ export const DetailView: React.FC<DetailViewProps> = ({
       {/* Requirement 5.7 (v2.7): 「網友關鍵字」往上移動到頁面的最上面 */}
       <div className="relative rounded-2xl p-3 sm:p-4 bg-white/80 dark:bg-slate-900/80 border border-amber-200/70 dark:border-slate-800 shadow-2xs backdrop-blur-xs">
         <div className="flex items-center justify-between gap-2 mb-2">
-          <button type="button" onClick={() => setShowDetailKeywords(prev => !prev)} className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-bold text-sm text-slate-800 dark:text-slate-200 text-left cursor-pointer">
+          <button type="button" onClick={() => setShowDetailKeywords(prev => !prev)} className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-bold text-sm text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 transition-colors text-left cursor-pointer">
   <span>網友關鍵字</span>
   <span className="text-xs text-slate-400 font-normal">({trackKeywords.length}/50 組)</span>
   <span className="text-sm font-bold text-slate-400">{showDetailKeywords ? '▲ 收起' : '▼ 展開'}</span>

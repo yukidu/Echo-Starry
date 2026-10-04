@@ -300,7 +300,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
           <div className="flex items-center justify-end gap-3 pt-2.5 border-t border-slate-200/50 dark:border-slate-700/50 mt-1.5">
   <span className="text-xs text-slate-400 font-mono">{inputText.length}/2000</span>
   <button type="submit" disabled={isSubmitting || !inputText.trim()} className="px-5 py-2 rounded-xl text-white font-medium text-sm transition-all shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer" style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}>
-    {isSubmitting ? '送出中…' : '送出'}
+    {isSubmitting ? '送出中...' : '送出'}
   </button>
 </div>
         </div>
