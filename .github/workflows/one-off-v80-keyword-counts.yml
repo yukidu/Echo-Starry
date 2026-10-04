@@ -1,0 +1,218 @@
+name: One-off v80 dynamic keyword counts
+
+on:
+  push:
+    branches: [feat/dynamic-keyword-counts-v80]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/dynamic-keyword-counts-v80
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply keyword filter improvements
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          app = Path('src/App.tsx')
+          text = app.read_text()
+
+          helper_anchor = '\nexport default function App() {'
+          helpers = r'''
+function trackMatchesHomeKeyword(track: Track, rawKeyword: string) {
+  const clean = rawKeyword.toLowerCase().trim();
+  if (!clean) return true;
+  const allKeywords = [...(track.keywords || []), ...(track.tags || [])].map(keyword => keyword.toLowerCase().trim());
+  return (
+    allKeywords.some(keyword => keyword.includes(clean)) ||
+    track.title.toLowerCase().includes(clean) ||
+    (track.speaker || '').toLowerCase().includes(clean) ||
+    (track.description || '').toLowerCase().includes(clean) ||
+    (track.series || '').toLowerCase().includes(clean)
+  );
+}
+
+function trackMatchesHomeSearch(track: Track, rawQuery: string) {
+  const tokens = rawQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+  const allKeywords = [...(track.keywords || []), ...(track.tags || [])].map(keyword => keyword.toLowerCase());
+  return tokens.every(token => (
+    track.title.toLowerCase().includes(token) ||
+    (track.speaker || '').toLowerCase().includes(token) ||
+    (track.speakerRank || '').toLowerCase().includes(token) ||
+    (track.series || '').toLowerCase().includes(token) ||
+    (track.description || '').toLowerCase().includes(token) ||
+    (track.remarks || '').toLowerCase().includes(token) ||
+    (track.category || '').toLowerCase().includes(token) ||
+    (track.categories || []).some(category => category.toLowerCase().includes(token)) ||
+    [
+      track.speechDate,
+      track.uploadDate,
+      track.seriesOrder,
+      track.requiredRank,
+      track.uploaderName,
+      track.uploaderEmail,
+      track.audioUrl,
+      track.duration,
+      ...(track.externalFiles || []).flatMap(file => [file.name, file.url]),
+      ...(track.externalVideos || []).flatMap(file => [file.name, file.url]),
+      ...(track.externalPpts || []).flatMap(file => [file.name, file.url])
+    ].some(value => value?.toLowerCase().includes(token)) ||
+    allKeywords.some(keyword => keyword.includes(token))
+  ));
+}
+
+function trackMatchesHomeBaseFilters(
+  track: Track,
+  selectedCategory: string,
+  selectedSpeakerRank: string,
+  searchQuery: string
+) {
+  if (selectedCategory !== '全部') {
+    const matchPrimary = track.category === selectedCategory;
+    const matchMultiple = Boolean(track.categories?.includes(selectedCategory));
+    if (!matchPrimary && !matchMultiple) return false;
+  }
+  if (selectedSpeakerRank !== '全部' && baseSpeakerRank(track.speakerRank || '') !== selectedSpeakerRank) return false;
+  return trackMatchesHomeSearch(track, searchQuery);
+}
+'''
+          assert helper_anchor in text, 'App export anchor not found'
+          assert 'function trackMatchesHomeKeyword' not in text, 'keyword helper already exists'
+          text = text.replace(helper_anchor, '\n' + helpers + helper_anchor, 1)
+
+          filter_pattern = re.compile(
+              r"    return trackList\n      \.filter\(t => \{.*?        return true;\n      \}\)\n      \.sort\(\(a, b\) => \{",
+              re.S,
+          )
+          filter_replacement = '''    return trackList
+      .filter(t => {
+        if (!trackMatchesHomeBaseFilters(t, selectedCategory, selectedSpeakerRank, searchQuery)) return false;
+        if (selectedKeywords.length > 0 && !selectedKeywords.every(keyword => trackMatchesHomeKeyword(t, keyword))) return false;
+        return true;
+      })
+      .sort((a, b) => {'''
+          text, changed = filter_pattern.subn(filter_replacement, text, count=1)
+          assert changed == 1, f'filteredTracks block replacements: {changed}'
+
+          count_anchor = '  // Filtered & Sorted Tracks List (Requirement 18 & 19 & Requirement 6: 多組網友關鍵字交叉複合搜尋)\n'
+          count_block = '''  // Dynamic keyword result counts: selected keywords are AND conditions.
+  // For an unselected keyword, show how many tracks would remain if the user adds it.
+  // For a selected keyword, show the current intersection result count.
+  const keywordMatchCounts = useMemo(() => {
+    const baseTracks = (Array.isArray(tracks) ? tracks : []).filter(track =>
+      trackMatchesHomeBaseFilters(track, selectedCategory, selectedSpeakerRank, searchQuery)
+    );
+
+    return allAvailableKeywords.reduce<Record<string, number>>((counts, keyword) => {
+      const activeKeywords = selectedKeywords.includes(keyword)
+        ? selectedKeywords
+        : [...selectedKeywords, keyword];
+      counts[keyword] = baseTracks.filter(track =>
+        activeKeywords.every(activeKeyword => trackMatchesHomeKeyword(track, activeKeyword))
+      ).length;
+      return counts;
+    }, {});
+  }, [tracks, allAvailableKeywords, selectedCategory, selectedSpeakerRank, selectedKeywords, searchQuery]);
+
+'''
+          assert count_anchor in text, 'filtered tracks comment anchor missing'
+          text = text.replace(count_anchor, count_block + count_anchor, 1)
+
+          old_header = '''                  className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 transition-colors cursor-pointer"
+                >
+                  <span>網友關鍵字</span>'''
+          new_header = '''                  className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm font-bold text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 transition-colors cursor-pointer text-left"
+                >
+                  <span>網友關鍵字（可複選多個條件）</span>'''
+          assert old_header in text, 'keyword header block not found'
+          text = text.replace(old_header, new_header, 1)
+
+          old_drawer_class = 'className={`px-1.5 py-0.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer border ${'
+          new_drawer_class = 'className={`px-2 py-1 rounded-lg text-sm font-semibold transition-colors cursor-pointer border ${'
+          assert old_drawer_class in text, 'drawer keyword class not found'
+          text = text.replace(old_drawer_class, new_drawer_class, 1)
+
+          old_suggestion_class = 'className={`px-2.5 py-1 rounded-xl text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${'
+          new_suggestion_class = 'className={`px-2.5 py-1 rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center gap-1 ${'
+          assert old_suggestion_class in text, 'search suggestion keyword class not found'
+          text = text.replace(old_suggestion_class, new_suggestion_class, 1)
+
+          old_chip_class = 'className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-200 border border-amber-300/80 dark:border-amber-700"'
+          new_chip_class = 'className="inline-flex items-center gap-0.5 px-2 py-1 rounded-full text-sm font-semibold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-200 border border-amber-300/80 dark:border-amber-700"'
+          assert old_chip_class in text, 'selected keyword chip class not found'
+          text = text.replace(old_chip_class, new_chip_class, 1)
+
+          assert '<span>🔍 {kw}</span>' in text, 'search suggestion keyword label missing'
+          text = text.replace('<span>🔍 {kw}</span>', '<span>🔍 {kw}({keywordMatchCounts[kw] ?? 0})</span>', 1)
+
+          drawer_and_chip_occurrences = text.count('<span>{kw}</span>')
+          assert drawer_and_chip_occurrences >= 2, f'expected at least 2 plain keyword labels, got {drawer_and_chip_occurrences}'
+          text = text.replace('<span>{kw}</span>', '<span>{kw}({keywordMatchCounts[kw] ?? 0})</span>')
+          app.write_text(text)
+
+          test = Path('tests/homeKeywordCounts.test.ts')
+          test.write_text(r'''import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+
+test('home keyword drawer explains multi-select and uses larger keyword text', () => {
+  assert.match(app, /網友關鍵字（可複選多個條件）/);
+  assert.match(app, /px-2 py-1 rounded-lg text-sm font-semibold/);
+  assert.match(app, /\{kw\}\(\{keywordMatchCounts\[kw\] \?\? 0\}\)/);
+});
+
+test('keyword counts are computed from the same home filters and update with selected intersections', () => {
+  assert.match(app, /const keywordMatchCounts = useMemo/);
+  assert.match(app, /trackMatchesHomeBaseFilters\(track, selectedCategory, selectedSpeakerRank, searchQuery\)/);
+  assert.match(app, /selectedKeywords\.includes\(keyword\)/);
+  assert.match(app, /activeKeywords\.every\(activeKeyword => trackMatchesHomeKeyword\(track, activeKeyword\)\)/);
+  assert.match(app, /\[tracks, allAvailableKeywords, selectedCategory, selectedSpeakerRank, selectedKeywords, searchQuery\]/);
+});
+
+test('the playlist and keyword counters share one keyword matching rule', () => {
+  assert.match(app, /selectedKeywords\.every\(keyword => trackMatchesHomeKeyword\(t, keyword\)\)/);
+  assert.match(app, /function trackMatchesHomeKeyword/);
+  assert.match(app, /function trackMatchesHomeSearch/);
+});
+''')
+
+          changelog = Path('src/changelogReleaseNotes.ts')
+          text = changelog.read_text()
+          note = "    '首頁「網友關鍵字」改成可複選條件提示，關鍵字字體放大；每個關鍵字後方新增即時音檔數量，例如 (3)。選取多個關鍵字時，數量會依目前分類、獎銜、搜尋與已選關鍵字交叉條件立即重新計算，不增加額外雲端查詢。',\n"
+          anchor = "    '個人中心的「上手白金」與「上手鑽石」改為真正可用的關聯詞提示：輸入或點進欄位時，會從現有會員姓名與既有上手資料中自動顯示符合候選詞，可直接點選帶入。',\n"
+          assert anchor in text, 'changelog insertion anchor missing'
+          changelog.write_text(text.replace(anchor, anchor + note, 1))
+
+          sw = Path('public/sw.js')
+          text = sw.read_text()
+          assert 'echostars-shell-v79' in text, 'expected v79 cache not found'
+          sw.write_text(text.replace('echostars-shell-v79', 'echostars-shell-v80', 1))
+
+          release = Path('tests/releaseIntegrity.test.ts')
+          text = release.read_text()
+          assert "test('v79 is the single current PWA cache version'" in text
+          text = text.replace("test('v79 is the single current PWA cache version'", "test('v80 is the single current PWA cache version'")
+          text = text.replace('echostars-shell-v79', 'echostars-shell-v80')
+          release.write_text(text)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name 'echostars-release-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/App.tsx tests/homeKeywordCounts.test.ts src/changelogReleaseNotes.ts public/sw.js tests/releaseIntegrity.test.ts
+          git diff --cached --check
+          git commit -m '網友關鍵字新增動態交叉條件音檔數量'
+          git push origin HEAD:feat/dynamic-keyword-counts-v80
