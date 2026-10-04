@@ -50,3 +50,5 @@ jobs:
           git add -A test-output-v90.txt || true
           git commit -m "精簡留言回覆顯示與時間字體" || exit 0
           git push
+
+# Final rerun after synchronizing the collapsible-comment regression rule.
