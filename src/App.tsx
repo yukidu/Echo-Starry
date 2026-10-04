@@ -1877,17 +1877,17 @@ export default function App() {
           {
             key: 'logo',
             selector: '[data-tutorial-target="home-logo"]',
-            text: '按此回首頁'
+            text: '回首頁'
           },
           {
             key: 'visitor',
             selector: '[data-tutorial-target="visitor-profile"]',
-            text: '按此註冊會員，可紀錄學習進度，跨裝置播放進度記憶，更多神秘有趣功能等你發現！'
+            text: '註冊會員\n才有完整功能\n\n記憶播放進度\n生命靈數分析\n累積星幣點數\n收藏我的最愛\n超多有趣功能等你發現'
           },
           {
             key: 'photo',
             selector: '[data-tutorial-target="first-track-photo"]',
-            text: '按照片可播放或暫停'
+            text: '按照片\n播放/暫停'
           }
         ]}
         neverRemind={neverRemindHomeTutorial}
