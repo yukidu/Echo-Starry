@@ -45,3 +45,11 @@ export function formatCommentTimestamp(source: CommentTimestampSource): string {
   if (legacy && legacy !== '剛剛' && legacy !== '剛才') return legacy;
   return '時間未知';
 }
+
+export function formatCommentTimestampDisplay(source: CommentTimestampSource): string[] {
+  const canonical = formatCommentTimestamp(source);
+  const match = canonical.match(/^(\d{4})\/(\d{2})\/(\d{2}) (\d{2}:\d{2})$/);
+  if (!match) return [canonical];
+  return [`${match[1]}年`, `${Number(match[2])}月/${Number(match[3])}日`, match[4]];
+}
+
