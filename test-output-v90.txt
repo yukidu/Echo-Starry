@@ -1,0 +1,1648 @@
+
+> react-example@0.0.0 test
+> node --import tsx --test tests/*.test.ts
+
+TAP version 13
+# Subtest: member list renders permanent delete only for the exact super-admin email and protects the super-admin row
+ok 1 - member list renders permanent delete only for the exact super-admin email and protects the super-admin row
+  ---
+  duration_ms: 4.288031
+  type: 'test'
+  ...
+# Subtest: member deletion API independently verifies a live session and exact super-admin email
+ok 2 - member deletion API independently verifies a live session and exact super-admin email
+  ---
+  duration_ms: 0.235942
+  type: 'test'
+  ...
+# Subtest: deleting an account removes member-bound sessions and learning identity data before the user row
+ok 3 - deleting an account removes member-bound sessions and learning identity data before the user row
+  ---
+  duration_ms: 0.235602
+  type: 'test'
+  ...
+# Subtest: privacy entrypoint routes requests through the member deletion guard
+ok 4 - privacy entrypoint routes requests through the member deletion guard
+  ---
+  duration_ms: 0.177241
+  type: 'test'
+  ...
+# Subtest: track title uses palette primary color and remains the only bold text
+ok 5 - track title uses palette primary color and remains the only bold text
+  ---
+  duration_ms: 1.677142
+  type: 'test'
+  ...
+# Subtest: track title grows further on larger screens
+ok 6 - track title grows further on larger screens
+  ---
+  duration_ms: 1.122954
+  type: 'test'
+  ...
+# Subtest: like count text inherits the same feedback-row color without overriding the heart icon
+ok 7 - like count text inherits the same feedback-row color without overriding the heart icon
+  ---
+  duration_ms: 0.28819
+  type: 'test'
+  ...
+# Subtest: v71 scrubs deleted categories from persisted tracks without inventing a fallback
+ok 8 - v71 scrubs deleted categories from persisted tracks without inventing a fallback
+  ---
+  duration_ms: 1.561956
+  type: 'test'
+  ...
+# Subtest: D1 categories is the only category authority, including an empty list
+ok 9 - D1 categories is the only category authority, including an empty list
+  ---
+  duration_ms: 0.255479
+  type: 'test'
+  ...
+# Subtest: browser startup reconciles stale or missing home cache before React mounts
+ok 10 - browser startup reconciles stale or missing home cache before React mounts
+  ---
+  duration_ms: 0.248676
+  type: 'test'
+  ...
+# Subtest: client track writes and track-list reads are sanitized against live categories
+ok 11 - client track writes and track-list reads are sanitized against live categories
+  ---
+  duration_ms: 0.254817
+  type: 'test'
+  ...
+# Subtest: home cards keep a valid empty category list instead of showing a made-up category
+ok 12 - home cards keep a valid empty category list instead of showing a made-up category
+  ---
+  duration_ms: 0.219872
+  type: 'test'
+  ...
+# Subtest: schema reruns cannot recreate categories deleted by an administrator
+ok 13 - schema reruns cannot recreate categories deleted by an administrator
+  ---
+  duration_ms: 0.288741
+  type: 'test'
+  ...
+# Subtest: upload/edit modal exposes category selection only
+ok 14 - upload/edit modal exposes category selection only
+  ---
+  duration_ms: 1.289987
+  type: 'test'
+  ...
+# Subtest: admin category deletion requires a second click before React delete handler can run
+ok 15 - admin category deletion requires a second click before React delete handler can run
+  ---
+  duration_ms: 0.285394
+  type: 'test'
+  ...
+# Subtest: category UI policy loads before the React bootstrap
+ok 16 - category UI policy loads before the React bootstrap
+  ---
+  duration_ms: 0.240962
+  type: 'test'
+  ...
+# Subtest: v3.9 explains the full-site healthcheck in plain language
+ok 17 - v3.9 explains the full-site healthcheck in plain language
+  ---
+  duration_ms: 1.639791
+  type: 'test'
+  ...
+# Subtest: v3.8 cumulative changelog remains available for recent user-facing releases
+ok 18 - v3.8 cumulative changelog remains available for recent user-facing releases
+  ---
+  duration_ms: 0.301735
+  type: 'test'
+  ...
+# Subtest: changelog release patch merges both maintained releases and only intercepts GET changelog requests
+ok 19 - changelog release patch merges both maintained releases and only intercepts GET changelog requests
+  ---
+  duration_ms: 0.200306
+  type: 'test'
+  ...
+# Subtest: release notes patch loads before the other runtime policies
+ok 20 - release notes patch loads before the other runtime policies
+  ---
+  duration_ms: 0.228498
+  type: 'test'
+  ...
+# Subtest: v3.7 public changelog removes implementation jargon and keeps user-facing meaning
+ok 21 - v3.7 public changelog removes implementation jargon and keeps user-facing meaning
+  ---
+  duration_ms: 4.63899
+  type: 'test'
+  ...
+# Subtest: v3.7 changelog is normalized in data before React renders the modal
+ok 22 - v3.7 changelog is normalized in data before React renders the modal
+  ---
+  duration_ms: 0.272561
+  type: 'test'
+  ...
+# Subtest: public changelog policy is loaded before the main application policies
+ok 23 - public changelog policy is loaded before the main application policies
+  ---
+  duration_ms: 0.249056
+  type: 'test'
+  ...
+# Subtest: long web comments collapse to three lines and can expand/collapse
+ok 24 - long web comments collapse to three lines and can expand/collapse
+  ---
+  duration_ms: 4.215016
+  type: 'test'
+  ...
+# Subtest: all requested web comment surfaces use the shared collapsible renderer
+not ok 25 - all requested web comment surfaces use the shared collapsible renderer
+  ---
+  duration_ms: 8.623725
+  type: 'test'
+  location: '/home/runner/work/echostars/echostars/tests/commentCollapse.test.ts:1:1110'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /renderFormattedContent\(c\.content\)/. Input:
+    
+    "import { commentThreads } from '../utils/comments';\n" +
+      "import { apiJson, identityKeys } from '../utils/api';\n" +
+      "import React, { useState, useRef, useMemo, useEffect } from 'react';\n" +
+      'import {\n' +
+      '  MessageSquare,\n' +
+      '  Trash2,\n' +
+      '  Edit3,\n' +
+      '  Check,\n' +
+      '  X,\n' +
+      '  ShieldAlert,\n' +
+      '  Heart,\n' +
+      '  Reply,\n' +
+      '  AtSign,\n' +
+      '  Radio,\n' +
+      '  Mic\n' +
+      "} from 'lucide-react';\n" +
+      "import { Comment, UserProfile, Track } from '../types';\n" +
+      "import { VisitorIdentity } from '../utils/visitor';\n" +
+      "import { CollapsibleCommentText } from './CollapsibleCommentText';\n" +
+      "import { formatCommentTimestampDisplay } from '../../shared/commentTime';\n" +
+      '\n' +
+      'const stripLegacyAutoReplyMention = (content: string, replyToAuthor?: string) => {\n' +
+      "  const value = typeof content === 'string' ? content : '';\n" +
+      '  const author = replyToAuthor?.trim();\n' +
+      '  if (!author) return value;\n' +
+      '  for (const prefix of [`@${author}`, `＠${author}`]) {\n' +
+      '    if (!value.startsWith(prefix)) continue;\n' +
+      '    const nextChar = value.slice(prefix.length, prefix.length + 1);\n' +
+      '    if (nextChar && !/\\s/.test(nextChar)) continue;\n' +
+      '    return value.slice(prefix.length).trimStart();\n' +
+      '  }\n' +
+      '  return value;\n' +
+      '};\n' +
+      '\n' +
+      'interface CommentsSectionProps {\n' +
+      '  trackId: string;\n' +
+      '  comments: Comment[];\n' +
+      '  visitor: VisitorIdentity;\n' +
+      '  currentUser: UserProfile | null;\n' +
+      '  isAdmin: boolean;\n' +
+      '  onAddComment: (content: string, replyToId?: string, replyToAuthor?: string) => Promise<void>;\n' +
+      '  onDeleteComment: (commentId: string) => Promise<void>;\n' +
+      '  onEditComment: (commentId: string, newContent: string) => Promise<void>;\n' +
+      '  onViewMember?: (user: UserProfile) => void;\n' +
+      '  allUsers?: UserProfile[];\n' +
+      '  tracks?: Track[];\n' +
+      '}\n' +
+      '\n' +
+      'export const CommentsSection: React.FC<CommentsSectionProps> = ({\n' +
+      '  comments,\n' +
+      '  visitor,\n' +
+      '  currentUser,\n' +
+      '  isAdmin,\n' +
+      '  onAddComment,\n' +
+      '  onDeleteComment,\n' +
+      '  onEditComment,\n' +
+      '  onViewMember,\n' +
+      '  allUsers = [],\n' +
+      '  tracks = []\n' +
+      '}) => {\n' +
+      "  const [inputText, setInputText] = useState('');\n" +
+      '  const [replyingTo, setReplyingTo] = useState<Comment | null>(null);\n' +
+      '  const [isSubmitting, setIsSubmitting] = useState(false);\n' +
+      '  const [errorMessage, setErrorMessage] = useState<string | null>(null);\n' +
+      '\n' +
+      '  const [editingId, setEditingId] = useState<string | null>(null);\n' +
+      "  const [editContent, setEditContent] = useState('');\n" +
+      '  const [likeStats, setLikeStats] = useState<Record<string, { likes: number; hasLiked: boolean }>>({});\n' +
+      '\n' +
+      '  const textareaRef = useRef<HTMLTextAreaElement | null>(null);\n' +
+      '  const [isMentionOpen, setIsMentionOpen] = useState(false);\n' +
+      "  const [mentionKeyword, setMentionKeyword] = useState('');\n" +
+      "  const [mentionTab, setMentionTab] = useState<'members' | 'tracks'>('members');\n" +
+      '\n' +
+      '  const myKeys = identityKeys(currentUser, visitor.deviceId);\n' +
+      '  const myId = myKeys[0];\n' +
+      "  const isSuperAdminModerator = isAdmin || currentUser?.role === '超級管理員';\n" +
+      "  const isAdminModerator = isSuperAdminModerator || currentUser?.isAdminUser === true || currentUser?.role === '管理員';\n" +
+      '\n' +
+      '  const pendingLikes = useRef(new Set<string>());\n' +
+      '  useEffect(() => { setLikeStats({}); }, [myId]);\n' +
+      '\n' +
+      '  const handleLikeComment = async (comment: Comment) => {\n' +
+      '    if (pendingLikes.current.has(comment.id)) return;\n' +
+      '    pendingLikes.current.add(comment.id);\n' +
+      '    const currentLiked = likeStats[comment.id] !== undefined\n' +
+      '      ? likeStats[comment.id].hasLiked\n' +
+      '      : (comment.likedBy || []).some(k => myKeys.includes(k));\n' +
+      '    const currentCount = likeStats[comment.id] !== undefined\n' +
+      '      ? likeStats[comment.id].likes\n' +
+      '      : (comment.likes || 0);\n' +
+      '\n' +
+      '    const nextLiked = !currentLiked;\n' +
+      '    const nextCount = nextLiked ? currentCount + 1 : Math.max(0, currentCount - 1);\n' +
+      '    setLikeStats(prev => ({ ...prev, [comment.id]: { likes: nextCount, hasLiked: nextLiked } }));\n' +
+      '\n' +
+      '    try {\n' +
+      '      const data = await apiJson(`/api/comments/${encodeURIComponent(comment.id)}/like`, {\n' +
+      "        method: 'POST',\n" +
+      "        headers: { 'Content-Type': 'application/json' },\n" +
+      '        body: JSON.stringify({ identifier: myId, userId: currentUser?.id, userEmail: currentUser?.email, deviceId: visitor?.deviceId })\n' +
+      '      });\n' +
+      '      setLikeStats(prev => ({ ...prev, [comment.id]: { likes: data.likes, hasLiked: data.hasLiked } }));\n' +
+      '    } catch (error) {\n' +
+      '      setLikeStats(prev => ({ ...prev, [comment.id]: { likes: currentCount, hasLiked: currentLiked } }));\n' +
+      "      setErrorMessage(error instanceof Error ? error.message : '按讚失敗，請重試。');\n" +
+      '    } finally {\n' +
+      '      pendingLikes.current.delete(comment.id);\n' +
+      '    }\n' +
+      '  };\n' +
+      '\n' +
+      '  const getRegisteredAuthor = (c: Comment): UserProfile | null => {\n' +
+      '    const email = c.authorEmail?.toLowerCase().trim();\n' +
+      '    if (!email) return null;\n' +
+      '    if (currentUser?.email?.toLowerCase().trim() === email) return currentUser;\n' +
+      '    return allUsers.find(u => u.email?.toLowerCase().trim() === email) || null;\n' +
+      '  };\n' +
+      '\n' +
+      '  const handleAuthorClick = (c: Comment) => {\n' +
+      '    const member = getRegisteredAuthor(c);\n' +
+      '    if (!member || !onViewMember) return;\n' +
+      '    onViewMember(member);\n' +
+      '  };\n' +
+      '\n' +
+      '  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {\n' +
+      '    const val = e.target.value;\n' +
+      '    setInputText(val);\n' +
+      '    const cursorPos = e.target.selectionStart;\n' +
+      '    const textBeforeCursor = val.slice(0, cursorPos);\n' +
+      "    const lastAtIdx = Math.max(textBeforeCursor.lastIndexOf('@'), textBeforeCursor.lastIndexOf('＠'));\n" +
+      '    if (lastAtIdx !== -1) {\n' +
+      '      const query = textBeforeCursor.slice(lastAtIdx + 1);\n' +
+      "      if (!query.includes(' ') && !query.includes('\\n')) {\n" +
+      '        setMentionKeyword(query);\n' +
+      '        setIsMentionOpen(true);\n' +
+      '        return;\n' +
+      '      }\n' +
+      '    }\n' +
+      '    setIsMentionOpen(false);\n' +
+      '  };\n' +
+      '\n' +
+      '  const handleSelectMention = (label: string) => {\n' +
+      '    if (!textareaRef.current) return;\n' +
+      '    const cursorPos = textareaRef.current.selectionStart;\n' +
+      '    const textBeforeCursor = inputText.slice(0, cursorPos);\n' +
+      '    const textAfterCursor = inputText.slice(cursorPos);\n' +
+      "    const lastAtIdx = Math.max(textBeforeCursor.lastIndexOf('@'), textBeforeCursor.lastIndexOf('＠'));\n" +
+      '    if (lastAtIdx !== -1) {\n' +
+      '      const newText = textBeforeCursor.slice(0, lastAtIdx) + `@${label} ` + textAfterCursor;\n' +
+      '      setInputText(newText);\n' +
+      '      setIsMentionOpen(false);\n' +
+      '      setTimeout(() => {\n' +
+      '        if (textareaRef.current) {\n' +
+      '          const nextPos = lastAtIdx + label.length + 2;\n' +
+      '          textareaRef.current.focus();\n' +
+      '          textareaRef.current.setSelectionRange(nextPos, nextPos);\n' +
+      '        }\n' +
+      '      }, 0);\n' +
+      '    }\n' +
+      '  };\n' +
+      '\n' +
+      '  const combinedMentionSuggestions = useMemo(() => {\n' +
+      '    const q = mentionKeyword.toLowerCase().trim();\n' +
+      '    const members = allUsers\n' +
+      '      .filter(u => {\n' +
+      "        if (!u.name || u.name.startsWith('訪客')) return false;\n" +
+      '        if (!q) return true;\n' +
+      '        return u.name.toLowerCase().includes(q) ||\n' +
+      '          (u.center && u.center.toLowerCase().includes(q)) ||\n' +
+      '          (u.email && u.email.toLowerCase().includes(q)) ||\n' +
+      '          (u.rank && u.rank.toLowerCase().includes(q));\n' +
+      '      })\n' +
+      '      .slice(0, 6)\n' +
+      '      .map(u => ({\n' +
+      "        type: 'member' as const,\n" +
+      '        id: `u-${u.id}`,\n' +
+      '        label: u.name,\n' +
+      "        badge: [u.center, u.rank || '會員'].filter(Boolean).join(' ') || '會員',\n" +
+      '        avatar: u.avatar\n' +
+      '      }));\n' +
+      '\n' +
+      '    const speakerMap = new Map<string, { name: string; avatar?: string }>();\n' +
+      '    tracks.forEach(t => {\n' +
+      '      if (t.speaker?.trim() && !speakerMap.has(t.speaker.trim())) {\n' +
+      '        speakerMap.set(t.speaker.trim(), { name: t.speaker.trim(), avatar: t.speakerAvatar });\n' +
+      '      }\n' +
+      '    });\n' +
+      '    const speakers = Array.from(speakerMap.values())\n' +
+      '      .filter(s => !q || s.name.toLowerCase().includes(q))\n' +
+      '      .slice(0, 5)\n' +
+      "      .map(s => ({ type: 'speaker' as const, id: `spk-${s.name}`, label: s.name, badge: '音檔演講者', avatar: s.avatar }));\n" +
+      '\n' +
+      '    const trackItems = tracks\n' +
+      '      .filter(t => !q || t.title.toLowerCase().includes(q) || t.speaker?.toLowerCase().includes(q))\n' +
+      '      .slice(0, 4)\n' +
+      "      .map(t => ({ type: 'track' as const, id: `t-${t.id}`, label: t.title, badge: t.speaker ? `講師：${t.speaker}` : '音檔', avatar: t.speakerAvatar }));\n" +
+      '\n' +
+      '    return [...members, ...speakers, ...trackItems].slice(0, 12);\n' +
+      '  }, [allUsers, tracks, mentionKeyword]);\n' +
+      '\n' +
+      '  const handleSubmit = async (e: React.FormEvent) => {\n' +
+      '    e.preventDefault();\n' +
+      '    if (!inputText.trim()) return;\n' +
+      '    setIsSubmitting(true);\n' +
+      '    setErrorMessage(null);\n' +
+      '    try {\n' +
+      '      await onAddComment(inputText.trim(), replyingTo?.id);\n' +
+      "      setInputText('');\n" +
+      '      setReplyingTo(null);\n' +
+      '      setIsMentionOpen(false);\n' +
+      '    } catch (err: any) {\n' +
+      "      setErrorMessage(err.message || '心得發送失敗，請稍後再試');\n" +
+      '    } finally {\n' +
+      '      setIsSubmitting(false);\n' +
+      '    }\n' +
+      '  };\n' +
+      '\n' +
+      '  const handleStartEdit = (c: Comment) => {\n' +
+      '    setEditingId(c.id);\n' +
+      '    setEditContent(c.content);\n' +
+      '  };\n' +
+      '\n' +
+      '  const handleSaveEdit = async (commentId: string) => {\n' +
+      '    if (!editContent.trim()) return;\n' +
+      '    try {\n' +
+      '      await onEditComment(commentId, editContent.trim());\n' +
+      '      setEditingId(null);\n' +
+      '    } catch (err: any) {\n' +
+      "      setErrorMessage(err.message || '修改失敗');\n" +
+      '    }\n' +
+      '  };\n' +
+      '\n' +
+      '  const renderFormattedContent = (value: string) => {\n' +
+      "    const content = typeof value === 'string' ? value : '';\n" +
+      '    const regex = /[@＠]([^\\s@＠\\n,，。！!？?]+)/g;\n' +
+      '    const elements: React.ReactNode[] = [];\n' +
+      '    let lastIndex = 0;\n' +
+      '    let match: RegExpExecArray | null;\n' +
+      '    while ((match = regex.exec(content)) !== null) {\n' +
+      '      if (match.index > lastIndex) elements.push(content.substring(lastIndex, match.index));\n' +
+      '      const rawLabel = match[1];\n' +
+      '      const normalized = rawLabel.trim().toLowerCase();\n' +
+      '      const matchedUser = allUsers.find(u => u.name?.trim().toLowerCase() === normalized);\n' +
+      '      const matchedSpeaker = tracks.find(t => t.speaker?.trim().toLowerCase() === normalized);\n' +
+      '      const matchedTrack = tracks.find(t => t.title && (t.title.trim().toLowerCase() === normalized || normalized.includes(t.title.trim().toLowerCase())));\n' +
+      '      if (matchedUser) {\n' +
+      '        elements.push(\n' +
+      '          <button key={`mention-user-${match.index}`} type="button" onClick={e => { e.stopPropagation(); onViewMember?.(matchedUser); }} className="inline-flex items-center gap-0.5 text-rose-600 dark:text-rose-400 font-bold hover:underline bg-rose-50 dark:bg-rose-950/70 border border-rose-200/60 dark:border-rose-900/60 px-1.5 py-0.5 rounded-lg mx-0.5 text-xs transition-colors cursor-pointer" title={`查看會員【${matchedUser.name}】個人資料卡`}>\n'... 15258 more characters
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    import { commentThreads } from '../utils/comments';
+    import { apiJson, identityKeys } from '../utils/api';
+    import React, { useState, useRef, useMemo, useEffect } from 'react';
+    import {
+      MessageSquare,
+      Trash2,
+      Edit3,
+      Check,
+      X,
+      ShieldAlert,
+      Heart,
+      Reply,
+      AtSign,
+      Radio,
+      Mic
+    } from 'lucide-react';
+    import { Comment, UserProfile, Track } from '../types';
+    import { VisitorIdentity } from '../utils/visitor';
+    import { CollapsibleCommentText } from './CollapsibleCommentText';
+    import { formatCommentTimestampDisplay } from '../../shared/commentTime';
+    
+    const stripLegacyAutoReplyMention = (content: string, replyToAuthor?: string) => {
+      const value = typeof content === 'string' ? content : '';
+      const author = replyToAuthor?.trim();
+      if (!author) return value;
+      for (const prefix of [`@${author}`, `＠${author}`]) {
+        if (!value.startsWith(prefix)) continue;
+        const nextChar = value.slice(prefix.length, prefix.length + 1);
+        if (nextChar && !/\s/.test(nextChar)) continue;
+        return value.slice(prefix.length).trimStart();
+      }
+      return value;
+    };
+    
+    interface CommentsSectionProps {
+      trackId: string;
+      comments: Comment[];
+      visitor: VisitorIdentity;
+      currentUser: UserProfile | null;
+      isAdmin: boolean;
+      onAddComment: (content: string, replyToId?: string, replyToAuthor?: string) => Promise<void>;
+      onDeleteComment: (commentId: string) => Promise<void>;
+      onEditComment: (commentId: string, newContent: string) => Promise<void>;
+      onViewMember?: (user: UserProfile) => void;
+      allUsers?: UserProfile[];
+      tracks?: Track[];
+    }
+    
+    export const CommentsSection: React.FC<CommentsSectionProps> = ({
+      comments,
+      visitor,
+      currentUser,
+      isAdmin,
+      onAddComment,
+      onDeleteComment,
+      onEditComment,
+      onViewMember,
+      allUsers = [],
+      tracks = []
+    }) => {
+      const [inputText, setInputText] = useState('');
+      const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    
+      const [editingId, setEditingId] = useState<string | null>(null);
+      const [editContent, setEditContent] = useState('');
+      const [likeStats, setLikeStats] = useState<Record<string, { likes: number; hasLiked: boolean }>>({});
+    
+      const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+      const [isMentionOpen, setIsMentionOpen] = useState(false);
+      const [mentionKeyword, setMentionKeyword] = useState('');
+      const [mentionTab, setMentionTab] = useState<'members' | 'tracks'>('members');
+    
+      const myKeys = identityKeys(currentUser, visitor.deviceId);
+      const myId = myKeys[0];
+      const isSuperAdminModerator = isAdmin || currentUser?.role === '超級管理員';
+      const isAdminModerator = isSuperAdminModerator || currentUser?.isAdminUser === true || currentUser?.role === '管理員';
+    
+      const pendingLikes = useRef(new Set<string>());
+      useEffect(() => { setLikeStats({}); }, [myId]);
+    
+      const handleLikeComment = async (comment: Comment) => {
+        if (pendingLikes.current.has(comment.id)) return;
+        pendingLikes.current.add(comment.id);
+        const currentLiked = likeStats[comment.id] !== undefined
+          ? likeStats[comment.id].hasLiked
+          : (comment.likedBy || []).some(k => myKeys.includes(k));
+        const currentCount = likeStats[comment.id] !== undefined
+          ? likeStats[comment.id].likes
+          : (comment.likes || 0);
+    
+        const nextLiked = !currentLiked;
+        const nextCount = nextLiked ? currentCount + 1 : Math.max(0, currentCount - 1);
+        setLikeStats(prev => ({ ...prev, [comment.id]: { likes: nextCount, hasLiked: nextLiked } }));
+    
+        try {
+          const data = await apiJson(`/api/comments/${encodeURIComponent(comment.id)}/like`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ identifier: myId, userId: currentUser?.id, userEmail: currentUser?.email, deviceId: visitor?.deviceId })
+          });
+          setLikeStats(prev => ({ ...prev, [comment.id]: { likes: data.likes, hasLiked: data.hasLiked } }));
+        } catch (error) {
+          setLikeStats(prev => ({ ...prev, [comment.id]: { likes: currentCount, hasLiked: currentLiked } }));
+          setErrorMessage(error instanceof Error ? error.message : '按讚失敗，請重試。');
+        } finally {
+          pendingLikes.current.delete(comment.id);
+        }
+      };
+    
+      const getRegisteredAuthor = (c: Comment): UserProfile | null => {
+        const email = c.authorEmail?.toLowerCase().trim();
+        if (!email) return null;
+        if (currentUser?.email?.toLowerCase().trim() === email) return currentUser;
+        return allUsers.find(u => u.email?.toLowerCase().trim() === email) || null;
+      };
+    
+      const handleAuthorClick = (c: Comment) => {
+        const member = getRegisteredAuthor(c);
+        if (!member || !onViewMember) return;
+        onViewMember(member);
+      };
+    
+      const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const val = e.target.value;
+        setInputText(val);
+        const cursorPos = e.target.selectionStart;
+        const textBeforeCursor = val.slice(0, cursorPos);
+        const lastAtIdx = Math.max(textBeforeCursor.lastIndexOf('@'), textBeforeCursor.lastIndexOf('＠'));
+        if (lastAtIdx !== -1) {
+          const query = textBeforeCursor.slice(lastAtIdx + 1);
+          if (!query.includes(' ') && !query.includes('\n')) {
+            setMentionKeyword(query);
+            setIsMentionOpen(true);
+            return;
+          }
+        }
+        setIsMentionOpen(false);
+      };
+    
+      const handleSelectMention = (label: string) => {
+        if (!textareaRef.current) return;
+        const cursorPos = textareaRef.current.selectionStart;
+        const textBeforeCursor = inputText.slice(0, cursorPos);
+        const textAfterCursor = inputText.slice(cursorPos);
+        const lastAtIdx = Math.max(textBeforeCursor.lastIndexOf('@'), textBeforeCursor.lastIndexOf('＠'));
+        if (lastAtIdx !== -1) {
+          const newText = textBeforeCursor.slice(0, lastAtIdx) + `@${label} ` + textAfterCursor;
+          setInputText(newText);
+          setIsMentionOpen(false);
+          setTimeout(() => {
+            if (textareaRef.current) {
+              const nextPos = lastAtIdx + label.length + 2;
+              textareaRef.current.focus();
+              textareaRef.current.setSelectionRange(nextPos, nextPos);
+            }
+          }, 0);
+        }
+      };
+    
+      const combinedMentionSuggestions = useMemo(() => {
+        const q = mentionKeyword.toLowerCase().trim();
+        const members = allUsers
+          .filter(u => {
+            if (!u.name || u.name.startsWith('訪客')) return false;
+            if (!q) return true;
+            return u.name.toLowerCase().includes(q) ||
+              (u.center && u.center.toLowerCase().includes(q)) ||
+              (u.email && u.email.toLowerCase().includes(q)) ||
+              (u.rank && u.rank.toLowerCase().includes(q));
+          })
+          .slice(0, 6)
+          .map(u => ({
+            type: 'member' as const,
+            id: `u-${u.id}`,
+            label: u.name,
+            badge: [u.center, u.rank || '會員'].filter(Boolean).join(' ') || '會員',
+            avatar: u.avatar
+          }));
+    
+        const speakerMap = new Map<string, { name: string; avatar?: string }>();
+        tracks.forEach(t => {
+          if (t.speaker?.trim() && !speakerMap.has(t.speaker.trim())) {
+            speakerMap.set(t.speaker.trim(), { name: t.speaker.trim(), avatar: t.speakerAvatar });
+          }
+        });
+        const speakers = Array.from(speakerMap.values())
+          .filter(s => !q || s.name.toLowerCase().includes(q))
+          .slice(0, 5)
+          .map(s => ({ type: 'speaker' as const, id: `spk-${s.name}`, label: s.name, badge: '音檔演講者', avatar: s.avatar }));
+    
+        const trackItems = tracks
+          .filter(t => !q || t.title.toLowerCase().includes(q) || t.speaker?.toLowerCase().includes(q))
+          .slice(0, 4)
+          .map(t => ({ type: 'track' as const, id: `t-${t.id}`, label: t.title, badge: t.speaker ? `講師：${t.speaker}` : '音檔', avatar: t.speakerAvatar }));
+    
+        return [...members, ...speakers, ...trackItems].slice(0, 12);
+      }, [allUsers, tracks, mentionKeyword]);
+    
+      const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!inputText.trim()) return;
+        setIsSubmitting(true);
+        setErrorMessage(null);
+        try {
+          await onAddComment(inputText.trim(), replyingTo?.id);
+          setInputText('');
+          setReplyingTo(null);
+          setIsMentionOpen(false);
+        } catch (err: any) {
+          setErrorMessage(err.message || '心得發送失敗，請稍後再試');
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+    
+      const handleStartEdit = (c: Comment) => {
+        setEditingId(c.id);
+        setEditContent(c.content);
+      };
+    
+      const handleSaveEdit = async (commentId: string) => {
+        if (!editContent.trim()) return;
+        try {
+          await onEditComment(commentId, editContent.trim());
+          setEditingId(null);
+        } catch (err: any) {
+          setErrorMessage(err.message || '修改失敗');
+        }
+      };
+    
+      const renderFormattedContent = (value: string) => {
+        const content = typeof value === 'string' ? value : '';
+        const regex = /[@＠]([^\s@＠\n,，。！!？?]+)/g;
+        const elements: React.ReactNode[] = [];
+        let lastIndex = 0;
+        let match: RegExpExecArray | null;
+        while ((match = regex.exec(content)) !== null) {
+          if (match.index > lastIndex) elements.push(content.substring(lastIndex, match.index));
+          const rawLabel = match[1];
+          const normalized = rawLabel.trim().toLowerCase();
+          const matchedUser = allUsers.find(u => u.name?.trim().toLowerCase() === normalized);
+          const matchedSpeaker = tracks.find(t => t.speaker?.trim().toLowerCase() === normalized);
+          const matchedTrack = tracks.find(t => t.title && (t.title.trim().toLowerCase() === normalized || normalized.includes(t.title.trim().toLowerCase())));
+          if (matchedUser) {
+            elements.push(
+              <button key={`mention-user-${match.index}`} type="button" onClick={e => { e.stopPropagation(); onViewMember?.(matchedUser); }} className="inline-flex items-center gap-0.5 text-rose-600 dark:text-rose-400 font-bold hover:underline bg-rose-50 dark:bg-rose-950/70 border border-rose-200/60 dark:border-rose-900/60 px-1.5 py-0.5 rounded-lg mx-0.5 text-xs transition-colors cursor-pointer" title={`查看會員【${matchedUser.name}】個人資料卡`}>
+                <AtSign className="w-3 h-3 shrink-0" /><span>{matchedUser.name}</span>
+              </button>
+            );
+          } else if (matchedSpeaker) {
+            elements.push(
+              <span key={`mention-speaker-${match.index}`} className="inline-flex items-center gap-1 text-purple-700 dark:text-purple-300 font-bold bg-purple-50 dark:bg-purple-950/70 border border-purple-200/60 dark:border-purple-900/60 px-1.5 py-0.2 rounded-lg mx-0.5 text-xs select-none" title={`音檔演講者：${matchedSpeaker.speaker}`}>
+                <Mic className="w-3 h-3 shrink-0 text-purple-500" /><span>@{matchedSpeaker.speaker}</span><span className="text-[9px] px-1 rounded-sm bg-purple-200/60 dark:bg-purple-900/60 text-purple-700 dark:text-purple-200 font-medium">演講者</span>
+              </span>
+            );
+          } else if (matchedTrack) {
+            elements.push(
+              <span key={`mention-track-${match.index}`} className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-semibold bg-indigo-50/80 dark:bg-indigo-950/60 border border-indigo-200/50 dark:border-indigo-800/50 px-1.5 py-0.2 rounded-md mx-0.5 text-xs select-none" title={`標記音檔：${matchedTrack.title}（主講：${matchedTrack.speaker}）`}>
+                <Radio className="w-3 h-3 shrink-0" /><span>{matchedTrack.title}</span>
+              </span>
+            );
+          } else {
+            elements.push(`@${rawLabel}`);
+          }
+          lastIndex = regex.lastIndex;
+        }
+        if (lastIndex < content.length) elements.push(content.substring(lastIndex));
+        return elements;
+      };
+    
+      return (
+        <div className="w-full bg-white/70 dark:bg-slate-900/60 rounded-3xl p-4 sm:p-5 border border-rose-100/60 dark:border-slate-800 shadow-xs relative leading-snug">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg sm:text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-rose-500" />
+              <span>心得收穫</span>
+              <span className="text-slate-400 font-normal text-base">({comments.length})</span>
+            </h3>
+          </div>
+    
+          <form onSubmit={handleSubmit} className="mb-5 relative">
+            <div className="bg-slate-50/80 dark:bg-slate-800/60 rounded-2xl p-3.5 border border-slate-200/70 dark:border-slate-700/60 focus-within:border-rose-400 dark:focus-within:border-rose-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-all relative">
+              {replyingTo && (
+                <div className="flex items-center justify-between bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 px-3 py-1.5 rounded-xl text-xs mb-2 border border-rose-200/60 dark:border-rose-900 font-medium">
+                  <span className="flex items-center gap-1.5"><Reply className="w-3.5 h-3.5" /><span>正在回覆這則留言</span></span>
+                  <button type="button" onClick={() => setReplyingTo(null)} className="p-0.5 hover:text-rose-900 dark:hover:text-rose-100"><X className="w-3.5 h-3.5" /></button>
+                </div>
+              )}
+    
+              <textarea ref={textareaRef} value={inputText} onChange={handleTextareaChange} maxLength={2000} rows={3} placeholder={replyingTo ? '寫下回覆內容...' : '寫下您的心得收穫...'} className="w-full bg-transparent resize-none outline-hidden text-sm sm:text-base text-slate-800 dark:text-slate-100 placeholder:text-slate-400" />
+    
+              {isMentionOpen && (
+                <div className="absolute left-2 top-full mt-1 z-40 w-64 max-w-[calc(100vw-32px)] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95">
+                  <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1 border-b border-slate-100 dark:border-slate-800 text-[10px] text-slate-500 font-bold">
+                    <span>標記關聯字 ({combinedMentionSuggestions.length})</span>
+                    <button type="button" onClick={() => setIsMentionOpen(false)} className="p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"><X className="w-3 h-3" /></button>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto p-1 text-[11px] space-y-0.5">
+                    {combinedMentionSuggestions.length === 0 ? <div className="p-2 text-center text-slate-400 text-[10px]">無符合的會員或演講者</div> : combinedMentionSuggestions.map(item => (
+                      <button key={item.id} type="button" onClick={() => handleSelectMention(item.label)} className="w-full flex items-center justify-between px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-left transition-colors cursor-pointer group">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-1.5">
+                          {item.avatar ? <img src={item.avatar} alt="" className="w-4 h-4 rounded-full object-cover shrink-0" /> : <span className="text-[10px] shrink-0">{item.type === 'member' ? '👤' : item.type === 'speaker' ? '🎙️' : '🎵'}</span>}
+                          <span className="font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-[var(--color-primary,#c06c84)]">{item.label}</span>
+                        </div>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-medium shrink-0 ${item.type === 'speaker' ? 'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800' : item.type === 'member' ? 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border border-rose-200 dark:border-rose-900' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>{item.badge}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+    
+              <div className="flex items-center justify-end gap-3 pt-2.5 border-t border-slate-200/50 dark:border-slate-700/50 mt-1.5">
+      <span className="text-xs text-slate-400 font-mono">{inputText.length}/2000</span>
+      <button type="submit" disabled={isSubmitting || !inputText.trim()} className="px-5 py-2 rounded-xl text-white font-medium text-sm transition-all shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer" style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}>
+        {isSubmitting ? '送出中...' : '送出'}
+      </button>
+    </div>
+            </div>
+    
+            {errorMessage && (
+              <div className="mt-2 flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 p-2.5 rounded-xl border border-rose-200 dark:border-rose-900">
+                <ShieldAlert className="w-4 h-4 shrink-0" /><span>{errorMessage}</span>
+              </div>
+            )}
+          </form>
+    
+          <div className="space-y-2.5 divide-y divide-slate-100 dark:divide-slate-800/70">
+            {comments.length === 0 ? (
+              <div className="text-center py-6 text-slate-400 dark:text-slate-500 text-xs">目前還沒有心得，快來當第一個分享心得的人吧！</div>
+            ) : (() => {
+              const threads = commentThreads(comments);
+              const rootComments = threads.roots;
+              const renderCommentItem = (c: Comment, isReply = false) => {
+                const isAuthor = Boolean(c.authorEmail ? currentUser?.email && c.authorEmail.toLowerCase().trim() === currentUser.email.toLowerCase().trim() : c.deviceId && c.deviceId === visitor.deviceId);
+                const registeredAuthor = getRegisteredAuthor(c);
+                const isVisitor = !registeredAuthor;
+                const displayAuthorName = registeredAuthor?.name || c.authorName;
+                const displayAuthorAvatar = registeredAuthor?.avatar || c.authorAvatar;
+                const displayAuthorBadge = registeredAuthor ? (registeredAuthor.rank || '無') : null;
+                const showBadge = !!registeredAuthor;
+                const userLiked = likeStats[c.id] !== undefined ? likeStats[c.id].hasLiked : (c.likedBy || []).some(k => myKeys.includes(k));
+                const userLikesCount = likeStats[c.id] !== undefined ? likeStats[c.id].likes : (c.likes || 0);
+                const isAvatarUrl = displayAuthorAvatar && (displayAuthorAvatar.startsWith('http') || displayAuthorAvatar.startsWith('data:'));
+                const isClickable = !!registeredAuthor;
+                const timestampLines = formatCommentTimestampDisplay(c);
+                const displayContent = stripLegacyAutoReplyMention(c.content, c.replyToAuthor);
+    
+                return (
+                  <div id={`comment-${c.id}`} key={c.id} className={`${isReply ? 'pt-2' : 'pt-3 first:pt-0'}`}>
+                    <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-start gap-x-2">
+                      <div
+                        onClick={isClickable ? () => handleAuthorClick(c) : undefined}
+                        className={`w-14 shrink-0 flex flex-col items-center gap-1 ${isClickable ? 'cursor-pointer hover:opacity-85 transition-opacity' : 'cursor-default pointer-events-none'}`}
+                        title={isClickable ? `點擊查看【${displayAuthorName}】會員個人檔案` : undefined}
+                      >
+                        {isAvatarUrl ? <img src={displayAuthorAvatar} alt={displayAuthorName} className="w-14 h-14 rounded-full object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700" /> : <span className="w-14 h-14 rounded-full flex items-center justify-center text-3xl shrink-0">{displayAuthorAvatar || '👤'}</span>}
+                        <span className="text-[8px] text-slate-400 dark:text-slate-500 font-mono leading-[1.05] text-center">{timestampLines.map((line, index) => <span key={`${c.id}-time-${index}`} className="block whitespace-nowrap">{line}</span>)}</span>
+                      </div>
+    
+                      <div className="min-w-0">
+                        <div
+                          onClick={isClickable ? () => handleAuthorClick(c) : undefined}
+                          className={`${isClickable ? 'cursor-pointer hover:opacity-85 transition-opacity' : 'cursor-default pointer-events-none'} min-w-0`}
+                          title={isClickable ? `點擊查看【${displayAuthorName}】會員個人檔案` : undefined}
+                        >
+                          {c.isAdmin || displayAuthorBadge === '貢獻者' ? <span className="rainbow-admin-text font-bold text-base leading-tight break-words">{displayAuthorName}</span> : isClickable ? <span className="font-bold text-slate-800 dark:text-slate-100 text-base underline decoration-dotted underline-offset-2 hover:text-rose-600 transition-colors leading-tight break-words">{displayAuthorName}</span> : <span className="font-bold text-slate-700 dark:text-slate-300 text-base select-none leading-tight break-words">{displayAuthorName}</span>}
+                        </div>
+    
+                        <div className="mt-1 flex items-center gap-1 min-w-0 flex-nowrap">
+                          <div className="flex items-center gap-1 min-w-0 shrink">
+                            {isVisitor && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium select-none leading-tight whitespace-nowrap shrink-0">訪客</span>}
+                            {showBadge && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-medium whitespace-nowrap shrink-0 leading-tight">{displayAuthorBadge}</span>}
+                          </div>
+    
+                          <div className="ml-auto flex items-center justify-end gap-0.5 shrink-0">
+                            <button type="button" onClick={() => handleLikeComment(c)} className={`flex items-center gap-0.5 text-sm px-0.5 py-0.5 rounded-lg transition-colors cursor-pointer ${userLiked ? 'text-rose-600 bg-rose-50 dark:bg-rose-950/60 font-bold' : 'text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`} title={userLiked ? '取消讚' : '按讚這則心得'}>
+                              <Heart className={`w-5 h-5 ${userLiked ? 'fill-rose-500 text-rose-500' : ''}`} /><span>{userLikesCount > 0 ? userLikesCount : ''}</span>
+                            </button>
+                            <button type="button" onClick={() => { setReplyingTo(c); textareaRef.current?.focus(); }} className="flex items-center gap-0.5 text-base leading-none text-slate-400 hover:text-[var(--color-primary,#c06c84)] px-0.5 py-0.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap" title="回覆此心得"><Reply className="w-5 h-5" /><span>回覆</span></button>
+                            {isAuthor && editingId !== c.id && <button onClick={() => handleStartEdit(c)} title="編輯心得" className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"><Edit3 className="w-4 h-4" /></button>}
+                            {(isAuthor || isSuperAdminModerator || (isAdminModerator && isVisitor)) && editingId !== c.id && <button onClick={() => onDeleteComment(c.id)} title="刪除心得" className="p-0.5 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"><Trash2 className="w-4 h-4" /></button>}
+                          </div>
+                        </div>
+    
+                        {editingId === c.id ? (
+                          <div className="mt-1.5 space-y-1.5">
+                            <textarea maxLength={2000} value={editContent} onChange={e => setEditContent(e.target.value)} className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/60 text-sm text-slate-800 dark:text-slate-100 outline-hidden" rows={2} />
+                            <div className="flex justify-end gap-1.5">
+                              <button onClick={() => setEditingId(null)} className="px-2 py-1 rounded-lg text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-1 cursor-pointer"><X className="w-3 h-3" /> 取消</button>
+                              <button onClick={() => handleSaveEdit(c.id)} className="px-2.5 py-1 rounded-lg text-xs bg-rose-600 text-white flex items-center gap-1 shadow-2xs font-bold cursor-pointer"><Check className="w-3 h-3" /> 儲存修改</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <CollapsibleCommentText
+                            className="text-base text-slate-700 dark:text-slate-300 leading-snug whitespace-pre-wrap mt-1.5 break-words"
+                            resetKey={`${c.id}:${c.content}`}
+                          >
+                            {renderFormattedContent(displayContent)}
+                          </CollapsibleCommentText>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              };
+    
+              return <div className="space-y-3">{rootComments.map(parent => {
+                const replies = threads.replies.get(parent.id) || [];
+                return <div key={parent.id} className="pb-2 border-b border-slate-100 dark:border-slate-800/80 last:border-b-0">
+                  {renderCommentItem(parent, false)}
+                  {replies.length > 0 && <div className="pl-5 sm:pl-7 ml-3 mt-2 border-l-2 border-rose-200/70 dark:border-slate-700/80 space-y-2">{replies.map(reply => renderCommentItem(reply, true))}</div>}
+                </div>;
+              })}</div>;
+            })()}
+          </div>
+        </div>
+      );
+    };
+    
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (/home/runner/work/echostars/echostars/tests/commentCollapse.test.ts:26:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: personal learning card export keeps the full comment instead of truncating it
+ok 26 - personal learning card export keeps the full comment instead of truncating it
+  ---
+  duration_ms: 0.230742
+  type: 'test'
+  ...
+# Subtest: comment forms do not block text with the retired moderation word list
+ok 27 - comment forms do not block text with the retired moderation word list
+  ---
+  duration_ms: 1.446149
+  type: 'test'
+  ...
+# Subtest: comment submit buttons describe sending rather than moderation
+ok 28 - comment submit buttons describe sending rather than moderation
+  ---
+  duration_ms: 0.18646
+  type: 'test'
+  ...
+# Subtest: VIP links use the short S-sequence plus numeric password contract
+ok 29 - VIP links use the short S-sequence plus numeric password contract
+  ---
+  duration_ms: 0.289342
+  type: 'test'
+  ...
+# Subtest: comment timestamps use canonical createdAt in Taiwan time instead of a frozen just-now label
+ok 30 - comment timestamps use canonical createdAt in Taiwan time instead of a frozen just-now label
+  ---
+  duration_ms: 2.444007
+  type: 'test'
+  ...
+# Subtest: production comment API derives every returned timestamp from createdAt
+ok 31 - production comment API derives every returned timestamp from createdAt
+  ---
+  duration_ms: 0.594448
+  type: 'test'
+  ...
+# Subtest: comment rank badge is forced onto one line
+ok 32 - comment rank badge is forced onto one line
+  ---
+  duration_ms: 0.463272
+  type: 'test'
+  ...
+# Subtest: comment time, badge, actions and body follow the compact mobile layout
+ok 33 - comment time, badge, actions and body follow the compact mobile layout
+  ---
+  duration_ms: 0.606689
+  type: 'test'
+  ...
+# (node:2604) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: legacy member schema upgrades without losing edited profile fields
+ok 34 - legacy member schema upgrades without losing edited profile fields
+  ---
+  duration_ms: 88.344485
+  type: 'test'
+  ...
+# Subtest: visitor likes and ratings persist with the frontend response contract
+ok 35 - visitor likes and ratings persist with the frontend response contract
+  ---
+  duration_ms: 12.310732
+  type: 'test'
+  ...
+# Subtest: comments support replies, likes, owner edits, deletion and 2000-character posts
+ok 36 - comments support replies, likes, owner edits, deletion and 2000-character posts
+  ---
+  duration_ms: 10.652103
+  type: 'test'
+  ...
+# Subtest: regular admins may delete visitor comments but not another registered member comment
+ok 37 - regular admins may delete visitor comments but not another registered member comment
+  ---
+  duration_ms: 14.783208
+  type: 'test'
+  ...
+# Subtest: keywords preserve creator ownership and ranking
+ok 38 - keywords preserve creator ownership and ranking
+  ---
+  duration_ms: 13.724262
+  type: 'test'
+  ...
+# Subtest: rank approval requires an authorized auditor
+ok 39 - rank approval requires an authorized auditor
+  ---
+  duration_ms: 18.933812
+  type: 'test'
+  ...
+# Subtest: D1 categories can legitimately start empty and then preserve administrator CRUD order
+ok 40 - D1 categories can legitimately start empty and then preserve administrator CRUD order
+  ---
+  duration_ms: 25.985129
+  type: 'test'
+  ...
+# Subtest: track metadata partial edits preserve unrelated fields and honestly fail for missing records
+ok 41 - track metadata partial edits preserve unrelated fields and honestly fail for missing records
+  ---
+  duration_ms: 6.564195
+  type: 'test'
+  ...
+# Subtest: VIP metadata persists through duration changes and token reset
+ok 42 - VIP metadata persists through duration changes and token reset
+  ---
+  duration_ms: 11.503623
+  type: 'test'
+  ...
+# Subtest: offline audio cleanup removes completed and stale cached objects
+ok 43 - offline audio cleanup removes completed and stale cached objects
+  ---
+  duration_ms: 20.58692
+  type: 'test'
+  ...
+# Subtest: comment threading keeps nested and orphan replies visible exactly once
+ok 44 - comment threading keeps nested and orphan replies visible exactly once
+  ---
+  duration_ms: 0.961165
+  type: 'test'
+  ...
+# Subtest: numerology rings stay inside square cells
+ok 45 - numerology rings stay inside square cells
+  ---
+  duration_ms: 16.769977
+  type: 'test'
+  ...
+# Subtest: missing database binding never pretends to save successfully
+ok 46 - missing database binding never pretends to save successfully
+  ---
+  duration_ms: 0.426456
+  type: 'test'
+  ...
+# Subtest: detail page mobile interaction rules
+ok 47 - detail page mobile interaction rules
+  ---
+  duration_ms: 1.310834
+  type: 'test'
+  ...
+# Subtest: comment composer and rows are compact and readable
+ok 48 - comment composer and rows are compact and readable
+  ---
+  duration_ms: 0.326466
+  type: 'test'
+  ...
+# Subtest: detail keywords keep toggle position and use title-sized regular text
+ok 49 - detail keywords keep toggle position and use title-sized regular text
+  ---
+  duration_ms: 0.209746
+  type: 'test'
+  ...
+# Subtest: main navigation is fixed to the viewport on every page
+ok 50 - main navigation is fixed to the viewport on every page
+  ---
+  duration_ms: 1.484595
+  type: 'test'
+  ...
+# Subtest: page reserves the navbar height so fixed navigation does not cover content
+ok 51 - page reserves the navbar height so fixed navigation does not cover content
+  ---
+  duration_ms: 0.246072
+  type: 'test'
+  ...
+# Subtest: global navigation policy is loaded by every app entry
+ok 52 - global navigation policy is loaded by every app entry
+  ---
+  duration_ms: 0.226546
+  type: 'test'
+  ...
+# Subtest: Google identity is verified server-side instead of trusting a submitted email
+ok 53 - Google identity is verified server-side instead of trusting a submitted email
+  ---
+  duration_ms: 1.70436
+  type: 'test'
+  ...
+# Subtest: super admin is anchored to the single verified Google email
+ok 54 - super admin is anchored to the single verified Google email
+  ---
+  duration_ms: 0.243447
+  type: 'test'
+  ...
+# Subtest: browser uses Google Identity Services credential flow and authenticated API sessions
+ok 55 - browser uses Google Identity Services credential flow and authenticated API sessions
+  ---
+  duration_ms: 0.244579
+  type: 'test'
+  ...
+# Subtest: first-party session cookie is secure and never placed in a share URL
+ok 56 - first-party session cookie is secure and never placed in a share URL
+  ---
+  duration_ms: 0.417179
+  type: 'test'
+  ...
+# Subtest: site-defined auth lifetime is persistent instead of expiring after 30 days
+ok 57 - site-defined auth lifetime is persistent instead of expiring after 30 days
+  ---
+  duration_ms: 0.346753
+  type: 'test'
+  ...
+# Subtest: expired sessions are not resurrected when existing sessions are upgraded
+ok 58 - expired sessions are not resurrected when existing sessions are upgraded
+  ---
+  duration_ms: 0.2342
+  type: 'test'
+  ...
+# Subtest: share entry can restore a verified member session and only then falls back to Google
+ok 59 - share entry can restore a verified member session and only then falls back to Google
+  ---
+  duration_ms: 0.398004
+  type: 'test'
+  ...
+# Subtest: sensitive write routes bind identity to the verified session
+ok 60 - sensitive write routes bind identity to the verified session
+  ---
+  duration_ms: 0.369364
+  type: 'test'
+  ...
+# Subtest: wrapper order preserves privacy, member deletion, categories, cookie continuity, playback and auth security
+ok 61 - wrapper order preserves privacy, member deletion, categories, cookie continuity, playback and auth security
+  ---
+  duration_ms: 0.811938
+  type: 'test'
+  ...
+# Subtest: no Google OAuth client secret is embedded in the auth implementation
+ok 62 - no Google OAuth client secret is embedded in the auth implementation
+  ---
+  duration_ms: 1.06409
+  type: 'test'
+  ...
+# Subtest: listening progress badges use the current palette primary color
+ok 63 - listening progress badges use the current palette primary color
+  ---
+  duration_ms: 2.009999
+  type: 'test'
+  ...
+# Subtest: portrait access label text is always white
+ok 64 - portrait access label text is always white
+  ---
+  duration_ms: 0.231827
+  type: 'test'
+  ...
+# Subtest: home density policy only activates when the audio card grid is present
+ok 65 - home density policy only activates when the audio card grid is present
+  ---
+  duration_ms: 2.37846
+  type: 'test'
+  ...
+# Subtest: homepage spacing and audio card vertical density are tightened
+ok 66 - homepage spacing and audio card vertical density are tightened
+  ---
+  duration_ms: 0.276988
+  type: 'test'
+  ...
+# Subtest: home density policy is loaded globally but scopes itself to the homepage
+ok 67 - home density policy is loaded globally but scopes itself to the homepage
+  ---
+  duration_ms: 0.174353
+  type: 'test'
+  ...
+# Subtest: home keyword drawer explains multi-select and uses larger keyword text
+ok 68 - home keyword drawer explains multi-select and uses larger keyword text
+  ---
+  duration_ms: 1.409353
+  type: 'test'
+  ...
+# Subtest: keyword counts are computed from the same home filters and update with selected intersections
+ok 69 - keyword counts are computed from the same home filters and update with selected intersections
+  ---
+  duration_ms: 0.287787
+  type: 'test'
+  ...
+# Subtest: the playlist and keyword counters share one keyword matching rule
+ok 70 - the playlist and keyword counters share one keyword matching rule
+  ---
+  duration_ms: 0.202959
+  type: 'test'
+  ...
+# Subtest: zero-result keyword choices disappear while selected chips remain removable
+ok 71 - zero-result keyword choices disappear while selected chips remain removable
+  ---
+  duration_ms: 0.362647
+  type: 'test'
+  ...
+# Subtest: keyword controls use consistent readable sizing and an oversized close control
+ok 72 - keyword controls use consistent readable sizing and an oversized close control
+  ---
+  duration_ms: 0.682345
+  type: 'test'
+  ...
+# Subtest: keyword chips stay regular weight, close button follows palette, and sort controls match search height
+ok 73 - keyword chips stay regular weight, close button follows palette, and sort controls match search height
+  ---
+  duration_ms: 2.283815
+  type: 'test'
+  ...
+# Subtest: personal learning record export uses the dedicated 1280px JPEG module and rejects empty output
+ok 74 - personal learning record export uses the dedicated 1280px JPEG module and rejects empty output
+  ---
+  duration_ms: 1.433848
+  type: 'test'
+  ...
+# Subtest: profile export loads canonical playback history before drawing and merges ratings/comments
+ok 75 - profile export loads canonical playback history before drawing and merges ratings/comments
+  ---
+  duration_ms: 0.210833
+  type: 'test'
+  ...
+# Subtest: exported numerology grid matches the web ring colors and is enlarged dynamically
+ok 76 - exported numerology grid matches the web ring colors and is enlarged dynamically
+  ---
+  duration_ms: 0.214922
+  type: 'test'
+  ...
+# Subtest: learning record titles wrap instead of being truncated and cards use dynamic compact height
+ok 77 - learning record titles wrap instead of being truncated and cards use dynamic compact height
+  ---
+  duration_ms: 0.227275
+  type: 'test'
+  ...
+# Subtest: learning-card backend canonicalizes old identity aliases and preserves completed progress
+ok 78 - learning-card backend canonicalizes old identity aliases and preserves completed progress
+  ---
+  duration_ms: 0.373097
+  type: 'test'
+  ...
+# Subtest: large JPEG canvas exports keep the shared 1280px / 95 percent quality policy
+ok 79 - large JPEG canvas exports keep the shared 1280px / 95 percent quality policy
+  ---
+  duration_ms: 0.23581
+  type: 'test'
+  ...
+# Subtest: JPEG export policy loads before the bootstrap that mounts React
+ok 80 - JPEG export policy loads before the bootstrap that mounts React
+  ---
+  duration_ms: 0.40676
+  type: 'test'
+  ...
+# Subtest: share-card modal releases preview URLs and surfaces generation failures
+ok 81 - share-card modal releases preview URLs and surfaces generation failures
+  ---
+  duration_ms: 0.228787
+  type: 'test'
+  ...
+# Subtest: detail page exposes and enforces a 50-keyword limit
+ok 82 - detail page exposes and enforces a 50-keyword limit
+  ---
+  duration_ms: 1.353529
+  type: 'test'
+  ...
+# Subtest: production keyword API accepts up to 50 keywords and rejects the 51st
+ok 83 - production keyword API accepts up to 50 keywords and rejects the 51st
+  ---
+  duration_ms: 0.257021
+  type: 'test'
+  ...
+# Subtest: public visitor viewing B and C resolves each selected member aliases
+ok 84 - public visitor viewing B and C resolves each selected member aliases
+  ---
+  duration_ms: 2.221639
+  type: 'test'
+  ...
+# Subtest: public member lookup may use member id and still resolves email plus id
+ok 85 - public member lookup may use member id and still resolves email plus id
+  ---
+  duration_ms: 0.225281
+  type: 'test'
+  ...
+# Subtest: public lookup rejects a missing or mismatched target
+ok 86 - public lookup rejects a missing or mismatched target
+  ---
+  duration_ms: 0.199302
+  type: 'test'
+  ...
+# Subtest: authenticated self-service scope still resolves only the actor for destructive actions
+ok 87 - authenticated self-service scope still resolves only the actor for destructive actions
+  ---
+  duration_ms: 0.35341
+  type: 'test'
+  ...
+# Subtest: administrator cannot clear another member history through the self-service delete route
+ok 88 - administrator cannot clear another member history through the self-service delete route
+  ---
+  duration_ms: 0.227455
+  type: 'test'
+  ...
+# Subtest: learning history matches legacy identities stored only in playback key
+ok 89 - learning history matches legacy identities stored only in playback key
+  ---
+  duration_ms: 2.661511
+  type: 'test'
+  ...
+# Subtest: canonical history and history deletion use the same legacy-compatible filter
+ok 90 - canonical history and history deletion use the same legacy-compatible filter
+  ---
+  duration_ms: 0.47124
+  type: 'test'
+  ...
+# Subtest: same member and track keeps completed 100 percent across legacy email/id rows
+ok 91 - same member and track keeps completed 100 percent across legacy email/id rows
+  ---
+  duration_ms: 1.929925
+  type: 'test'
+  ...
+# Subtest: summary counts each track once and uses canonical highest progress
+ok 92 - summary counts each track once and uses canonical highest progress
+  ---
+  duration_ms: 0.571437
+  type: 'test'
+  ...
+# Subtest: finish date always makes a legacy row canonical 100 percent
+ok 93 - finish date always makes a legacy row canonical 100 percent
+  ---
+  duration_ms: 0.336859
+  type: 'test'
+  ...
+# Subtest: mini player exposes current track metadata to the system media policy
+ok 94 - mini player exposes current track metadata to the system media policy
+  ---
+  duration_ms: 1.335344
+  type: 'test'
+  ...
+# Subtest: media session publishes title, speaker, artwork and app album name
+ok 95 - media session publishes title, speaker, artwork and app album name
+  ---
+  duration_ms: 0.232273
+  type: 'test'
+  ...
+# Subtest: real speaker portrait is the only artwork candidate so OS cannot prefer app icons
+ok 96 - real speaker portrait is the only artwork candidate so OS cannot prefer app icons
+  ---
+  duration_ms: 0.168945
+  type: 'test'
+  ...
+# Subtest: system playback controls support play pause and seeking without desyncing React state
+ok 97 - system playback controls support play pause and seeking without desyncing React state
+  ---
+  duration_ms: 0.234999
+  type: 'test'
+  ...
+# Subtest: media session loads before the React bootstrap and PWA exposes monochrome icon
+ok 98 - media session loads before the React bootstrap and PWA exposes monochrome icon
+  ---
+  duration_ms: 0.291715
+  type: 'test'
+  ...
+# Subtest: mini player has left shortcuts, themed title and close control
+ok 99 - mini player has left shortcuts, themed title and close control
+  ---
+  duration_ms: 1.560966
+  type: 'test'
+  ...
+# Subtest: comment identity layout keeps avatar, time, name and badge readable
+ok 100 - comment identity layout keeps avatar, time, name and badge readable
+  ---
+  duration_ms: 0.489555
+  type: 'test'
+  ...
+# Subtest: collapsed comments show triangle direction cues
+ok 101 - collapsed comments show triangle direction cues
+  ---
+  duration_ms: 0.189384
+  type: 'test'
+  ...
+# Subtest: mobile menu layout policy is loaded after the base stylesheet
+ok 102 - mobile menu layout policy is loaded after the base stylesheet
+  ---
+  duration_ms: 1.341455
+  type: 'test'
+  ...
+# Subtest: mobile drawer stays right aligned, half width, and out of document flow
+ok 103 - mobile drawer stays right aligned, half width, and out of document flow
+  ---
+  duration_ms: 0.436846
+  type: 'test'
+  ...
+# Subtest: dark mobile drawer is visually separated from the dark page
+ok 104 - dark mobile drawer is visually separated from the dark page
+  ---
+  duration_ms: 0.259224
+  type: 'test'
+  ...
+# Subtest: menu labels are larger while still wrapping as whole Chinese words
+ok 105 - menu labels are larger while still wrapping as whole Chinese words
+  ---
+  duration_ms: 0.306643
+  type: 'test'
+  ...
+# Subtest: notification pending badge is placed on its own row
+ok 106 - notification pending badge is placed on its own row
+  ---
+  duration_ms: 0.237103
+  type: 'test'
+  ...
+# Subtest: install status is positioned under the install label
+ok 107 - install status is positioned under the install label
+  ---
+  duration_ms: 0.232254
+  type: 'test'
+  ...
+# Subtest: mobile install entry always keeps a download arrow on the left
+ok 108 - mobile install entry always keeps a download arrow on the left
+  ---
+  duration_ms: 0.368759
+  type: 'test'
+  ...
+# Subtest: palette primary color is synced to browser and standalone PWA chrome
+ok 109 - palette primary color is synced to browser and standalone PWA chrome
+  ---
+  duration_ms: 0.19253
+  type: 'test'
+  ...
+# Subtest: mobile hamburger drawer remains the existing React drawer
+ok 110 - mobile hamburger drawer remains the existing React drawer
+  ---
+  duration_ms: 1.064889
+  type: 'test'
+  ...
+# Subtest: mobile hamburger drawer uses the right half of the viewport
+ok 111 - mobile hamburger drawer uses the right half of the viewport
+  ---
+  duration_ms: 0.318544
+  type: 'test'
+  ...
+# Subtest: only the 新人 category tag receives the rainbow border class
+ok 112 - only the 新人 category tag receives the rainbow border class
+  ---
+  duration_ms: 1.255495
+  type: 'test'
+  ...
+# Subtest: newcomer border shows a simultaneous 45-degree seven-color gradient that flows left to right
+ok 113 - newcomer border shows a simultaneous 45-degree seven-color gradient that flows left to right
+  ---
+  duration_ms: 0.509422
+  type: 'test'
+  ...
+# Subtest: newcomer keeps its original fill and paints only a true 1px rainbow border
+ok 114 - newcomer keeps its original fill and paints only a true 1px rainbow border
+  ---
+  duration_ms: 0.424042
+  type: 'test'
+  ...
+# Subtest: playback memories use stable memberId ownership with legacy aliases kept only for recovery
+ok 115 - playback memories use stable memberId ownership with legacy aliases kept only for recovery
+  ---
+  duration_ms: 1.71885
+  type: 'test'
+  ...
+# Subtest: public history resolves the selected member and is independent from the viewer session
+ok 116 - public history resolves the selected member and is independent from the viewer session
+  ---
+  duration_ms: 0.306723
+  type: 'test'
+  ...
+# Subtest: legacy device ownership is recovered only when one device maps to one member
+ok 117 - legacy device ownership is recovered only when one device maps to one member
+  ---
+  duration_ms: 0.51416
+  type: 'test'
+  ...
+# Subtest: backfill is non-destructive and only fills missing memberId
+ok 118 - backfill is non-destructive and only fills missing memberId
+  ---
+  duration_ms: 0.255948
+  type: 'test'
+  ...
+# Subtest: future playback writes canonicalize registered email or id to users.id
+ok 119 - future playback writes canonicalize registered email or id to users.id
+  ---
+  duration_ms: 0.262962
+  type: 'test'
+  ...
+# Subtest: local playback claim requires the verified bearer session and cannot trust body email
+ok 120 - local playback claim requires the verified bearer session and cannot trust body email
+  ---
+  duration_ms: 0.249626
+  type: 'test'
+  ...
+# Subtest: a device already owned by another member is never transferred
+ok 121 - a device already owned by another member is never transferred
+  ---
+  duration_ms: 0.282427
+  type: 'test'
+  ...
+# Subtest: verified device claim imports localStorage progress into canonical member keys
+ok 122 - verified device claim imports localStorage progress into canonical member keys
+  ---
+  duration_ms: 0.221603
+  type: 'test'
+  ...
+# Subtest: the browser imports local history after secure login and for an existing verified session
+ok 123 - the browser imports local history after secure login and for an existing verified session
+  ---
+  duration_ms: 0.524049
+  type: 'test'
+  ...
+# Subtest: changed local progress is eligible for another safe import instead of a permanent one-time skip
+ok 124 - changed local progress is eligible for another safe import instead of a permanent one-time skip
+  ---
+  duration_ms: 0.540731
+  type: 'test'
+  ...
+# Subtest: playback owner stays in the active privacy/member-delete/category/session wrapper chain
+ok 125 - playback owner stays in the active privacy/member-delete/category/session wrapper chain
+  ---
+  duration_ms: 0.201085
+  type: 'test'
+  ...
+# Subtest: site declares global noindex and nofollow directives
+ok 126 - site declares global noindex and nofollow directives
+  ---
+  duration_ms: 1.180705
+  type: 'test'
+  ...
+# Subtest: robots.txt denies all crawlers and explicitly names major AI crawlers
+ok 127 - robots.txt denies all crawlers and explicitly names major AI crawlers
+  ---
+  duration_ms: 0.328474
+  type: 'test'
+  ...
+# Subtest: worker blocks known search and AI crawler user agents
+ok 128 - worker blocks known search and AI crawler user agents
+  ---
+  duration_ms: 0.189153
+  type: 'test'
+  ...
+# Subtest: all site requests run through privacy crawler router
+ok 129 - all site requests run through privacy crawler router
+  ---
+  duration_ms: 0.201036
+  type: 'test'
+  ...
+# Subtest: new and existing members with any missing basic profile field reopen directly in edit mode on each page entry
+ok 130 - new and existing members with any missing basic profile field reopen directly in edit mode on each page entry
+  ---
+  duration_ms: 1.469775
+  type: 'test'
+  ...
+# Subtest: profile edit save decoration is one-time so the mutation observer cannot freeze the page
+ok 131 - profile edit save decoration is one-time so the mutation observer cannot freeze the page
+  ---
+  duration_ms: 0.344133
+  type: 'test'
+  ...
+# Subtest: Google sign-in keeps the large animated loading message and hides redundant login copy without removing React nodes
+ok 132 - Google sign-in keeps the large animated loading message and hides redundant login copy without removing React nodes
+  ---
+  duration_ms: 0.242603
+  type: 'test'
+  ...
+# Subtest: mobile hamburger owns logout and profile modal logout stays hidden from the rendered UI
+ok 133 - mobile hamburger owns logout and profile modal logout stays hidden from the rendered UI
+  ---
+  duration_ms: 0.213439
+  type: 'test'
+  ...
+# Subtest: profile save action remains a high-contrast emerald call to action
+ok 134 - profile save action remains a high-contrast emerald call to action
+  ---
+  duration_ms: 0.281686
+  type: 'test'
+  ...
+# Subtest: profile modal receives the loaded member list so upline autocomplete is not empty
+ok 135 - profile modal receives the loaded member list so upline autocomplete is not empty
+  ---
+  duration_ms: 1.744348
+  type: 'test'
+  ...
+# Subtest: platinum and diamond fields show related member and existing-upline suggestions while typing or focusing
+ok 136 - platinum and diamond fields show related member and existing-upline suggestions while typing or focusing
+  ---
+  duration_ms: 1.47168
+  type: 'test'
+  ...
+# Subtest: public GET history resolves the requested member and never the viewer session
+ok 137 - public GET history resolves the requested member and never the viewer session
+  ---
+  duration_ms: 1.34907
+  type: 'test'
+  ...
+# Subtest: public resolver looks up the requested registered member by email or user id
+ok 138 - public resolver looks up the requested registered member by email or user id
+  ---
+  duration_ms: 0.266769
+  type: 'test'
+  ...
+# Subtest: v90 is the single current PWA cache version
+ok 139 - v90 is the single current PWA cache version
+  ---
+  duration_ms: 2.872385
+  type: 'test'
+  ...
+# Subtest: service worker never caches API responses or personalized share HTML as app shell
+ok 140 - service worker never caches API responses or personalized share HTML as app shell
+  ---
+  duration_ms: 0.263211
+  type: 'test'
+  ...
+# Subtest: release verification keeps regression tests and the production build as explicit gates
+ok 141 - release verification keeps regression tests and the production build as explicit gates
+  ---
+  duration_ms: 0.323835
+  type: 'test'
+  ...
+# Subtest: preview configuration stays isolated from production storage bindings
+ok 142 - preview configuration stays isolated from production storage bindings
+  ---
+  duration_ms: 0.176079
+  type: 'test'
+  ...
+# (node:3007) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: speaker names use uppercase Hanyu Pinyin with surname pronunciation and hyphens
+ok 143 - speaker names use uppercase Hanyu Pinyin with surname pronunciation and hyphens
+  ---
+  duration_ms: 28.471965
+  type: 'test'
+  ...
+# Subtest: public share slug is remembered per track and increments within the same romanized speaker name
+ok 144 - public share slug is remembered per track and increments within the same romanized speaker name
+  ---
+  duration_ms: 33.983086
+  type: 'test'
+  ...
+# Subtest: public share route serves the app shell and old t-id routes stay retired
+ok 145 - public share route serves the app shell and old t-id routes stay retired
+  ---
+  duration_ms: 3.299683
+  type: 'test'
+  ...
+# Subtest: VIP links use NAME-S001 with a durable 4-digit default password and 4-12 digit custom password
+ok 146 - VIP links use NAME-S001 with a durable 4-digit default password and 4-12 digit custom password
+  ---
+  duration_ms: 8.022956
+  type: 'test'
+  ...
+# Subtest: upload modal top controls use cover, audio, permission, VIP order
+ok 147 - upload modal top controls use cover, audio, permission, VIP order
+  ---
+  duration_ms: 1.398903
+  type: 'test'
+  ...
+# Subtest: mobile upload controls preserve cover, audio, permission, VIP sequence
+ok 148 - mobile upload controls preserve cover, audio, permission, VIP sequence
+  ---
+  duration_ms: 0.510052
+  type: 'test'
+  ...
+# Subtest: R2 cover names stay complete and shrink to fit
+ok 149 - R2 cover names stay complete and shrink to fit
+  ---
+  duration_ms: 0.263191
+  type: 'test'
+  ...
+# Subtest: keyword input filters related database candidates and add button is compact
+ok 150 - keyword input filters related database candidates and add button is compact
+  ---
+  duration_ms: 0.20335
+  type: 'test'
+  ...
+# Subtest: keyword presentation keeps plain words without check, hash and plus prefixes
+ok 151 - keyword presentation keeps plain words without check, hash and plus prefixes
+  ---
+  duration_ms: 0.25173
+  type: 'test'
+  ...
+# Subtest: new uploads clear speech date and series order defaults without affecting edits
+ok 152 - new uploads clear speech date and series order defaults without affecting edits
+  ---
+  duration_ms: 0.240549
+  type: 'test'
+  ...
+# Subtest: non VIP explanatory notes are hidden while VIP copy is exempt
+ok 153 - non VIP explanatory notes are hidden while VIP copy is exempt
+  ---
+  duration_ms: 0.350215
+  type: 'test'
+  ...
+# Subtest: presentation policy is loaded before the React bootstrap
+ok 154 - presentation policy is loaded before the React bootstrap
+  ---
+  duration_ms: 0.282668
+  type: 'test'
+  ...
+# Subtest: VIP share pages retry real audio playback after React selects the shared track
+ok 155 - VIP share pages retry real audio playback after React selects the shared track
+  ---
+  duration_ms: 1.275843
+  type: 'test'
+  ...
+# Subtest: blocked audible autoplay never leaves a fake playing animation
+ok 156 - blocked audible autoplay never leaves a fake playing animation
+  ---
+  duration_ms: 0.199733
+  type: 'test'
+  ...
+# Subtest: VIP autoplay fallback performs play directly inside the real click handler
+ok 157 - VIP autoplay fallback performs play directly inside the real click handler
+  ---
+  duration_ms: 0.298117
+  type: 'test'
+  ...
+1..157
+# tests 157
+# suites 0
+# pass 156
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4342.722968
