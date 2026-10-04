@@ -24,7 +24,7 @@
   /* Dark mode must read as a separate floating panel instead of visually
      merging into the dark page underneath. */
   .dark header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] {
-    background: linear-gradient(180deg, rgba(30, 41, 59, 0.99), rgba(17, 24, 39, 0.99)) !important;
+    background: linear-gradient(180deg, rgba(51, 65, 85, 0.99), rgba(30, 41, 59, 0.99)) !important;
     border-top-color: rgba(148, 163, 184, 0.18) !important;
     border-left-color: rgba(148, 163, 184, 0.30) !important;
     box-shadow:
