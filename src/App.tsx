@@ -1777,7 +1777,7 @@ export default function App() {
       return sortDefaultHomeTracks(filtered, {
         canAccess: checkCanAccess,
         getRequiredRankIndex: getRequiredRankSortIndex,
-        getUploadTimestamp,
+        getUploadTimestamp: track => getUploadTimestamp(track.uploadDate),
         getUploadSequence,
         shuffleSeed: homeShuffleSeed
       });
