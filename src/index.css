@@ -386,41 +386,35 @@ input[type="range"].audio-scrubber::-moz-range-thumb {
 }
 
 
-/* Home lucky draw v95: fixed surrounding cards + second-slot reel */
+/* Home lucky draw v93 */
 .audio-card-grid > .lucky-card {
-  transition: filter 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
+  transition: filter 150ms ease, opacity 150ms ease, transform 150ms ease, box-shadow 150ms ease;
   border-radius: 1.5rem;
   transform-origin: center;
 }
 
-/* All non-focus cards stay in their exact layout positions. */
 .audio-card-grid.lucky-spin-active > .lucky-card {
   filter: brightness(0.34) saturate(0.55);
   opacity: 0.48;
   z-index: 10;
-  transform: none;
-  animation: none;
+  animation: echostars-lucky-reel 180ms cubic-bezier(.35,0,.65,1) infinite alternate;
 }
 
-/* Only the second slot behaves like the reel window. Its keyed card is replaced on
-   every tick, so this one-shot entrance animation restarts without moving siblings. */
+.audio-card-grid.lucky-spin-active > .lucky-card:nth-child(3n + 1) {
+  animation-delay: -55ms;
+}
+
+.audio-card-grid.lucky-spin-active > .lucky-card:nth-child(3n + 3) {
+  animation-delay: -105ms;
+  animation-direction: alternate-reverse;
+}
+
 .audio-card-grid.lucky-spin-active > .lucky-card:nth-child(2) {
+  filter: brightness(1.18) saturate(1.2);
   opacity: 1;
   z-index: 20;
-  box-shadow: 0 0 0 3px var(--color-primary, #c06c84), 0 0 34px var(--color-primary, #c06c84);
-  will-change: transform, filter, opacity;
-  animation: echostars-lucky-slot-enter 210ms cubic-bezier(.16,.84,.28,1) both;
-}
-
-.audio-card-grid.lucky-spin-active > .lucky-card:nth-child(2)::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(180deg, transparent 0%, rgb(255 255 255 / 0.18) 46%, rgb(255 255 255 / 0.34) 50%, transparent 56%);
-  opacity: 0.75;
-  animation: echostars-lucky-slot-sheen 210ms ease-out both;
+  box-shadow: 0 0 0 3px var(--color-primary, #c06c84), 0 0 30px var(--color-primary, #c06c84);
+  animation: echostars-lucky-reel-focus 170ms ease-in-out infinite alternate;
 }
 
 .audio-card-grid.lucky-win-active > .lucky-card {
@@ -440,43 +434,28 @@ input[type="range"].audio-scrubber::-moz-range-thumb {
 .lucky-winner-badge {
   position: absolute;
   z-index: 40;
-  top: -2.85rem;
-  right: 0.35rem;
+  top: -1.25rem;
+  right: 0.5rem;
   padding: 0.35rem 0.7rem;
   border-radius: 9999px;
   background: var(--color-primary, #c06c84);
   color: white;
   font-weight: 900;
   font-size: 0.95rem;
-  line-height: 1.1;
   letter-spacing: 0.04em;
   box-shadow: 0 6px 20px rgb(0 0 0 / 0.28);
   pointer-events: none;
   animation: echostars-lucky-badge 420ms cubic-bezier(.2,.9,.25,1.4) both;
 }
 
-@keyframes echostars-lucky-slot-enter {
-  0% {
-    transform: translate3d(0, 18px, 0) scale(0.985);
-    filter: brightness(1.35) saturate(1.2) blur(2px);
-    opacity: 0.35;
-  }
-  58% {
-    transform: translate3d(0, -2px, 0) scale(1.018);
-    filter: brightness(1.25) saturate(1.2) blur(0.4px);
-    opacity: 1;
-  }
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-    filter: brightness(1.18) saturate(1.2) blur(0);
-    opacity: 1;
-  }
+@keyframes echostars-lucky-reel {
+  from { transform: translateY(-7px) scale(0.98); }
+  to { transform: translateY(7px) scale(0.99); }
 }
 
-@keyframes echostars-lucky-slot-sheen {
-  from { transform: translateY(-35%); opacity: 0; }
-  45% { opacity: 0.85; }
-  to { transform: translateY(35%); opacity: 0; }
+@keyframes echostars-lucky-reel-focus {
+  from { transform: translateY(-10px) scale(1.018); }
+  to { transform: translateY(10px) scale(1.035); }
 }
 
 @keyframes echostars-lucky-win {
@@ -493,7 +472,6 @@ input[type="range"].audio-scrubber::-moz-range-thumb {
 @media (prefers-reduced-motion: reduce) {
   .audio-card-grid > .lucky-card,
   .audio-card-grid.lucky-spin-active > .lucky-card:nth-child(2),
-  .audio-card-grid.lucky-spin-active > .lucky-card:nth-child(2)::after,
   .audio-card-grid.lucky-win-active > .lucky-card[data-lucky-winner="true"],
   .lucky-winner-badge {
     animation: none !important;

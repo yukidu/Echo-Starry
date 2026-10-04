@@ -6,7 +6,7 @@ import { baseSpeakerRank } from './utils/ranks';
 
 import { apiJson, identityKeys } from './utils/api';
 import { keywordRanking } from './utils/keywords';
-import { sortDefaultHomeTracks } from './homePlaylistPolicy';
+import { moveTrackIdToSecondSlot, sortDefaultHomeTracks } from './homePlaylistPolicy';
 import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import { Search, ChevronDown, Check, X, ShieldAlert, UploadCloud, Mic, ArrowDown, ArrowUp } from 'lucide-react';
 import {
@@ -486,7 +486,7 @@ export default function App() {
     ((Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0)
   );
   const [luckyPhase, setLuckyPhase] = useState<'idle' | 'spin' | 'win'>('idle');
-  const [luckySpinTrackId, setLuckySpinTrackId] = useState<string | null>(null);
+  const [luckyOrderIds, setLuckyOrderIds] = useState<string[] | null>(null);
   const [luckyWinnerId, setLuckyWinnerId] = useState<string | null>(null);
   const luckyTimersRef = useRef<number[]>([]);
   const luckyAudioContextRef = useRef<AudioContext | null>(null);
@@ -499,7 +499,7 @@ export default function App() {
   const resetLuckyDrawState = useCallback(() => {
     clearLuckyTimers();
     setLuckyPhase('idle');
-    setLuckySpinTrackId(null);
+    setLuckyOrderIds(null);
     setLuckyWinnerId(null);
   }, [clearLuckyTimers]);
 
@@ -1865,18 +1865,12 @@ export default function App() {
   ]);
 
   const displayedTracks = useMemo(() => {
-    // Keep the reel/result in the same visual slot. The final winner is already
-    // rendered in slot #2 before the phase changes to win, so mobile scroll
-    // anchoring never sees a whole-list reorder at the end of the animation.
-    if ((luckyPhase === 'spin' || luckyPhase === 'win') && luckySpinTrackId) {
-      const spinTrack = filteredTracks.find(track => track.id === luckySpinTrackId);
-      if (!spinTrack) return filteredTracks;
-      if (filteredTracks.length <= 1) return [spinTrack];
-      return [filteredTracks[0], spinTrack, ...filteredTracks.slice(2)];
-    }
-
-    return filteredTracks;
-  }, [filteredTracks, luckyPhase, luckySpinTrackId]);
+    if (!luckyOrderIds) return filteredTracks;
+    const byId = new Map(filteredTracks.map(track => [track.id, track]));
+    const ordered = luckyOrderIds.map(id => byId.get(id)).filter((track): track is Track => Boolean(track));
+    const included = new Set(ordered.map(track => track.id));
+    return [...ordered, ...filteredTracks.filter(track => !included.has(track.id))];
+  }, [filteredTracks, luckyOrderIds]);
 
   const getLuckyAudioContext = () => {
     if (typeof window === 'undefined') return null;
@@ -1933,13 +1927,12 @@ export default function App() {
 
     // Initial call happens directly inside the user click, so mobile browsers allow Web Audio.
     getLuckyAudioContext();
+    const baseIds = filteredTracks.map(track => track.id);
     const winner = candidates[Math.floor(Math.random() * candidates.length)];
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     const finish = () => {
-      // Do not reorder the whole list here. Keep the winner in the exact same
-      // second slot that the last reel frame already rendered.
-      setLuckySpinTrackId(winner.id);
+      setLuckyOrderIds(moveTrackIdToSecondSlot(baseIds, winner.id));
       setLuckyWinnerId(winner.id);
       setLuckyPhase('win');
       playLuckyWin();
@@ -1957,12 +1950,12 @@ export default function App() {
     reel.push(winner);
 
     const spin = (index: number) => {
-      if (index >= reel.length) {
+      if (index >= reel.length - 1) {
         finish();
         return;
       }
       const candidate = reel[index];
-      setLuckySpinTrackId(candidate.id);
+      setLuckyOrderIds(moveTrackIdToSecondSlot(baseIds, candidate.id));
       setLuckyWinnerId(null);
       setLuckyPhase('spin');
       playLuckyTick(index);
