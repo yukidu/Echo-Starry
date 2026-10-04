@@ -24,7 +24,6 @@ test('the playlist and keyword counters share one keyword matching rule', () => 
   assert.match(app, /function trackMatchesHomeSearch/);
 });
 
-
 test('zero-result keyword choices disappear while selected chips remain removable', () => {
   assert.match(app, /const visibleAvailableKeywords = useMemo/);
   assert.match(app, /allAvailableKeywords\.filter\(keyword => \(keywordMatchCounts\[keyword\] \?\? 0\) > 0\)/);
@@ -34,10 +33,9 @@ test('zero-result keyword choices disappear while selected chips remain removabl
   assert.match(app, /selectedKeywords\.map\(kw =>/);
 });
 
-
 test('keyword controls use consistent readable sizing and an oversized close control', () => {
   assert.match(app, /網友關鍵字\(可複選多個\)/);
-  assert.match(app, />重設<\/button>/);
+  assert.match(app, />\s*重設\s*<\/button>/);
   assert.match(app, /showKeywordsDrawer \? '▲ 收起' : '▼ 展開'/);
   assert.match(app, /text-sm font-bold text-slate-400/);
   assert.match(app, /w-11 h-11[\s\S]*text-4xl font-black/);
