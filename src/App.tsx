@@ -1714,6 +1714,10 @@ export default function App() {
     }, {});
   }, [tracks, allAvailableKeywords, selectedCategory, selectedSpeakerRank, selectedKeywords, searchQuery]);
 
+  // Hide zero-result keyword choices; keep selected chips removable.
+  const visibleAvailableKeywords = useMemo(() => allAvailableKeywords.filter(keyword => (keywordMatchCounts[keyword] ?? 0) > 0), [allAvailableKeywords, keywordMatchCounts]);
+  const visibleSearchSuggestionKeywords = useMemo(() => searchSuggestions.keywords.filter(keyword => (keywordMatchCounts[keyword] ?? 0) > 0), [searchSuggestions.keywords, keywordMatchCounts]);
+
   // Filtered & Sorted Tracks List (Requirement 18 & 19 & Requirement 6: 多組網友關鍵字交叉複合搜尋)
   const filteredTracks = useMemo(() => {
     const trackList = Array.isArray(tracks) ? tracks : [];
@@ -2075,7 +2079,7 @@ export default function App() {
                 )}
 
                 {/* Requirement 10 (v2.7): 搜尋建議選單僅顯示分類標籤與網友關鍵字，刪除音檔詳細資料 */}
-                {isSearchFocused && (searchSuggestions.categories.length > 0 || searchSuggestions.keywords.length > 0) && (
+                {isSearchFocused && (searchSuggestions.categories.length > 0 || visibleSearchSuggestionKeywords.length > 0) && (
                   <div
                     className="absolute left-0 right-0 top-full mt-2 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl shadow-2xl border border-rose-100 dark:border-slate-800 overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 animate-in fade-in zoom-in-95 text-slate-800 dark:text-slate-100 max-h-96 overflow-y-auto"
                     onClick={e => e.stopPropagation()}
@@ -2107,14 +2111,14 @@ export default function App() {
                     )}
 
                     {/* 網友關鍵字 */}
-                    {searchSuggestions.keywords.length > 0 && (
+                    {visibleSearchSuggestionKeywords.length > 0 && (
                       <div className="p-2.5">
                         <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
                           <span>💬</span>
                           <span>網友關鍵字</span>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
-                          {searchSuggestions.keywords.map(kw => {
+                          {visibleSearchSuggestionKeywords.map(kw => {
                             const isSelected = selectedKeywords.includes(kw);
                             return (
                               <button
@@ -2192,10 +2196,10 @@ export default function App() {
                     ✕
                   </button>
                   <div className="flex flex-wrap gap-0.5 max-h-40 overflow-y-auto pr-5">
-                    {allAvailableKeywords.length === 0 ? (
-                      <span className="text-xs text-slate-400 italic">尚無網友關鍵字</span>
+                    {visibleAvailableKeywords.length === 0 ? (
+                      <span className="text-xs text-slate-400 italic">目前條件下沒有其他符合的關鍵字</span>
                     ) : (
-                      allAvailableKeywords.map(kw => {
+                      visibleAvailableKeywords.map(kw => {
                         const isSelected = selectedKeywords.includes(kw);
                         return (
                           <button
