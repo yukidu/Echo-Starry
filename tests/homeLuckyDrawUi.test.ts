@@ -8,16 +8,19 @@ const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
 test('home search-side action is the accessible-track lucky draw', () => {
   assert.match(app, /🫵好手氣/);
   assert.match(app, /filteredTracks\.filter\(track => !track\.isPrivateVip && checkCanAccess\(track\)\)/);
-  assert.match(app, /moveTrackIdToSecondSlot/);
+  assert.doesNotMatch(app, /moveTrackIdToSecondSlot/);
   assert.match(app, /prefers-reduced-motion: reduce/);
   assert.match(app, /createOscillator\(\)/);
 });
 
 test('spin keeps surrounding cards fixed and only replaces the second visible slot', () => {
   assert.match(app, /const \[luckySpinTrackId, setLuckySpinTrackId\]/);
-  assert.match(app, /luckyPhase === 'spin' && luckySpinTrackId/);
+  assert.match(app, /\(luckyPhase === 'spin' \|\| luckyPhase === 'win'\) && luckySpinTrackId/);
   assert.match(app, /return \[filteredTracks\[0\], spinTrack, \.\.\.filteredTracks\.slice\(2\)\]/);
   assert.match(app, /setLuckySpinTrackId\(candidate\.id\)/);
+  assert.match(app, /setLuckySpinTrackId\(winner\.id\)/);
+  assert.doesNotMatch(app, /luckyOrderIds/);
+  assert.match(app, /if \(index >= reel\.length\)/);
   assert.doesNotMatch(app, /--lucky-x-from/);
   assert.doesNotMatch(app, /--lucky-y-to/);
   assert.match(css, /\.audio-card-grid\.lucky-spin-active > \.lucky-card \{[\s\S]*transform: none;[\s\S]*animation: none;/);
