@@ -473,22 +473,30 @@ export const DetailView: React.FC<DetailViewProps> = ({
     <div className="max-w-2xl mx-auto px-3.5 py-3 sm:px-6 space-y-3 pb-28 leading-snug">
       {/* Requirement 5.7 (v2.7): 「網友關鍵字」往上移動到頁面的最上面 */}
       <div className="relative rounded-2xl p-3 sm:p-4 bg-white/80 dark:bg-slate-900/80 border border-amber-200/70 dark:border-slate-800 shadow-2xs backdrop-blur-xs">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <button type="button" onClick={() => setShowDetailKeywords(prev => !prev)} className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-bold text-sm text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 transition-colors text-left cursor-pointer">
-  <span>網友關鍵字</span>
-  <span className="text-xs text-slate-400 font-normal">({trackKeywords.length}/50 組)</span>
-  <span className="text-sm font-bold text-slate-400">{showDetailKeywords ? '▲ 收起' : '▼ 展開'}</span>
-</button>
-{showDetailKeywords && canAddKeywords && !isAddingKeyword && (
+        <div className="mb-2 space-y-1.5">
+          <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-bold text-sm text-amber-700 dark:text-amber-300">
+              <span>網友關鍵字</span>
+              <span className="text-xs text-slate-400 font-normal">({trackKeywords.length}/50 組)</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowDetailKeywords(prev => !prev)}
+              className="w-[4.75rem] justify-self-end text-left text-sm font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              {showDetailKeywords ? '▲ 收起' : '▼ 展開'}
+            </button>
+          </div>
+          {showDetailKeywords && canAddKeywords && !isAddingKeyword && (
             <button
               type="button"
               onClick={() => {
                 setIsAddingKeyword(true);
                 setKeywordError(null);
               }}
-              className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-0.5 cursor-pointer shrink-0"
+              className="text-sm font-normal text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer w-fit"
             >
-              <Plus className="w-3 h-3" />
+              <Plus className="w-4 h-4" />
               <span>新增關鍵字</span>
             </button>
           )}
@@ -544,7 +552,7 @@ export const DetailView: React.FC<DetailViewProps> = ({
               return (
                 <div
                   key={idx}
-                  className="group inline-flex items-center gap-0.5 px-1 py-0 rounded-md text-xs font-semibold bg-amber-50/90 dark:bg-slate-800 text-amber-900 dark:text-amber-200 border border-amber-200/80 dark:border-slate-700 shadow-2xs hover:border-amber-400 transition-all"
+                  className="group inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-sm font-normal bg-amber-50/90 dark:bg-slate-800 text-amber-900 dark:text-amber-200 border border-amber-200/80 dark:border-slate-700 shadow-2xs hover:border-amber-400 transition-all"
                 >
                   {/* Requirement 5.11 (v2.7): 點選已新增的關鍵字，跳轉首頁篩選該關鍵字 */}
                   <button

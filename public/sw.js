@@ -1,4 +1,4 @@
-const CACHE_NAME = 'echostars-shell-v84';
+const CACHE_NAME = 'echostars-shell-v85';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-monochrome.svg', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', event => {
