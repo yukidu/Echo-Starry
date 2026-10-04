@@ -2063,7 +2063,7 @@ export default function App() {
                     if (e.key === 'Escape') setIsSearchFocused(false);
                   }}
                   placeholder="搜尋演講者、主題、系列或網友關鍵字..."
-                  className="w-full pl-10 pr-9 py-2.5 rounded-2xl text-sm text-white placeholder:text-white/70 outline-hidden shadow-2xs transition-all border border-white/20 focus:ring-2 focus:ring-white/40"
+                  className="w-full pl-10 pr-9 h-[46px] py-0 rounded-2xl text-sm text-white placeholder:text-white/70 outline-hidden shadow-2xs transition-all border border-white/20 focus:ring-2 focus:ring-white/40"
                   style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
                 />
                 {searchQuery && (
@@ -2128,9 +2128,9 @@ export default function App() {
                                   setSelectedKeywords(prev => isSelected ? prev.filter(k => k !== kw) : [...prev, kw]);
                                   setIsSearchFocused(false);
                                 }}
-                                className={`px-2.5 py-1 rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                                className={`px-2.5 py-1 rounded-xl text-sm font-normal transition-colors cursor-pointer flex items-center gap-1 ${
                                   isSelected
-                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 font-bold'
+                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300'
                                     : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-slate-700'
                                 }`}
                               >
@@ -2150,7 +2150,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setIsSearchFocused(false)}
-                className="px-3.5 sm:px-4 py-2.5 rounded-2xl text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-2xs hover:brightness-105 shrink-0 active:scale-95 transition-all cursor-pointer"
+                className="h-[46px] px-3.5 sm:px-4 py-0 rounded-2xl text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-2xs hover:brightness-105 shrink-0 active:scale-95 transition-all cursor-pointer"
                 style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
                 title="執行搜尋"
               >
@@ -2190,7 +2190,8 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setShowKeywordsDrawer(false)}
-                    className="absolute top-1 right-1 z-10 w-11 h-11 rounded-full flex items-center justify-center bg-rose-100/95 dark:bg-rose-950/90 text-rose-600 dark:text-rose-300 hover:bg-rose-200 dark:hover:bg-rose-900 hover:text-rose-700 dark:hover:text-rose-200 text-4xl font-black leading-none shadow-md border-2 border-rose-300 dark:border-rose-700 cursor-pointer"
+                    className="absolute top-1 right-1 z-10 w-11 h-11 rounded-full flex items-center justify-center hover:brightness-110 text-4xl font-black leading-none shadow-md border-2 cursor-pointer transition-all"
+                    style={{ backgroundColor: 'var(--color-light-pill, #ffffff)', color: 'var(--color-primary, #c06c84)', borderColor: 'var(--color-primary, #c06c84)' }}
                     aria-label="收起網友關鍵字"
                   >
                     ✕
@@ -2210,7 +2211,7 @@ export default function App() {
                                 isSelected ? prev.filter(k => k !== kw) : [...prev, kw]
                               );
                             }}
-                            className={`px-2 py-1 rounded-lg text-sm font-semibold transition-colors cursor-pointer border ${
+                            className={`px-2 py-1 rounded-lg text-sm font-normal transition-colors cursor-pointer border ${
                               isSelected
                                 ? 'bg-amber-600 text-white border-amber-600'
                                 : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-amber-50 dark:hover:bg-slate-800'
@@ -2231,7 +2232,7 @@ export default function App() {
                   {selectedKeywords.map(kw => (
                     <span
                       key={kw}
-                      className="inline-flex items-center gap-0.5 px-2 py-1 rounded-full text-sm font-semibold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-200 border border-amber-300/80 dark:border-amber-700"
+                      className="inline-flex items-center gap-0.5 px-2 py-1 rounded-full text-sm font-normal bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-200 border border-amber-300/80 dark:border-amber-700"
                     >
                       <span>{kw}({keywordMatchCounts[kw] ?? 0})</span>
                       <button
@@ -2260,9 +2261,9 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => handleSortClick(field)}
-                      className={`w-full min-w-0 px-0 py-1 rounded-xl text-[10px] sm:text-xs font-bold transition-all flex items-center justify-center gap-0 shadow-2xs ${
+                      className={`w-full h-[46px] min-w-0 px-0 py-0 rounded-xl text-[10px] sm:text-xs font-bold transition-all flex items-center justify-center gap-0 shadow-2xs ${
                         isActive
-                          ? 'ring-2 ring-white/95 text-white brightness-110 font-black scale-102'
+                          ? 'ring-2 ring-white/95 text-white brightness-110 font-black'
                           : 'text-white/85 hover:text-white hover:brightness-105 opacity-90 hover:opacity-100'
                       }`}
                       style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
@@ -2293,7 +2294,7 @@ export default function App() {
                       setIsSpeakerRankDropdownOpen(prev => !prev);
                       setIsCategoryDropdownOpen(false);
                     }}
-                    className={`w-full min-w-0 px-0 py-1 rounded-xl text-[10px] sm:text-xs font-bold text-white flex items-center justify-center gap-0 shadow-2xs hover:brightness-105 transition-all ${
+                    className={`w-full h-[46px] min-w-0 px-0 py-0 rounded-xl text-[10px] sm:text-xs font-bold text-white flex items-center justify-center gap-0 shadow-2xs hover:brightness-105 transition-all ${
                       selectedSpeakerRank !== '全部' ? 'ring-2 ring-amber-300' : ''
                     }`}
                     style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
@@ -2350,7 +2351,7 @@ export default function App() {
                       setIsCategoryDropdownOpen(prev => !prev);
                       setIsSpeakerRankDropdownOpen(false);
                     }}
-                    className="w-full min-w-0 px-0 py-1 rounded-xl text-[10px] sm:text-xs font-bold text-white flex items-center justify-center gap-0 shadow-2xs hover:brightness-105 transition-all"
+                    className="w-full h-[46px] min-w-0 px-0 py-0 rounded-xl text-[10px] sm:text-xs font-bold text-white flex items-center justify-center gap-0 shadow-2xs hover:brightness-105 transition-all"
                     style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
                     title="點擊展開分類選單"
                   >
