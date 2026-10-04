@@ -12,6 +12,8 @@ const VISITOR_KEY = 'sq_visitor_identity_v1';
 const PLAYBACK_PREFIX = 'sq_audio_progress_v1_';
 const CLAIM_MARKER_PREFIX = 'echostars_playback_claim_v1';
 const SESSION_CHECK_KEY = 'echostars_auth_session_checked_at';
+const FIRST_PROFILE_EDIT_KEY = 'echostars_first_profile_edit_v1';
+const FIRST_PROFILE_EDIT_OPENED_KEY = 'echostars_first_profile_edit_opened_v1';
 const SESSION_CHECK_TTL = 10 * 60 * 1000;
 const originalFetch = window.fetch.bind(window);
 
@@ -198,9 +200,44 @@ let activeStatus: HTMLElement | null = null;
 
 function setStatus(message: string, isError = false) {
   if (!activeStatus) return;
-  activeStatus.textContent = message;
-  activeStatus.style.display = message ? 'block' : 'none';
-  activeStatus.style.color = isError ? '#e11d48' : '#64748b';
+  activeStatus.replaceChildren();
+  activeStatus.style.display = message ? 'flex' : 'none';
+  if (!message) return;
+
+  const isLoading = !isError && (message.includes('登入中') || message.includes('正在'));
+  activeStatus.style.alignItems = 'center';
+  activeStatus.style.justifyContent = 'center';
+  activeStatus.style.gap = isLoading ? '14px' : '0';
+  activeStatus.style.width = '100%';
+  activeStatus.style.boxSizing = 'border-box';
+  activeStatus.style.padding = isLoading ? '18px 14px' : '8px 10px';
+  activeStatus.style.borderRadius = '18px';
+  activeStatus.style.fontSize = isLoading ? '26px' : '13px';
+  activeStatus.style.lineHeight = '1.25';
+  activeStatus.style.fontWeight = isLoading ? '900' : '700';
+  activeStatus.style.letterSpacing = isLoading ? '0.08em' : '0';
+  activeStatus.style.textAlign = 'center';
+  activeStatus.style.color = isError ? '#e11d48' : 'var(--color-primary, #0f8b83)';
+  activeStatus.style.background = isLoading ? 'rgba(15, 139, 131, 0.08)' : 'transparent';
+  activeStatus.style.border = isLoading ? '2px solid var(--color-primary, #0f8b83)' : '0';
+  activeStatus.style.boxShadow = isLoading ? '0 10px 28px rgba(15, 23, 42, 0.12)' : 'none';
+
+  if (isLoading) {
+    const spinner = document.createElement('span');
+    spinner.setAttribute('aria-hidden', 'true');
+    spinner.className = 'animate-spin';
+    spinner.style.width = '30px';
+    spinner.style.height = '30px';
+    spinner.style.flex = '0 0 auto';
+    spinner.style.borderRadius = '9999px';
+    spinner.style.border = '4px solid rgba(15, 139, 131, 0.22)';
+    spinner.style.borderTopColor = 'var(--color-primary, #0f8b83)';
+    activeStatus.appendChild(spinner);
+  }
+
+  const text = document.createElement('span');
+  text.textContent = message;
+  activeStatus.appendChild(text);
 }
 
 async function handleGoogleCredential(response: any) {
@@ -210,7 +247,7 @@ async function handleGoogleCredential(response: any) {
     return;
   }
 
-  setStatus('正在驗證 Google 帳號…');
+  setStatus('登入中請稍後');
   try {
     const result = await originalFetch('/api/users/google-sync', {
       method: 'POST',
@@ -230,7 +267,11 @@ async function handleGoogleCredential(response: any) {
     };
     localStorage.setItem(USER_KEY, JSON.stringify(user));
     sessionStorage.setItem(SESSION_CHECK_KEY, String(Date.now()));
-    setStatus('登入成功，正在同步學習紀錄…');
+    if (data.isNewUser) {
+      sessionStorage.setItem(FIRST_PROFILE_EDIT_KEY, String(user.id || 'new'));
+      sessionStorage.removeItem(FIRST_PROFILE_EDIT_OPENED_KEY);
+    }
+    setStatus(data.isNewUser ? '登入成功，正在開啟個人資料…' : '登入成功，正在同步學習紀錄…');
     await claimLocalPlayback(user);
     window.location.reload();
   } catch (error) {
@@ -262,6 +303,27 @@ function isLegacyGoogleButton(button: HTMLButtonElement) {
   return text.includes('使用 Google 帳戶登入 / 註冊') || text.includes('正在連線至 Google 授權');
 }
 
+function simplifyLoginPanel(legacyButton: HTMLButtonElement) {
+  const actionCard = legacyButton.parentElement;
+  const loginContainer = actionCard?.parentElement;
+  if (!actionCard || !loginContainer) return;
+
+  Array.from(loginContainer.children).forEach(child => {
+    if (child !== actionCard) child.remove();
+  });
+  Array.from(actionCard.children).forEach(child => {
+    if (child === legacyButton || (child as HTMLElement).dataset?.echostarsGoogleIdentity === '1') return;
+    const text = (child.textContent || '').replace(/\s+/g, ' ').trim();
+    if (
+      text.includes('使用 Google 官方帳號進行安全驗證與身分綁定') ||
+      text.includes('初次登入將自動建立專屬帳號')
+    ) child.remove();
+  });
+  actionCard.style.padding = '16px';
+  loginContainer.style.paddingTop = '24px';
+  loginContainer.style.paddingBottom = '24px';
+}
+
 function renderOfficialButton(legacyButton: HTMLButtonElement) {
   if (legacyButton.dataset.googleIdentityReplaced === '1') return;
   legacyButton.dataset.googleIdentityReplaced = '1';
@@ -272,7 +334,7 @@ function renderOfficialButton(legacyButton: HTMLButtonElement) {
   wrapper.style.display = 'flex';
   wrapper.style.flexDirection = 'column';
   wrapper.style.alignItems = 'center';
-  wrapper.style.gap = '8px';
+  wrapper.style.gap = '10px';
 
   const buttonHost = document.createElement('div');
   buttonHost.style.minHeight = '44px';
@@ -283,14 +345,15 @@ function renderOfficialButton(legacyButton: HTMLButtonElement) {
 
   const status = document.createElement('div');
   status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
   status.style.display = 'none';
-  status.style.fontSize = '12px';
   status.style.lineHeight = '1.5';
   status.style.textAlign = 'center';
   wrapper.append(buttonHost, status);
   legacyButton.insertAdjacentElement('beforebegin', wrapper);
   legacyButton.style.display = 'none';
   activeStatus = status;
+  simplifyLoginPanel(legacyButton);
 
   const render = () => {
     if (!wrapper.isConnected) return;
@@ -318,21 +381,70 @@ function renderOfficialButton(legacyButton: HTMLButtonElement) {
   render();
 }
 
-function scanForGoogleButton() {
-  if (readCachedUser()) return;
-  document.querySelectorAll('button').forEach(node => {
-    const button = node as HTMLButtonElement;
-    if (isLegacyGoogleButton(button)) renderOfficialButton(button);
-  });
+function resumeFirstProfileEdit() {
+  const marker = sessionStorage.getItem(FIRST_PROFILE_EDIT_KEY);
+  const cachedUser = readCachedUser();
+  if (!marker || !cachedUser?.id || String(cachedUser.id) !== marker) return;
+  if (sessionStorage.getItem(FIRST_PROFILE_EDIT_OPENED_KEY) === '1') return;
+
+  const profileButtons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('[data-tutorial-target="visitor-profile"]')
+  );
+  const profileButton = profileButtons.find(button => button.offsetParent !== null) || profileButtons[0];
+  if (!profileButton) return;
+  sessionStorage.setItem(FIRST_PROFILE_EDIT_OPENED_KEY, '1');
+  profileButton.click();
+}
+
+function normalizeProfileModalUx() {
+  const roots = Array.from(document.querySelectorAll<HTMLElement>('.app-modal-overlay'));
+  const profileRoot = roots.find(root => root.querySelector('h2')?.textContent?.trim() === '個人中心');
+  if (!profileRoot) return;
+
+  profileRoot.querySelector<HTMLButtonElement>('button[title="登出目前帳號"]')?.remove();
+
+  const headerButtons = Array.from(profileRoot.querySelectorAll<HTMLButtonElement>('button'));
+  const saveButton = headerButtons.find(button => button.textContent?.trim() === '儲存');
+  if (saveButton && saveButton.dataset.echostarsProminentSave !== '1') {
+    saveButton.dataset.echostarsProminentSave = '1';
+    saveButton.textContent = '儲存資料';
+    saveButton.style.background = '#10b981';
+    saveButton.style.color = '#ffffff';
+    saveButton.style.padding = '10px 16px';
+    saveButton.style.borderRadius = '14px';
+    saveButton.style.border = '2px solid rgba(255,255,255,0.55)';
+    saveButton.style.fontSize = '14px';
+    saveButton.style.fontWeight = '900';
+    saveButton.style.boxShadow = '0 8px 22px rgba(16,185,129,0.35)';
+  }
+
+  const marker = sessionStorage.getItem(FIRST_PROFILE_EDIT_KEY);
+  if (!marker || sessionStorage.getItem(FIRST_PROFILE_EDIT_OPENED_KEY) !== '1') return;
+  const editButton = headerButtons.find(button => button.textContent?.trim() === '修改');
+  if (!editButton) return;
+  editButton.click();
+  sessionStorage.removeItem(FIRST_PROFILE_EDIT_KEY);
+  sessionStorage.removeItem(FIRST_PROFILE_EDIT_OPENED_KEY);
+}
+
+function scanUi() {
+  if (!readCachedUser()) {
+    document.querySelectorAll('button').forEach(node => {
+      const button = node as HTMLButtonElement;
+      if (isLegacyGoogleButton(button)) renderOfficialButton(button);
+    });
+  }
+  resumeFirstProfileEdit();
+  normalizeProfileModalUx();
 }
 
 installAuthenticatedFetch();
 void validateCachedSession();
 
-const observer = new MutationObserver(scanForGoogleButton);
+const observer = new MutationObserver(scanUi);
 observer.observe(document.documentElement, { childList: true, subtree: true });
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', scanForGoogleButton, { once: true });
+  document.addEventListener('DOMContentLoaded', scanUi, { once: true });
 } else {
-  scanForGoogleButton();
+  scanUi();
 }
