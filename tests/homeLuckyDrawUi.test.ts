@@ -17,10 +17,14 @@ test('lucky draw acts directly on the home card grid with a spotlight and winner
   assert.match(app, /lucky-spin-active/);
   assert.match(app, /lucky-win-active/);
   assert.match(app, /data-lucky-winner/);
-  assert.match(css, /\.audio-card-grid\.lucky-spin-active > \.lucky-card \{[\s\S]*animation: echostars-lucky-reel/);
-  assert.match(css, /\.audio-card-grid\.lucky-spin-active > \.lucky-card:nth-child\(2\)/);
+  assert.match(app, /--lucky-x-from/);
+  assert.match(app, /--lucky-y-to/);
+  assert.match(app, /--lucky-duration/);
+  assert.match(css, /\.audio-card-grid\.lucky-spin-active > \.lucky-card \{[\s\S]*animation-name: echostars-lucky-reel/);
+  assert.match(css, /animation-duration: var\(--lucky-duration, 190ms\)/);
+  assert.match(css, /\.audio-card-grid\.lucky-spin-active > \.lucky-card:nth-child\(2\) \{[\s\S]*box-shadow/);
   assert.match(css, /\.audio-card-grid\.lucky-win-active > \.lucky-card\[data-lucky-winner="true"\]/);
-  assert.match(css, /\.lucky-winner-badge \{[\s\S]*top: -1\.25rem/);
+  assert.match(css, /\.lucky-winner-badge \{[\s\S]*top: -2\.2rem/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 });
 

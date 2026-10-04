@@ -386,7 +386,7 @@ input[type="range"].audio-scrubber::-moz-range-thumb {
 }
 
 
-/* Home lucky draw v93 */
+/* Home lucky draw v94 */
 .audio-card-grid > .lucky-card {
   transition: filter 150ms ease, opacity 150ms ease, transform 150ms ease, box-shadow 150ms ease;
   border-radius: 1.5rem;
@@ -397,16 +397,13 @@ input[type="range"].audio-scrubber::-moz-range-thumb {
   filter: brightness(0.34) saturate(0.55);
   opacity: 0.48;
   z-index: 10;
-  animation: echostars-lucky-reel 180ms cubic-bezier(.35,0,.65,1) infinite alternate;
-}
-
-.audio-card-grid.lucky-spin-active > .lucky-card:nth-child(3n + 1) {
-  animation-delay: -55ms;
-}
-
-.audio-card-grid.lucky-spin-active > .lucky-card:nth-child(3n + 3) {
-  animation-delay: -105ms;
-  animation-direction: alternate-reverse;
+  will-change: transform, filter, opacity;
+  animation-name: echostars-lucky-reel;
+  animation-duration: var(--lucky-duration, 190ms);
+  animation-delay: var(--lucky-delay, 0ms);
+  animation-timing-function: cubic-bezier(.32,0,.68,1);
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
 }
 
 .audio-card-grid.lucky-spin-active > .lucky-card:nth-child(2) {
@@ -414,7 +411,6 @@ input[type="range"].audio-scrubber::-moz-range-thumb {
   opacity: 1;
   z-index: 20;
   box-shadow: 0 0 0 3px var(--color-primary, #c06c84), 0 0 30px var(--color-primary, #c06c84);
-  animation: echostars-lucky-reel-focus 170ms ease-in-out infinite alternate;
 }
 
 .audio-card-grid.lucky-win-active > .lucky-card {
@@ -434,14 +430,15 @@ input[type="range"].audio-scrubber::-moz-range-thumb {
 .lucky-winner-badge {
   position: absolute;
   z-index: 40;
-  top: -1.25rem;
-  right: 0.5rem;
+  top: -2.2rem;
+  right: 0.35rem;
   padding: 0.35rem 0.7rem;
   border-radius: 9999px;
   background: var(--color-primary, #c06c84);
   color: white;
   font-weight: 900;
   font-size: 0.95rem;
+  line-height: 1.1;
   letter-spacing: 0.04em;
   box-shadow: 0 6px 20px rgb(0 0 0 / 0.28);
   pointer-events: none;
@@ -449,13 +446,15 @@ input[type="range"].audio-scrubber::-moz-range-thumb {
 }
 
 @keyframes echostars-lucky-reel {
-  from { transform: translateY(-7px) scale(0.98); }
-  to { transform: translateY(7px) scale(0.99); }
-}
-
-@keyframes echostars-lucky-reel-focus {
-  from { transform: translateY(-10px) scale(1.018); }
-  to { transform: translateY(10px) scale(1.035); }
+  0% {
+    transform: translate3d(var(--lucky-x-from, -4px), var(--lucky-y-from, -18px), 0) scale(0.965);
+  }
+  48% {
+    transform: translate3d(0, 0, 0) scale(0.985);
+  }
+  100% {
+    transform: translate3d(var(--lucky-x-to, 4px), var(--lucky-y-to, 18px), 0) scale(0.975);
+  }
 }
 
 @keyframes echostars-lucky-win {

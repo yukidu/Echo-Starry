@@ -2619,6 +2619,11 @@ export default function App() {
                     (currentUser?.email === 'yukidu@gmail.com' ? tRatings['u-admin'] : undefined) ||
                     0;
                   const hasLiked = Boolean(track?.likedBy && Array.isArray(track.likedBy) && track.likedBy.some(k => currentIdentityKeys.includes(k)));
+                  const luckyMotionDirection = trackIndex % 2 === 0 ? 1 : -1;
+                  const luckyMotionDistance = 16 + ((trackIndex * 7) % 13);
+                  const luckyMotionLateral = 2 + ((trackIndex * 5) % 7);
+                  const luckyMotionDuration = 150 + ((trackIndex * 37) % 120);
+                  const luckyMotionDelay = -((trackIndex * 53) % 190);
 
                   return (
                     <div
@@ -2626,6 +2631,14 @@ export default function App() {
                       className="lucky-card relative"
                       data-track-card-id={track.id}
                       data-lucky-winner={luckyWinnerId === track.id ? 'true' : undefined}
+                      style={{
+                        '--lucky-x-from': `${luckyMotionDirection * luckyMotionLateral}px`,
+                        '--lucky-y-from': `${-luckyMotionDistance}px`,
+                        '--lucky-x-to': `${-luckyMotionDirection * luckyMotionLateral}px`,
+                        '--lucky-y-to': `${luckyMotionDistance}px`,
+                        '--lucky-duration': `${luckyMotionDuration}ms`,
+                        '--lucky-delay': `${luckyMotionDelay}ms`
+                      } as React.CSSProperties}
                     >
                     {luckyPhase === 'win' && luckyWinnerId === track.id && (
                       <div className="lucky-winner-badge" aria-live="polite">✨ 好手氣！✨</div>
