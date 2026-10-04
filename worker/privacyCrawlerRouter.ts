@@ -1,4 +1,4 @@
-import appWorker from './categoryIntegrityRouter';
+import appWorker from './adminUserDeleteRouter';
 import type { Env } from './index';
 
 const X_ROBOTS_TAG = 'noindex, nofollow, noarchive, nosnippet, noimageindex';
