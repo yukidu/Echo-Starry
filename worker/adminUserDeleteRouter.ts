@@ -68,7 +68,7 @@ async function tableExists(db: any, name: string) {
   return Boolean(row);
 }
 
-async function deleteMember(request: Request, env: Env, targetId: string) {
+async function deleteMember(request: Request, env: Env, targetKey: string) {
   if (!env.DB) return json({ error: '資料庫尚未連線' }, 503);
 
   const actor = await verifiedActor(request, env);
@@ -76,9 +76,13 @@ async function deleteMember(request: Request, env: Env, targetId: string) {
     return json({ error: '只有超級管理員可刪除會員' }, 403);
   }
 
-  const target: any = await env.DB.prepare(
-    'SELECT id, email, name FROM users WHERE id = ? LIMIT 1'
-  ).bind(targetId).first();
+  const normalizedKey = normalizeEmail(targetKey);
+  const target: any = await env.DB.prepare(`
+    SELECT id, email, name
+    FROM users
+    WHERE id = ? OR LOWER(TRIM(email)) = ?
+    LIMIT 1
+  `).bind(targetKey, normalizedKey).first();
   if (!target) return json({ error: '找不到此會員' }, 404);
 
   const targetEmail = normalizeEmail(target.email);
