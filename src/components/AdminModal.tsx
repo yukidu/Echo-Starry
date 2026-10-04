@@ -108,6 +108,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     cleanEmail === 'yukidu@gmail.com' ||
     currentUser?.role === '超級管理員' ||
     currentUser?.id === 'u-admin';
+  // Destructive member deletion is intentionally stricter than the broader admin UI.
+  // Only the single verified super-admin email may even see the control.
+  const isSuperAdminAccount = cleanEmail === 'yukidu@gmail.com';
 
   const userRank = currentUser?.rank || '';
   const isDiamondOrAbove = userRank.includes('鑽石') || userRank.includes('皇冠') || userRank.includes('大使');
@@ -140,6 +143,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   // Deletion confirm state without window.confirm (Requirement 17)
   const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
 
   // Single user editing state
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -568,6 +573,26 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       setEditingUserId(null);
     } catch (error) {
       alert(error instanceof Error ? error.message : '會員儲存失敗');
+    }
+  };
+
+  const handleDeleteUser = async (user: UserProfile) => {
+    if (!isSuperAdminAccount || isDeletingUser) return;
+    if (user.email?.toLowerCase().trim() === 'yukidu@gmail.com') return;
+    setIsDeletingUser(true);
+    try {
+      const res = await fetch(`/api/admin/users/${encodeURIComponent(user.id)}`, {
+        method: 'DELETE',
+        cache: 'no-store'
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || '刪除會員失敗');
+      setDeletingUserId(null);
+      window.location.reload();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '刪除會員失敗，請稍後再試');
+    } finally {
+      setIsDeletingUser(false);
     }
   };
 
@@ -1376,6 +1401,53 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                                 {u.isBlocked ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
                                 <span>{u.isBlocked ? '解鎖' : '封鎖'}</span>
                               </button>
+
+                              {/* Permanent member deletion - exact super-admin account only. */}
+                              {isSuperAdminAccount && u.email?.toLowerCase().trim() !== 'yukidu@gmail.com' && (
+                                deletingUserId === u.id ? (
+                                  <div
+                                    className="flex items-center gap-1 bg-rose-950/55 p-1 rounded-xl border border-white/30"
+                                    onClick={e => e.stopPropagation()}
+                                  >
+                                    <span className="text-[10px] text-white font-black">確定刪除會員？</span>
+                                    <button
+                                      type="button"
+                                      disabled={isDeletingUser}
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        void handleDeleteUser(u);
+                                      }}
+                                      className="px-2 py-0.5 rounded-lg bg-rose-700 hover:bg-rose-800 text-white text-[10px] font-black disabled:opacity-50"
+                                    >
+                                      {isDeletingUser ? '刪除中…' : '確認'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isDeletingUser}
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        setDeletingUserId(null);
+                                      }}
+                                      className="px-1.5 py-0.5 rounded-lg bg-white/20 text-white text-[10px] font-bold disabled:opacity-50"
+                                    >
+                                      取消
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      setDeletingUserId(u.id);
+                                    }}
+                                    title="永久刪除此會員帳號（僅超級管理員）"
+                                    className="px-2 py-1 rounded-lg bg-rose-700 hover:bg-rose-800 text-white flex items-center gap-1 text-[11px] font-black transition-colors"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>刪除</span>
+                                  </button>
+                                )
+                              )}
                             </>
                           )}
                         </div>
