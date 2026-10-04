@@ -206,9 +206,9 @@ export const DetailView: React.FC<DetailViewProps> = ({
   const canEditTrack = isSuperAdmin || isContributorUploader;
 
   // Permissions for keywords (Requirement 1):
-  // 已登入會員的「所有人」都有權限可以新增關鍵字，前提是最多不能超過20組關鍵字。
+  // 已登入會員的「所有人」都有權限可以新增關鍵字，前提是最多不能超過50組關鍵字。
   // 建立者可管理自己的關鍵字；超級管理員可管理全部。
-  const canAddKeywords = currentUser !== null && trackKeywords.length < 20;
+  const canAddKeywords = currentUser !== null && trackKeywords.length < 50;
   const canManageKeywords = (kw: string) => currentUser?.email?.toLowerCase().trim() === 'yukidu@gmail.com' || Boolean(currentUser && keywordMeta[kw]?.creatorId === currentUser.id);
 
   const handleAddKeyword = async (kw: string) => {
@@ -218,8 +218,8 @@ export const DetailView: React.FC<DetailViewProps> = ({
       setKeywordError('此關鍵字已存在');
       return;
     }
-    if (trackKeywords.length >= 20) {
-      setKeywordError('此音檔網友關鍵字已達 20 組上限！');
+    if (trackKeywords.length >= 50) {
+      setKeywordError('此音檔網友關鍵字已達 50 組上限！');
       return;
     }
     setKeywordError(null);
@@ -450,7 +450,7 @@ export const DetailView: React.FC<DetailViewProps> = ({
           <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800 dark:text-slate-200">
             <span>網友關鍵字</span>
             <span className="text-[10px] text-slate-400 font-normal">
-              ({trackKeywords.length}/20 組)
+              ({trackKeywords.length}/50 組)
             </span>
           </div>
           {canAddKeywords && !isAddingKeyword && (

@@ -269,7 +269,7 @@ export async function communityApi(request: Request, env: Env, defaults: any[]):
         if (method !== 'POST' && !superAdmin && meta[old]?.creatorId !== actor.id) return json({error:'只能修改或刪除自己新增的關鍵字'},403);
         if (method === 'POST') {
           if (keywords.includes(name)) return json({error:'此關鍵字已存在'},409);
-          if (keywords.length >= 20) return json({error:'每首最多20個關鍵字'},400);
+          if (keywords.length >= 50) return json({error:'每首最多50個關鍵字'},400);
           keywords.push(name); meta[name] = {creatorId:actor.id,createdAt:Date.now()};
         } else if (method === 'PUT') {
           if (name !== old && keywords.includes(name)) return json({error:'此關鍵字已存在'},409);
