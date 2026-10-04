@@ -487,6 +487,7 @@ export default function App() {
   );
   const [luckyPhase, setLuckyPhase] = useState<'idle' | 'spin' | 'win'>('idle');
   const [luckyOrderIds, setLuckyOrderIds] = useState<string[] | null>(null);
+  const [luckySpinTrackId, setLuckySpinTrackId] = useState<string | null>(null);
   const [luckyWinnerId, setLuckyWinnerId] = useState<string | null>(null);
   const luckyTimersRef = useRef<number[]>([]);
   const luckyAudioContextRef = useRef<AudioContext | null>(null);
@@ -500,6 +501,7 @@ export default function App() {
     clearLuckyTimers();
     setLuckyPhase('idle');
     setLuckyOrderIds(null);
+    setLuckySpinTrackId(null);
     setLuckyWinnerId(null);
   }, [clearLuckyTimers]);
 
@@ -1865,12 +1867,21 @@ export default function App() {
   ]);
 
   const displayedTracks = useMemo(() => {
+    // During the reel animation the list itself stays frozen. Only slot #2 swaps
+    // its card content, which gives a slot-machine feel without moving nearby cards.
+    if (luckyPhase === 'spin' && luckySpinTrackId) {
+      const spinTrack = filteredTracks.find(track => track.id === luckySpinTrackId);
+      if (!spinTrack) return filteredTracks;
+      if (filteredTracks.length <= 1) return [spinTrack];
+      return [filteredTracks[0], spinTrack, ...filteredTracks.slice(2)];
+    }
+
     if (!luckyOrderIds) return filteredTracks;
     const byId = new Map(filteredTracks.map(track => [track.id, track]));
     const ordered = luckyOrderIds.map(id => byId.get(id)).filter((track): track is Track => Boolean(track));
     const included = new Set(ordered.map(track => track.id));
     return [...ordered, ...filteredTracks.filter(track => !included.has(track.id))];
-  }, [filteredTracks, luckyOrderIds]);
+  }, [filteredTracks, luckyPhase, luckySpinTrackId, luckyOrderIds]);
 
   const getLuckyAudioContext = () => {
     if (typeof window === 'undefined') return null;
@@ -1932,6 +1943,7 @@ export default function App() {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     const finish = () => {
+      setLuckySpinTrackId(null);
       setLuckyOrderIds(moveTrackIdToSecondSlot(baseIds, winner.id));
       setLuckyWinnerId(winner.id);
       setLuckyPhase('win');
@@ -1955,7 +1967,8 @@ export default function App() {
         return;
       }
       const candidate = reel[index];
-      setLuckyOrderIds(moveTrackIdToSecondSlot(baseIds, candidate.id));
+      setLuckyOrderIds(null);
+      setLuckySpinTrackId(candidate.id);
       setLuckyWinnerId(null);
       setLuckyPhase('spin');
       playLuckyTick(index);
@@ -2619,11 +2632,6 @@ export default function App() {
                     (currentUser?.email === 'yukidu@gmail.com' ? tRatings['u-admin'] : undefined) ||
                     0;
                   const hasLiked = Boolean(track?.likedBy && Array.isArray(track.likedBy) && track.likedBy.some(k => currentIdentityKeys.includes(k)));
-                  const luckyMotionDirection = trackIndex % 2 === 0 ? 1 : -1;
-                  const luckyMotionDistance = 16 + ((trackIndex * 7) % 13);
-                  const luckyMotionLateral = 2 + ((trackIndex * 5) % 7);
-                  const luckyMotionDuration = 150 + ((trackIndex * 37) % 120);
-                  const luckyMotionDelay = -((trackIndex * 53) % 190);
 
                   return (
                     <div
@@ -2631,14 +2639,6 @@ export default function App() {
                       className="lucky-card relative"
                       data-track-card-id={track.id}
                       data-lucky-winner={luckyWinnerId === track.id ? 'true' : undefined}
-                      style={{
-                        '--lucky-x-from': `${luckyMotionDirection * luckyMotionLateral}px`,
-                        '--lucky-y-from': `${-luckyMotionDistance}px`,
-                        '--lucky-x-to': `${-luckyMotionDirection * luckyMotionLateral}px`,
-                        '--lucky-y-to': `${luckyMotionDistance}px`,
-                        '--lucky-duration': `${luckyMotionDuration}ms`,
-                        '--lucky-delay': `${luckyMotionDelay}ms`
-                      } as React.CSSProperties}
                     >
                     {luckyPhase === 'win' && luckyWinnerId === track.id && (
                       <div className="lucky-winner-badge" aria-live="polite">✨ 好手氣！✨</div>
