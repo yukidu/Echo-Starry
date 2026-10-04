@@ -5,6 +5,7 @@ on:
     branches: [fix/comment-time-layout-v88]
     paths:
       - .github/workflows/one-off-v88-comment-layout.yml
+      - scripts/patch-v88-comment-layout.py
 
 permissions:
   contents: write
@@ -31,6 +32,6 @@ jobs:
         run: |
           git config user.name echostars-release-bot
           git config user.email actions@users.noreply.github.com
-          git add shared/commentTime.ts src/components/CommentsSection.tsx tests/commentTimestamp.test.ts public/sw.js tests/releaseIntegrity.test.ts src/changelogReleaseNotes.ts
+          git add shared/commentTime.ts src/components/CommentsSection.tsx tests/commentTimestamp.test.ts tests/miniPlayerCommentLayout.test.ts public/sw.js tests/releaseIntegrity.test.ts src/changelogReleaseNotes.ts
           git commit -m "調整留言時間版面與按讚操作" || exit 0
           git push
