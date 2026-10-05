@@ -144,7 +144,7 @@ export const AudioCard: React.FC<AudioCardProps> = ({
 
         <div className="flex-1 min-w-0 flex flex-col self-stretch pr-0">
           <div className="pr-0">
-            <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100 leading-tight break-words line-clamp-3 group-hover:text-[var(--color-primary,#c06c84)] dark:group-hover:text-rose-400 transition-colors">
+            <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100 leading-[1.02] break-words line-clamp-3 group-hover:text-[var(--color-primary,#c06c84)] dark:group-hover:text-rose-400 transition-colors">
               {track.title}
             </h3>
 
