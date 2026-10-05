@@ -117,6 +117,9 @@ async function deleteMember(request: Request, env: Env, targetKey: string) {
         .bind(target.id, targetEmail)
     );
   }
+  if (await tableExists(env.DB, 'sticker_comment_rewards')) {
+    statements.push(env.DB.prepare('DELETE FROM sticker_comment_rewards WHERE userId = ?').bind(target.id));
+  }
   if (await tableExists(env.DB, 'sticker_unlocks')) {
     statements.push(env.DB.prepare('DELETE FROM sticker_unlocks WHERE userId = ?').bind(target.id));
   }

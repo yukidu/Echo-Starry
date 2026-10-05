@@ -362,11 +362,11 @@ input[type="range"].audio-scrubber::-moz-range-thumb {
   .audio-card-grid .audio-card .order-2 { flex-wrap: wrap; }
 }
 
-/* Mobile hamburger drawer: keep it on the right and use only half of the viewport. */
+/* Mobile hamburger drawer: keep it on the right and fit the enlarged sticker balance without wrapping. */
 @media (max-width: 767px) {
   header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] {
-    width: 50vw !important;
-    max-width: 50vw !important;
+    width: min(90vw, 360px) !important;
+    max-width: min(90vw, 360px) !important;
     margin-left: auto !important;
     margin-right: 0 !important;
     padding-left: 0.5rem !important;
@@ -478,3 +478,5 @@ input[type="range"].audio-scrubber::-moz-range-thumb {
     transition-duration: 0.01ms !important;
   }
 }
+
+.sticker-spend-overlay { z-index: 210 !important; }

@@ -35,7 +35,7 @@ test('後端建立貼紙帳本、永久解鎖、規則與通知資料表', () =>
   assert.match(source, /白金以上會員只能幫自己的下線會員加貼紙/);
 });
 
-test('錄音貼紙欄位支援 0 到 20 且 0 保留免貼紙語意', () => {
+test('錄音解鎖貼紙欄位支援 0 到 50 且 0 保留免貼紙語意', () => {
   const types = read('src/types.ts');
   const upload = read('src/components/UploadModal.tsx');
   const card = read('src/components/AudioCard.tsx');
@@ -44,8 +44,9 @@ test('錄音貼紙欄位支援 0 到 20 且 0 保留免貼紙語意', () => {
   assert.match(types, /commentStickerReward\?: number/);
   assert.match(upload, /解鎖本錄音所需貼紙/);
   assert.match(upload, /聽完後留言心得獲得貼紙/);
-  assert.match(card, /貼紙.*張/);
-  assert.match(detail, /聽完後分享心得/);
+  assert.match(card, /張貼紙/);
+  assert.match(detail, /commentStickerReward/);
+  assert.match(read('src/components/CommentsSection.tsx'), /按這裡寫下您的心得收穫/);
 });
 
 test('主選單與貼紙專區保留訪客會員界線及超管分頁', () => {
@@ -54,7 +55,7 @@ test('主選單與貼紙專區保留訪客會員界線及超管分頁', () => {
   assert.match(navbar, /我的貼紙\(會員專屬\)/);
   assert.match(navbar, /我的貼紙/);
   assert.match(modal, /批次修改/);
-  assert.match(modal, /更多貼紙規則/);
+  assert.match(modal, /其他規則/);
   assert.match(modal, /人工加貼紙/);
   assert.match(modal, /keywordRewardLimit/);
 });

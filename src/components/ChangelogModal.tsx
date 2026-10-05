@@ -46,9 +46,16 @@ const sanitizeVersionLog = (log: VersionLog): VersionLog => ({
 
 export const DEFAULT_CHANGELOG_DATA: VersionLog[] = [
   {
+    version: 'v3.8', date: '2026/10/06', isLatest: true,
+    summary: '我的貼紙簿與心得獎勵更新。',
+    added: ['先留言後聽完可自動補發貼紙。', '回覆他人心得與按讚他人心得獎勵，並可設定同篇心得總上限。', '白金以上可於人工加貼紙分頁搜尋自己的下線，查看完整發放紀錄。'],
+    modified: ['貼紙簿改為上方固定位置、來源可直接跳轉，並採用網站主視覺確認解鎖。', '批次修改支援全選與取消全選，解鎖貼紙範圍擴為 0 至 50 張。', '其他規則改為數字輸入；關鍵字獎勵上限以張計算。'],
+    removed: []
+  },
+  {
     version: 'v3.7',
     date: '2026/10/02',
-    isLatest: true,
+    isLatest: false,
     summary: '修復跨平台 PWA 安裝入口並固定顯示，精簡首頁排序列且確保直式小螢幕完整顯示所有排序／篩選按鈕；本次修改只使用瀏覽器本機能力，不新增 Cloudflare D1、KV、R2 寫入。',
     added: [
       '漢堡選單中的「安裝到桌面」改為永久固定顯示，不論裝置是否已安裝、瀏覽器是否提供 beforeinstallprompt 都不再隱藏。',

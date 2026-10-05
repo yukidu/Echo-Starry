@@ -1,3 +1,4 @@
+import { StickerSpendDialog } from './components/StickerSpendDialog';
 import { vipPasswordForTrack } from '../shared/stickers';
 import { baseSpeakerRank } from './utils/ranks';
 /**
@@ -394,6 +395,11 @@ export default function App() {
   }, [refreshStickerSummary]);
 
   // Requirement 9, 10 & 12: 未審核通過名單總數 + 被 @ 標記提醒總數（用於通知鈴鐺徽章提醒）
+  const pendingAuditCount = allUsers.filter(u => u.rankAuditStatus === 'pending' || u.rankApproved === false).length;
+  const [stickerSpend, setStickerSpend] = useState<{title:string;cost:number} | null>(null);
+  const stickerSpendResolver = useRef<((value:boolean)=>void) | null>(null);
+  const resolveStickerSpend = (value:boolean) => { const resolve=stickerSpendResolver.current; stickerSpendResolver.current=null; setStickerSpend(null); resolve?.(value); };
+  useEffect(() => { resolveStickerSpend(false); }, [currentUser?.id]);
   const pendingNotificationsCount = useMemo(() => {
     const userList = Array.isArray(allUsers) ? allUsers : [];
     const auditCount = userList.filter(u => u.rankAuditStatus === 'pending' || u.rankApproved === false).length;
@@ -567,7 +573,7 @@ export default function App() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // Prevent HTMLAudioElement "timeupdate" from sending duplicate progress requests
   // multiple times during the same 15-second checkpoint.
-  const lastPlaybackSyncRef = useRef<{ trackId: string; second: number }>({
+  const lastPlaybackSyncRef = useRef<{ trackId: string; second: number; completed?: boolean }>({
     trackId: '',
     second: -1
   });
@@ -1091,7 +1097,9 @@ export default function App() {
       showPermissionAlert(`此錄音需要貼紙${cost}張解鎖；貼紙為會員專屬，請先登入。`, anchor);
       return false;
     }
-    if (!window.confirm(`此錄音需使用 ${cost} 張貼紙永久解鎖，是否繼續？`)) return false;
+    if (stickerSpendResolver.current) return false;
+    const confirmed = await new Promise<boolean>(resolve => { stickerSpendResolver.current=resolve; setStickerSpend({title:track.title,cost}); });
+    if (!confirmed) return false;
     try {
       await apiJson(`/api/stickers/unlock/${encodeURIComponent(track.id)}`, {
         method: 'POST',
@@ -1184,7 +1192,7 @@ export default function App() {
     }
   };
 
-  const syncPlaybackToCloud = (force = false) => {
+  const syncPlaybackToCloud = async (force = false) => {
     // Visitors already have instant localStorage progress; only logged-in members
     // need D1 for cross-device resume. This avoids needless writes for anonymous use.
     if (!currentUser?.email || !currentTrack || !audioRef.current) return;
@@ -1198,15 +1206,17 @@ export default function App() {
     const sameTrack = lastSync.trackId === currentTrack.id;
     const secondsSinceLast = sameTrack ? wholeSecond - lastSync.second : Number.POSITIVE_INFINITY;
 
-    if (!force) {
+    const completed = cur / dur >= 0.95;
+    const newlyCompleted = completed && (!sameTrack || !lastSync.completed);
+    if (!force && !newlyCompleted) {
       if (wholeSecond < 1) return;
       if (sameTrack && secondsSinceLast < 60) return;
-    } else if (sameTrack && Math.abs(secondsSinceLast) < 10) {
+    } else if (!newlyCompleted && sameTrack && Math.abs(secondsSinceLast) < 10) {
       return;
     }
 
-    lastPlaybackSyncRef.current = { trackId: currentTrack.id, second: wholeSecond };
-    fetch('/api/playback/record', {
+    lastPlaybackSyncRef.current = { trackId: currentTrack.id, second: wholeSecond, completed };
+    await fetch('/api/playback/record', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       keepalive: force,
@@ -1214,9 +1224,10 @@ export default function App() {
         trackId: currentTrack.id,
         userIdOrDeviceId: currentUser.email,
         currentTime: cur,
-        duration: dur
+        duration: dur,
+        vipPassword: vipPasswordForTrack(currentTrack.id)
       })
-    }).catch(() => {});
+    }).then(response => { if (!response.ok) throw new Error('進度同步失敗'); if (completed) window.dispatchEvent(new CustomEvent('echostars:sticker-changed')); }).catch(() => { lastPlaybackSyncRef.current = {trackId:'',second:-1}; });
   };
 
   const handleLoadedMetadata = () => {
@@ -1497,6 +1508,7 @@ export default function App() {
   const handleAddComment = async (content: string, replyToId?: string, replyToAuthor?: string, trackIdOverride?: string) => {
     const targetTrackId = trackIdOverride || (selectedDetailTrack || currentTrack)?.id;
     if (!targetTrackId) return;
+    if (currentTrack?.id === targetTrackId) await syncPlaybackToCloud(true);
 
     const authorBadge = isSuperAdmin
       ? '超級管理員'
@@ -2204,6 +2216,7 @@ export default function App() {
         isAdmin={isAdmin}
         canUpload={canUpload}
         pendingNotificationsCount={pendingNotificationsCount}
+        pendingAuditCount={pendingAuditCount}
         stickerBalance={stickerSummary?.balance}
         onOpenStickers={() => setIsStickersOpen(true)}
       />
@@ -2771,7 +2784,7 @@ export default function App() {
                       track={track}
                       isPlaying={isPlaying && isCurrent}
                       isCurrentTrack={isCurrent}
-                      canAccess={canAccess && isStickerUnlocked}
+                      canAccess={canAccess}
                       isVipUnlocked={isVipUnlocked}
                       tutorialTarget={trackIndex === 0}
                       progressMemory={playbackMemories[track.id]}
@@ -3041,12 +3054,23 @@ export default function App() {
         </button>
       )}
 
+      {stickerSpend && <StickerSpendDialog {...stickerSpend} balance={stickerSummary?.balance} onResolve={resolveStickerSpend} />}
       {isStickersOpen && <Suspense fallback={<div role="status" className="fixed inset-0 z-50 grid place-items-center bg-black/50 text-white">載入功能中…</div>}>
       <StickersModal
         isOpen={isStickersOpen}
         onClose={() => setIsStickersOpen(false)}
         currentUser={currentUser}
         tracks={tracks}
+        initialSummary={stickerSummary}
+        onOpenSource={source => {
+          if (source.kind === 'track') {
+            const track = tracks.find(item => item.id === source.trackId);
+            if (track) { setIsStickersOpen(false); openTrackDetail(track, source.commentId); }
+          } else if (source.kind === 'member') {
+            const member = [currentUser,...allUsers].find(item => item?.id === source.userId);
+            if (member) { setIsStickersOpen(false); setPreviewMember(member); }
+          } else { setIsStickersOpen(false); setCurrentTab('home'); }
+        }}
         onStickerChanged={refreshStickerSummary}
         onTracksUpdated={savedTracks => {
           const byId = new Map(savedTracks.map(track => [track.id, track]));

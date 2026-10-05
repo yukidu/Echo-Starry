@@ -1,4 +1,4 @@
-/* v72: Mobile hamburger menu is intentionally half-width and right-aligned.
+/* v72: Mobile hamburger menu is intentionally sized for the large sticker balance and right-aligned.
    Keep it out of document flow so opening the drawer never pushes down or
    hides the left half of the current page. */
 @media (max-width: 767px) {
@@ -8,8 +8,8 @@
     right: 0 !important;
     left: auto !important;
     z-index: 30;
-    width: 50vw !important;
-    max-width: 50vw !important;
+    width: min(90vw, 360px) !important;
+    max-width: min(90vw, 360px) !important;
     margin-left: auto !important;
     margin-right: 0 !important;
     padding: 0.55rem max(0.5rem, env(safe-area-inset-right)) 0.65rem 0.5rem !important;
@@ -169,4 +169,11 @@
       font-size: 0.9rem !important;
     }
   }
+}
+
+/* v99: keep the two balance/status labels together, without badge backgrounds. */
+@media (max-width: 767px) {
+  header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button.sticker-menu-row { font-size: 2rem !important; }
+  header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button.sticker-menu-row > span,
+  header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button.notification-menu-row > span { white-space: nowrap !important; }
 }

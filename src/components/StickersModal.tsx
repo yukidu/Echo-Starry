@@ -1,303 +1,131 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Gift, X, History, SlidersHorizontal, ListChecks, PlusCircle, Search } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Trophy, X, History, SlidersHorizontal, ListChecks, PlusCircle, Search, ArrowUpRight } from 'lucide-react';
 import type { Track, UserProfile } from '../types';
-import { formatStickerAmount } from '../../shared/stickers';
+import { formatStickerAmount, isPlatinumOrAboveRank } from '../../shared/stickers';
 import { ThemedSelect } from './ThemedSelect';
 
-type StickerTransaction = {
-  id: string;
-  delta: number;
-  balanceAfter: number;
-  description: string;
-  type: string;
-  createdAt: number;
-};
-
-type StickerSettings = {
-  ratingReward: number;
-  likeReward: number;
-  keywordReward: number;
-  keywordRewardLimit: number;
-  luckyCost: number;
-  vipUploadCost: number;
-};
-
-type StickerSummary = {
-  balance: number;
-  transactions: StickerTransaction[];
-  canGrant: boolean;
-  isSuperAdmin: boolean;
-};
-
+export type StickerSource = { kind: 'track' | 'member' | 'feature'; trackId?: string; commentId?: string; userId?: string; label: string; available: boolean };
+type StickerTransaction = { id: string; delta: number; description: string; type: string; createdAt: number; source?: StickerSource | null };
+type StickerSettings = { ratingReward: number; likeReward: number; keywordReward: number; keywordRewardLimit: number; commentThreadLimit: number; replyReward: number; luckyCost: number; vipUploadCost: number };
+type StickerSummary = { balance: number; transactions?: StickerTransaction[]; canGrant: boolean; isSuperAdmin: boolean };
 interface StickersModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  currentUser: UserProfile | null;
-  tracks: Track[];
-  onTracksUpdated?: (tracks: Track[]) => void;
-  onStickerChanged?: () => void;
+  isOpen: boolean; onClose: () => void; currentUser: UserProfile | null; tracks: Track[];
+  initialSummary?: StickerSummary | null;
+  onTracksUpdated?: (tracks: Track[]) => void; onStickerChanged?: () => void;
+  onOpenSource?: (source: StickerSource) => void;
 }
-
-const TENTH_OPTIONS = Array.from({ length: 10 }, (_, index) => (index + 1) / 10);
-const WHOLE_OPTIONS = Array.from({ length: 21 }, (_, index) => index);
-
+const field = 'w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100';
+const primary = { backgroundColor: 'var(--color-primary,#c06c84)' };
+const actions: Record<string,string> = {initial:'會員初始貼紙',rating_reward:'評價錄音',like_reward:'按讚錄音',keyword_reward:'新增網友關鍵字',comment_reward:'聽完後分享心得',reply_reward:'回覆他人心得',comment_like_reward:'按讚他人心得',comment_reward_reversal:'刪除心得扣回',track_unlock_cost:'解鎖錄音',vip_upload_cost:'建立私秘VIP',lucky_cost:'好手氣',manual_grant:'人工加貼紙'};
 async function requestJson(url: string, options?: RequestInit) {
-  const response = await fetch(url, options);
-  const data = await response.json().catch(() => ({}));
+  const response = await fetch(url, options); const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || '操作失敗，請稍後再試');
   return data;
 }
-
-export const StickersModal: React.FC<StickersModalProps> = ({
-  isOpen,
-  onClose,
-  currentUser,
-  tracks,
-  onTracksUpdated,
-  onStickerChanged
-}) => {
-  const [summary, setSummary] = useState<StickerSummary | null>(null);
-  const [tab, setTab] = useState<'history' | 'batch' | 'rules'>('history');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [settings, setSettings] = useState<StickerSettings | null>(null);
-  const [targets, setTargets] = useState<UserProfile[]>([]);
-  const [targetUserId, setTargetUserId] = useState('');
-  const [grantAmount, setGrantAmount] = useState('1');
-  const [grantReason, setGrantReason] = useState('');
-  const [trackSearch, setTrackSearch] = useState('');
-  const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>([]);
-  const [batchUnlockCost, setBatchUnlockCost] = useState('');
-  const [batchCommentReward, setBatchCommentReward] = useState('');
-
-  const notifyChanged = () => {
-    onStickerChanged?.();
-    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('echostars:sticker-changed'));
-  };
-
-  const loadSummary = async () => {
-    if (!currentUser) {
-      setSummary(null);
-      return;
-    }
+export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,currentUser,tracks,initialSummary,onTracksUpdated,onStickerChanged,onOpenSource}) => {
+  // Tabs are available from the signed-in profile immediately; every API still checks the live session.
+  const superAdmin = currentUser?.email?.trim().toLowerCase() === 'yukidu@gmail.com' || currentUser?.role === '超級管理員';
+  const canGrant = superAdmin || Boolean(currentUser?.rankApproved && isPlatinumOrAboveRank(currentUser.approvedRank || currentUser.rank));
+  const [summary,setSummary] = useState<StickerSummary | null>(initialSummary || null);
+  const [tab,setTab] = useState<'history'|'grant'|'batch'|'rules'>('history');
+  const [error,setError] = useState(''); const [busy,setBusy] = useState(false); const [loading,setLoading] = useState(true);
+  const [settings,setSettings] = useState<StickerSettings | null>(null);
+  const [targets,setTargets] = useState<UserProfile[]>([]); const [grantHistory,setGrantHistory] = useState<StickerTransaction[]>([]);
+  const [targetSearch,setTargetSearch] = useState(''); const [targetUserId,setTargetUserId] = useState('');
+  const [grantAmount,setGrantAmount] = useState('1'); const [grantReason,setGrantReason] = useState('');
+  const [trackSearch,setTrackSearch] = useState(''); const [selectedTrackIds,setSelectedTrackIds] = useState<string[]>([]);
+  const [batchUnlockCost,setBatchUnlockCost] = useState(''); const [batchCommentReward,setBatchCommentReward] = useState('');
+  const requestSequence = useRef(0); const mutationPending = useRef(false);
+  const grantOperation = useRef<{signature:string;id:string} | null>(null);
+  const notifyChanged = () => { onStickerChanged?.(); window.dispatchEvent(new CustomEvent('echostars:sticker-changed')); };
+  const load = async () => {
+    if (!currentUser) { setLoading(false); return; }
+    const sequence = ++requestSequence.current;
+    setLoading(true);
     try {
-      const data = await requestJson('/api/stickers/me');
-      setSummary(data);
-      setError('');
-      if (data.canGrant) {
-        const grantData = await requestJson('/api/stickers/grant-targets');
-        setTargets(Array.isArray(grantData.targets) ? grantData.targets : []);
-      } else {
-        setTargets([]);
-      }
-      if (data.isSuperAdmin) {
-        const settingsData = await requestJson('/api/stickers/settings');
-        setSettings(settingsData.settings);
-      }
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '無法讀取貼紙資料');
-    }
+      const [data, grants, rules, history] = await Promise.all([
+        requestJson('/api/stickers/me'),
+        canGrant ? requestJson('/api/stickers/grant-targets') : null,
+        superAdmin ? requestJson('/api/stickers/settings') : null,
+        canGrant ? requestJson('/api/stickers/grant-history') : null
+      ]);
+      if (sequence !== requestSequence.current) return;
+      setSummary(data); setTargets(grants?.targets || []); setSettings(rules?.settings || null); setGrantHistory(history?.transactions || []);
+    } catch (reason) { if (sequence === requestSequence.current) setError(reason instanceof Error ? reason.message : '無法讀取貼紙資料'); }
+    finally { if (sequence === requestSequence.current) setLoading(false); }
   };
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setTab('history');
-    void loadSummary();
-  }, [isOpen, currentUser?.id]);
-
-  const filteredTracks = useMemo(() => {
-    const query = trackSearch.trim().toLocaleLowerCase('zh-Hant');
-    if (!query) return tracks;
-    return tracks.filter(track => [track.title, track.speaker, track.series]
-      .some(value => String(value || '').toLocaleLowerCase('zh-Hant').includes(query)));
-  }, [tracks, trackSearch]);
-
+  useEffect(() => { if (isOpen) { setTab('history'); setError(''); setSummary(initialSummary || null); void load(); } return () => {requestSequence.current += 1;}; }, [isOpen,currentUser?.id]);
+  const filteredTracks = useMemo(() => tracks.filter(track => [track.title,track.speaker,track.series].some(value => String(value || '').toLocaleLowerCase('zh-Hant').includes(trackSearch.trim().toLocaleLowerCase('zh-Hant')))),[tracks,trackSearch]);
+  const filteredTargets = useMemo(() => targets.filter(target => target.name.toLocaleLowerCase('zh-Hant').includes(targetSearch.trim().toLocaleLowerCase('zh-Hant'))),[targets,targetSearch]);
   if (!isOpen) return null;
-
-  const grantStickers = async () => {
-    if (!targetUserId || !grantReason.trim()) {
-      setError('請選擇會員並填寫加貼紙原因');
-      return;
-    }
-    setBusy(true);
-    try {
-      await requestJson('/api/stickers/grant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          targetUserId,
-          amount: Number(grantAmount),
-          reason: grantReason.trim(),
-          operationId: crypto.randomUUID()
-        })
-      });
-      setGrantReason('');
-      setTargetUserId('');
-      await loadSummary();
-      notifyChanged();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '加貼紙失敗');
-    } finally {
-      setBusy(false);
-    }
+  const mutate = async (action: () => Promise<void>) => {
+    if (mutationPending.current) return;
+    mutationPending.current = true; setBusy(true); setError('');
+    try { await action(); } catch (reason) { setError(reason instanceof Error ? reason.message : '操作失敗，請重試'); }
+    finally { mutationPending.current = false; setBusy(false); }
   };
-
-  const saveBatch = async () => {
-    if (!selectedTrackIds.length) {
-      setError('請先勾選至少一筆錄音');
-      return;
-    }
-    if (batchUnlockCost === '' && batchCommentReward === '') {
-      setError('請至少選一個要修改的貼紙欄位');
-      return;
-    }
-    setBusy(true);
-    try {
-      const data = await requestJson('/api/stickers/tracks/batch', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          trackIds: selectedTrackIds,
-          stickerUnlockCost: batchUnlockCost === '' ? undefined : Number(batchUnlockCost),
-          commentStickerReward: batchCommentReward === '' ? undefined : Number(batchCommentReward)
-        })
-      });
-      if (Array.isArray(data.tracks)) onTracksUpdated?.(data.tracks);
-      setSelectedTrackIds([]);
-      setBatchUnlockCost('');
-      setBatchCommentReward('');
-      setError('');
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '批次修改失敗');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const saveSettings = async () => {
-    if (!settings) return;
-    setBusy(true);
-    try {
-      const data = await requestJson('/api/stickers/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings)
-      });
-      setSettings(data.settings);
-      setError('');
-      notifyChanged();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '貼紙規則儲存失敗');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[190] bg-black/60 backdrop-blur-sm flex items-center justify-center p-3" onMouseDown={event => event.target === event.currentTarget && onClose()}>
-      <div className="w-full max-w-2xl max-h-[88vh] overflow-hidden rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col">
-        <div className="px-4 py-3 flex items-center justify-between text-white" style={{ backgroundColor: 'var(--color-primary,#c06c84)' }}>
-          <div className="flex items-center gap-2">
-            <Gift className="w-5 h-5" />
-            <div>
-              <h2 className="font-black">我的貼紙{currentUser && summary ? `${formatStickerAmount(summary.balance)}張` : ''}</h2>
-              <p className="text-[10px] text-white/80">累積學習互動，解鎖更多錄音</p>
-            </div>
-          </div>
-          <button type="button" onClick={onClose} className="p-2 rounded-xl hover:bg-white/20" aria-label="關閉"><X className="w-5 h-5" /></button>
-        </div>
-
-        {!currentUser ? (
-          <div className="p-8 text-center space-y-3">
-            <Gift className="w-12 h-12 mx-auto text-slate-300" />
-            <h3 className="font-black text-slate-800 dark:text-slate-100">我的貼紙是會員專屬功能</h3>
-            <p className="text-sm text-slate-500">登入會員後可獲得初始 6 張貼紙，並查看完整獲得與使用紀錄。</p>
-          </div>
-        ) : (
-          <>
-            <div className={`grid ${summary?.isSuperAdmin ? 'grid-cols-3' : 'grid-cols-1'} gap-1 p-2 border-b border-slate-100 dark:border-slate-800`}>
-              <button type="button" onClick={() => setTab('history')} className={`px-2 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 ${tab === 'history' ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`} style={tab === 'history' ? { backgroundColor: 'var(--color-primary,#c06c84)' } : undefined}><History className="w-4 h-4" />貼紙紀錄</button>
-              {summary?.isSuperAdmin && <button type="button" onClick={() => setTab('batch')} className={`px-2 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 ${tab === 'batch' ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`} style={tab === 'batch' ? { backgroundColor: 'var(--color-primary,#c06c84)' } : undefined}><ListChecks className="w-4 h-4" />批次修改</button>}
-              {summary?.isSuperAdmin && <button type="button" onClick={() => setTab('rules')} className={`px-2 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 ${tab === 'rules' ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`} style={tab === 'rules' ? { backgroundColor: 'var(--color-primary,#c06c84)' } : undefined}><SlidersHorizontal className="w-4 h-4" />更多貼紙規則</button>}
-            </div>
-
-            <div className="overflow-y-auto p-4 space-y-4 text-sm">
-              {error && <div className="p-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs">{error}</div>}
-
-              {tab === 'history' && (
-                <>
-                  <div className="rounded-2xl p-4 text-white shadow-sm" style={{ backgroundColor: 'var(--color-primary,#c06c84)' }}>
-                    <p className="text-xs text-white/80">目前可用貼紙</p>
-                    <p className="text-3xl font-black mt-1">{summary ? formatStickerAmount(summary.balance) : '—'} 張</p>
-                  </div>
-
-                  {summary?.canGrant && (
-                    <div className="rounded-2xl border border-amber-200 dark:border-slate-700 p-3 space-y-2 bg-amber-50/50 dark:bg-slate-800/50">
-                      <div className="font-black flex items-center gap-1"><PlusCircle className="w-4 h-4" />人工加貼紙</div>
-                      <ThemedSelect value={targetUserId} onChange={event => setTargetUserId(event.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-                        <option value="">選擇會員</option>
-                        {targets.map(target => <option key={target.id} value={target.id}>{target.name}（{target.rank || '會員'}）</option>)}
-                      </ThemedSelect>
-                      <div className="grid grid-cols-[110px_1fr] gap-2">
-                        <ThemedSelect value={grantAmount} onChange={event => setGrantAmount(event.target.value)} className="px-2 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-                          {Array.from({ length: 200 }, (_, index) => (index + 1) / 10).map(value => <option key={value} value={value}>{formatStickerAmount(value)} 張</option>)}
-                        </ThemedSelect>
-                        <input value={grantReason} onChange={event => setGrantReason(event.target.value)} placeholder="加貼紙原因（必填）" maxLength={120} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900" />
-                      </div>
-                      <button type="button" disabled={busy} onClick={grantStickers} className="w-full py-2 rounded-xl text-white font-bold disabled:opacity-50" style={{ backgroundColor: 'var(--color-primary,#c06c84)' }}>確認加貼紙</button>
-                    </div>
-                  )}
-
-                  <div className="space-y-1.5">
-                    <h3 className="font-black text-slate-800 dark:text-slate-100">來源與消耗紀錄</h3>
-                    {!summary?.transactions?.length ? <p className="text-slate-400 text-xs py-4">目前沒有貼紙紀錄</p> : summary.transactions.map(transaction => (
-                      <div key={transaction.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-xs text-slate-700 dark:text-slate-200 break-words">{transaction.description}</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">{new Date(transaction.createdAt).toLocaleString('zh-TW')}</p>
-                        </div>
-                        <div className={`font-black tabular-nums ${transaction.delta >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{transaction.delta >= 0 ? '+' : ''}{formatStickerAmount(transaction.delta)}</div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {tab === 'batch' && summary?.isSuperAdmin && (
-                <div className="space-y-3">
-                  <div className="relative"><Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={trackSearch} onChange={event => setTrackSearch(event.target.value)} placeholder="搜尋錄音標題、講者、系列" className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900" /></div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className="text-xs font-bold">解鎖本錄音所需貼紙<ThemedSelect value={batchUnlockCost} onChange={event => setBatchUnlockCost(event.target.value)} className="mt-1 w-full px-2 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"><option value="">不修改</option>{WHOLE_OPTIONS.map(value => <option key={value} value={value}>{value} 張</option>)}</ThemedSelect></label>
-                    <label className="text-xs font-bold">心得獲得貼紙<ThemedSelect value={batchCommentReward} onChange={event => setBatchCommentReward(event.target.value)} className="mt-1 w-full px-2 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"><option value="">不修改</option>{WHOLE_OPTIONS.map(value => <option key={value} value={value}>{value} 張</option>)}</ThemedSelect></label>
-                  </div>
-                  <div className="max-h-72 overflow-y-auto space-y-1 border border-slate-200 dark:border-slate-700 rounded-2xl p-2">
-                    {filteredTracks.map(track => {
-                      const checked = selectedTrackIds.includes(track.id);
-                      return <label key={track.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"><input type="checkbox" checked={checked} onChange={() => setSelectedTrackIds(prev => checked ? prev.filter(id => id !== track.id) : [...prev, track.id])} /><div className="min-w-0 flex-1"><p className="font-bold text-xs truncate">{track.title}</p><p className="text-[10px] text-slate-400">{track.speaker}｜解鎖 {track.stickerUnlockCost || 0}｜心得 +{track.commentStickerReward || 0}</p></div></label>;
-                    })}
-                  </div>
-                  <button type="button" disabled={busy || !selectedTrackIds.length} onClick={saveBatch} className="w-full py-2 rounded-xl text-white font-bold disabled:opacity-50" style={{ backgroundColor: 'var(--color-primary,#c06c84)' }}>套用批次修改（{selectedTrackIds.length} 筆）</button>
-                </div>
-              )}
-
-              {tab === 'rules' && summary?.isSuperAdmin && settings && (
-                <div className="space-y-3">
-                  <div className="rounded-2xl bg-emerald-50/60 dark:bg-slate-800/70 p-3 space-y-2 border border-emerald-100 dark:border-slate-700">
-                    <h3 className="font-black">賺取貼紙</h3>
-                    {([['評價', 'ratingReward'], ['按讚', 'likeReward'], ['新增網友關鍵字', 'keywordReward']] as const).map(([label, key]) => <label key={key} className="flex items-center justify-between gap-3 text-xs font-bold"><span>{label}</span><ThemedSelect value={settings[key]} onChange={event => setSettings({ ...settings, [key]: Number(event.target.value) })} className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">{TENTH_OPTIONS.map(value => <option key={value} value={value}>{value.toFixed(1)} 張</option>)}</ThemedSelect></label>)}
-                    <label className="flex items-center justify-between gap-3 text-xs font-bold"><span>每人每支錄音關鍵字獎勵上限</span><ThemedSelect value={settings.keywordRewardLimit} onChange={event => setSettings({ ...settings, keywordRewardLimit: Number(event.target.value) })} className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">{Array.from({ length: 20 }, (_, index) => index + 1).map(value => <option key={value} value={value}>{value} 次</option>)}</ThemedSelect></label>
-                  </div>
-                  <div className="rounded-2xl bg-rose-50/60 dark:bg-slate-800/70 p-3 space-y-2 border border-rose-100 dark:border-slate-700">
-                    <h3 className="font-black">消耗貼紙</h3>
-                    {([['好手氣', 'luckyCost'], ['上傳私秘VIP', 'vipUploadCost']] as const).map(([label, key]) => <label key={key} className="flex items-center justify-between gap-3 text-xs font-bold"><span>{label}</span><ThemedSelect value={settings[key]} onChange={event => setSettings({ ...settings, [key]: Number(event.target.value) })} className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">{TENTH_OPTIONS.map(value => <option key={value} value={value}>{value.toFixed(1)} 張</option>)}</ThemedSelect></label>)}
-                  </div>
-                  <button type="button" disabled={busy} onClick={saveSettings} className="w-full py-2 rounded-xl text-white font-bold disabled:opacity-50" style={{ backgroundColor: 'var(--color-primary,#c06c84)' }}>儲存貼紙規則</button>
-                </div>
-              )}
-            </div>
-          </>
-        )}
+  const grant = () => mutate(async () => {
+    if (!targetUserId || !grantReason.trim()) throw new Error('請選擇下線並填寫加貼紙原因');
+    const signature = JSON.stringify([targetUserId,grantAmount,grantReason.trim()]);
+    if (grantOperation.current?.signature !== signature) grantOperation.current = {signature,id:crypto.randomUUID()};
+    await requestJson('/api/stickers/grant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetUserId,amount:Number(grantAmount),reason:grantReason.trim(),operationId:grantOperation.current.id})});
+    grantOperation.current=null;setGrantReason('');setTargetUserId('');await load();notifyChanged();
+  });
+  const batch = () => mutate(async () => {
+    if (!selectedTrackIds.length || (batchUnlockCost === '' && batchCommentReward === '')) throw new Error('請勾選錄音並選擇要修改的貼紙欄位');
+    const data=await requestJson('/api/stickers/tracks/batch',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({trackIds:selectedTrackIds,stickerUnlockCost:batchUnlockCost===''?undefined:Number(batchUnlockCost),commentStickerReward:batchCommentReward===''?undefined:Number(batchCommentReward)})});
+    onTracksUpdated?.(data.tracks || []);setSelectedTrackIds([]);setBatchUnlockCost('');setBatchCommentReward('');
+  });
+  const saveRules = () => mutate(async () => {
+    const data=await requestJson('/api/stickers/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(settings)});
+    setSettings(data.settings);notifyChanged();
+  });
+  const transactions = (rows: StickerTransaction[]) => <div className="space-y-1">
+    {loading && !rows.length ? <p role="status" className="text-center text-slate-400 py-4">載入紀錄中…</p> : !rows.length ? <p className="text-center text-slate-400 py-4">目前沒有紀錄</p> : rows.map(tx => <div key={tx.id} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700">
+      <div className="min-w-0 flex-1 leading-tight">
+        <p className="text-[10px] text-slate-500 dark:text-slate-400">{actions[tx.type] || tx.type}</p>
+        <button type="button" disabled={!tx.source?.available} onClick={() => tx.source && onOpenSource?.(tx.source)} className="text-left text-xs font-bold break-words hover:underline disabled:no-underline disabled:cursor-default" style={{color:'var(--color-primary,#c06c84)'}}>
+          {tx.source?.label || tx.description}{tx.source?.available && <ArrowUpRight className="inline w-3 h-3 ml-0.5" />}
+        </button>
+        {tx.type === 'manual_grant' && <p className="text-[11px] text-slate-600 dark:text-slate-300 break-words">{tx.description}</p>}
+        {tx.source && !tx.source.available && <span className="text-[10px] text-slate-400">（來源已移除）</span>}
+        <p className="text-[10px] text-slate-400">{new Date(tx.createdAt).toLocaleString('zh-TW')}</p>
       </div>
+      <strong className={`text-4xl sm:text-5xl font-black tabular-nums leading-none shrink-0 ${tx.delta >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{tx.delta>=0?'+':''}{formatStickerAmount(tx.delta)}</strong>
+    </div>)}
+  </div>;
+  const tabs = [{id:'history',label:'貼紙紀錄',Icon:History},...(canGrant?[{id:'grant',label:'人工加貼紙',Icon:PlusCircle}]:[]),...(superAdmin?[{id:'batch',label:'批次修改',Icon:ListChecks},{id:'rules',label:'其他規則',Icon:SlidersHorizontal}]:[])] as const;
+  return <div className="app-modal-overlay fixed inset-0 z-[190] bg-black/60 backdrop-blur-sm flex items-start justify-center p-3 overflow-y-auto" onMouseDown={event=>event.target===event.currentTarget&&onClose()}>
+    <div role="dialog" aria-modal="true" aria-labelledby="sticker-book-title" className="w-full max-w-2xl max-h-[calc(100dvh-32px)] overflow-hidden rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col">
+      <div className="px-4 py-3 flex items-center justify-between text-white shrink-0" style={primary}><h2 id="sticker-book-title" className="font-black text-lg flex items-center gap-2"><Trophy className="w-5 h-5"/>我的貼紙簿</h2><button type="button" onClick={onClose} className="p-2 rounded-xl hover:bg-white/20" aria-label="關閉"><X className="w-5 h-5"/></button></div>
+      {!currentUser ? <div className="p-8 text-center font-bold">我的貼紙是會員專屬功能，請先登入。</div> : <>
+        <div role="tablist" aria-label="貼紙簿分頁" className={`grid ${tabs.length>2?'grid-cols-2 sm:grid-cols-4':tabs.length>1?'grid-cols-2':'grid-cols-1'} gap-1 p-2 border-b border-slate-100 dark:border-slate-800 shrink-0`}>
+          {tabs.map(({id,label,Icon})=><button role="tab" aria-selected={tab===id} key={id} type="button" onClick={()=>setTab(id as typeof tab)} className={`px-2 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 whitespace-nowrap ${tab===id?'text-white':'text-slate-600 dark:text-slate-300'}`} style={tab===id?primary:undefined}><Icon className="w-4 h-4 shrink-0"/>{label}</button>)}
+        </div>
+        <div role="tabpanel" className="overflow-y-auto min-h-0 p-3 space-y-3 text-sm text-slate-800 dark:text-slate-100">
+          {error && <div role="alert" className="p-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs">{error}</div>}
+          {tab==='history' && <><div className="rounded-2xl p-3 text-white text-center" style={primary}><p className="text-xs">目前可用貼紙</p><p className="text-4xl font-black mt-1">{summary?formatStickerAmount(summary.balance):'—'} 張</p></div><h3 className="font-black">來源與消耗紀錄</h3>{transactions(summary?.transactions || [])}</>}
+          {tab==='grant' && canGrant && <div className="space-y-3">
+            <input aria-label="搜尋下線名字" value={targetSearch} onChange={e=>setTargetSearch(e.target.value)} placeholder={superAdmin?'搜尋會員名字':'搜尋下線名字'} className={field}/>
+            <ThemedSelect aria-label="選擇下線" value={targetUserId} onChange={e=>setTargetUserId(e.target.value)} className={field}><option value="">{superAdmin?'選擇會員':'選擇下線'}</option>{filteredTargets.map(target=><option key={target.id} value={target.id}>{target.name}（{target.approvedRank || target.rank || '會員'}）</option>)}</ThemedSelect>
+            <label className="block font-bold">加貼紙張數<ThemedSelect value={grantAmount} onChange={e=>setGrantAmount(e.target.value)} className={`${field} mt-1`}>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n} 張</option>)}</ThemedSelect></label>
+            <textarea aria-label="加貼紙原因" value={grantReason} onChange={e=>setGrantReason(e.target.value)} placeholder="加貼紙原因（必填）" rows={4} maxLength={500} className={`${field} resize-y min-h-28`}/>
+            <button type="button" disabled={busy||loading} onClick={grant} className="w-full py-2.5 rounded-xl text-white font-bold disabled:opacity-50" style={primary}>確認加貼紙</button>
+            <h3 className="font-black">所有加貼紙紀錄</h3>{transactions(grantHistory)}
+          </div>}
+          {tab==='batch' && superAdmin && <div className="space-y-3">
+            <div className="relative"><Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input aria-label="搜尋錄音" value={trackSearch} onChange={e=>setTrackSearch(e.target.value)} placeholder="搜尋錄音標題、講者、系列" className={`${field} pl-9`}/></div>
+            <div className="grid grid-cols-2 gap-2">{([['解鎖本錄音所需貼紙',batchUnlockCost,setBatchUnlockCost,50],['心得獲得貼紙',batchCommentReward,setBatchCommentReward,20]] as const).map(([label,value,setValue,max])=><label key={label} className="text-xs font-bold">{label}<ThemedSelect value={value} onChange={e=>setValue(e.target.value)} className={`${field} mt-1`}><option value="">不修改</option>{Array.from({length:max+1},(_,n)=><option key={n} value={n}>{n} 張</option>)}</ThemedSelect></label>)}</div>
+            <div className="flex items-center gap-3 font-bold text-xs" style={{color:'var(--color-primary,#c06c84)'}}><button type="button" onClick={()=>setSelectedTrackIds(prev=>[...new Set([...prev,...filteredTracks.map(t=>t.id)])])}>全選{trackSearch?'搜尋結果':''}</button><button type="button" onClick={()=>setSelectedTrackIds([])}>取消全選</button><span className="ml-auto">已選 {selectedTrackIds.length} 筆</span></div>
+            <div className="max-h-72 overflow-y-auto space-y-1 border border-slate-200 dark:border-slate-700 rounded-2xl p-2">{filteredTracks.map(track=><label key={track.id} className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"><input type="checkbox" checked={selectedTrackIds.includes(track.id)} onChange={e=>setSelectedTrackIds(prev=>e.target.checked?[...prev,track.id]:prev.filter(id=>id!==track.id))}/><div className="min-w-0 flex-1"><p className="font-bold text-xs">{track.speaker}{track.speakerRank==='無'?'':track.speakerRank}-{track.title}</p><p className="text-[10px] text-slate-400">解鎖 {track.stickerUnlockCost || 0}｜心得 +{track.commentStickerReward || 0}</p></div></label>)}</div>
+            <button type="button" disabled={busy||!selectedTrackIds.length} onClick={batch} className="w-full py-2.5 rounded-xl text-white font-bold disabled:opacity-50" style={primary}>套用批次修改（{selectedTrackIds.length} 筆）</button>
+          </div>}
+          {tab==='rules' && superAdmin && (settings?<form className="space-y-3" onSubmit={e=>{e.preventDefault();void saveRules();}}>
+            {([{title:'獲取貼紙',items:[['評價','ratingReward'],['按讚（錄音或他人心得）','likeReward'],['新增網友關鍵字','keywordReward'],['每人每支錄音關鍵字獎勵上限','keywordRewardLimit'],['同篇心得區可獲得貼紙總上限（本人心得＋回覆他人留言）','commentThreadLimit'],['回覆他人心得','replyReward']]},{title:'消耗貼紙',items:[['好手氣','luckyCost'],['上傳私秘VIP','vipUploadCost']]}] as const).map(group=><div key={group.title} className="rounded-2xl bg-slate-50 dark:bg-slate-800/70 p-3 space-y-3 border border-slate-200 dark:border-slate-700"><h3 className="font-black">{group.title}</h3>{group.items.map(([label,key])=><label key={key} className="flex items-center justify-between gap-3 text-xs font-bold"><span className="leading-snug">{label}</span><span className="flex items-center gap-1 shrink-0"><input aria-label={label} type="number" min="0" max="1000" step="0.1" required value={Number.isNaN(settings[key])?'':settings[key]} onChange={e=>setSettings({...settings,[key]:e.target.value===''?NaN:Number(e.target.value)})} className={`${field} !w-20 !px-2`}/>張</span></label>)}</div>)}
+            <button type="submit" disabled={busy} className="w-full py-2.5 rounded-xl text-white font-bold disabled:opacity-50" style={primary}>儲存貼紙規則</button>
+          </form>:<p role="status" className="text-center text-slate-400 py-4">載入規則中…</p>)}
+        </div>
+      </>}
     </div>
-  );
+  </div>;
 };

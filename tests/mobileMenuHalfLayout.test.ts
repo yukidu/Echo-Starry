@@ -13,12 +13,12 @@ test('mobile menu layout policy is loaded after the base stylesheet', () => {
   assert.ok(menu > base);
 });
 
-test('mobile drawer stays right aligned, half width, and out of document flow', () => {
+test('mobile drawer stays right aligned, bounded width, and out of document flow', () => {
   assert.match(css, /position:\s*absolute\s*!important/);
   assert.match(css, /top:\s*100%\s*!important/);
   assert.match(css, /right:\s*0\s*!important/);
-  assert.match(css, /width:\s*50vw\s*!important/);
-  assert.match(css, /max-width:\s*50vw\s*!important/);
+  assert.match(css, /width:\s*min\(90vw, 360px\)\s*!important/);
+  assert.match(css, /max-width:\s*min\(90vw, 360px\)\s*!important/);
   assert.match(css, /max-height:\s*calc\(100dvh - 64px\)/);
 });
 

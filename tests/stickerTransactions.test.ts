@@ -129,9 +129,9 @@ test('paid tracks reject direct likes before unlock', async () => {
 
 test('parallel keyword rewards respect the super-admin limit atomically', async () => {
   const db = database(); const token = await session(db, 'member'); const admin = await session(db, 'admin');
-  const settings = { ratingReward: .1, likeReward: .1, keywordReward: .1, keywordRewardLimit: 2, luckyCost: .1, vipUploadCost: .1 };
+  const settings = { ratingReward: .1, likeReward: .1, keywordReward: .1, keywordRewardLimit: .2, commentThreadLimit:20, replyReward:.1, luckyCost: .1, vipUploadCost: .1 };
   assert.equal((await call(db, token, '/api/stickers/settings', 'PUT', settings)).status, 403);
-  assert.equal((await call(db, admin, '/api/stickers/settings', 'PUT', {...settings, keywordRewardLimit:21})).status, 400);
+  assert.equal((await call(db, admin, '/api/stickers/settings', 'PUT', {...settings, keywordRewardLimit:1000.1})).status, 400);
   assert.equal((await call(db, admin, '/api/stickers/settings', 'PUT', settings)).status, 200);
   await Promise.all(['甲','乙','丙','丁'].map(keyword => call(db, token, '/api/tracks/track/keywords', 'POST', { keyword, userId:'other', userEmail:'other@example.com' })));
   assert.equal(count(db, 'keyword_reward'), 2);
@@ -145,12 +145,12 @@ test('root comment rewards require 95% completion; edit/reply/delete/repost cann
   assert.equal(early.status, 201); assert.equal(count(db, 'comment_reward'), 0);
   db.sqlite.exec(`INSERT INTO playback_memories(key,trackId,userIdentifier,memberId,progressPercent) VALUES ('member_track','track','member','member',95)`);
   const reply = await call(db, token, '/api/tracks/track/comments', 'POST', { content:'回覆', replyToId:early.data.id });
-  assert.equal(reply.status,201); assert.equal(count(db, 'comment_reward'),0);
+  assert.equal(reply.status,201); assert.equal(count(db, 'comment_reward'),1);
   const earned = await call(db, token, '/api/tracks/track/comments', 'POST', { content:'聽完心得' });
   assert.equal(earned.status,201); assert.equal(await balance(db, token),8);
-  await call(db, token, `/api/comments/${earned.data.id}`, 'PUT', { content:'編輯',userEmail:'member@example.com' });
+  await call(db, token, `/api/comments/${early.data.id}`, 'PUT', { content:'編輯',userEmail:'member@example.com' });
   assert.equal(count(db,'comment_reward'),1);
-  const deleted = await call(db, token, `/api/comments/${earned.data.id}`, 'DELETE', { userEmail:'member@example.com' });
+  const deleted = await call(db, token, `/api/comments/${early.data.id}`, 'DELETE', { userEmail:'member@example.com' });
   assert.equal(deleted.status,200); assert.equal(await balance(db, token),6);
   await call(db, token, '/api/tracks/track/comments', 'POST', { content:'重新留言' });
   assert.equal(await balance(db, token),6); assert.equal(count(db,'comment_reward_reversal'),1);
@@ -160,15 +160,15 @@ test('manual grant is limited to approved platinum downlines, retry has one cred
   const db = database(); const token = await session(db, 'platinum'); const member = await session(db,'member');
   const targets = await call(db,token,'/api/stickers/grant-targets');
   assert.deepEqual(targets.data.targets.map((x:any)=>x.id), ['member']);
-  const body = { targetUserId:'member', amount:2.3, reason:'鼓勵學習', operationId:'grant-1' };
+  const body = { targetUserId:'member', amount:3, reason:'鼓勵學習', operationId:'grant-1' };
   assert.equal((await call(db,token,'/api/stickers/grant','POST',{...body,targetUserId:'other'})).status,403);
   assert.equal((await call(db,token,'/api/stickers/grant','POST',{...body,amount:-1})).status,400);
   await call(db,token,'/api/stickers/grant','POST',body);
   await call(db,token,'/api/stickers/grant','POST',body);
-  assert.equal(await balance(db,member),8.3); assert.equal(count(db,'manual_grant'),1);
+  assert.equal(await balance(db,member),9); assert.equal(count(db,'manual_grant'),1);
   const notices = await call(db,member,'/api/stickers/notifications');
   assert.equal(notices.data.notifications.length,1);
-  assert.match(notices.data.notifications[0].message,/2.3.*鼓勵學習/);
+  assert.match(notices.data.notifications[0].message,/3.*鼓勵學習/);
   await call(db,member,'/api/stickers/notifications/read','POST');
   assert.equal((await call(db,member,'/api/stickers/me')).data.unreadNotifications,0);
 });
@@ -210,15 +210,15 @@ test('lucky draw requires an accessible result, retry charges once and insuffici
   await call(db,token,'/api/stickers/lucky-spend','POST',body);
   await call(db,token,'/api/stickers/lucky-spend','POST',body);
   assert.equal(await balance(db,token),5.9);assert.equal(count(db,'lucky_cost'),1);
-  db.sqlite.exec("INSERT INTO sticker_transactions VALUES ('drain','member',-59,0,'test',NULL,'test',NULL,'drain',0)");
+  db.sqlite.exec("INSERT INTO sticker_transactions(id,userId,deltaUnits,balanceAfterUnits,type,sourceId,description,actorUserId,uniqueKey,createdAt) VALUES ('drain','member',-59,0,'test',NULL,'test',NULL,'drain',0)");
   assert.equal((await call(db,token,'/api/stickers/lucky-spend','POST',{...body,operationId:'draw-2'})).status,402);
 });
 
 test('parallel VIP creations with one remaining fee commit exactly one recording', async () => {
   const db=database();const token=await session(db,'member');const admin=await session(db,'admin');
   await balance(db,token);
-  db.sqlite.exec("INSERT INTO sticker_transactions VALUES ('drain','member',-50,10,'test',NULL,'test',NULL,'drain',0)");
-  await call(db,admin,'/api/stickers/settings','PUT',{ratingReward:.1,likeReward:.1,keywordReward:.1,keywordRewardLimit:1,luckyCost:.1,vipUploadCost:1});
+  db.sqlite.exec("INSERT INTO sticker_transactions(id,userId,deltaUnits,balanceAfterUnits,type,sourceId,description,actorUserId,uniqueKey,createdAt) VALUES ('drain','member',-50,10,'test',NULL,'test',NULL,'drain',0)");
+  await call(db,admin,'/api/stickers/settings','PUT',{ratingReward:.1,likeReward:.1,keywordReward:.1,keywordRewardLimit:1,commentThreadLimit:20,replyReward:.1,luckyCost:.1,vipUploadCost:1});
   const results=await Promise.all(['a','b'].map(operationId=>call(db,token,'/api/tracks','POST',{
     title:'VIP',speaker:'講者',audioUrl:`/${operationId}.mp3`,isPrivateVip:true,stickerOperationId:operationId
   })));
@@ -234,4 +234,91 @@ test('a failed VIP batch rolls back the track when the charge statement fails', 
   const result=await call(db,token,'/api/tracks','POST',{title:'VIP',speaker:'講者',audioUrl:'/atomic.mp3',isPrivateVip:true,stickerOperationId:'atomic'});
   assert.equal(result.status,500);assert.equal(await balance(db,token),6);
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS n FROM tracks WHERE isPrivateVip = 1').get()?.n,0);
+});
+
+test('ordinary member early comment receives its snapshot reward when cloud progress completes, exactly once', async () => {
+  const db=database();const token=await session(db,'member');
+  db.sqlite.exec('UPDATE tracks SET stickerUnlockCost=1,commentStickerReward=3');
+  await call(db,token,'/api/stickers/unlock/track','POST',{});
+  const comment=await call(db,token,'/api/tracks/track/comments','POST',{content:'先分享'});
+  assert.equal(comment.status,201);assert.equal(await balance(db,token),5);
+  db.sqlite.exec('UPDATE tracks SET commentStickerReward=5');
+  const progress=(currentTime:number)=>call(db,token,'/api/playback/record','POST',{trackId:'track',userIdOrDeviceId:'member@example.com',currentTime,duration:100});
+  assert.equal((await progress(94)).status,200);assert.equal(count(db,'comment_reward'),0);
+  assert.equal((await progress(96)).status,200);assert.equal(await balance(db,token),8);
+  await Promise.all([progress(100),progress(100),balance(db,token)]);
+  assert.equal(count(db,'comment_reward'),1);assert.equal(await balance(db,token),8);
+  const history=(await call(db,token,'/api/stickers/me')).data.transactions;
+  assert.equal(history.find((t:any)=>t.type==='comment_reward').source.commentId,comment.data.id);
+  assert.equal(history.find((t:any)=>t.type==='comment_reward').source.label,'講者-錄音');
+});
+
+test('root and other-author replies share an atomic sticker amount cap; self replies and deleted awards cannot reopen it', async () => {
+  const db=database();const token=await session(db,'member');const other=await session(db,'other');const admin=await session(db,'admin');
+  const rules={ratingReward:.1,likeReward:.2,keywordReward:.1,keywordRewardLimit:1,commentThreadLimit:2.5,replyReward:1,luckyCost:.1,vipUploadCost:.1};
+  assert.equal((await call(db,admin,'/api/stickers/settings','PUT',rules)).status,200);
+  db.sqlite.exec('UPDATE tracks SET commentStickerReward=2');
+  const parent=await call(db,other,'/api/tracks/track/comments','POST',{content:'別人的心得'});
+  await call(db,token,'/api/playback/record','POST',{trackId:'track',userIdOrDeviceId:'member@example.com',currentTime:100,duration:100});
+  const root=await call(db,token,'/api/tracks/track/comments','POST',{content:'本人的心得'});
+  await call(db,token,'/api/tracks/track/comments','POST',{content:'回覆自己',replyToId:root.data.id});
+  assert.equal(count(db,'reply_reward'),0);
+  await Promise.all([1,2,3].map(i=>call(db,token,'/api/tracks/track/comments','POST',{content:`回覆別人${i}`,replyToId:parent.data.id})));
+  assert.equal(await balance(db,token),8.5);assert.equal(count(db,'reply_reward'),1);
+  const reply:any=db.sqlite.prepare("SELECT * FROM sticker_transactions WHERE type='reply_reward'").get();
+  assert.equal(reply.deltaUnits,5);
+  await call(db,token,`/api/comments/${reply.commentId}`,'DELETE',{userEmail:'member@example.com'});
+  await call(db,token,'/api/tracks/track/comments','POST',{content:'刪除後再回覆',replyToId:parent.data.id});
+  assert.equal(await balance(db,token),8);assert.equal(count(db,'reply_reward'),1);
+});
+
+test('comment likes reward the authenticated liker once, exclude self likes, and link to the original comment', async () => {
+  const db=database();const token=await session(db,'member');const other=await session(db,'other');
+  const parent=await call(db,other,'/api/tracks/track/comments','POST',{content:'心得'});
+  for(let i=0;i<3;i++) assert.equal((await call(db,token,`/api/comments/${parent.data.id}/like`,'POST',{identifier:'other'})).status,200);
+  await call(db,other,`/api/comments/${parent.data.id}/like`,'POST',{});
+  assert.equal(count(db,'comment_like_reward'),1);assert.equal(await balance(db,token),6.1);assert.equal(await balance(db,other),6);
+  const tx=(await call(db,token,'/api/stickers/me')).data.transactions.find((t:any)=>t.type==='comment_like_reward');
+  assert.equal(tx.source.trackId,'track');assert.equal(tx.source.commentId,parent.data.id);
+});
+
+test('wallet recovers missed regular-member completed comments using email-owned playback, but not pre-launch comments', async () => {
+  const db=database();const token=await session(db,'member');await balance(db,token);
+  db.sqlite.exec('UPDATE tracks SET commentStickerReward=2');
+  const insert=db.sqlite.prepare("INSERT INTO comments(id,trackId,authorEmail,authorName,content,createdAt) VALUES (?,'track','member@example.com','下線','心得',?)");
+  insert.run('old',1);insert.run('missed',Date.now());
+  db.sqlite.exec("INSERT INTO playback_memories(key,trackId,userIdentifier,currentTime,duration) VALUES ('legacy','track','member@example.com',100,100)");
+  assert.equal(await balance(db,token),8);
+  assert.equal(db.sqlite.prepare("SELECT sourceId FROM sticker_transactions WHERE type='comment_reward'").get()?.sourceId,'missed');
+});
+
+test('manual grant history is scoped to issuer, fractional counts rejected, and unlock range reaches 50', async () => {
+  const db=database();const platinum=await session(db,'platinum');const admin=await session(db,'admin');const member=await session(db,'member');
+  const body={targetUserId:'member',amount:5,reason:'完整原因',operationId:'history'};
+  assert.equal((await call(db,platinum,'/api/stickers/grant','POST',{...body,amount:1.5})).status,400);
+  assert.equal((await call(db,platinum,'/api/stickers/grant','POST',body)).status,200);
+  const history=(await call(db,platinum,'/api/stickers/grant-history')).data.transactions;
+  assert.equal(history.length,1);assert.equal(history[0].source.userId,'member');
+  assert.equal((await call(db,admin,'/api/stickers/grant-history')).data.transactions.length,0);
+  assert.equal((await call(db,member,'/api/stickers/grant-history')).status,403);
+  assert.equal((await call(db,admin,'/api/stickers/tracks/batch','PUT',{trackIds:['track'],stickerUnlockCost:50})).status,200);
+  assert.equal((await call(db,admin,'/api/stickers/tracks/batch','PUT',{trackIds:['track'],stickerUnlockCost:51})).status,400);
+});
+
+test('v98 migration preserves balances and translates keyword count to sticker cap', async () => {
+  const db=database();const token=await session(db,'member');const admin=await session(db,'admin');
+  db.sqlite.exec(`DROP INDEX IF EXISTS sticker_transactions_member_track;
+    ALTER TABLE sticker_transactions DROP COLUMN trackId;
+    ALTER TABLE sticker_transactions DROP COLUMN commentId;
+    ALTER TABLE sticker_transactions DROP COLUMN relatedUserId;
+    ALTER TABLE sticker_transactions DROP COLUMN sourceLabel;
+    INSERT INTO sticker_settings VALUES ('keyword_reward_limit',3,1,'admin');
+    INSERT INTO sticker_transactions VALUES ('initial:member','member',60,60,'initial','member','初始','system','initial:member',1);
+    INSERT INTO sticker_transactions VALUES ('old-reward','member',20,80,'comment_reward','deleted','心得','member','comment-reward:member:track',2);`);
+  assert.equal(await balance(db,token),8);
+  const rules=(await call(db,admin,'/api/stickers/settings')).data.settings;
+  assert.equal(rules.keywordRewardLimit,3);
+  const history=(await call(db,token,'/api/stickers/me')).data.transactions;
+  assert.equal(history.find((t:any)=>t.id==='old-reward').source.trackId,'track');
+  assert.equal(await balance(db,token),8);
 });
