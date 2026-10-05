@@ -31,9 +31,16 @@ test('lucky winner stays pinned without scrolling and dismisses from blank space
   assert.doesNotMatch(app, /setLuckyPhase\('idle'\), 2400/);
 });
 
+test('lucky draw sits to the left of the search field', () => {
+  const luckyIndex = app.indexOf('title="從目前條件下可播放的音檔中抽一張好手氣"');
+  const searchIndex = app.indexOf('ref={searchContainerRef}');
+  assert.ok(luckyIndex >= 0 && searchIndex >= 0 && luckyIndex < searchIndex);
+});
+
 test('home keyword expand and collapse control is integrated into the heading', () => {
   assert.match(app, /onClick=\{\(\) => setShowKeywordsDrawer\(prev => !prev\)\}/);
   assert.match(app, /showKeywordsDrawer \? '▲收起' : '▼展開'/);
-  assert.match(app, /網友關鍵字\(可複選多個\)/);
+  assert.match(app, /網友關鍵字/);
+  assert.match(app, /\(可複選多個\)/);
   assert.doesNotMatch(app, /className="ml-auto flex items-center gap-2"[\s\S]*showKeywordsDrawer \? '▲ 收起' : '▼ 展開'/);
 });

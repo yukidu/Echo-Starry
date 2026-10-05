@@ -5,7 +5,9 @@ import { readFileSync } from 'node:fs';
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 
 test('home keyword drawer explains multi-select and uses larger keyword text', () => {
-  assert.match(app, /網友關鍵字\(可複選多個\)/);
+  assert.match(app, /網友關鍵字/);
+  assert.match(app, /\(可複選多個\)/);
+  assert.match(app, /text-\[9px\]/);
   assert.match(app, /px-2 py-1 rounded-lg text-sm font-normal/);
   assert.match(app, /\{kw\}\(\{keywordMatchCounts\[kw\] \?\? 0\}\)/);
 });
@@ -34,7 +36,9 @@ test('zero-result keyword choices disappear while selected chips remain removabl
 });
 
 test('keyword controls use consistent readable sizing and the heading owns expand/collapse without a close button', () => {
-  assert.match(app, /網友關鍵字\(可複選多個\)/);
+  assert.match(app, /網友關鍵字/);
+  assert.match(app, /\(可複選多個\)/);
+  assert.match(app, /text-\[9px\]/);
   assert.match(app, />\s*重設\s*<\/button>/);
   assert.match(app, /showKeywordsDrawer \? '▲收起' : '▼展開'/);
   assert.match(app, /aria-expanded=\{showKeywordsDrawer\}/);

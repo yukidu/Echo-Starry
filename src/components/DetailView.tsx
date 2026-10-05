@@ -483,7 +483,7 @@ export const DetailView: React.FC<DetailViewProps> = ({
             >
               <span className="font-semibold">按此</span>
               <span className="font-black">{showDetailKeywords ? '▲收起' : '▼展開'}</span>
-              <span className="font-bold">網友關鍵字(登入可自訂新增)</span>
+              <span className="font-bold">網友關鍵字<span className="ml-0.5 text-[9px] font-semibold">{currentUser ? '(可自訂新增)' : '(登入可自訂新增)'}</span></span>
             </button>
           </div>
           {showDetailKeywords && canAddKeywords && !isAddingKeyword && (
