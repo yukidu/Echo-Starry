@@ -37,7 +37,7 @@ jobs:
           git config user.name "echostars-release-bot"
           git config user.email "actions@users.noreply.github.com"
           if [ -f .github/npm-test-v96.log ]; then
-            git add .github/npm-test-v96.log
+            git add -f .github/npm-test-v96.log
             git commit -m "暫存 v96 測試診斷紀錄"
             git push origin HEAD:fix/keyword-header-detail-layout-v96
           fi
