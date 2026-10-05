@@ -18,9 +18,8 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
+          node-version: 22
+      - run: npm install --no-audit --no-fund
       - run: node .github/scripts/apply-keyword-header-detail-layout-v96.mjs
       - run: npm test
       - run: npm run build
