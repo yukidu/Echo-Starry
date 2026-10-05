@@ -5,11 +5,11 @@ import { readFileSync } from 'node:fs';
 const detail = readFileSync(new URL('../src/components/DetailView.tsx', import.meta.url), 'utf8');
 const community = readFileSync(new URL('../worker/community.ts', import.meta.url), 'utf8');
 
-test('detail page exposes and enforces a 50-keyword limit', () => {
+test('detail page enforces a 50-keyword limit without showing the retired count statistic', () => {
   assert.match(detail, /trackKeywords\.length < 50/);
   assert.match(detail, /trackKeywords\.length >= 50/);
   assert.match(detail, /網友關鍵字已達 50 組上限/);
-  assert.match(detail, /\(\{trackKeywords\.length\}\/50 組\)/);
+  assert.doesNotMatch(detail, /\(\{trackKeywords\.length\}\/50 組\)/);
   assert.doesNotMatch(detail, /trackKeywords\.length < 20/);
   assert.doesNotMatch(detail, /trackKeywords\.length >= 20/);
 });
