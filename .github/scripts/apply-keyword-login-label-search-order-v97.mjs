@@ -35,6 +35,16 @@ detail = replaceOnce(
 );
 fs.writeFileSync(detailPath, detail);
 
+const detailPageUxTestPath = 'tests/detailPageUx.test.ts';
+let detailPageUxTest = fs.readFileSync(detailPageUxTestPath, 'utf8');
+detailPageUxTest = replaceOnce(
+  detailPageUxTest,
+  'assert.match(detail, /網友關鍵字\\(登入可自訂新增\\)/);',
+  'assert.match(detail, /網友關鍵字/); assert.match(detail, /currentUser \\? \'\\(可自訂新增\\)\' : \'\\(登入可自訂新增\\)\'/); assert.match(detail, /text-\\[9px\\]/);',
+  'detail page ux login-aware keyword label test'
+);
+fs.writeFileSync(detailPageUxTestPath, detailPageUxTest);
+
 const homeKeywordTestPath = 'tests/homeKeywordCounts.test.ts';
 let homeKeywordTest = fs.readFileSync(homeKeywordTestPath, 'utf8');
 homeKeywordTest = homeKeywordTest.replaceAll(
