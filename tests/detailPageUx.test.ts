@@ -3,6 +3,32 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 const detail = readFileSync(new URL('../src/components/DetailView.tsx', import.meta.url), 'utf8');
 const comments = readFileSync(new URL('../src/components/CommentsSection.tsx', import.meta.url), 'utf8');
-test('detail page mobile interaction rules', () => { assert.match(detail, /thumbTouchRadius = 28/); assert.match(detail, /onPointerDown=\{handleScrubberPointerDown\}/); assert.match(detail, /grid-cols-\[1fr_auto_1fr\]/); assert.match(detail, /showDetailKeywords, setShowDetailKeywords\] = useState\(false\)/); assert.match(detail, /<span>編輯<\/span>/); assert.doesNotMatch(detail, />演講資訊與備註</); assert.match(detail, /if \(!raw\) return '';/); });
-test('comment composer and rows are compact and readable', () => { assert.doesNotMatch(comments, /送出心得/); assert.match(comments, /'送出'/); assert.match(comments, /w-14 h-14 rounded-full object-cover/); assert.match(comments, /grid grid-cols-\[3\.5rem_minmax\(0,1fr\)\]/); assert.match(comments, /text-base text-slate-700[^\n]*leading-snug whitespace-pre-wrap mt-1\.5/); assert.doesNotMatch(comments, /pl-16 whitespace-pre-wrap/); });
-test('detail keywords keep toggle position and use title-sized regular text', () => { assert.match(detail, /grid grid-cols-\[1fr_auto\]/); assert.match(detail, /w-\[4\.75rem\]/); assert.match(detail, /text-sm font-normal text-amber-600/); assert.match(detail, /text-sm font-normal bg-amber-50/); assert.doesNotMatch(detail, /text-xs font-semibold bg-amber-50/); });
+
+test('detail page mobile interaction rules', () => {
+  assert.match(detail, /thumbTouchRadius = 28/);
+  assert.match(detail, /onPointerDown=\{handleScrubberPointerDown\}/);
+  assert.match(detail, /grid-cols-\[1fr_auto_1fr\]/);
+  assert.match(detail, /showDetailKeywords, setShowDetailKeywords\] = useState\(false\)/);
+  assert.match(detail, /<span>編輯<\/span>/);
+  assert.doesNotMatch(detail, />演講資訊與備註</);
+  assert.match(detail, /if \(!raw\) return '';/);
+});
+
+test('comment composer and rows are compact and readable', () => {
+  assert.doesNotMatch(comments, /送出心得/);
+  assert.match(comments, /'送出'/);
+  assert.match(comments, /w-14 h-14 rounded-full object-cover/);
+  assert.match(comments, /grid grid-cols-\[3\.5rem_minmax\(0,1fr\)\]/);
+  assert.match(comments, /text-base text-slate-700[^\n]*leading-snug whitespace-pre-wrap mt-1\.5/);
+  assert.doesNotMatch(comments, /pl-16 whitespace-pre-wrap/);
+});
+
+test('detail keywords keep one compact toggle and use title-sized regular keyword text', () => {
+  assert.match(detail, /showDetailKeywords \? '▲收起' : '▼展開'/);
+  assert.match(detail, /網友關鍵字\(登入可自訂新增\)/);
+  assert.match(detail, /showDetailKeywords \? 'p-3 sm:p-4' : 'px-3 py-2 sm:px-4 sm:py-2'/);
+  assert.match(detail, /text-sm font-normal text-amber-600/);
+  assert.match(detail, /text-sm font-normal bg-amber-50/);
+  assert.doesNotMatch(detail, /\{trackKeywords\.length\}\/50 組/);
+  assert.doesNotMatch(detail, /w-\[4\.75rem\]/);
+});
