@@ -9,14 +9,18 @@ const card = readFileSync(new URL('../src/components/AudioCard.tsx', import.meta
 test('home keyword heading owns expand and collapse state without drawer X', () => {
   assert.match(app, /按此/);
   assert.match(app, /showKeywordsDrawer \? '▲收起' : '▼展開'/);
-  assert.match(app, /網友關鍵字\(可複選多個\)/);
+  assert.match(app, /網友關鍵字/);
+  assert.match(app, /\(可複選多個\)/);
+  assert.match(app, /text-\[9px\]/);
   assert.doesNotMatch(app, /aria-label=\"收起網友關鍵字\"/);
 });
 
 test('detail keyword heading is compact, count-free and login-aware', () => {
   assert.match(detail, /showDetailKeywords \? 'p-3 sm:p-4' : 'px-3 py-1\.5 sm:px-4 sm:py-2'/);
   assert.match(detail, /showDetailKeywords \? '▲收起' : '▼展開'/);
-  assert.match(detail, /網友關鍵字\(登入可自訂新增\)/);
+  assert.match(detail, /網友關鍵字/);
+  assert.match(detail, /currentUser \? '\(可自訂新增\)' : '\(登入可自訂新增\)'/);
+  assert.match(detail, /text-\[9px\]/);
   assert.doesNotMatch(detail, /\{trackKeywords\.length\}\/50 組/);
 });
 
