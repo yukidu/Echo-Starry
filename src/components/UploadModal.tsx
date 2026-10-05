@@ -795,7 +795,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             <label className="font-bold text-slate-700 dark:text-slate-200">
               解鎖本錄音所需貼紙
               <ThemedSelect value={stickerUnlockCost} onChange={e => setStickerUnlockCost(Number(e.target.value))} className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-                {Array.from({ length: 21 }, (_, i) => i).map(value => <option key={value} value={value}>{value === 0 ? '0（免貼紙）' : `${value} 張`}</option>)}
+                {Array.from({ length: 51 }, (_, i) => i).map(value => <option key={value} value={value}>{value === 0 ? '0（免貼紙）' : `${value} 張`}</option>)}
               </ThemedSelect>
             </label>
             <label className="font-bold text-slate-700 dark:text-slate-200">

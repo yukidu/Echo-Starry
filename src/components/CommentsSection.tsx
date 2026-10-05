@@ -1,3 +1,4 @@
+import { vipPasswordForTrack } from '../../shared/stickers';
 import { commentThreads } from '../utils/comments';
 import { apiJson, identityKeys } from '../utils/api';
 import React, { useState, useRef, useMemo, useEffect } from 'react';
@@ -34,6 +35,7 @@ const stripLegacyAutoReplyMention = (content: string, replyToAuthor?: string) =>
 
 interface CommentsSectionProps {
   trackId: string;
+  commentStickerReward?: number;
   comments: Comment[];
   visitor: VisitorIdentity;
   currentUser: UserProfile | null;
@@ -47,6 +49,8 @@ interface CommentsSectionProps {
 }
 
 export const CommentsSection: React.FC<CommentsSectionProps> = ({
+  trackId,
+  commentStickerReward = 0,
   comments,
   visitor,
   currentUser,
@@ -98,9 +102,10 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
       const data = await apiJson(`/api/comments/${encodeURIComponent(comment.id)}/like`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: myId, userId: currentUser?.id, userEmail: currentUser?.email, deviceId: visitor?.deviceId })
+        body: JSON.stringify({ identifier: myId, userId: currentUser?.id, userEmail: currentUser?.email, deviceId: visitor?.deviceId, vipPassword: vipPasswordForTrack(trackId) })
       });
       setLikeStats(prev => ({ ...prev, [comment.id]: { likes: data.likes, hasLiked: data.hasLiked } }));
+      window.dispatchEvent(new CustomEvent('echostars:sticker-changed'));
     } catch (error) {
       setLikeStats(prev => ({ ...prev, [comment.id]: { likes: currentCount, hasLiked: currentLiked } }));
       setErrorMessage(error instanceof Error ? error.message : '按讚失敗，請重試。');
@@ -289,7 +294,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             </div>
           )}
 
-          <textarea ref={textareaRef} value={inputText} onChange={handleTextareaChange} maxLength={2000} rows={3} placeholder={replyingTo ? '寫下回覆內容...' : '寫下您的心得收穫...'} className="w-full bg-transparent resize-none outline-hidden text-sm sm:text-base text-slate-800 dark:text-slate-100 placeholder:text-slate-400" />
+          <textarea ref={textareaRef} value={inputText} onChange={handleTextareaChange} maxLength={2000} rows={3} placeholder={replyingTo ? '寫下回覆內容...' : `按這裡寫下您的心得收穫，可獲得+${commentStickerReward}張貼紙（必須100%聽完錄音）`} className="w-full bg-transparent resize-none outline-hidden text-sm sm:text-base text-slate-800 dark:text-slate-100 placeholder:text-slate-400" />
 
           {isMentionOpen && (
             <div className="absolute left-2 top-full mt-1 z-40 w-64 max-w-[calc(100vw-32px)] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95">

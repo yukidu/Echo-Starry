@@ -192,7 +192,11 @@ CREATE TABLE IF NOT EXISTS sticker_transactions (
   description TEXT NOT NULL,
   actorUserId TEXT,
   uniqueKey TEXT NOT NULL UNIQUE,
-  createdAt INTEGER NOT NULL
+  createdAt INTEGER NOT NULL,
+  trackId TEXT,
+  commentId TEXT,
+  relatedUserId TEXT,
+  sourceLabel TEXT
 );
 CREATE INDEX IF NOT EXISTS sticker_transactions_user_created ON sticker_transactions(userId, createdAt DESC);
 CREATE INDEX IF NOT EXISTS sticker_transactions_source ON sticker_transactions(sourceId, type);
@@ -230,3 +234,9 @@ CREATE TABLE IF NOT EXISTS member_notifications (
 );
 
 -- 會員在首次 Google 登入時建立，不預先寫入個人範例資料。
+
+CREATE TABLE IF NOT EXISTS sticker_comment_rewards (
+  commentId TEXT PRIMARY KEY, userId TEXT NOT NULL, trackId TEXT NOT NULL,
+  rewardUnits INTEGER NOT NULL, kind TEXT NOT NULL, createdAt INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sticker_pending_member_track ON sticker_comment_rewards(userId,trackId);

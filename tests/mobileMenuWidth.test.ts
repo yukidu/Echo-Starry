@@ -11,10 +11,10 @@ test('mobile hamburger drawer remains the existing React drawer', () => {
   assert.match(navbar, /md:hidden border-t/);
 });
 
-test('mobile hamburger drawer uses the right half of the viewport', () => {
+test('mobile hamburger drawer uses the right side with room for the large sticker balance', () => {
   const combined = `${css}\n${layout}`;
   assert.match(combined, /@media \(max-width: 767px\)/);
-  assert.match(combined, /width:\s*50vw\s*!important/);
-  assert.match(combined, /max-width:\s*50vw\s*!important/);
+  assert.match(combined, /width:\s*min\(90vw, 360px\)\s*!important/);
+  assert.match(combined, /max-width:\s*min\(90vw, 360px\)\s*!important/);
   assert.match(combined, /right:\s*0\s*!important/);
 });

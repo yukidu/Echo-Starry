@@ -1,5 +1,6 @@
 import appWorker from './sessionCookieRouter';
 import type { Env } from './index';
+import { canonicalProgressPercent } from '../shared/learningProgress';
 import {
   INITIAL_STICKER_UNITS,
   formatStickerAmount,
@@ -18,7 +19,9 @@ const SETTING_DEFAULTS: Record<string, number> = {
   rating_reward_units: 1,
   like_reward_units: 1,
   keyword_reward_units: 1,
-  keyword_reward_limit: 1,
+  keyword_reward_cap_units: 10,
+  comment_thread_cap_units: 200,
+  reply_reward_units: 1,
   lucky_cost_units: 1,
   vip_upload_cost_units: 1
 };
@@ -184,7 +187,33 @@ async function ensureStickerSchema(db: any) {
         db.prepare('CREATE INDEX IF NOT EXISTS member_notifications_user_created ON member_notifications(userId, createdAt DESC)')
       ]);
 
+      const transactionColumns = new Set((await db.prepare('PRAGMA table_info(sticker_transactions)').all()).results.map((row: any) => row.name));
+      for (const column of ['trackId', 'commentId', 'relatedUserId', 'sourceLabel']) {
+        if (!transactionColumns.has(column)) {
+          try { await db.prepare(`ALTER TABLE sticker_transactions ADD COLUMN ${column} TEXT`).run(); }
+          catch (error) {
+            const check = await db.prepare('PRAGMA table_info(sticker_transactions)').all();
+            if (!check.results.some((row: any) => row.name === column)) throw error;
+          }
+        }
+      }
+      await db.prepare(`CREATE TABLE IF NOT EXISTS sticker_comment_rewards (
+        commentId TEXT PRIMARY KEY, userId TEXT NOT NULL, trackId TEXT NOT NULL,
+        rewardUnits INTEGER NOT NULL, kind TEXT NOT NULL, createdAt INTEGER NOT NULL
+      )`).run();
+      await db.prepare('CREATE INDEX IF NOT EXISTS sticker_pending_member_track ON sticker_comment_rewards(userId, trackId)').run();
+      await db.prepare('CREATE INDEX IF NOT EXISTS sticker_transactions_member_track ON sticker_transactions(userId, trackId, type)').run();
       const now = Date.now();
+      // v98 stored this setting as a count. The configured number now means stickers.
+      await db.prepare(`INSERT OR IGNORE INTO sticker_settings(key,valueUnits,updatedAt,updatedBy)
+        SELECT 'keyword_reward_cap_units', valueUnits * 10, ?, 'system' FROM sticker_settings WHERE key = 'keyword_reward_limit'`).bind(now).run();
+      await db.prepare(`INSERT OR IGNORE INTO sticker_settings VALUES ('comment_rewards_v99_started_at', ?, ?, 'system')`).bind(now, now).run();
+      await db.prepare(`UPDATE sticker_transactions SET trackId = COALESCE(
+        (SELECT id FROM tracks WHERE id = sticker_transactions.sourceId),
+        (SELECT trackId FROM comments WHERE id = sticker_transactions.sourceId),
+        CASE WHEN type = 'comment_reward' THEN SUBSTR(uniqueKey, LENGTH('comment-reward:' || userId || ':') + 1) END)
+        WHERE trackId IS NULL AND type IN ('rating_reward','like_reward','keyword_reward','track_unlock_cost','comment_reward','comment_reward_reversal','vip_upload_cost')`).run();
+      await db.prepare(`UPDATE sticker_transactions SET commentId = sourceId WHERE commentId IS NULL AND type IN ('comment_reward','comment_reward_reversal')`).run();
       await db.batch(Object.entries(SETTING_DEFAULTS).map(([settingKey, value]) =>
         db.prepare('INSERT OR IGNORE INTO sticker_settings(key, valueUnits, updatedAt, updatedBy) VALUES (?, ?, ?, ?)')
           .bind(settingKey, value, now, 'system')
@@ -230,68 +259,63 @@ type TransactionResult = {
   insufficient?: boolean;
 };
 
-async function addStickerTransaction(
-  db: any,
-  input: {
-    userId: string;
-    deltaUnits: number;
-    type: string;
-    sourceId?: string;
-    description: string;
-    actorUserId?: string;
-    uniqueKey: string;
-    allowNegative?: boolean;
-    rewardLimit?: number;
-  }
-): Promise<TransactionResult> {
+async function addStickerTransaction(db: any, input: {
+  userId: string; deltaUnits: number; type: string; sourceId?: string; description: string;
+  actorUserId?: string; uniqueKey: string; allowNegative?: boolean;
+  trackId?: string; commentId?: string; relatedUserId?: string;
+  capUnits?: number; capTypes?: string[];
+}): Promise<TransactionResult> {
   await ensureInitialStickers(db, input.userId);
-  const existing: any = await db.prepare('SELECT * FROM sticker_transactions WHERE uniqueKey = ? LIMIT 1')
-    .bind(input.uniqueKey).first();
-  if (existing) {
-    return { inserted: false, balanceUnits: await stickerBalanceUnits(db, input.userId), transaction: existing };
-  }
-
+  const existing: any = await db.prepare('SELECT * FROM sticker_transactions WHERE uniqueKey = ? LIMIT 1').bind(input.uniqueKey).first();
+  if (existing) return { inserted: false, balanceUnits: await stickerBalanceUnits(db, input.userId), transaction: existing };
+  const track: any = await db.prepare('SELECT id,title,speaker,speakerRank FROM tracks WHERE id = ?').bind(input.trackId || input.sourceId || '').first();
   const id = `st-${crypto.randomUUID()}`;
-  const now = Date.now();
-  let result: any;
-  if (input.deltaUnits < 0 && !input.allowNegative) {
-    result = await db.prepare(`
-      INSERT OR IGNORE INTO sticker_transactions
-        (id, userId, deltaUnits, balanceAfterUnits, type, sourceId, description, actorUserId, uniqueKey, createdAt)
-      SELECT ?, ?, ?,
-        COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?), 0) + ?,
-        ?, ?, ?, ?, ?, ?
-      WHERE COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?), 0) + ? >= 0
-    `).bind(
-      id, input.userId, input.deltaUnits, input.userId, input.deltaUnits,
-      input.type, input.sourceId || null, input.description, input.actorUserId || null, input.uniqueKey, now,
-      input.userId, input.deltaUnits
-    ).run();
-  } else {
-    result = await db.prepare(`
-      INSERT OR IGNORE INTO sticker_transactions
-        (id, userId, deltaUnits, balanceAfterUnits, type, sourceId, description, actorUserId, uniqueKey, createdAt)
-      SELECT ?, ?, ?,
-        COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?), 0) + ?,
-        ?, ?, ?, ?, ?, ?
-      WHERE (SELECT COUNT(*) FROM sticker_transactions WHERE userId = ? AND type = ? AND sourceId = ?) < ?
-    `).bind(
-      id, input.userId, input.deltaUnits, input.userId, input.deltaUnits,
-      input.type, input.sourceId || null, input.description, input.actorUserId || null, input.uniqueKey, now,
-      input.userId, input.type, input.sourceId || null, input.rewardLimit ?? 2147483647
-    ).run();
-  }
+  const capTypes = input.capTypes || [input.type];
+  const capped = input.capUnits !== undefined && input.deltaUnits > 0;
+  const amountSql = capped ? `MIN(?, MAX(0, ? - COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions
+    WHERE userId = ? AND trackId = ? AND deltaUnits > 0 AND type IN (${capTypes.map(() => '?').join(',')})), 0)))` : '?';
+  const amountArgs = capped ? [input.deltaUnits, input.capUnits, input.userId, input.trackId || track?.id || '', ...capTypes] : [input.deltaUnits];
+  // The cap and balance are computed within the same INSERT, including concurrent requests.
+  const result: any = await db.prepare(`WITH award(amount) AS (SELECT ${amountSql})
+    INSERT OR IGNORE INTO sticker_transactions
+      (id,userId,deltaUnits,balanceAfterUnits,type,sourceId,description,actorUserId,uniqueKey,createdAt,trackId,commentId,relatedUserId,sourceLabel)
+    SELECT ?, ?, amount, COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?),0) + amount,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM award
+    WHERE (? = 1 OR COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?),0) + amount >= 0)
+      AND (? = 0 OR amount > 0)
+  `).bind(...amountArgs, id, input.userId, input.userId, input.type, input.sourceId || null,
+    input.description, input.actorUserId || null, input.uniqueKey, Date.now(), input.trackId || track?.id || null,
+    input.commentId || null, input.relatedUserId || null, track ? trackLabel(track) : null,
+    input.allowNegative || input.deltaUnits >= 0 ? 1 : 0, input.userId, capped ? 1 : 0).run();
+  const transaction: any = await db.prepare('SELECT * FROM sticker_transactions WHERE uniqueKey = ?').bind(input.uniqueKey).first();
+  return { inserted: Boolean(result?.meta?.changes), balanceUnits: await stickerBalanceUnits(db, input.userId),
+    transaction, insufficient: !transaction && input.deltaUnits < 0 };
+}
 
-  if (!result?.meta?.changes) {
-    const duplicate: any = await db.prepare('SELECT * FROM sticker_transactions WHERE uniqueKey = ? LIMIT 1')
-      .bind(input.uniqueKey).first();
-    if (duplicate) {
-      return { inserted: false, balanceUnits: await stickerBalanceUnits(db, input.userId), transaction: duplicate };
-    }
-    return { inserted: false, balanceUnits: await stickerBalanceUnits(db, input.userId), insufficient: true };
-  }
-  const transaction: any = await db.prepare('SELECT * FROM sticker_transactions WHERE id = ?').bind(id).first();
-  return { inserted: true, balanceUnits: Number(transaction?.balanceAfterUnits || 0), transaction };
+function trackLabel(track: any) {
+  return `${track.speaker || ''}${track.speakerRank && track.speakerRank !== '無' ? track.speakerRank : ''}-${track.title || track.id}`;
+}
+
+async function transactionHistory(db: any, actor: any, outgoing = false) {
+  const { results } = await db.prepare(`SELECT tx.*, t.id AS liveTrackId, t.title AS trackTitle,
+    t.speaker AS trackSpeaker, t.speakerRank AS trackSpeakerRank, c.id AS liveCommentId,
+    u.id AS liveUserId, u.name AS sourceUserName
+    FROM sticker_transactions tx
+    LEFT JOIN tracks t ON t.id = tx.trackId
+    LEFT JOIN comments c ON c.id = tx.commentId
+    LEFT JOIN users u ON u.id = CASE WHEN ? = 1 THEN tx.userId
+      WHEN tx.type = 'initial' THEN tx.userId ELSE COALESCE(tx.relatedUserId, tx.actorUserId) END
+    WHERE ${outgoing ? "tx.actorUserId = ? AND tx.type = 'manual_grant'" : 'tx.userId = ?'}
+    ORDER BY tx.createdAt DESC, tx.rowid DESC`).bind(outgoing ? 1 : 0, actor.id).all();
+  return (results || []).map((tx: any) => ({
+    id: tx.id, type: tx.type, description: tx.description, createdAt: tx.createdAt,
+    delta: unitsToStickers(tx.deltaUnits), balanceAfter: unitsToStickers(tx.balanceAfterUnits),
+    source: tx.trackId ? {
+      kind: 'track', trackId: tx.trackId, commentId: tx.liveCommentId || undefined,
+      label: tx.liveTrackId ? trackLabel({id:tx.trackId,title:tx.trackTitle,speaker:tx.trackSpeaker,speakerRank:tx.trackSpeakerRank}) : tx.sourceLabel || tx.description,
+      available: Boolean(tx.liveTrackId)
+    } : tx.type === 'lucky_cost' ? {kind:'feature', label:'好手氣', available:true} : tx.liveUserId ? {kind:'member', userId:tx.liveUserId, label:tx.sourceUserName, available:true} : null
+  }));
 }
 
 async function settingMap(db: any) {
@@ -306,20 +330,23 @@ function settingsForClient(values: Record<string, number>) {
     ratingReward: unitsToStickers(values.rating_reward_units),
     likeReward: unitsToStickers(values.like_reward_units),
     keywordReward: unitsToStickers(values.keyword_reward_units),
-    keywordRewardLimit: Number(values.keyword_reward_limit || 1),
+    keywordRewardLimit: unitsToStickers(values.keyword_reward_cap_units),
+    commentThreadLimit: unitsToStickers(values.comment_thread_cap_units),
+    replyReward: unitsToStickers(values.reply_reward_units),
     luckyCost: unitsToStickers(values.lucky_cost_units),
     vipUploadCost: unitsToStickers(values.vip_upload_cost_units)
   };
 }
 
 function validTenth(value: unknown) {
+  if (value === null || typeof value === "boolean" || value === "" || value === undefined) return false;
   const units = stickersToUnits(value);
-  return Number.isFinite(Number(value)) && units >= 1 && units <= 10 && Math.abs(Number(value) * 10 - units) < 1e-8;
+  return Number.isFinite(Number(value)) && units >= 0 && units <= 10000 && Math.abs(Number(value) * 10 - units) < 1e-8;
 }
 
-function validWholeTrackSticker(value: unknown) {
+function validWholeTrackSticker(value: unknown, maximum = 20) {
   const number = Number(value);
-  return Number.isInteger(number) && number >= 0 && number <= 20;
+  return Number.isInteger(number) && number >= 0 && number <= maximum;
 }
 
 function hasRankAccess(actor: any, track: any) {
@@ -358,31 +385,66 @@ async function canEarnFromTrack(db: any, actor: any, track: any, vipPassword = '
 }
 
 async function playbackCompleted(db: any, actor: any, trackId: string) {
-  const email = String(actor?.email || '').trim().toLowerCase();
-  const row: any = await db.prepare(`
-    SELECT MAX(COALESCE(progressPercent, 0)) AS progress,
-           MAX(COALESCE(completed, 0)) AS completed,
-           MAX(CASE WHEN finishDate IS NOT NULL AND TRIM(finishDate) <> '' THEN 1 ELSE 0 END) AS hasFinish
-    FROM playback_memories
-    WHERE trackId = ? AND (
-      memberId = ? OR ((memberId IS NULL OR TRIM(memberId) = '') AND (userIdentifier = ? OR userIdentifier = ? OR LOWER(TRIM(userIdentifier)) = ?))
-    )
-  `).bind(trackId, actor.id, actor.id, actor.email || '', email).first();
-  return Number(row?.completed || 0) === 1 || Number(row?.hasFinish || 0) === 1 || Number(row?.progress || 0) >= 95;
+  const { results } = await db.prepare(`SELECT * FROM playback_memories WHERE trackId = ? AND (
+    memberId = ? OR ((memberId IS NULL OR TRIM(memberId) = '') AND
+    (userIdentifier = ? OR LOWER(TRIM(userIdentifier)) = ?)))`)
+    .bind(trackId, actor.id, actor.id, String(actor.email || '').trim().toLowerCase()).all();
+  return (results || []).some((row: any) => canonicalProgressPercent(row) >= 100);
 }
 
-async function awardInteraction(db: any, actor: any, type: string, sourceId: string, units: number, description: string, uniqueKey: string, rewardLimit?: number) {
+async function awardInteraction(db: any, actor: any, type: string, sourceId: string, units: number, description: string, uniqueKey: string, trackId?: string, commentId?: string, capUnits?: number) {
   if (!actor || units <= 0) return null;
-  return addStickerTransaction(db, {
-    userId: actor.id,
-    deltaUnits: units,
-    type,
-    sourceId,
-    description,
-    actorUserId: actor.id,
-    uniqueKey,
-    rewardLimit
-  });
+  return addStickerTransaction(db, { userId:actor.id, deltaUnits:units, type, sourceId, description,
+    actorUserId:actor.id, uniqueKey, trackId, commentId, capUnits });
+}
+
+async function queueCommentReward(db: any, actor: any, comment: any, track: any, settings: Record<string, number>, vipPassword = '') {
+  if (!comment || !await canEarnFromTrack(db, actor, track, vipPassword)) return;
+  const reply = Boolean(comment.replyToId);
+  let eligible = true;
+  if (reply) {
+    const parent: any = await db.prepare('SELECT authorEmail FROM comments WHERE id = ?').bind(comment.replyToId).first();
+    if (!parent || String(parent.authorEmail || '').trim().toLowerCase() === String(actor.email).trim().toLowerCase()) eligible = false;
+  }
+  const units = eligible ? (reply ? settings.reply_reward_units : stickersToUnits(track.commentStickerReward || 0)) : 0;
+  await db.prepare(`INSERT OR IGNORE INTO sticker_comment_rewards(commentId,userId,trackId,rewardUnits,kind,createdAt)
+    VALUES (?,?,?,?,?,?)`).bind(comment.id,actor.id,track.id,units,reply?'reply_reward':'comment_reward',comment.createdAt || Date.now()).run();
+}
+
+async function reconcileCommentRewards(db: any, actor: any, trackId?: string, vipPassword = '') {
+  if (!actor) return;
+  const settings = await settingMap(db);
+  // Recover missed v98 roots, but never reward pre-launch history or retrospectively reward old replies.
+  const { results: comments } = await db.prepare(`SELECT c.* FROM comments c
+    WHERE LOWER(TRIM(c.authorEmail)) = ? AND (? = '' OR c.trackId = ?)
+      AND c.createdAt >= COALESCE((SELECT createdAt FROM sticker_transactions WHERE uniqueKey = ?), ?)
+      AND NOT EXISTS (SELECT 1 FROM sticker_comment_rewards p WHERE p.commentId = c.id)
+    ORDER BY c.createdAt, c.id`).bind(String(actor.email || '').trim().toLowerCase(),trackId || '',trackId || '',`initial:${actor.id}`,Date.now()).all();
+  for (const comment of comments || []) {
+    if (comment.replyToId && comment.createdAt < settings.comment_rewards_v99_started_at) continue;
+    const track = await db.prepare('SELECT * FROM tracks WHERE id = ?').bind(comment.trackId).first();
+    await queueCommentReward(db,actor,comment,track,settings,vipPassword);
+  }
+  const { results: pending } = await db.prepare(`SELECT p.* FROM sticker_comment_rewards p
+    JOIN comments c ON c.id = p.commentId
+    WHERE p.userId = ? AND (? = '' OR p.trackId = ?) ORDER BY p.createdAt, p.commentId`)
+    .bind(actor.id,trackId || '',trackId || '').all();
+  const completed = new Map<string, boolean>();
+  for (const item of pending || []) {
+    if (item.rewardUnits <= 0) continue;
+    if (!completed.has(item.trackId)) completed.set(item.trackId,await playbackCompleted(db,actor,item.trackId));
+    if (!completed.get(item.trackId)) continue;
+    const track: any = await db.prepare('SELECT * FROM tracks WHERE id = ?').bind(item.trackId).first();
+    if (!track || !hasRankAccess(actor,track)) continue;
+    // VIP eligibility was verified when queued; permanent sticker access is still required.
+    if (Number(track.stickerUnlockCost || 0) > 0 && !isSuperAdmin(actor) && !await db.prepare('SELECT trackId FROM sticker_unlocks WHERE userId = ? AND trackId = ?').bind(actor.id,item.trackId).first()) continue;
+    await addStickerTransaction(db, {
+      userId:actor.id,deltaUnits:item.rewardUnits,type:item.kind,sourceId:item.commentId,trackId:item.trackId,commentId:item.commentId,
+      description:item.kind === 'reply_reward' ? '回覆他人心得' : '聽完後分享心得',actorUserId:actor.id,
+      uniqueKey:item.kind === 'reply_reward' ? `reply-reward:${actor.id}:${item.commentId}` : `comment-reward:${actor.id}:${item.trackId}`,
+      capUnits:settings.comment_thread_cap_units,capTypes:['comment_reward','reply_reward']
+    });
+  }
 }
 
 function makeJsonRequest(request: Request, body: any) {
@@ -410,7 +472,7 @@ async function handleTrackWrite(request: Request, env: Env, actor: any) {
   const body: any = await request.clone().json().catch(() => ({}));
   const hasUnlockField = Object.prototype.hasOwnProperty.call(body, 'stickerUnlockCost');
   const hasRewardField = Object.prototype.hasOwnProperty.call(body, 'commentStickerReward');
-  if (hasUnlockField && !validWholeTrackSticker(body.stickerUnlockCost)) return json({ error: '解鎖貼紙需為 0 至 20 張整數' }, 400);
+  if (hasUnlockField && !validWholeTrackSticker(body.stickerUnlockCost, 50)) return json({ error: '解鎖貼紙需為 0 至 50 張整數' }, 400);
   if (hasRewardField && !validWholeTrackSticker(body.commentStickerReward)) return json({ error: '心得獎勵貼紙需為 0 至 20 張整數' }, 400);
 
   const existing: any = isCreate ? null : await db.prepare('SELECT * FROM tracks WHERE id = ?').bind(trackId).first();
@@ -467,6 +529,8 @@ async function handleTrackWrite(request: Request, env: Env, actor: any) {
         savedId, isCreate ? '上傳私秘VIP錄音' : '將錄音改為私秘VIP', actor.id, vipUniqueKey, Date.now()));
   }
 
+  if (vipUniqueKey) statements.push(db.prepare('UPDATE sticker_transactions SET trackId = ?, sourceLabel = ? WHERE uniqueKey = ?').bind(savedId, trackLabel({ ...existing, ...body, id:savedId }), vipUniqueKey));
+
   const cleanBody = { ...body };
   delete cleanBody.stickerUnlockCost;
   delete cleanBody.commentStickerReward;
@@ -511,10 +575,9 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
   await ensureInitialStickers(db, actor.id);
 
   if (path === '/api/stickers/me' && method === 'GET') {
+    await reconcileCommentRewards(db, actor);
     const balanceUnits = await stickerBalanceUnits(db, actor.id);
-    const { results: transactions } = await db.prepare(
-      'SELECT * FROM sticker_transactions WHERE userId = ? ORDER BY createdAt DESC LIMIT 100'
-    ).bind(actor.id).all();
+    const transactions = await transactionHistory(db, actor);
     const { results: unlocks } = await db.prepare('SELECT trackId FROM sticker_unlocks WHERE userId = ?').bind(actor.id).all();
     const unread: any = await db.prepare('SELECT COUNT(*) AS count FROM member_notifications WHERE userId = ? AND readAt IS NULL')
       .bind(actor.id).first();
@@ -525,11 +588,7 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
       unreadNotifications: Number(unread?.count || 0),
       canGrant: canGrantStickers(actor),
       isSuperAdmin: isSuperAdmin(actor),
-      transactions: (transactions || []).map((tx: any) => ({
-        ...tx,
-        delta: unitsToStickers(tx.deltaUnits),
-        balanceAfter: unitsToStickers(tx.balanceAfterUnits)
-      }))
+      transactions
     });
   }
 
@@ -538,18 +597,17 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
     if (method === 'GET') return json({ settings: settingsForClient(await settingMap(db)) });
     if (method === 'PUT') {
       const body: any = await request.json().catch(() => ({}));
-      for (const key of ['ratingReward', 'likeReward', 'keywordReward', 'luckyCost', 'vipUploadCost']) {
-        if (!validTenth(body[key])) return json({ error: `${key} 必須為 0.1 至 1.0，且以 0.1 為單位` }, 400);
-      }
-      if (!Number.isInteger(Number(body.keywordRewardLimit)) || Number(body.keywordRewardLimit) < 1 || Number(body.keywordRewardLimit) > 20) {
-        return json({ error: '網友關鍵字獎勵上限需為 1 至 20 次' }, 400);
+      for (const key of ['ratingReward', 'likeReward', 'keywordReward', 'keywordRewardLimit', 'commentThreadLimit', 'replyReward', 'luckyCost', 'vipUploadCost']) {
+        if (!validTenth(body[key])) return json({ error: `${key} 必須為 0 至 1000 張，且以 0.1 為單位` }, 400);
       }
       const now = Date.now();
       const updates: Record<string, number> = {
         rating_reward_units: stickersToUnits(body.ratingReward),
         like_reward_units: stickersToUnits(body.likeReward),
         keyword_reward_units: stickersToUnits(body.keywordReward),
-        keyword_reward_limit: Number(body.keywordRewardLimit),
+        keyword_reward_cap_units: stickersToUnits(body.keywordRewardLimit),
+        comment_thread_cap_units: stickersToUnits(body.commentThreadLimit),
+        reply_reward_units: stickersToUnits(body.replyReward),
         lucky_cost_units: stickersToUnits(body.luckyCost),
         vip_upload_cost_units: stickersToUnits(body.vipUploadCost)
       };
@@ -576,7 +634,7 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
       userId: actor.id,
       deltaUnits: -cost,
       type: 'lucky_cost',
-      sourceId: operationId,
+      sourceId: operationId, trackId: track.id,
       description: '使用好手氣',
       actorUserId: actor.id,
       uniqueKey: `lucky:${actor.id}:${operationId}`
@@ -629,7 +687,7 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
         deltaUnits: -stickersToUnits(costStickers),
         type: 'track_unlock_cost',
         sourceId: trackId,
-        description: `解鎖錄音：${track.title || trackId}`,
+        description: '解鎖錄音', trackId,
         actorUserId: actor.id,
         uniqueKey
       });
@@ -640,6 +698,11 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
     await db.prepare('INSERT OR IGNORE INTO sticker_unlocks(userId, trackId, costUnits, transactionId, createdAt) VALUES (?, ?, ?, ?, ?)')
       .bind(actor.id, trackId, stickersToUnits(costStickers), transaction?.id || null, Date.now()).run();
     return json({ success: true, unlocked: true, charged: costStickers, balance: unitsToStickers(balanceUnits) });
+  }
+
+  if (path === '/api/stickers/grant-history' && method === 'GET') {
+    if (!canGrantStickers(actor)) return json({ error: '目前獎銜沒有加貼紙權限' }, 403);
+    return json({ transactions: await transactionHistory(db, actor, true) });
   }
 
   if (path === '/api/stickers/grant-targets' && method === 'GET') {
@@ -660,9 +723,9 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
     const reason = String(body.reason || '').trim();
     const operationId = String(body.operationId || '').trim();
     if (!targetId || !operationId) return json({ error: '缺少會員或操作識別碼' }, 400);
-    if (!reason) return json({ error: '人工加貼紙必須填寫原因' }, 400);
-    if (!Number.isFinite(amount) || units < 1 || units > 200 || Math.abs(amount * 10 - units) > 1e-8) {
-      return json({ error: '人工加貼紙需為 0.1 至 20 張，且以 0.1 為單位' }, 400);
+    if (!reason || reason.length > 500) return json({ error: '人工加貼紙原因需為 1 至 500 字' }, 400);
+    if (!Number.isInteger(amount) || amount < 1 || amount > 5) {
+      return json({ error: '人工加貼紙需為 1 至 5 張整數' }, 400);
     }
     const target: any = await db.prepare('SELECT * FROM users WHERE id = ? AND COALESCE(isBlocked,0)=0').bind(targetId).first();
     if (!target) return json({ error: '找不到可用會員' }, 404);
@@ -677,7 +740,7 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
       userId: target.id,
       deltaUnits: units,
       type: 'manual_grant',
-      sourceId: operationId,
+      sourceId: operationId, relatedUserId: actor.id,
       description: `${actor.name || '會員'}人工加貼紙：${reason}`,
       actorUserId: actor.id,
       uniqueKey
@@ -700,7 +763,7 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
     const updates: string[] = [];
     const values: number[] = [];
     if (body.stickerUnlockCost !== undefined && body.stickerUnlockCost !== null && body.stickerUnlockCost !== '') {
-      if (!validWholeTrackSticker(body.stickerUnlockCost)) return json({ error: '解鎖貼紙需為 0 至 20 張整數' }, 400);
+      if (!validWholeTrackSticker(body.stickerUnlockCost, 50)) return json({ error: '解鎖貼紙需為 0 至 50 張整數' }, 400);
       updates.push('stickerUnlockCost = ?'); values.push(Number(body.stickerUnlockCost));
     }
     if (body.commentStickerReward !== undefined && body.commentStickerReward !== null && body.commentStickerReward !== '') {
@@ -739,7 +802,7 @@ export default {
     const method = request.method.toUpperCase();
     if (!env.DB) return appWorker.fetch(request, env);
 
-    const relevant = path.startsWith('/api/stickers') || path.startsWith('/api/tracks') || path.startsWith('/api/comments') || path === '/api/users/google-sync';
+    const relevant = path.startsWith('/api/stickers') || path.startsWith('/api/tracks') || path.startsWith('/api/comments') || path === '/api/users/google-sync' || path === '/api/playback/record' || path === '/api/playback/claim-local';
     if (relevant) {
       try { await ensureStickerSchema(env.DB); }
       catch (error) {
@@ -761,12 +824,15 @@ export default {
     const trackAction = path.match(/^\/api\/tracks\/([^/]+)\/(like|rate)$/);
     const keywordPost = path.match(/^\/api\/tracks\/([^/]+)\/keywords$/) && method === 'POST';
     const commentPost = path.match(/^\/api\/tracks\/([^/]+)\/comments$/) && method === 'POST';
+    const commentLike = method === 'POST' ? path.match(/^\/api\/comments\/([^/]+)\/like$/) : null;
+    const playbackWrite = method === 'POST' && (path === '/api/playback/record' || path === '/api/playback/claim-local');
     const commentDelete = method === 'DELETE' ? path.match(/^\/api\/comments\/([^/]+)$/) : null;
 
     let beforeTrack: any = null;
     let beforeCommentReward: any = null;
+    const likedComment: any = commentLike ? await env.DB.prepare('SELECT * FROM comments WHERE id = ?').bind(commentLike[1]).first() : null;
     let requestBody: any = null;
-    if ((trackAction && method === 'POST') || keywordPost || commentPost) {
+    if ((trackAction && method === 'POST') || keywordPost || commentPost || commentLike || playbackWrite) {
       requestBody = await request.clone().json().catch(() => ({}));
     }
     if (trackAction && method === 'POST' && actor) {
@@ -782,7 +848,7 @@ export default {
     if (commentDelete) {
       const commentId = decodeURIComponent((commentDelete as RegExpMatchArray)[1]);
       beforeCommentReward = await env.DB.prepare(
-        "SELECT * FROM sticker_transactions WHERE type = 'comment_reward' AND sourceId = ? AND deltaUnits > 0 ORDER BY createdAt ASC LIMIT 1"
+        "SELECT * FROM sticker_transactions WHERE type IN ('comment_reward','reply_reward') AND sourceId = ? AND deltaUnits > 0 ORDER BY createdAt ASC LIMIT 1"
       ).bind(commentId).first();
     }
 
@@ -806,7 +872,11 @@ export default {
       return response;
     }
 
-    const settings = actor && (trackAction || keywordPost) ? await settingMap(env.DB) : null;
+    const settings = actor && (trackAction || keywordPost || commentLike || commentPost) ? await settingMap(env.DB) : null;
+    if (playbackWrite && actor) {
+      await reconcileCommentRewards(env.DB,actor,requestBody?.trackId,String(requestBody?.vipPassword || ''));
+      return response;
+    }
 
     if (trackAction && method === 'POST' && actor && beforeTrack && requestBody) {
       const action = trackAction[2];
@@ -833,27 +903,33 @@ export default {
     if (keywordPost && actor && requestBody) {
       const trackId = decodeURIComponent((path.match(/^\/api\/tracks\/([^/]+)/) as RegExpMatchArray)[1]);
       const keyword = String(requestBody.keyword || '').trim();
-      const limit = Number(settings?.keyword_reward_limit || 1);
-      const count: any = await env.DB.prepare("SELECT COUNT(*) AS count FROM sticker_transactions WHERE userId = ? AND type = 'keyword_reward' AND sourceId = ?")
-        .bind(actor.id, trackId).first();
-      if (Number(count?.count || 0) < limit) {
-        const track: any = await env.DB.prepare('SELECT id, title, requiredRank, isPrivateVip, uploaderEmail, vipExpiresAt, stickerUnlockCost FROM tracks WHERE id = ?').bind(trackId).first();
-        if (await canEarnFromTrack(env.DB, actor, track, String(requestBody.vipPassword || ''))) await awardInteraction(env.DB, actor, 'keyword_reward', trackId, Number(settings?.keyword_reward_units || 0), `新增網友關鍵字「${keyword}」：${track?.title || trackId}`, `keyword:${actor.id}:${trackId}:${keyword.toLocaleLowerCase('zh-Hant')}`, limit);
+      const track: any = await env.DB.prepare('SELECT * FROM tracks WHERE id = ?').bind(trackId).first();
+      if (await canEarnFromTrack(env.DB, actor, track, String(requestBody.vipPassword || ''))) {
+        await awardInteraction(env.DB, actor, 'keyword_reward', trackId, Number(settings?.keyword_reward_units || 0),
+          `新增網友關鍵字「${keyword}」`, `keyword:${actor.id}:${trackId}:${keyword.toLocaleLowerCase('zh-Hant')}`,trackId,undefined,settings?.keyword_reward_cap_units);
       }
       return response;
     }
 
-    if (commentPost && actor && requestBody && !requestBody.replyToId) {
-      const trackId = decodeURIComponent((path.match(/^\/api\/tracks\/([^/]+)/) as RegExpMatchArray)[1]);
-      const track: any = await env.DB.prepare('SELECT id, title, commentStickerReward, requiredRank, isPrivateVip, uploaderEmail, vipExpiresAt, stickerUnlockCost FROM tracks WHERE id = ?').bind(trackId).first();
-      const reward = Math.max(0, Number(track?.commentStickerReward || 0));
-      if (reward > 0 && await canEarnFromTrack(env.DB, actor, track, String(requestBody.vipPassword || '')) && await playbackCompleted(env.DB, actor, trackId)) {
-        const data: any = await response.clone().json().catch(() => null);
-        const comment = data?.comment || data;
-        if (comment?.id) {
-          await awardInteraction(env.DB, actor, 'comment_reward', comment.id, stickersToUnits(reward), `聽完後分享心得：${track?.title || trackId}`, `comment-reward:${actor.id}:${trackId}`);
-        }
+    if (commentLike && actor && likedComment && requestBody) {
+      const data: any = await response.clone().json().catch(() => ({}));
+      const ownerEmail = String(likedComment.authorEmail || '').trim().toLowerCase();
+      const actorEmail = String(actor.email || '').trim().toLowerCase();
+      const previous = parseJson(likedComment.likedBy, []);
+      const track: any = await env.DB.prepare('SELECT * FROM tracks WHERE id = ?').bind(likedComment.trackId).first();
+      if (data.hasLiked && ownerEmail !== actorEmail && !previous.includes(actor.id) && !previous.includes(actorEmail)
+        && await canEarnFromTrack(env.DB,actor,track,String(requestBody.vipPassword || ''))) {
+        await awardInteraction(env.DB,actor,'comment_like_reward',likedComment.id,settings?.like_reward_units || 0,
+          '按讚他人心得',`comment-like:${actor.id}:${likedComment.id}`,track.id,likedComment.id);
       }
+      return response;
+    }
+    if (commentPost && actor && requestBody) {
+      const trackId = decodeURIComponent(path.split('/')[3]);
+      const track: any = await env.DB.prepare('SELECT * FROM tracks WHERE id = ?').bind(trackId).first();
+      const data: any = await response.clone().json().catch(() => null);
+      await queueCommentReward(env.DB,actor,data?.comment || data,track,settings!,String(requestBody.vipPassword || ''));
+      await reconcileCommentRewards(env.DB,actor,trackId,String(requestBody.vipPassword || ''));
       return response;
     }
 
@@ -863,7 +939,7 @@ export default {
         userId: beforeCommentReward.userId,
         deltaUnits: -Number(beforeCommentReward.deltaUnits || 0),
         type: 'comment_reward_reversal',
-        sourceId: commentId,
+        sourceId: commentId, trackId: beforeCommentReward.trackId, commentId,
         description: `刪除原獎勵心得，扣回 ${formatStickerAmount(unitsToStickers(beforeCommentReward.deltaUnits))} 張貼紙`,
         actorUserId: actor?.id || undefined,
         uniqueKey: `comment-reversal:${beforeCommentReward.id}`,

@@ -708,14 +708,14 @@ export const DetailView: React.FC<DetailViewProps> = ({
             </button>
 
             {/* Badge: Required permission (Requirement 11 v2.7: 私秘VIP顯示鎖頭+私秘VIP) */}
-            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-xs text-amber-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-md border border-amber-500/40 whitespace-nowrap flex items-center gap-1 z-10">
+            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-xs text-amber-300 text-[9px] font-bold px-2.5 py-0.5 rounded-full shadow-md border border-amber-500/40 whitespace-nowrap flex items-center gap-1 z-10">
               {(track.isPrivateVip || track.requiredRank !== '無') && (
                 <Lock className="w-3 h-3 text-amber-400 shrink-0" />
               )}
               <span>{(() => {
             const permission = track.isPrivateVip ? '私秘VIP' : (track.requiredRank === '無' ? '公開' : track.requiredRank);
             const cost = Math.max(0, Number(track.stickerUnlockCost || 0));
-            return cost > 0 ? `${permission} │ 貼紙${cost}張` : permission;
+            return cost > 0 ? `${permission}│-${cost}張貼紙` : permission;
           })()}</span>
             </div>
           </div>
@@ -1034,12 +1034,8 @@ export const DetailView: React.FC<DetailViewProps> = ({
 
       {/* Comments Section */}
       <div id="comments-section">
-        <div className="mb-2 px-1 text-sm font-black text-slate-800 dark:text-slate-100">
-          {Math.max(0, Number(track.commentStickerReward || 0)) > 0
-            ? `聽完後分享心得+貼紙${Math.max(0, Number(track.commentStickerReward || 0))}張`
-            : '聽完後分享心得'}
-        </div>
         <CommentsSection
+          commentStickerReward={track.commentStickerReward}
           trackId={track.id}
           comments={comments}
           visitor={visitor}

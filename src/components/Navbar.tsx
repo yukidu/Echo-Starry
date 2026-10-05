@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Home, BarChart3, Bell, User, UploadCloud, Settings, Palette, Moon, Sun, Mic, Menu, X, ShieldAlert, LogOut } from 'lucide-react';
+import { Trophy, Home, BarChart3, Bell, User, UploadCloud, Settings, Palette, Moon, Sun, Mic, Menu, X, ShieldAlert, LogOut } from 'lucide-react';
 import { UserProfile, RANK_ORDER } from '../types';
 import { VisitorIdentity } from '../utils/visitor';
 import { TwinklingStars } from './TwinklingStars';
@@ -18,6 +18,7 @@ interface NavbarProps {
   isAdmin: boolean;
   canUpload?: boolean;
   pendingNotificationsCount?: number;
+  pendingAuditCount?: number;
   stickerBalance?: number;
   onOpenStickers?: () => void;
   visitor?: VisitorIdentity;
@@ -34,6 +35,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   isAdmin,
   canUpload = true,
   pendingNotificationsCount = 0,
+  pendingAuditCount = 0,
   stickerBalance,
   onOpenStickers,
   visitor
@@ -50,7 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const stickerBalanceText = stickerBalance === undefined
     ? '…'
     : (Number.isInteger(stickerBalance) ? String(stickerBalance) : stickerBalance.toFixed(1));
-  const stickerMenuTitle = currentUser ? `我的貼紙${stickerBalanceText}張` : '我的貼紙(會員專屬)';
+  const stickerMenuTitle = currentUser ? `我的貼紙 ${stickerBalanceText} 張` : '我的貼紙(會員專屬)';
 
   // Requirement 11: 首頁置頂主選單，直接顯示目前名字+身份，分二行顯示，如果名稱太長，自動縮小字體符合4個字的寬度，身份用底色橢圓框區隔
   const displayName = currentUser?.name || visitor?.fullName || '勇敢的獅子';
@@ -254,7 +256,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             title={stickerMenuTitle}
             className="px-2.5 py-2 rounded-xl text-xs font-black text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap"
           >
-            🎟️ {currentUser ? `${stickerBalanceText}張` : '貼紙'}
+            <Trophy className="w-5 h-5" /> {stickerMenuTitle}
           </button>
 
           {/* PWA install is shown directly whenever desktop/landscape navigation replaces the hamburger menu. */}
@@ -409,46 +411,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>排行榜</span>
           </button>
 
-          {/* Requirement 7: 訪客身分，隱藏主選單的「通知」按鈕 */}
-          {currentUser && (
-            <button
-              onClick={() => handleMobileNav('notifications')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
-                currentTab === 'notifications'
-                  ? 'font-bold'
-                  : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-              style={{
-                backgroundColor: currentTab === 'notifications' ? 'var(--color-light-pill, #fae8ed)' : undefined,
-                color: currentTab === 'notifications' ? 'var(--color-primary, #c06c84)' : undefined
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <Bell className="w-4 h-4" style={{ color: 'var(--color-primary, #c06c84)' }} />
-                <span>{notificationsMenuTitle}</span>
-              </div>
-              {pendingNotificationsCount > 0 && (
-                <span
-                  className="px-2 py-0.5 rounded-full text-white text-xs font-bold"
-                  style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
-                >
-                  {pendingNotificationsCount} 待審
-                </span>
-              )}
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => {
-              onOpenStickers?.();
-              setIsMobileMenuOpen(false);
-            }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-          >
-            <span aria-hidden="true">🎟️</span>
-            <span>{stickerMenuTitle}</span>
-          </button>
+          {currentUser && <button type="button" onClick={() => handleMobileNav('notifications')} className="notification-menu-row w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold whitespace-nowrap" style={{color:'var(--color-primary,#c06c84)'}}><Bell className="w-4 h-4 shrink-0"/><span>{canAudit ? `通知 ${pendingAuditCount} 待審核` : '通知'}</span></button>}
+          <button type="button" onClick={() => {onOpenStickers?.();setIsMobileMenuOpen(false);}} className="sticker-menu-row w-full flex items-center gap-2 px-3 py-2.5 font-bold whitespace-nowrap" style={{color:'var(--color-primary,#c06c84)',fontSize:'28px'}}><Trophy className="w-6 h-6 shrink-0"/><span>{stickerMenuTitle}</span></button>
 
           {canUpload && (
             <button
