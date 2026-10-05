@@ -90,7 +90,9 @@ test('wrapper order preserves privacy, member deletion, categories, cookie conti
   assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
   assert.match(privacyRouter, /import appWorker from '\.\/adminUserDeleteRouter'/);
   assert.match(adminUserDeleteRouter, /import appWorker from '\.\/categoryIntegrityRouter'/);
-  assert.match(categoryRouter, /import appWorker from '\.\/sessionCookieRouter'/);
+  assert.match(categoryRouter, /import appWorker from '\.\/stickerRouter'/);
+  const stickerRouter = readFileSync(new URL('../worker/stickerRouter.ts', import.meta.url), 'utf8');
+  assert.match(stickerRouter, /import appWorker from '\.\/sessionCookieRouter'/);
   assert.match(sessionCookieRouter, /import appWorker from '\.\/playbackOwnerRouter'/);
   assert.match(playbackRouter, /import learningWorker from '\.\/learningCardRouter'/);
   assert.match(learningRouter, /import authWorker from '\.\/authRouter'/);

@@ -38,7 +38,7 @@ function storeRecoveredSession(data: any) {
   }
 }
 
-function authorizationFor(user: any) {
+function authorizationFor(user: any): Record<string, string> {
   const token = typeof user?._authToken === 'string' ? user._authToken : '';
   return token ? { Authorization: `Bearer ${token}` } : {};
 }

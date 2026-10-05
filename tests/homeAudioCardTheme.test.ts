@@ -12,7 +12,7 @@ test('listening progress badges use the current palette primary color', () => {
 });
 
 test('portrait access label text is always white', () => {
-  assert.match(audioCard, /收聽權限：\$\{displayRequiredRank\}/);
+  assert.match(audioCard, /收聽權限：\$\{permissionStickerLabel\}/);
   assert.match(audioCard, /font-black text-white/);
   assert.doesNotMatch(audioCard, /text-amber-300/);
 });

@@ -13,6 +13,8 @@ export interface Env {
   KV?: any; // Cloudflare KVNamespace
   ASSETS?: { fetch: (request: Request) => Promise<Response> };
   ENVIRONMENT?: string;
+  // Server-only statements committed atomically with a track write.
+  stickerTrackWriteStatements?: any[];
 }
 
 const CORS_HEADERS = {
@@ -576,7 +578,7 @@ export default {
                 JSON.stringify(newTrack.externalPpts), JSON.stringify(newTrack.externalFiles),
                 JSON.stringify(newTrack.likedBy), JSON.stringify(newTrack.ratings), newTrack.vipToken, newTrack.vipExpiresAt, newTrack.vipDurationDays, JSON.stringify(newTrack.keywordMeta)
               );
-              await env.DB.batch([insert, ...newTrack.keywords.map((name: string) => env.DB.prepare('INSERT OR IGNORE INTO keyword_catalog(name,createdAt) VALUES (?,?)').bind(name,newTrack.keywordMeta[name]?.createdAt || Date.now()))]);
+              await env.DB.batch([insert, ...(env.stickerTrackWriteStatements || []), ...newTrack.keywords.map((name: string) => env.DB.prepare('INSERT OR IGNORE INTO keyword_catalog(name,createdAt) VALUES (?,?)').bind(name,newTrack.keywordMeta[name]?.createdAt || Date.now()))]);
             } catch (e) {
               console.error('D1 insert track error:', e);
               return errorResponse('音檔資訊儲存失敗，請保留表單並重試', 500);
@@ -683,7 +685,7 @@ export default {
               if (has('keywords')) {
                 for (const name of new Set<string>([...JSON.parse(existing.keywords || '[]'), ...body.keywords])) statements.push(env.DB.prepare('INSERT OR IGNORE INTO keyword_catalog(name,createdAt) VALUES (?,?)').bind(name,Date.now()));
               }
-              await env.DB.batch(statements);
+              await env.DB.batch([...statements, ...(env.stickerTrackWriteStatements || [])]);
             }
 
             const row: any = await env.DB.prepare('SELECT * FROM tracks WHERE id = ?').bind(trackId).first();

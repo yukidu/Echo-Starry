@@ -7,7 +7,7 @@ const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
 
 test('home search-side action is the accessible-track lucky draw', () => {
   assert.match(app, /🫵好手氣/);
-  assert.match(app, /filteredTracks\.filter\(track => !track\.isPrivateVip && checkCanAccess\(track\)\)/);
+  assert.match(app, /filteredTracks\.filter\(track => !track\.isPrivateVip && checkCanAccess\(track\) && isTrackStickerUnlocked\(track\)\)/);
   assert.match(app, /moveTrackIdToSecondSlot/);
   assert.match(app, /prefers-reduced-motion: reduce/);
   assert.match(app, /createOscillator\(\)/);

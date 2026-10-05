@@ -117,6 +117,16 @@ async function deleteMember(request: Request, env: Env, targetKey: string) {
         .bind(target.id, targetEmail)
     );
   }
+  if (await tableExists(env.DB, 'sticker_unlocks')) {
+    statements.push(env.DB.prepare('DELETE FROM sticker_unlocks WHERE userId = ?').bind(target.id));
+  }
+  if (await tableExists(env.DB, 'sticker_transactions')) {
+    statements.push(env.DB.prepare('DELETE FROM sticker_transactions WHERE userId = ?').bind(target.id));
+    statements.push(env.DB.prepare('UPDATE sticker_transactions SET actorUserId = NULL WHERE actorUserId = ?').bind(target.id));
+  }
+  if (await tableExists(env.DB, 'member_notifications')) {
+    statements.push(env.DB.prepare('DELETE FROM member_notifications WHERE userId = ?').bind(target.id));
+  }
 
   statements.push(env.DB.prepare('DELETE FROM users WHERE id = ?').bind(target.id));
   await env.DB.batch(statements);

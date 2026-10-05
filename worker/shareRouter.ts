@@ -219,11 +219,11 @@ async function upsertVipPassword(db: any, trackId: string, requestedPassword?: s
 
 async function prepareVipShare(db: any, trackId: string, userEmail: string, requestedPassword?: string) {
   const authorization = await getAuthorizedVipTrack(db, trackId, userEmail);
-  if ('error' in authorization) return authorization;
+  if ('error' in authorization) return { error: authorization.error, status: authorization.status } as const;
 
   const shareSlug = await assignVipShareSlug(db, authorization.track);
   const passwordResult = await upsertVipPassword(db, trackId, requestedPassword);
-  if ('error' in passwordResult) return passwordResult;
+  if ('error' in passwordResult) return { error: passwordResult.error, status: passwordResult.status } as const;
 
   return {
     shareSlug,
@@ -241,9 +241,10 @@ function escapeAttribute(value: string) {
     .replaceAll('>', '&gt;');
 }
 
-function vipUnlockScript(trackId: string) {
+function vipUnlockScript(trackId: string, password: string) {
   const safeId = JSON.stringify(String(trackId)).replace(/</g, '\\u003c');
-  return `<script>try{const id=${safeId};const key='sq_unlocked_vip_tracks';const list=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(list)&&!list.includes(id)){list.push(id);localStorage.setItem(key,JSON.stringify(list));}}catch{}</script>`;
+  const safePassword = JSON.stringify(password);
+  return `<script>try{const passwords=JSON.parse(localStorage.getItem('sq_vip_passwords')||'{}');passwords[${safeId}]=${safePassword};localStorage.setItem('sq_vip_passwords',JSON.stringify(passwords));const id=${safeId};const key='sq_unlocked_vip_tracks';const list=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(list)&&!list.includes(id)){list.push(id);localStorage.setItem(key,JSON.stringify(list));}}catch{}</script>`;
 }
 
 async function serveSharePage(request: Request, env: Env, slug: string) {
@@ -301,7 +302,7 @@ async function serveSharePage(request: Request, env: Env, slug: string) {
     isPrivateVip ? suppliedPassword : ''
   );
   const vipMeta = isPrivateVip ? '<meta name="echostars-share-vip" content="1">' : '';
-  const unlockScript = isPrivateVip ? vipUnlockScript(String(track.id)) : '';
+  const unlockScript = isPrivateVip ? vipUnlockScript(String(track.id), suppliedPassword) : '';
   const html = metadataHtml.replace(
     '</head>',
     `<meta name="echostars-share-track" content="${escapeAttribute(String(track.id))}">${vipMeta}${unlockScript}</head>`
