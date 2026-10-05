@@ -1,0 +1,35 @@
+name: Apply keyword header detail layout v96
+
+on:
+  push:
+    branches:
+      - fix/keyword-header-detail-layout-v96
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node .github/scripts/apply-keyword-header-detail-layout-v96.mjs
+      - run: npm test
+      - run: npm run build
+      - name: Commit verified UI changes and remove one-shot files
+        run: |
+          git config user.name "echostars-release-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git rm .github/scripts/apply-keyword-header-detail-layout-v96.mjs
+          git rm .github/workflows/apply-keyword-header-detail-layout-v96.yml
+          git add -A
+          git commit -m "壓縮網友關鍵字與詳細播放頁版面"
+          git push origin HEAD:fix/keyword-header-detail-layout-v96
