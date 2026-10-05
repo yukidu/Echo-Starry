@@ -26,7 +26,6 @@ jobs:
       - name: Sharing PWA privacy and mobile navigation
         run: node --import tsx --test tests/shareLinks.test.ts tests/releaseIntegrity.test.ts tests/privacyCrawler.test.ts tests/mediaSessionPolicy.test.ts tests/mobileMenuHalfLayout.test.ts tests/mobileMenuWidth.test.ts tests/vipAutoplay.test.ts
       - name: TypeScript diagnostic
-        continue-on-error: true
         run: npm run lint
       - name: Production build
         run: npm run build

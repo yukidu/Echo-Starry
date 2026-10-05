@@ -38,3 +38,13 @@ export function isPlatinumOrAboveRank(value: unknown): boolean {
   const platinumIndex = (RANK_ORDER_FOR_STICKERS as readonly string[]).indexOf('白金');
   return index >= platinumIndex && platinumIndex >= 0;
 }
+
+export function vipPasswordForTrack(trackId: string): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    const saved = JSON.parse(localStorage.getItem('sq_vip_passwords') || '{}')[trackId];
+    if (/^\d{4,12}$/.test(String(saved || ''))) return String(saved);
+  } catch {}
+  const raw = window.location.search.replace(/^\?/, '');
+  return /^\d{4,12}$/.test(raw) ? raw : '';
+}

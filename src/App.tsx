@@ -1,3 +1,4 @@
+import { vipPasswordForTrack } from '../shared/stickers';
 import { baseSpeakerRank } from './utils/ranks';
 /**
  * @license
@@ -58,6 +59,7 @@ import { NotificationsView } from './components/NotificationsView';
 import { TwinklingStars } from './components/TwinklingStars';
 import { TutorialSpotlight } from './components/TutorialSpotlight';
 const ChangelogModal = lazy(() => import('./components/ChangelogModal').then(module => ({ default: module.ChangelogModal })));
+const StickersModal = lazy(() => import('./components/StickersModal').then(module => ({ default: module.StickersModal })));
 
 const DEFAULT_CATEGORIES: string[] = [
   '全部',
@@ -320,6 +322,8 @@ export default function App() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [allComments, setAllComments] = useState<Comment[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [stickerSummary, setStickerSummary] = useState<{ balance: number; unlockedTrackIds: string[]; unreadNotifications: number; canGrant: boolean; isSuperAdmin: boolean } | null>(null);
+  const [isStickersOpen, setIsStickersOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(() => (readHomeCache()?.tracks || []).length === 0);
   const homeCacheValidatedAtRef = useRef(readHomeCache()?.savedAt || 0);
   const hasFetchedAllCommentsRef = useRef(false);
@@ -357,6 +361,38 @@ export default function App() {
     }
   };
 
+  const stickerSummaryRequest = useRef(0);
+  const refreshStickerSummary = useCallback(async () => {
+    const requestId = ++stickerSummaryRequest.current;
+    if (!currentUser) {
+      setStickerSummary(null);
+      return;
+    }
+    try {
+      const data = await apiJson('/api/stickers/me');
+      if (requestId !== stickerSummaryRequest.current) return;
+      setStickerSummary({
+        balance: Number(data.balance || 0),
+        unlockedTrackIds: Array.isArray(data.unlockedTrackIds) ? data.unlockedTrackIds : [],
+        unreadNotifications: Number(data.unreadNotifications || 0),
+        canGrant: Boolean(data.canGrant),
+        isSuperAdmin: Boolean(data.isSuperAdmin)
+      });
+    } catch (error) {
+      console.warn('Failed to load sticker balance:', error);
+    }
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    void refreshStickerSummary();
+  }, [refreshStickerSummary]);
+
+  useEffect(() => {
+    const refresh = () => { void refreshStickerSummary(); };
+    window.addEventListener('echostars:sticker-changed', refresh);
+    return () => window.removeEventListener('echostars:sticker-changed', refresh);
+  }, [refreshStickerSummary]);
+
   // Requirement 9, 10 & 12: 未審核通過名單總數 + 被 @ 標記提醒總數（用於通知鈴鐺徽章提醒）
   const pendingNotificationsCount = useMemo(() => {
     const userList = Array.isArray(allUsers) ? allUsers : [];
@@ -384,8 +420,8 @@ export default function App() {
           return (hasDirect || isReply) && !isSelf;
         }).length
       : 0;
-    return auditCount + mentionCount;
-  }, [allUsers, comments, allComments, currentUser]);
+    return auditCount + mentionCount + Number(stickerSummary?.unreadNotifications || 0);
+  }, [allUsers, comments, allComments, currentUser, stickerSummary?.unreadNotifications]);
 
   // Filter & Search & Sort states (Requirement 18 & 19)
   const [selectedCategory, setSelectedCategory] = useState<string>('全部');
@@ -648,6 +684,7 @@ export default function App() {
       setIsAdminOpen(false);
       setIsProfileOpen(false);
       setIsChangelogOpen(false);
+      setIsStickersOpen(false);
       setCommentPreviewTrack(null);
       setPreviewMember(null);
       setTrackToEdit(null);
@@ -822,6 +859,7 @@ export default function App() {
     setIsAdminOpen(false);
     setIsProfileOpen(false);
     setIsChangelogOpen(false);
+    setIsStickersOpen(false);
     setIsShareOpen(false);
     setIsBwExportOpen(false);
     setCommentPreviewTrack(null);
@@ -1038,6 +1076,36 @@ export default function App() {
     return userIdx >= reqIdx;
   };
 
+
+
+  const isTrackStickerUnlocked = (track: Track) => {
+    const cost = Math.max(0, Number(track.stickerUnlockCost || 0));
+    if (cost <= 0 || isSuperAdmin) return true;
+    return Boolean(currentUser && stickerSummary?.unlockedTrackIds?.includes(track.id));
+  };
+
+  const ensureStickerUnlock = async (track: Track, anchor?: HTMLElement | null) => {
+    const cost = Math.max(0, Number(track.stickerUnlockCost || 0));
+    if (cost <= 0 || isTrackStickerUnlocked(track)) return true;
+    if (!currentUser) {
+      showPermissionAlert(`此錄音需要貼紙${cost}張解鎖；貼紙為會員專屬，請先登入。`, anchor);
+      return false;
+    }
+    if (!window.confirm(`此錄音需使用 ${cost} 張貼紙永久解鎖，是否繼續？`)) return false;
+    try {
+      await apiJson(`/api/stickers/unlock/${encodeURIComponent(track.id)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vipPassword: vipPasswordForTrack(track.id) })
+      });
+      await refreshStickerSummary();
+      return true;
+    } catch (error) {
+      showPermissionAlert(error instanceof Error ? error.message : '貼紙解鎖失敗', anchor);
+      return false;
+    }
+  };
+
   // 2. Play / Select Track with Memory Resume & Fullscreen Loading
   const handlePlayTrack = async (track: Track, targetMode?: PlayerDisplayMode, permissionAnchor?: HTMLElement | null) => {
     // Requirement 11 (v2.7): 私秘VIP音檔播放守護
@@ -1053,6 +1121,8 @@ export default function App() {
       );
       return;
     }
+
+    if (!await ensureStickerUnlock(track, permissionAnchor)) return;
 
     // Preserve user preferred player mode (Requirement 14)
     const effectiveMode = targetMode || (playerMode === 'expanded' ? savedPreferredMode : playerMode);
@@ -1185,13 +1255,14 @@ export default function App() {
   };
 
   // Toggle Play / Pause
-  const handleTogglePlay = () => {
+  const handleTogglePlay = async () => {
     if (!audioRef.current) return;
     if (isPlaying) {
       syncPlaybackToCloud(true);
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
+      if (currentTrack && (!checkCanAccess(currentTrack) || !isTrackVipUnlocked(currentTrack) || !await ensureStickerUnlock(currentTrack))) return;
       audioRef.current
         .play()
         .then(() => setIsPlaying(true))
@@ -1377,12 +1448,13 @@ export default function App() {
     try {
       const data = await apiJson(`/api/tracks/${encodeURIComponent(trackId)}/${action}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier, score, userId: currentUser?.id, userEmail: currentUser?.email, deviceId: visitor.deviceId })
+        body: JSON.stringify({ identifier, score, userId: currentUser?.id, userEmail: currentUser?.email, deviceId: visitor.deviceId, vipPassword: vipPasswordForTrack(trackId) })
       });
       const confirmed = action === 'like'
         ? { likes: data.likes, likedBy: data.likedBy || (data.hasLiked ?? data.liked ? likedBy : likedBy.filter(k => k !== identifier)) }
         : { rating: data.rating, ratingCount: data.ratingCount, ratings: data.ratings || ratings };
       updateTrackCopies(trackId, t => ({ ...t, ...confirmed }));
+      window.dispatchEvent(new CustomEvent('echostars:sticker-changed'));
     } catch (error) {
       updateTrackCopies(trackId, t => ({ ...t, ...snapshot }));
       alert(error instanceof Error ? error.message : '操作失敗，請再試一次。');
@@ -1403,9 +1475,23 @@ export default function App() {
       );
       return;
     }
+    if (!await ensureStickerUnlock(track)) return;
     await handleTrackInteraction(trackId, 'rate', score);
   };
-  const handleToggleLike = (trackId: string) => handleTrackInteraction(trackId, 'like');
+  const handleToggleLike = async (trackId: string) => {
+    const track = tracks.find(t => t.id === trackId);
+    if (!track) return;
+    if (track.isPrivateVip && !isTrackVipUnlocked(track)) {
+      showPermissionAlert('此錄音檔為【私密VIP】專屬內容，未解鎖前無法按讚。');
+      return;
+    }
+    if (!checkCanAccess(track)) {
+      showPermissionAlert('目前會員獎銜未達此錄音的互動權限。');
+      return;
+    }
+    if (!await ensureStickerUnlock(track)) return;
+    await handleTrackInteraction(trackId, 'like');
+  };
 
   // Add Comment (Requirement 3 & 6: 支持最大化視窗與通知頁直接快速回覆留言)
   const handleAddComment = async (content: string, replyToId?: string, replyToAuthor?: string, trackIdOverride?: string) => {
@@ -1429,7 +1515,8 @@ export default function App() {
       isAdmin: isSuperAdmin,
       content,
       replyToId,
-      replyToAuthor
+      replyToAuthor,
+      vipPassword: vipPasswordForTrack(targetTrackId)
     };
 
     const res = await fetch(`/api/tracks/${targetTrackId}/comments`, {
@@ -1445,6 +1532,7 @@ export default function App() {
 
     const commentData = await res.json();
     const newComment = commentData.comment || commentData;
+    window.dispatchEvent(new CustomEvent('echostars:sticker-changed'));
     if (activeCommentsTrackIdRef.current === targetTrackId) setComments(prev => [newComment, ...prev]);
     setAllComments(prev => [newComment, ...prev]);
 
@@ -1475,6 +1563,7 @@ export default function App() {
     });
     if (!res.ok) throw new Error('您沒有刪除此心得的權限，或連線暫時失敗。');
     if (res.ok) {
+      window.dispatchEvent(new CustomEvent('echostars:sticker-changed'));
       setComments(prev => prev.filter(c => c.id !== commentId));
       setAllComments(prev => prev.filter(c => c.id !== commentId));
       if (targetTrack) {
@@ -1609,6 +1698,7 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setStickerSummary(null);
     localStorage.removeItem('sq_current_user_v1');
     setIsProfileOpen(false);
   };
@@ -1942,13 +2032,14 @@ export default function App() {
     );
   };
 
-  const handleLuckyDraw = (anchor: HTMLElement) => {
-    if (luckyPhase === 'spin') return;
+  const luckyRequestPending = useRef(false);
+  const handleLuckyDraw = async (anchor: HTMLElement) => {
+    if (luckyPhase === 'spin' || luckyRequestPending.current) return;
     setIsSearchFocused(false);
     clearLuckyTimers();
 
     // Private VIP stays a separate third group and is never surfaced by random discovery.
-    const candidates = filteredTracks.filter(track => !track.isPrivateVip && checkCanAccess(track));
+    const candidates = filteredTracks.filter(track => !track.isPrivateVip && checkCanAccess(track) && isTrackStickerUnlocked(track));
     if (candidates.length === 0) {
       showPermissionAlert('目前條件下沒有可播放的音檔可以抽選。', anchor);
       return;
@@ -1958,6 +2049,22 @@ export default function App() {
     getLuckyAudioContext();
     const baseIds = filteredTracks.map(track => track.id);
     const winner = candidates[Math.floor(Math.random() * candidates.length)];
+    if (currentUser) {
+      luckyRequestPending.current = true;
+      try {
+        await apiJson('/api/stickers/lucky-spend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ operationId: crypto.randomUUID(), trackId: winner.id })
+        });
+        await refreshStickerSummary();
+      } catch (error) {
+        showPermissionAlert(error instanceof Error ? error.message : '貼紙不足，無法使用好手氣', anchor);
+        return;
+      } finally {
+        luckyRequestPending.current = false;
+      }
+    }
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     const finish = () => {
@@ -2097,6 +2204,8 @@ export default function App() {
         isAdmin={isAdmin}
         canUpload={canUpload}
         pendingNotificationsCount={pendingNotificationsCount}
+        stickerBalance={stickerSummary?.balance}
+        onOpenStickers={() => setIsStickersOpen(true)}
       />
 
       <TutorialSpotlight
@@ -2223,7 +2332,7 @@ export default function App() {
                 currentUser={currentUser}
                 isAdmin={isAdmin}
                 userRating={activeRating}
-                canRate={checkCanAccess(activeTrack) && isTrackVipUnlocked(activeTrack)}
+                canRate={checkCanAccess(activeTrack) && isTrackVipUnlocked(activeTrack) && isTrackStickerUnlocked(activeTrack)}
                 hasLiked={hasLikedActive}
                 progressMemory={playbackMemories[activeTrack.id]}
                 playerMode={playerMode}
@@ -2639,6 +2748,7 @@ export default function App() {
                   const isCurrent = currentTrack?.id === track.id;
                   const canAccess = checkCanAccess(track);
                   const isVipUnlocked = isTrackVipUnlocked(track);
+                  const isStickerUnlocked = isTrackStickerUnlocked(track);
                   const tRatings = track?.ratings || {};
                   const trackRating = tRatings[currentIdentifier] ||
                     (currentUser && (tRatings[currentUser.email] || tRatings[currentUser.id])) ||
@@ -2661,7 +2771,7 @@ export default function App() {
                       track={track}
                       isPlaying={isPlaying && isCurrent}
                       isCurrentTrack={isCurrent}
-                      canAccess={canAccess}
+                      canAccess={canAccess && isStickerUnlocked}
                       isVipUnlocked={isVipUnlocked}
                       tutorialTarget={trackIndex === 0}
                       progressMemory={playbackMemories[track.id]}
@@ -2930,6 +3040,22 @@ export default function App() {
           <ArrowUp className="w-[30px] h-[30px] text-[var(--color-primary,#c06c84)] stroke-[2.5]" />
         </button>
       )}
+
+      {isStickersOpen && <Suspense fallback={<div role="status" className="fixed inset-0 z-50 grid place-items-center bg-black/50 text-white">載入功能中…</div>}>
+      <StickersModal
+        isOpen={isStickersOpen}
+        onClose={() => setIsStickersOpen(false)}
+        currentUser={currentUser}
+        tracks={tracks}
+        onStickerChanged={refreshStickerSummary}
+        onTracksUpdated={savedTracks => {
+          const byId = new Map(savedTracks.map(track => [track.id, track]));
+          setTracks(prev => prev.map(track => byId.get(track.id) || track));
+          setCurrentTrack(prev => prev ? byId.get(prev.id) || prev : prev);
+          setSelectedDetailTrack(prev => prev ? byId.get(prev.id) || prev : prev);
+        }}
+      />
+      </Suspense>}
 
       {/* Version Changelog Modal */}
       {isChangelogOpen && <Suspense fallback={<div role="status" className="fixed inset-0 z-50 grid place-items-center bg-black/50 text-white">載入功能中…</div>}>

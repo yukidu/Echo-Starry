@@ -83,6 +83,8 @@ test('playback owner stays in the active privacy/member-delete/category/session 
   assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
   assert.match(privacyRouter, /import appWorker from '\.\/adminUserDeleteRouter'/);
   assert.match(adminUserDeleteRouter, /import appWorker from '\.\/categoryIntegrityRouter'/);
-  assert.match(categoryRouter, /import appWorker from '\.\/sessionCookieRouter'/);
+  assert.match(categoryRouter, /import appWorker from '\.\/stickerRouter'/);
+  const stickerRouter = readFileSync(new URL('../worker/stickerRouter.ts', import.meta.url), 'utf8');
+  assert.match(stickerRouter, /import appWorker from '\.\/sessionCookieRouter'/);
   assert.match(sessionRouter, /import appWorker from '\.\/playbackOwnerRouter'/);
 });

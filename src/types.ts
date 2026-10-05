@@ -189,6 +189,8 @@ export interface Track {
   vipToken?: string;
   vipExpiresAt?: number | null;
   vipDurationDays?: number;
+  stickerUnlockCost?: number; // 0~20 張；0 表示免貼紙
+  commentStickerReward?: number; // 聽完後首次根心得獎勵 0~20 張
   tags?: string[];
   remarks?: string;
   uploadedBy?: string;

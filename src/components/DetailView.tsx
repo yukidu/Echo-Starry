@@ -1,3 +1,4 @@
+import { vipPasswordForTrack } from '../../shared/stickers';
 import { keywordRanking } from '../utils/keywords';
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import {
@@ -233,7 +234,12 @@ export const DetailView: React.FC<DetailViewProps> = ({
       const res = await fetch(`/api/tracks/${track.id}/keywords`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword: trimmed, userEmail: currentUser?.email, userId: currentUser?.id })
+        body: JSON.stringify({
+          keyword: trimmed,
+          userEmail: currentUser?.email,
+          userId: currentUser?.id,
+          vipPassword: vipPasswordForTrack(track.id)
+        })
       });
       if (res.ok) {
         const data = await res.json();
@@ -242,6 +248,7 @@ export const DetailView: React.FC<DetailViewProps> = ({
         setNewKeywordInput('');
         setIsAddingKeyword(false);
         setDbKeywords(prev => [...new Set([...prev, ...(data.keywords || [])])]);
+        window.dispatchEvent(new CustomEvent('echostars:sticker-changed'));
         if (onUpdateTrack) {
           await onUpdateTrack(track.id, { keywords: data.keywords, keywordMeta: data.keywordMeta }, { persist: false });
         }
@@ -705,7 +712,11 @@ export const DetailView: React.FC<DetailViewProps> = ({
               {(track.isPrivateVip || track.requiredRank !== '無') && (
                 <Lock className="w-3 h-3 text-amber-400 shrink-0" />
               )}
-              <span>{track.isPrivateVip ? '私秘VIP' : (track.requiredRank === '無' ? '公開' : track.requiredRank)}</span>
+              <span>{(() => {
+            const permission = track.isPrivateVip ? '私秘VIP' : (track.requiredRank === '無' ? '公開' : track.requiredRank);
+            const cost = Math.max(0, Number(track.stickerUnlockCost || 0));
+            return cost > 0 ? `${permission} │ 貼紙${cost}張` : permission;
+          })()}</span>
             </div>
           </div>
 
@@ -1023,6 +1034,11 @@ export const DetailView: React.FC<DetailViewProps> = ({
 
       {/* Comments Section */}
       <div id="comments-section">
+        <div className="mb-2 px-1 text-sm font-black text-slate-800 dark:text-slate-100">
+          {Math.max(0, Number(track.commentStickerReward || 0)) > 0
+            ? `聽完後分享心得+貼紙${Math.max(0, Number(track.commentStickerReward || 0))}張`
+            : '聽完後分享心得'}
+        </div>
         <CommentsSection
           trackId={track.id}
           comments={comments}

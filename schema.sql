@@ -76,6 +76,8 @@ CREATE TABLE IF NOT EXISTS tracks (
   vipToken TEXT,
   vipExpiresAt INTEGER,
   vipDurationDays INTEGER DEFAULT 7,
+  stickerUnlockCost INTEGER DEFAULT 0,
+  commentStickerReward INTEGER DEFAULT 0,
   externalVideos TEXT,
   externalPpts TEXT,
   externalFiles TEXT,
@@ -177,6 +179,54 @@ CREATE TABLE IF NOT EXISTS user_activity_logs (
   details TEXT,
   timestamp INTEGER NOT NULL,
   createdAt TEXT NOT NULL
+);
+
+-- 7. 貼紙點數：以 0.1 張為 1 unit 的整數帳本，避免浮點誤差。
+CREATE TABLE IF NOT EXISTS sticker_transactions (
+  id TEXT PRIMARY KEY,
+  userId TEXT NOT NULL,
+  deltaUnits INTEGER NOT NULL,
+  balanceAfterUnits INTEGER NOT NULL,
+  type TEXT NOT NULL,
+  sourceId TEXT,
+  description TEXT NOT NULL,
+  actorUserId TEXT,
+  uniqueKey TEXT NOT NULL UNIQUE,
+  createdAt INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sticker_transactions_user_created ON sticker_transactions(userId, createdAt DESC);
+CREATE INDEX IF NOT EXISTS sticker_transactions_source ON sticker_transactions(sourceId, type);
+CREATE TRIGGER IF NOT EXISTS sticker_spend_balance_guard
+BEFORE INSERT ON sticker_transactions
+WHEN NEW.type IN ('vip_upload_cost', 'lucky_cost', 'track_unlock_cost')
+  AND COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = NEW.userId), 0) + NEW.deltaUnits < 0
+BEGIN SELECT RAISE(ABORT, 'sticker_insufficient'); END;
+
+CREATE TABLE IF NOT EXISTS sticker_unlocks (
+  userId TEXT NOT NULL,
+  trackId TEXT NOT NULL,
+  costUnits INTEGER NOT NULL,
+  transactionId TEXT,
+  createdAt INTEGER NOT NULL,
+  PRIMARY KEY(userId, trackId)
+);
+
+CREATE TABLE IF NOT EXISTS sticker_settings (
+  key TEXT PRIMARY KEY,
+  valueUnits INTEGER NOT NULL,
+  updatedAt INTEGER NOT NULL,
+  updatedBy TEXT
+);
+
+CREATE TABLE IF NOT EXISTS member_notifications (
+  id TEXT PRIMARY KEY,
+  userId TEXT NOT NULL,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  createdAt INTEGER NOT NULL,
+  readAt INTEGER,
+  sourceId TEXT UNIQUE
 );
 
 -- 會員在首次 Google 登入時建立，不預先寫入個人範例資料。

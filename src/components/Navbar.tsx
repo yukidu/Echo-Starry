@@ -18,6 +18,8 @@ interface NavbarProps {
   isAdmin: boolean;
   canUpload?: boolean;
   pendingNotificationsCount?: number;
+  stickerBalance?: number;
+  onOpenStickers?: () => void;
   visitor?: VisitorIdentity;
 }
 
@@ -32,6 +34,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   isAdmin,
   canUpload = true,
   pendingNotificationsCount = 0,
+  stickerBalance,
+  onOpenStickers,
   visitor
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -43,6 +47,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   // Requirement 1 (v2.4): 主選單名稱改為：首頁播放清單、排行榜、通知與獎銜審核（若無審核權限則只顯示「通知」）、上傳音檔、個人中心、後台管理
   const canAudit = isSuperAdmin || isAdministrator || cleanEmail === 'yukidu@gmail.com' || currentUser?.role === '獎銜審核員' || currentUser?.isAdminUser === true;
   const notificationsMenuTitle = canAudit ? '通知與獎銜審核' : '通知';
+  const stickerBalanceText = stickerBalance === undefined
+    ? '…'
+    : (Number.isInteger(stickerBalance) ? String(stickerBalance) : stickerBalance.toFixed(1));
+  const stickerMenuTitle = currentUser ? `我的貼紙${stickerBalanceText}張` : '我的貼紙(會員專屬)';
 
   // Requirement 11: 首頁置頂主選單，直接顯示目前名字+身份，分二行顯示，如果名稱太長，自動縮小字體符合4個字的寬度，身份用底色橢圓框區隔
   const displayName = currentUser?.name || visitor?.fullName || '勇敢的獅子';
@@ -240,6 +248,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </button>
 
+          <button
+            type="button"
+            onClick={onOpenStickers}
+            title={stickerMenuTitle}
+            className="px-2.5 py-2 rounded-xl text-xs font-black text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap"
+          >
+            🎟️ {currentUser ? `${stickerBalanceText}張` : '貼紙'}
+          </button>
+
           {/* PWA install is shown directly whenever desktop/landscape navigation replaces the hamburger menu. */}
           <InstallAppButton
             compact
@@ -420,6 +437,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => {
+              onOpenStickers?.();
+              setIsMobileMenuOpen(false);
+            }}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            <span aria-hidden="true">🎟️</span>
+            <span>{stickerMenuTitle}</span>
+          </button>
 
           {canUpload && (
             <button

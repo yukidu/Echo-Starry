@@ -64,7 +64,7 @@ async function verifiedActor(request: Request, env: Env) {
   const tokenHash = await hashToken(token);
   const actor: any = await env.DB.prepare(`
     SELECT u.id, u.email, u.name, u.role, u.rank, u.approvedRank, u.rankApproved,
-           u.isAdminUser, u.isBlocked, u.platinumUpline, u.diamondUpline, s.expiresAt
+           u.isAdminUser, u.isBlocked, u.canUpload, u.isContributor, u.platinumUpline, u.diamondUpline, s.expiresAt
     FROM auth_sessions s
     JOIN users u ON u.id = s.userId
     WHERE s.tokenHash = ?
@@ -152,6 +152,11 @@ async function ensureStickerSchema(db: any) {
         )`),
         db.prepare('CREATE INDEX IF NOT EXISTS sticker_transactions_user_created ON sticker_transactions(userId, createdAt DESC)'),
         db.prepare('CREATE INDEX IF NOT EXISTS sticker_transactions_source ON sticker_transactions(sourceId, type)'),
+        db.prepare(`CREATE TRIGGER IF NOT EXISTS sticker_spend_balance_guard
+          BEFORE INSERT ON sticker_transactions
+          WHEN NEW.type IN ('vip_upload_cost', 'lucky_cost', 'track_unlock_cost')
+            AND COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = NEW.userId), 0) + NEW.deltaUnits < 0
+          BEGIN SELECT RAISE(ABORT, 'sticker_insufficient'); END`),
         db.prepare(`CREATE TABLE IF NOT EXISTS sticker_unlocks (
           userId TEXT NOT NULL,
           trackId TEXT NOT NULL,
@@ -236,6 +241,7 @@ async function addStickerTransaction(
     actorUserId?: string;
     uniqueKey: string;
     allowNegative?: boolean;
+    rewardLimit?: number;
   }
 ): Promise<TransactionResult> {
   await ensureInitialStickers(db, input.userId);
@@ -268,9 +274,11 @@ async function addStickerTransaction(
       SELECT ?, ?, ?,
         COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?), 0) + ?,
         ?, ?, ?, ?, ?, ?
+      WHERE (SELECT COUNT(*) FROM sticker_transactions WHERE userId = ? AND type = ? AND sourceId = ?) < ?
     `).bind(
       id, input.userId, input.deltaUnits, input.userId, input.deltaUnits,
-      input.type, input.sourceId || null, input.description, input.actorUserId || null, input.uniqueKey, now
+      input.type, input.sourceId || null, input.description, input.actorUserId || null, input.uniqueKey, now,
+      input.userId, input.type, input.sourceId || null, input.rewardLimit ?? 2147483647
     ).run();
   }
 
@@ -341,6 +349,14 @@ async function hasVipAccess(db: any, actor: any, track: any, suppliedPassword: s
   return Boolean(access && String(access.password) === String(suppliedPassword));
 }
 
+async function canEarnFromTrack(db: any, actor: any, track: any, vipPassword = '') {
+  if (!actor || !track || !hasRankAccess(actor, track)) return false;
+  if (!await hasVipAccess(db, actor, track, vipPassword)) return false;
+  const cost = Math.max(0, Number(track.stickerUnlockCost || 0));
+  if (cost <= 0 || isSuperAdmin(actor)) return true;
+  return Boolean(await db.prepare('SELECT trackId FROM sticker_unlocks WHERE userId = ? AND trackId = ?').bind(actor.id, track.id).first());
+}
+
 async function playbackCompleted(db: any, actor: any, trackId: string) {
   const email = String(actor?.email || '').trim().toLowerCase();
   const row: any = await db.prepare(`
@@ -349,13 +365,13 @@ async function playbackCompleted(db: any, actor: any, trackId: string) {
            MAX(CASE WHEN finishDate IS NOT NULL AND TRIM(finishDate) <> '' THEN 1 ELSE 0 END) AS hasFinish
     FROM playback_memories
     WHERE trackId = ? AND (
-      memberId = ? OR userIdentifier = ? OR userIdentifier = ? OR LOWER(TRIM(userIdentifier)) = ?
+      memberId = ? OR ((memberId IS NULL OR TRIM(memberId) = '') AND (userIdentifier = ? OR userIdentifier = ? OR LOWER(TRIM(userIdentifier)) = ?))
     )
   `).bind(trackId, actor.id, actor.id, actor.email || '', email).first();
   return Number(row?.completed || 0) === 1 || Number(row?.hasFinish || 0) === 1 || Number(row?.progress || 0) >= 95;
 }
 
-async function awardInteraction(db: any, actor: any, type: string, sourceId: string, units: number, description: string, uniqueKey: string) {
+async function awardInteraction(db: any, actor: any, type: string, sourceId: string, units: number, description: string, uniqueKey: string, rewardLimit?: number) {
   if (!actor || units <= 0) return null;
   return addStickerTransaction(db, {
     userId: actor.id,
@@ -364,7 +380,8 @@ async function awardInteraction(db: any, actor: any, type: string, sourceId: str
     sourceId,
     description,
     actorUserId: actor.id,
-    uniqueKey
+    uniqueKey,
+    rewardLimit
   });
 }
 
@@ -402,6 +419,7 @@ async function handleTrackWrite(request: Request, env: Env, actor: any) {
   const changesStickerConfig = hasUnlockField || hasRewardField;
   if (changesStickerConfig) {
     if (!actor) return json({ error: '請先登入會員' }, 401);
+    if (!isSuperAdmin(actor) && !actor.canUpload && !actor.isContributor) return json({ error: '沒有修改音檔權限' }, 403);
     const uploader = String(existing?.uploaderEmail || '').trim().toLowerCase();
     const actorEmail = String(actor.email || '').trim().toLowerCase();
     if (!isCreate && !isSuperAdmin(actor) && (!uploader || uploader !== actorEmail)) {
@@ -411,28 +429,42 @@ async function handleTrackWrite(request: Request, env: Env, actor: any) {
 
   const requestedVip = Boolean(Object.prototype.hasOwnProperty.call(body, 'isPrivateVip') ? body.isPrivateVip : existing?.isPrivateVip);
   const becomesVip = requestedVip && !Boolean(existing?.isPrivateVip);
-  let vipTransaction: TransactionResult | null = null;
+  const savedId = isCreate ? `t-${crypto.randomUUID()}` : trackId;
+  const statements: any[] = [];
+  if (changesStickerConfig) {
+    const unlockCost = hasUnlockField ? Number(body.stickerUnlockCost) : Number(existing?.stickerUnlockCost || 0);
+    const commentReward = hasRewardField ? Number(body.commentStickerReward) : Number(existing?.commentStickerReward || 0);
+    statements.push(db.prepare('UPDATE tracks SET stickerUnlockCost = ?, commentStickerReward = ? WHERE id = ?')
+      .bind(unlockCost, commentReward, savedId));
+  }
   let vipUniqueKey = '';
+  let vipCostUnits = 0;
   if (becomesVip) {
     if (!actor) return json({ error: '請先登入會員才能建立私秘 VIP' }, 401);
+    if (!isSuperAdmin(actor) && !actor.canUpload && !actor.isContributor) return json({ error: '沒有上傳音檔權限' }, 403);
+    await ensureInitialStickers(db, actor.id);
     const settings = await settingMap(db);
-    const vipCostUnits = Number(settings.vip_upload_cost_units || 0);
-    if (vipCostUnits > 0) {
-      const operationId = String(body.stickerOperationId || '').trim() || (isCreate ? String(body.audioUrl || '') : trackId) || crypto.randomUUID();
-      vipUniqueKey = `vip-upload:${actor.id}:${operationId}`;
-      vipTransaction = await addStickerTransaction(db, {
-        userId: actor.id,
-        deltaUnits: -vipCostUnits,
-        type: 'vip_upload_cost',
-        sourceId: isCreate ? String(body.audioUrl || operationId) : trackId,
-        description: isCreate ? '上傳私秘VIP錄音' : '將錄音改為私秘VIP',
-        actorUserId: actor.id,
-        uniqueKey: vipUniqueKey
-      });
-      if (vipTransaction.insufficient) {
-        return json({ error: `貼紙不足，需要 ${formatStickerAmount(unitsToStickers(vipCostUnits))} 張貼紙才能建立私秘VIP`, balance: unitsToStickers(vipTransaction.balanceUnits) }, 402);
-      }
+    vipCostUnits = Number(settings.vip_upload_cost_units || 0);
+    const operationId = String(body.stickerOperationId || '').trim() || crypto.randomUUID();
+    vipUniqueKey = `vip-upload:${actor.id}:${operationId}`;
+    const prior: any = await db.prepare('SELECT * FROM sticker_transactions WHERE uniqueKey = ?').bind(vipUniqueKey).first();
+    if (prior) {
+      // Retry returns the saved recording; the operation cannot create a second free VIP.
+      const saved: any = await db.prepare('SELECT * FROM tracks WHERE id = ?').bind(prior.sourceId).first();
+      if (!saved || (!isCreate && saved.id !== trackId)) return json({ error: '此上傳操作已完成，請重新整理' }, 409);
+      return json(normalizeTrackRow(saved));
     }
+    if (await stickerBalanceUnits(db, actor.id) < vipCostUnits) {
+      return json({ error: `貼紙不足，需要 ${formatStickerAmount(unitsToStickers(vipCostUnits))} 張貼紙才能建立私秘VIP` }, 402);
+    }
+    // The balance trigger and unique key abort the entire D1 batch if a concurrent
+    // spend or retry conflicts. A failed track save never commits this charge.
+    statements.push(db.prepare(`INSERT INTO sticker_transactions
+      (id, userId, deltaUnits, balanceAfterUnits, type, sourceId, description, actorUserId, uniqueKey, createdAt)
+      SELECT ?, ?, ?, COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?), 0) + ?,
+        'vip_upload_cost', ?, ?, ?, ?, ?`)
+      .bind(`st-${crypto.randomUUID()}`, actor.id, -vipCostUnits, actor.id, -vipCostUnits,
+        savedId, isCreate ? '上傳私秘VIP錄音' : '將錄音改為私秘VIP', actor.id, vipUniqueKey, Date.now()));
   }
 
   const cleanBody = { ...body };
@@ -440,34 +472,32 @@ async function handleTrackWrite(request: Request, env: Env, actor: any) {
   delete cleanBody.commentStickerReward;
   delete cleanBody.stickerOperationId;
   const functionalKeys = Object.keys(cleanBody).filter(key => key !== 'userEmail');
+  if (isCreate) cleanBody.id = savedId;
 
   let response: Response;
   if (!isCreate && functionalKeys.length === 0) {
+    await db.batch(statements);
     response = json(normalizeTrackRow(existing));
   } else {
-    response = await appWorker.fetch(makeJsonRequest(request, cleanBody), env);
+    response = await appWorker.fetch(makeJsonRequest(request, cleanBody), {
+      ...env, stickerTrackWriteStatements: statements
+    });
   }
-
   if (!response.ok) {
-    if (vipTransaction?.inserted && vipUniqueKey) {
-      await db.prepare('DELETE FROM sticker_transactions WHERE uniqueKey = ?').bind(vipUniqueKey).run().catch(() => {});
+    if (vipUniqueKey) {
+      const prior: any = await db.prepare('SELECT sourceId FROM sticker_transactions WHERE uniqueKey = ?').bind(vipUniqueKey).first();
+      if (prior) {
+        const saved: any = await db.prepare('SELECT * FROM tracks WHERE id = ?').bind(prior.sourceId).first();
+        if (saved) return jsonFromBase(normalizeTrackRow(saved), json({}));
+      }
+      if (await stickerBalanceUnits(db, actor.id) < vipCostUnits) return json({ error: '貼紙不足，VIP 儲存與扣款均未完成' }, 402);
     }
     return response;
   }
-
   const data: any = await response.clone().json().catch(() => null);
-  const savedTrack = data?.track || data;
-  const savedId = String(savedTrack?.id || trackId || '').trim();
-  if (savedId) {
-    const unlockCost = hasUnlockField ? Number(body.stickerUnlockCost) : Number(existing?.stickerUnlockCost || 0);
-    const commentReward = hasRewardField ? Number(body.commentStickerReward) : Number(existing?.commentStickerReward || 0);
-    await db.prepare('UPDATE tracks SET stickerUnlockCost = ?, commentStickerReward = ? WHERE id = ?')
-      .bind(unlockCost, commentReward, savedId).run();
-    const fresh = normalizeTrackRow(await db.prepare('SELECT * FROM tracks WHERE id = ?').bind(savedId).first());
-    if (fresh) {
-      return jsonFromBase(data?.track ? { ...data, track: fresh } : fresh, response);
-    }
-  }
+  const fresh = normalizeTrackRow(await db.prepare('SELECT * FROM tracks WHERE id = ?').bind(savedId).first());
+  if (fresh) return jsonFromBase(data?.track ? { ...data, track: fresh } : fresh, response);
+
   return response;
 }
 
@@ -538,6 +568,8 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
     const body: any = await request.json().catch(() => ({}));
     const operationId = String(body.operationId || '').trim();
     if (!operationId) return json({ error: '缺少抽選識別碼' }, 400);
+    const track: any = await db.prepare('SELECT * FROM tracks WHERE id = ?').bind(String(body.trackId || '')).first();
+    if (!track || track.isPrivateVip || !await canEarnFromTrack(db, actor, track)) return json({ error: '沒有可抽選的錄音' }, 403);
     const settings = await settingMap(db);
     const cost = Number(settings.lucky_cost_units || 0);
     const result = await addStickerTransaction(db, {
@@ -639,6 +671,8 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
       if (!isDownlineOf(target, actor)) return json({ error: '白金以上會員只能幫自己的下線會員加貼紙' }, 403);
     }
     const uniqueKey = `manual-grant:${actor.id}:${operationId}`;
+    const prior: any = await db.prepare('SELECT userId, deltaUnits FROM sticker_transactions WHERE uniqueKey = ?').bind(uniqueKey).first();
+    if (prior && (prior.userId !== target.id || prior.deltaUnits !== units)) return json({ error: '操作識別碼已用於其他加貼紙紀錄' }, 409);
     const result = await addStickerTransaction(db, {
       userId: target.id,
       deltaUnits: units,
@@ -648,7 +682,7 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
       actorUserId: actor.id,
       uniqueKey
     });
-    if (result.inserted && result.transaction?.id) {
+    if (result.transaction?.id && result.transaction.userId === target.id) {
       const amountText = formatStickerAmount(amount);
       await db.prepare(`INSERT OR IGNORE INTO member_notifications
         (id, userId, type, title, message, createdAt, readAt, sourceId)
@@ -674,10 +708,12 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
       updates.push('commentStickerReward = ?'); values.push(Number(body.commentStickerReward));
     }
     if (!updates.length) return json({ error: '沒有要修改的欄位' }, 400);
-    const { results: existing } = await db.prepare(`SELECT id FROM tracks WHERE id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all();
-    if ((existing || []).length !== ids.length) return json({ error: '部分錄音已不存在，請重新整理' }, 409);
-    await db.batch(ids.map(id => db.prepare(`UPDATE tracks SET ${updates.join(', ')} WHERE id = ?`).bind(...values, id)));
-    const { results } = await db.prepare(`SELECT * FROM tracks WHERE id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all();
+    const existing = await Promise.all(ids.map(id => db.prepare('SELECT id FROM tracks WHERE id = ?').bind(id).first()));
+    if (existing.some(row => !row)) return json({ error: '部分錄音已不存在，請重新整理' }, 409);
+    for (let offset = 0; offset < ids.length; offset += 50) {
+      await db.batch(ids.slice(offset, offset + 50).map(id => db.prepare(`UPDATE tracks SET ${updates.join(', ')} WHERE id = ?`).bind(...values, id)));
+    }
+    const results = await Promise.all(ids.map(id => db.prepare('SELECT * FROM tracks WHERE id = ?').bind(id).first()));
     return json({ success: true, tracks: (results || []).map(normalizeTrackRow) });
   }
 
@@ -725,7 +761,7 @@ export default {
     const trackAction = path.match(/^\/api\/tracks\/([^/]+)\/(like|rate)$/);
     const keywordPost = path.match(/^\/api\/tracks\/([^/]+)\/keywords$/) && method === 'POST';
     const commentPost = path.match(/^\/api\/tracks\/([^/]+)\/comments$/) && method === 'POST';
-    const commentDelete = path.match(/^\/api\/comments\/([^/]+)$/) && method === 'DELETE';
+    const commentDelete = method === 'DELETE' ? path.match(/^\/api\/comments\/([^/]+)$/) : null;
 
     let beforeTrack: any = null;
     let beforeCommentReward: any = null;
@@ -734,7 +770,14 @@ export default {
       requestBody = await request.clone().json().catch(() => ({}));
     }
     if (trackAction && method === 'POST' && actor) {
-      beforeTrack = await env.DB.prepare('SELECT id, title, likedBy, ratings FROM tracks WHERE id = ?').bind(decodeURIComponent(trackAction[1])).first();
+      beforeTrack = await env.DB.prepare('SELECT id, title, likedBy, ratings, requiredRank, isPrivateVip, uploaderEmail, vipExpiresAt, stickerUnlockCost FROM tracks WHERE id = ?').bind(decodeURIComponent(trackAction[1])).first();
+    }
+    if ((trackAction && method === 'POST') || keywordPost) {
+      const id = decodeURIComponent(path.split('/')[3]);
+      const track: any = beforeTrack || await env.DB.prepare('SELECT * FROM tracks WHERE id = ?').bind(id).first();
+      if (Number(track?.stickerUnlockCost || 0) > 0 && !await canEarnFromTrack(env.DB, actor, track, String(requestBody?.vipPassword || ''))) {
+        return json({ error: '請先取得錄音權限並使用貼紙解鎖' }, 403);
+      }
     }
     if (commentDelete) {
       const commentId = decodeURIComponent((commentDelete as RegExpMatchArray)[1]);
@@ -743,7 +786,18 @@ export default {
       ).bind(commentId).first();
     }
 
-    const response = await appWorker.fetch(request, env);
+    let delegated = request;
+    if (requestBody && actor) {
+      delegated = makeJsonRequest(request, {
+        ...requestBody, identifier: actor.id, userId: actor.id, userEmail: actor.email,
+        ...(commentPost ? { authorEmail: actor.email, authorName: actor.name } : {})
+      });
+    }
+    if (commentDelete) {
+      const body: any = await request.clone().json().catch(() => ({}));
+      delegated = makeJsonRequest(request, { ...body, userEmail: actor?.email || '' });
+    }
+    const response = await appWorker.fetch(delegated, env);
     if (!response.ok) return response;
 
     if (path === '/api/users/google-sync' && method === 'POST') {
@@ -759,13 +813,14 @@ export default {
       const trackId = decodeURIComponent(trackAction[1]);
       const data: any = await response.clone().json().catch(() => ({}));
       const actorKeys = [String(actor.id), String(actor.email || '').toLowerCase().trim()].filter(Boolean);
-      if (action === 'rate' && Number(requestBody.score) > 0) {
+      const canEarn = await canEarnFromTrack(env.DB, actor, beforeTrack, String(requestBody.vipPassword || ''));
+      if (action === 'rate' && Number(requestBody.score) > 0 && canEarn) {
         const ratings = parseJson(beforeTrack.ratings, {});
         const hadRating = actorKeys.some(key => Number(ratings[key] || 0) > 0);
         if (!hadRating) {
           await awardInteraction(env.DB, actor, 'rating_reward', trackId, Number(settings?.rating_reward_units || 0), `首次評價錄音：${beforeTrack.title || trackId}`, `rating:${actor.id}:${trackId}`);
         }
-      } else if (action === 'like' && data?.hasLiked === true) {
+      } else if (action === 'like' && data?.hasLiked === true && canEarn) {
         const likedBy: string[] = parseJson(beforeTrack.likedBy, []);
         const hadLike = actorKeys.some(key => likedBy.includes(key));
         if (!hadLike) {
@@ -782,17 +837,17 @@ export default {
       const count: any = await env.DB.prepare("SELECT COUNT(*) AS count FROM sticker_transactions WHERE userId = ? AND type = 'keyword_reward' AND sourceId = ?")
         .bind(actor.id, trackId).first();
       if (Number(count?.count || 0) < limit) {
-        const track: any = await env.DB.prepare('SELECT title FROM tracks WHERE id = ?').bind(trackId).first();
-        await awardInteraction(env.DB, actor, 'keyword_reward', trackId, Number(settings?.keyword_reward_units || 0), `新增網友關鍵字「${keyword}」：${track?.title || trackId}`, `keyword:${actor.id}:${trackId}:${keyword.toLocaleLowerCase('zh-Hant')}`);
+        const track: any = await env.DB.prepare('SELECT id, title, requiredRank, isPrivateVip, uploaderEmail, vipExpiresAt, stickerUnlockCost FROM tracks WHERE id = ?').bind(trackId).first();
+        if (await canEarnFromTrack(env.DB, actor, track, String(requestBody.vipPassword || ''))) await awardInteraction(env.DB, actor, 'keyword_reward', trackId, Number(settings?.keyword_reward_units || 0), `新增網友關鍵字「${keyword}」：${track?.title || trackId}`, `keyword:${actor.id}:${trackId}:${keyword.toLocaleLowerCase('zh-Hant')}`, limit);
       }
       return response;
     }
 
     if (commentPost && actor && requestBody && !requestBody.replyToId) {
       const trackId = decodeURIComponent((path.match(/^\/api\/tracks\/([^/]+)/) as RegExpMatchArray)[1]);
-      const track: any = await env.DB.prepare('SELECT title, commentStickerReward FROM tracks WHERE id = ?').bind(trackId).first();
+      const track: any = await env.DB.prepare('SELECT id, title, commentStickerReward, requiredRank, isPrivateVip, uploaderEmail, vipExpiresAt, stickerUnlockCost FROM tracks WHERE id = ?').bind(trackId).first();
       const reward = Math.max(0, Number(track?.commentStickerReward || 0));
-      if (reward > 0 && await playbackCompleted(env.DB, actor, trackId)) {
+      if (reward > 0 && await canEarnFromTrack(env.DB, actor, track, String(requestBody.vipPassword || '')) && await playbackCompleted(env.DB, actor, trackId)) {
         const data: any = await response.clone().json().catch(() => null);
         const comment = data?.comment || data;
         if (comment?.id) {
@@ -810,7 +865,7 @@ export default {
         type: 'comment_reward_reversal',
         sourceId: commentId,
         description: `刪除原獎勵心得，扣回 ${formatStickerAmount(unitsToStickers(beforeCommentReward.deltaUnits))} 張貼紙`,
-        actorUserId: actor?.id || null,
+        actorUserId: actor?.id || undefined,
         uniqueKey: `comment-reversal:${beforeCommentReward.id}`,
         allowNegative: true
       });

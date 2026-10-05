@@ -76,6 +76,10 @@ export const AudioCard: React.FC<AudioCardProps> = ({
       ? `約 ${Math.max(1, Math.round(Number(track.durationSeconds) / 60))} 分鐘`
       : (track.duration || '時間待確認');
 
+  const stickerUnlockCost = Math.max(0, Number(track.stickerUnlockCost || 0));
+  const permissionStickerLabel = stickerUnlockCost > 0
+    ? `${displayRequiredRank} │ 貼紙${stickerUnlockCost}張`
+    : displayRequiredRank;
   const hasReadAccess = canAccess && isVipUnlocked;
 
   const handlePlayClick = (e: React.MouseEvent<HTMLElement>) => {
@@ -129,10 +133,10 @@ export const AudioCard: React.FC<AudioCardProps> = ({
 
             <div
               className="absolute bottom-0 inset-x-0 z-30 flex items-center justify-center gap-0.5 bg-black/35 px-1 py-[2px] sm:py-0.5 text-[8px] sm:text-[9px] leading-none font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)] whitespace-nowrap overflow-hidden"
-              title={`收聽權限：${displayRequiredRank}`}
+              title={`收聽權限：${permissionStickerLabel}`}
             >
               {displayRequiredRank !== '公開' && <Lock className="w-2.5 h-2.5 shrink-0" />}
-              <span className="truncate">{displayRequiredRank}</span>
+              <span className="truncate">{permissionStickerLabel}</span>
             </div>
           </button>
 

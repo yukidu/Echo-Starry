@@ -17,7 +17,8 @@ import {
   MessageSquare,
   Radio,
   Play,
-  Reply
+  Reply,
+  Gift
 } from 'lucide-react';
 import { UserProfile, AmwayRank, RANK_ORDER, Track, Comment } from '../types';
 
@@ -160,8 +161,29 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
       .slice(0, 100); // Requirement 3: 保留前100則心得
   }, [internalComments, comments, currentUser, tracks, users, dismissedMentionIds]);
 
+  const [stickerNotifications, setStickerNotifications] = useState<any[]>([]);
+  const loadStickerNotifications = async () => {
+    if (!currentUser) return;
+    try {
+      const res = await fetch('/api/stickers/notifications');
+      if (!res.ok) return;
+      const data = await res.json();
+      setStickerNotifications(Array.isArray(data.notifications) ? data.notifications : []);
+    } catch {}
+  };
+  React.useEffect(() => { void loadStickerNotifications(); }, [currentUser?.id]);
+  const openStickerNotifications = async () => {
+    setFilterType('stickers');
+    if (!currentUser) return;
+    try {
+      await fetch('/api/stickers/notifications/read', { method: 'POST' });
+      await loadStickerNotifications();
+      window.dispatchEvent(new CustomEvent('echostars:sticker-changed'));
+    } catch {}
+  };
+
   // Requirement 5 (v2.4): 刪除「所有通知」，預設為「被標記的心得」('mentions')
-  const [filterType, setFilterType] = useState<'mentions' | 'pending' | 'approved'>('mentions');
+  const [filterType, setFilterType] = useState<'mentions' | 'stickers' | 'pending' | 'approved'>('mentions');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [modifiedRank, setModifiedRank] = useState<AmwayRank>('3%');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -187,8 +209,8 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
     if (filterType === 'approved') {
       return u.rankAuditStatus === 'approved' || u.rankApproved === true;
     }
-    if (filterType === 'mentions') {
-      return false; // only show mentions tab
+    if (filterType === 'mentions' || filterType === 'stickers') {
+      return false; // special notification tabs render independently
     }
     return true;
   });
@@ -242,7 +264,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
         </div>
 
         {/* Filter Tabs - Requirement 5 (v2.4): 把「@被標記的心得」分頁移到第一位，刪除「所有通知」分頁，整排選項左右更緊密排列，窄螢幕自動縮小字體 */}
-        <div className="grid grid-cols-3 gap-1 sm:gap-1.5 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 w-full text-[10px] sm:text-xs">
+        <div className="grid grid-cols-4 gap-1 sm:gap-1.5 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 w-full text-[9px] sm:text-xs">
           <button
             type="button"
             onClick={() => setFilterType('mentions')}
@@ -259,6 +281,20 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
             }`}>
               {mentionNotifications.length}
             </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={openStickerNotifications}
+            className={`w-full py-1.5 sm:py-2 px-1 rounded-xl font-bold transition-all flex items-center justify-center gap-1 truncate cursor-pointer ${
+              filterType === 'stickers'
+                ? 'bg-violet-600 text-white shadow-xs'
+                : 'bg-white dark:bg-slate-800 text-violet-600 dark:text-violet-300 border border-violet-200/70 dark:border-slate-700'
+            }`}
+          >
+            <Gift className="w-3 h-3 shrink-0" />
+            <span className="truncate">貼紙通知</span>
+            <span className="px-1 rounded-full text-[9px] bg-violet-100 text-violet-700">{stickerNotifications.filter(n => !n.readAt).length}</span>
           </button>
 
           <button
@@ -307,6 +343,22 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
       {/* Notification List */}
       <div className="space-y-2">
+        {filterType === 'stickers' && stickerNotifications.length === 0 && (
+          <div className="p-6 text-center text-sm text-slate-400 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">目前沒有貼紙通知</div>
+        )}
+        {filterType === 'stickers' && stickerNotifications.map(notification => (
+          <div key={notification.id} className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-violet-200/70 dark:border-slate-800 shadow-2xs">
+            <div className="flex items-start gap-2">
+              <Gift className="w-5 h-5 text-violet-500 shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="font-black text-sm text-slate-900 dark:text-slate-100">{notification.title}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 break-words">{notification.message}</p>
+                <p className="text-[10px] text-slate-400 mt-1">{new Date(notification.createdAt).toLocaleString('zh-TW')}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+
         {/* TAB 1: 被標記的心得 - Requirement 6 (v2.5): 緊密排版，刪除左上角重複出現的「＠標記了你」標題 */}
         {filterType === 'mentions' &&
           mentionNotifications.map(m => {

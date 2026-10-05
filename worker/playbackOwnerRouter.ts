@@ -395,7 +395,7 @@ async function claimLocalPlayback(request: Request, env: Env) {
   `).bind(memberId, deviceId, deviceId, `${deviceId}_`).run();
 
   const localRows = Array.isArray(body.localPlayback) ? body.localPlayback.slice(0, 300) : [];
-  const trackIds = [...new Set(
+  const trackIds = [...new Set<string>(
     localRows.map((row: any) => String(row?.trackId || '').trim()).filter(Boolean)
   )];
   const meta = await trackMetaMap(env.DB, trackIds);

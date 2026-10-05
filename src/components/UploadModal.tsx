@@ -114,6 +114,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const [speechDate, setSpeechDate] = useState(new Date().toISOString().split('T')[0].replace(/-/g, '/'));
   const [seriesOrder, setSeriesOrder] = useState('第 1 集');
   const [requiredRank, setRequiredRank] = useState<AmwayRank>('無');
+  const [stickerUnlockCost, setStickerUnlockCost] = useState(0);
+  const [commentStickerReward, setCommentStickerReward] = useState(0);
   const [description, setDescription] = useState('');
   // Requirement 6 & 12: 私秘 VIP 音檔，預設永久有效
   const [isPrivateVip, setIsPrivateVip] = useState(false);
@@ -385,6 +387,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setSpeechDate(trackToEdit.speechDate || '');
       setSeriesOrder(trackToEdit.seriesOrder ?? '');
       setRequiredRank(trackToEdit.requiredRank || '無');
+      setStickerUnlockCost(Math.max(0, Number(trackToEdit.stickerUnlockCost || 0)));
+      setCommentStickerReward(Math.max(0, Number(trackToEdit.commentStickerReward || 0)));
       setDescription(trackToEdit.description || '');
       setIsPrivateVip(Boolean(trackToEdit.isPrivateVip));
       setVipDurationDays(trackToEdit.vipDurationDays !== undefined ? trackToEdit.vipDurationDays : 0);
@@ -407,6 +411,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setSpeechDate(new Date().toISOString().split('T')[0].replace(/-/g, '/'));
       setSeriesOrder('第 1 集');
       setRequiredRank('無');
+      setStickerUnlockCost(0);
+      setCommentStickerReward(0);
       setDescription('');
       setIsPrivateVip(false);
       setVipDurationDays(0);
@@ -579,6 +585,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     const resolvedSpeaker = speaker.trim() || '特邀講師';
 
     try {
+      if (isPrivateVip && !trackToEdit?.isPrivateVip && currentUser) {
+        const preflight = await fetch('/api/stickers/vip-preflight', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trackId: trackToEdit?.id, isPrivateVip: true })
+        });
+        if (!preflight.ok) {
+          const data = await preflight.json().catch(() => ({}));
+          throw new Error(data.error || '貼紙不足，無法建立私秘VIP');
+        }
+      }
+
       let finalAudioUrl = trackToEdit?.audioUrl || '';
 
       // Direct upload audio file to Cloudflare R2
@@ -673,6 +691,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         series: series.trim(),
         speechDate: speechDate.trim(),
         requiredRank,
+        stickerUnlockCost,
+        commentStickerReward,
+        stickerOperationId: crypto.randomUUID(),
         seriesOrder: seriesOrder.trim(),
         description: description.trim(),
         audioUrl: finalAudioUrl,
@@ -717,12 +738,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         ratingCount: typeof trackObj?.ratingCount === 'number' ? trackObj.ratingCount : 1,
         commentsCount: typeof trackObj?.commentsCount === 'number' ? trackObj.commentsCount : 0,
         likes: typeof trackObj?.likes === 'number' ? trackObj.likes : 0,
-        playCount: typeof trackObj?.playCount === 'number' ? trackObj.playCount : 0
+        playCount: typeof trackObj?.playCount === 'number' ? trackObj.playCount : 0,
+        stickerUnlockCost: Number(trackObj?.stickerUnlockCost ?? stickerUnlockCost ?? 0),
+        commentStickerReward: Number(trackObj?.commentStickerReward ?? commentStickerReward ?? 0)
       };
       if (!trackObj?.id || (trackToEdit && trackObj.id !== trackToEdit.id)) {
         throw new Error('伺服器未回傳已儲存的音檔，請重試。');
       }
       onSuccess(normalizedTrack);
+      window.dispatchEvent(new CustomEvent('echostars:sticker-changed'));
       onClose();
     } catch (err: any) {
       setErrorMessage(err.message || '上傳失敗，請檢查網路連線');
@@ -766,6 +790,21 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               <span>{errorMessage}</span>
             </div>
           )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-2xl border border-amber-200/70 dark:border-slate-700 bg-amber-50/50 dark:bg-slate-800/50 p-3">
+            <label className="font-bold text-slate-700 dark:text-slate-200">
+              解鎖本錄音所需貼紙
+              <ThemedSelect value={stickerUnlockCost} onChange={e => setStickerUnlockCost(Number(e.target.value))} className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                {Array.from({ length: 21 }, (_, i) => i).map(value => <option key={value} value={value}>{value === 0 ? '0（免貼紙）' : `${value} 張`}</option>)}
+              </ThemedSelect>
+            </label>
+            <label className="font-bold text-slate-700 dark:text-slate-200">
+              聽完後留言心得獲得貼紙
+              <ThemedSelect value={commentStickerReward} onChange={e => setCommentStickerReward(Number(e.target.value))} className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                {Array.from({ length: 21 }, (_, i) => i).map(value => <option key={value} value={value}>{value === 0 ? '0（不發放）' : `${value} 張`}</option>)}
+              </ThemedSelect>
+            </label>
+          </div>
 
           {/* 1. Audio Drag and Drop Area */}
           <div>

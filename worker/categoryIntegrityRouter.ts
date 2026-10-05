@@ -1,4 +1,4 @@
-import appWorker from './sessionCookieRouter';
+import appWorker from './stickerRouter';
 import type { Env } from './index';
 
 const CATEGORY_INTEGRITY_MIGRATION = 'category-integrity-v71';
