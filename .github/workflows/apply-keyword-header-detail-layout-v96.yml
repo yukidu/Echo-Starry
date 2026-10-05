@@ -21,7 +21,26 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: node .github/scripts/apply-keyword-header-detail-layout-v96.mjs
-      - run: npm test
+      - name: Run tests with diagnostic capture
+        shell: bash
+        run: |
+          set +e
+          npm test 2>&1 | tee /tmp/npm-test-v96.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            cp /tmp/npm-test-v96.log .github/npm-test-v96.log
+          fi
+          exit "$status"
+      - name: Save failing test log
+        if: failure()
+        run: |
+          git config user.name "echostars-release-bot"
+          git config user.email "actions@users.noreply.github.com"
+          if [ -f .github/npm-test-v96.log ]; then
+            git add .github/npm-test-v96.log
+            git commit -m "暫存 v96 測試診斷紀錄"
+            git push origin HEAD:fix/keyword-header-detail-layout-v96
+          fi
       - run: npm run build
       - name: Commit verified UI changes
         run: |
