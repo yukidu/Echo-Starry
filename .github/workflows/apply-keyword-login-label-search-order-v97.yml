@@ -1,0 +1,32 @@
+name: Apply keyword login label search order v97
+
+on:
+  push:
+    branches:
+      - fix/keyword-login-label-search-order-v97
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: node .github/scripts/apply-keyword-login-label-search-order-v97.mjs
+      - run: npm test
+      - run: npm run build
+      - name: Commit verified v97 UI changes
+        run: |
+          git config user.name "echostars-release-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/App.tsx src/components/DetailView.tsx src/changelogReleaseNotes.ts public/sw.js tests/homeKeywordCounts.test.ts tests/homeLuckyDrawUi.test.ts tests/keywordHeaderDetailLayout.test.ts tests/releaseIntegrity.test.ts
+          git commit -m "調整關鍵字登入提示與首頁搜尋順序"
+          git push origin HEAD:fix/keyword-login-label-search-order-v97
