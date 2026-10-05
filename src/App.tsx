@@ -2395,44 +2395,32 @@ export default function App() {
             {/* Requirement 6 (v2.8): 多組網友關鍵字交叉複合搜尋 (Selected Keywords Chips & Tag Drawer) */}
             <div className="space-y-1">
               <div className="flex items-center gap-2 px-0.5">
-                <span className="text-sm font-bold text-amber-700 dark:text-amber-300">
-                  網友關鍵字(可複選多個)
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowKeywordsDrawer(prev => !prev)}
+                  className="flex-1 min-w-0 text-left text-sm font-bold text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 transition-colors cursor-pointer"
+                  aria-expanded={showKeywordsDrawer}
+                >
+                  <span>按此 </span>
+                  <span className="font-black">{showKeywordsDrawer ? '▲收起' : '▼展開'}</span>
+                  <span> 網友關鍵字(可複選多個)</span>
+                </button>
 
-                <div className="ml-auto flex items-center gap-2">
-                  {selectedKeywords.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedKeywords([])}
-                      className="text-sm font-bold text-slate-500 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-300 underline cursor-pointer"
-                    >
-                      重設
-                    </button>
-                  )}
-
+                {selectedKeywords.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => setShowKeywordsDrawer(prev => !prev)}
-                    className="inline-flex items-center justify-end gap-1 text-sm font-bold text-slate-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors cursor-pointer text-right whitespace-nowrap"
+                    onClick={() => setSelectedKeywords([])}
+                    className="shrink-0 text-sm font-bold text-slate-500 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-300 underline cursor-pointer"
                   >
-                    <span>{showKeywordsDrawer ? '▲ 收起' : '▼ 展開'}</span>
+                    重設
                   </button>
-                </div>
+                )}
               </div>
 
               {/* Expandable Keywords Tag Cloud Drawer for Multi-selection */}
               {showKeywordsDrawer && (
-                <div className="relative p-1.5 rounded-xl bg-amber-50/80 dark:bg-slate-800/80 border border-amber-200/70 dark:border-slate-700 animate-in fade-in">
-                  <button
-                    type="button"
-                    onClick={() => setShowKeywordsDrawer(false)}
-                    className="absolute top-1 right-1 z-10 w-11 h-11 rounded-full flex items-center justify-center hover:brightness-110 text-4xl font-black leading-none shadow-md border-2 cursor-pointer transition-all"
-                    style={{ backgroundColor: 'var(--color-light-pill, #ffffff)', color: 'var(--color-primary, #c06c84)', borderColor: 'var(--color-primary, #c06c84)' }}
-                    aria-label="收起網友關鍵字"
-                  >
-                    ✕
-                  </button>
-                  <div className="flex flex-wrap gap-0.5 max-h-40 overflow-y-auto pr-5">
+                <div className="p-1.5 rounded-xl bg-amber-50/80 dark:bg-slate-800/80 border border-amber-200/70 dark:border-slate-700 animate-in fade-in">
+                  <div className="flex flex-wrap gap-0.5 max-h-40 overflow-y-auto">
                     {visibleAvailableKeywords.length === 0 ? (
                       <span className="text-xs text-slate-400 italic">目前條件下沒有其他符合的關鍵字</span>
                     ) : (
