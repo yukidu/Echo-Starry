@@ -470,21 +470,20 @@ export const DetailView: React.FC<DetailViewProps> = ({
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-3.5 py-3 sm:px-6 space-y-3 pb-28 leading-snug">
+    <div className="max-w-2xl mx-auto px-3.5 pt-0 pb-28 sm:px-6 space-y-3 leading-snug">
       {/* Requirement 5.7 (v2.7): 「網友關鍵字」往上移動到頁面的最上面 */}
-      <div className="relative rounded-2xl p-3 sm:p-4 bg-white/80 dark:bg-slate-900/80 border border-amber-200/70 dark:border-slate-800 shadow-2xs backdrop-blur-xs">
-        <div className="mb-2 space-y-1.5">
-          <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-bold text-sm text-amber-700 dark:text-amber-300">
-              <span>網友關鍵字</span>
-              <span className="text-xs text-slate-400 font-normal">({trackKeywords.length}/50 組)</span>
-            </div>
+      <div className={`relative rounded-2xl ${showDetailKeywords ? 'p-3 sm:p-4' : 'px-3 py-2 sm:px-4 sm:py-2'} bg-white/80 dark:bg-slate-900/80 border border-amber-200/70 dark:border-slate-800 shadow-2xs backdrop-blur-xs`}>
+        <div className={showDetailKeywords ? 'mb-2 space-y-1.5' : 'space-y-0'}>
+          <div className="flex items-center">
             <button
               type="button"
               onClick={() => setShowDetailKeywords(prev => !prev)}
-              className="w-[4.75rem] justify-self-end text-left text-sm font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
+              className="w-full text-left text-sm font-bold text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 transition-colors cursor-pointer"
+              aria-expanded={showDetailKeywords}
             >
-              {showDetailKeywords ? '▲ 收起' : '▼ 展開'}
+              <span>按此 </span>
+              <span className="font-black">{showDetailKeywords ? '▲收起' : '▼展開'}</span>
+              <span> 網友關鍵字(登入可自訂新增)</span>
             </button>
           </div>
           {showDetailKeywords && canAddKeywords && !isAddingKeyword && (
@@ -728,7 +727,7 @@ export const DetailView: React.FC<DetailViewProps> = ({
           </div>
 
           {/* Big Title */}
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-snug mb-1 max-w-lg">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-[1.05] mb-1 max-w-lg">
             {track.title}
           </h1>
 
@@ -738,7 +737,7 @@ export const DetailView: React.FC<DetailViewProps> = ({
           </p>
 
           {/* Requirement 4 (v2.8): 評價、心得、按讚排列極致緊密，星星更緊密，心得顯示 icon+數字，刪除「則心得」，圖標放大與愛心星星一致 */}
-          <div className="flex items-center justify-center gap-1.5 sm:gap-2.5 text-xs text-slate-600 dark:text-slate-400 bg-white/85 dark:bg-slate-800/80 py-1 sm:py-1.5 px-2.5 sm:px-3 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-2xs select-none">
+          <div className="flex items-center justify-center gap-1.5 sm:gap-2.5 text-xs text-slate-600 dark:text-slate-400 py-0.5 select-none">
             {/* Direct 5-star interactive rating (星星更緊密排列) */}
             <div className="flex items-center gap-0.5 sm:gap-1">
               {[1, 2, 3, 4, 5].map(star => {
