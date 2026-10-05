@@ -34,13 +34,13 @@ let detail = fs.readFileSync(detailPath, 'utf8');
 detail = replaceOnce(
   detail,
   '<div className="max-w-2xl mx-auto px-3.5 py-3 sm:px-6 space-y-3 pb-28 leading-snug">',
-  '<div className="max-w-2xl mx-auto px-3.5 pt-1.5 pb-3 sm:px-6 sm:pt-2 space-y-2.5 pb-28 leading-snug">',
+  '<div className="max-w-2xl mx-auto px-3.5 pt-1.5 sm:px-6 sm:pt-2 space-y-2.5 pb-28 leading-snug">',
   'detail top spacing'
 );
 detail = replaceOnce(
   detail,
   '<div className="relative rounded-2xl p-3 sm:p-4 bg-white/80 dark:bg-slate-900/80 border border-amber-200/70 dark:border-slate-800 shadow-2xs backdrop-blur-xs">',
-  `<div className={\`relative rounded-2xl ${showDetailKeywords ? 'p-3 sm:p-4' : 'px-3 py-1.5 sm:px-4 sm:py-2'} bg-white/80 dark:bg-slate-900/80 border border-amber-200/70 dark:border-slate-800 shadow-2xs backdrop-blur-xs\`}>`,
+  "<div className={`relative rounded-2xl ${showDetailKeywords ? 'p-3 sm:p-4' : 'px-3 py-1.5 sm:px-4 sm:py-2'} bg-white/80 dark:bg-slate-900/80 border border-amber-200/70 dark:border-slate-800 shadow-2xs backdrop-blur-xs`}>",
   'detail keyword collapsed padding'
 );
 detail = replaceOnce(
@@ -97,5 +97,7 @@ fs.writeFileSync(releasePath, release);
 
 const uiTestPath = 'tests/keywordHeaderDetailLayout.test.ts';
 fs.writeFileSync(uiTestPath, `import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { readFileSync } from 'node:fs';\n\nconst app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');\nconst detail = readFileSync(new URL('../src/components/DetailView.tsx', import.meta.url), 'utf8');\nconst card = readFileSync(new URL('../src/components/AudioCard.tsx', import.meta.url), 'utf8');\n\ntest('home keyword heading owns expand and collapse state without drawer X', () => {\n  assert.match(app, /按此<\\/span>[\\s\\S]{0,180}showKeywordsDrawer \\? '▲收起' : '▼展開'/);\n  assert.match(app, /網友關鍵字\\(可複選多個\\)/);\n  assert.doesNotMatch(app, /aria-label=\\"收起網友關鍵字\\"/);\n});\n\ntest('detail keyword heading is compact, count-free and login-aware', () => {\n  assert.match(detail, /showDetailKeywords \\? 'p-3 sm:p-4' : 'px-3 py-1\\.5 sm:px-4 sm:py-2'/);\n  assert.match(detail, /showDetailKeywords \\? '▲收起' : '▼展開'/);\n  assert.match(detail, /網友關鍵字\\(登入可自訂新增\\)/);\n  assert.doesNotMatch(detail, /\\{trackKeywords\\.length\\}\\/50 組/);\n});\n\ntest('detail reaction strip has no decorative rounded backing frame', () => {\n  assert.doesNotMatch(detail, /bg-white\\/85 dark:bg-slate-800\\/80 py-1 sm:py-1\\.5 px-2\\.5 sm:px-3 rounded-2xl border border-slate-200\\/60/);\n  assert.match(detail, /text-slate-600 dark:text-slate-400 py-0\\.5 select-none/);\n});\n\ntest('long titles use very tight multiline leading on home and detail', () => {\n  assert.match(detail, /tracking-tight leading-\\[1\\.02\\]/);\n  assert.match(card, /font-black text-slate-900 dark:text-slate-100 leading-\\[1\\.02\\]/);\n});\n`);
+
+if (fs.existsSync('package-lock.json')) fs.rmSync('package-lock.json');
 
 console.log('keyword/detail layout v96 patch applied');
