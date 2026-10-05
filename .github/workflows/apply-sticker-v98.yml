@@ -44,3 +44,4 @@ jobs:
           fi
           git commit -m "完成貼紙積分機制 v98 整合"
           git push origin HEAD:feature/sticker-economy-v98
+# retry-trigger: 2026-10-05T08:54Z
