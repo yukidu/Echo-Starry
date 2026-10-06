@@ -43,11 +43,11 @@ writeFileSync(stickerPath,sticker);
 // Deleting a member also detaches only that member from the shared organization.
 const deletePath='worker/adminUserDeleteRouter.ts';
 let deletion=readFileSync(deletePath,'utf8');
-delection=replaceOnce(deletion,
+deletion=replaceOnce(deletion,
   "import type { Env } from './index';\n",
   "import type { Env } from './index';\nimport { deleteOrganizationStateForUser } from './organizationModel';\n",
   'delete organization import');
-delection=replaceOnce(deletion,
+deletion=replaceOnce(deletion,
 `  statements.push(env.DB.prepare('DELETE FROM users WHERE id = ?').bind(target.id));
   await env.DB.batch(statements);
 
