@@ -29,8 +29,11 @@ const SETTING_DEFAULTS: Record<string, number> = {
   lucky_daily_limit_units: 30,
   toast_seconds_units: 10,
   profile_hint_seconds_units: 10,
-  lucky_hint_seconds_units: 20,
-  vip_upload_cost_units: 1
+  vip_upload_cost_units: 1,
+  platinum_rank_base_units: 500,
+  platinum_rank_multiplier_tenths: 20,
+  emerald_rank_reward_units: 3000,
+  diamond_rank_reward_units: 5000
 };
 
 const RANK_ORDER = [
@@ -167,6 +170,11 @@ async function ensureStickerSchema(db: any) {
           WHEN NEW.type IN ('vip_upload_cost', 'lucky_cost', 'track_unlock_cost')
             AND COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = NEW.userId), 0) + NEW.deltaUnits < 0
           BEGIN SELECT RAISE(ABORT, 'sticker_insufficient'); END`),
+        db.prepare(`CREATE TRIGGER IF NOT EXISTS sticker_manual_grant_debit_guard
+          BEFORE INSERT ON sticker_transactions
+          WHEN NEW.type = 'manual_grant_debit'
+            AND COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = NEW.userId), 0) + NEW.deltaUnits < 0
+          BEGIN SELECT RAISE(ABORT, 'sticker_insufficient'); END`),
         db.prepare(`CREATE TABLE IF NOT EXISTS sticker_unlocks (
           userId TEXT NOT NULL,
           trackId TEXT NOT NULL,
@@ -239,6 +247,7 @@ async function ensureStickerSchema(db: any) {
         SELECT 'initial:' || id, id, ?, ?, 'initial', id, '會員初始貼紙', 'system', 'initial:' || id, ?
         FROM users
       `).bind(INITIAL_STICKER_UNITS, INITIAL_STICKER_UNITS, now).run();
+      await backfillExistingRankApprovalRewards(db);
     })();
     schemaReady.set(key, task);
     task.catch(() => schemaReady.delete(key));
@@ -340,14 +349,13 @@ async function settingMap(db: any) {
   return values;
 }
 
-function settingsForClient(values: Record<string, number>) {
+function settingsForClient(values: Record<string, number>, includeRankRewards = false) {
   return {
     profileReward: unitsToStickers(values.profile_reward_units),
     luckyCompleteReward: unitsToStickers(values.lucky_complete_units),
     luckyDailyLimit: unitsToStickers(values.lucky_daily_limit_units),
     toastSeconds: unitsToStickers(values.toast_seconds_units),
     profileHintSeconds: unitsToStickers(values.profile_hint_seconds_units),
-    luckyHintSeconds: unitsToStickers(values.lucky_hint_seconds_units),
     profileHintText: (values as any).profileHintText || '尚有欄位未填，完整填寫可+{x}張貼紙',
     luckyHintText: (values as any).luckyHintText || '這是宇宙給你的答案\n聽完貼紙額外+{x}張',
     ratingReward: unitsToStickers(values.rating_reward_units),
@@ -357,8 +365,82 @@ function settingsForClient(values: Record<string, number>) {
     commentThreadLimit: unitsToStickers(values.comment_thread_cap_units),
     replyReward: unitsToStickers(values.reply_reward_units),
     luckyCost: unitsToStickers(values.lucky_cost_units),
-    vipUploadCost: unitsToStickers(values.vip_upload_cost_units)
+    vipUploadCost: unitsToStickers(values.vip_upload_cost_units),
+    ...(includeRankRewards ? {
+      platinumRankBaseReward: unitsToStickers(values.platinum_rank_base_units),
+      platinumRankMultiplier: Number(values.platinum_rank_multiplier_tenths || 0) / 10,
+      emeraldRankReward: unitsToStickers(values.emerald_rank_reward_units),
+      diamondRankReward: unitsToStickers(values.diamond_rank_reward_units)
+    } : {})
   };
+}
+
+type RankRewardTier = 'platinum' | 'emerald' | 'diamond';
+
+function rankRewardTier(value: unknown): RankRewardTier | null {
+  const rank = String(value || '').trim();
+  if (!rank) return null;
+  if (/鑽石|皇冠|大使/.test(rank)) return 'diamond';
+  if (/翡翠/.test(rank)) return 'emerald';
+  return isPlatinumOrAboveRank(rank) ? 'platinum' : null;
+}
+
+function rankRewardUnits(values: Record<string, number>, tier: RankRewardTier) {
+  if (tier === 'diamond') return Number(values.diamond_rank_reward_units || 0);
+  if (tier === 'emerald') return Number(values.emerald_rank_reward_units || 0);
+  return Math.max(0, Math.round(Number(values.platinum_rank_base_units || 0) * Number(values.platinum_rank_multiplier_tenths || 0) / 10));
+}
+
+function rankRewardLabel(tier: RankRewardTier) {
+  return tier === 'diamond' ? '鑽石以上' : tier === 'emerald' ? '翡翠以上' : '白金以上';
+}
+
+const RANK_TIER_PRIORITY: Record<RankRewardTier, number> = { platinum: 1, emerald: 2, diamond: 3 };
+
+async function awardRankApprovalReward(db: any, user: any, actorUserId = 'system') {
+  if (!user?.id || !user.rankApproved) return null;
+  const tier = rankRewardTier(user.approvedRank || user.rank);
+  if (!tier) return null;
+  const prior = (await db.prepare("SELECT sourceId FROM sticker_transactions WHERE userId = ? AND type = 'rank_approval_reward'").bind(user.id).all()).results || [];
+  if (prior.some((row: any) => RANK_TIER_PRIORITY[String(row.sourceId) as RankRewardTier] >= RANK_TIER_PRIORITY[tier])) return null;
+  const settings = await settingMap(db);
+  const units = rankRewardUnits(settings, tier);
+  if (units <= 0) return null;
+  return addStickerTransaction(db, {
+    userId: user.id,
+    deltaUnits: units,
+    type: 'rank_approval_reward',
+    sourceId: tier,
+    description: `${rankRewardLabel(tier)}獎銜審核通過獎勵`,
+    actorUserId,
+    uniqueKey: `rank-approval:${user.id}:${tier}`
+  });
+}
+
+async function backfillExistingRankApprovalRewards(db: any) {
+  await db.prepare('CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY)').run();
+  const migration = 'rank-approval-reward-v101';
+  if (await db.prepare('SELECT name FROM app_migrations WHERE name = ?').bind(migration).first()) return;
+  const settings = await settingMap(db);
+  const users = (await db.prepare('SELECT id,name,rank,approvedRank,rankApproved FROM users WHERE COALESCE(rankApproved,0)=1').all()).results || [];
+  const statements: any[] = [];
+  const now = Date.now();
+  for (const user of users as any[]) {
+    const tier = rankRewardTier(user.approvedRank || user.rank);
+    if (!tier) continue;
+    const units = rankRewardUnits(settings, tier);
+    if (units <= 0) continue;
+    const uniqueKey = `rank-approval:${user.id}:${tier}`;
+    statements.push(db.prepare(`INSERT OR IGNORE INTO sticker_transactions
+      (id,userId,deltaUnits,balanceAfterUnits,type,sourceId,description,actorUserId,uniqueKey,createdAt)
+      SELECT ?, ?, ?, COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?),0) + ?,
+        'rank_approval_reward', ?, ?, 'system', ?, ?`)
+      .bind(uniqueKey, user.id, units, user.id, units, tier, `${rankRewardLabel(tier)}獎銜審核通過獎勵（既有會員補發）`, uniqueKey, now));
+  }
+  for (let offset = 0; offset < statements.length; offset += 50) {
+    await db.batch(statements.slice(offset, offset + 50));
+  }
+  await db.prepare('INSERT OR IGNORE INTO app_migrations(name) VALUES (?)').bind(migration).run();
 }
 
 function validTenth(value: unknown) {
@@ -613,15 +695,17 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
     // One query returns a consistent balance/cursor/changes snapshot.
     const snapshot:any=await db.prepare(`SELECT COALESCE(SUM(deltaUnits),0) AS balanceUnits,COALESCE(MAX(rowid),0) AS cursor,
       (SELECT json_group_array(json_object('id',id,'delta',deltaUnits/10.0)) FROM
-        (SELECT id,deltaUnits FROM sticker_transactions WHERE userId=? AND rowid>? AND ?>0 AND type<>'initial' ORDER BY rowid)) AS changes
-      FROM sticker_transactions WHERE userId=?`).bind(actor.id,after,after,actor.id).first();
+        (SELECT id,deltaUnits FROM sticker_transactions WHERE userId=? AND rowid>? AND ?>0 AND type<>'initial' ORDER BY rowid)) AS changes,
+      (SELECT json_group_array(DISTINCT trackId) FROM sticker_transactions WHERE userId=? AND type='comment_reward' AND deltaUnits>0 AND trackId IS NOT NULL) AS commentRewardTrackIds
+      FROM sticker_transactions WHERE userId=?`).bind(actor.id,after,after,actor.id,actor.id).first();
     const balanceUnits=Number(snapshot.balanceUnits);const cursor=Number(snapshot.cursor);const changes=parseJson(snapshot.changes,[]);
+    const commentRewardTrackIds=parseJson(snapshot.commentRewardTrackIds,[]);
     const [unlocks, unread] = await Promise.all([
       db.prepare('SELECT trackId FROM sticker_unlocks WHERE userId = ? AND transactionId IS NOT NULL').bind(actor.id).all(),
       db.prepare('SELECT COUNT(*) AS count FROM member_notifications WHERE userId = ? AND readAt IS NULL').bind(actor.id).first()
     ]);
     return json({balanceUnits,balance:unitsToStickers(balanceUnits),cursor,changes,
-      unlockedTrackIds:(unlocks.results || []).map((row:any)=>row.trackId),unreadNotifications:Number((unread as any)?.count || 0),
+      unlockedTrackIds:(unlocks.results || []).map((row:any)=>row.trackId),commentRewardTrackIds,unreadNotifications:Number((unread as any)?.count || 0),
       canGrant:canGrantStickers(actor),isSuperAdmin:isSuperAdmin(actor),canManageRules:canManageRules(actor),
       ...(quick ? {} : {transactions:await transactionHistory(db,actor)})});
   }
@@ -629,14 +713,19 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
 
   if (path === '/api/stickers/settings') {
     if (!canManageRules(actor)) return json({ error: '只有超級管理員可管理貼紙規則，或授權管理員可修改' }, 403);
-    if (method === 'GET') return json({ settings: settingsForClient(await settingMap(db)) });
+    if (method === 'GET') return json({ settings: settingsForClient(await settingMap(db), isSuperAdmin(actor)) });
     if (method === 'PUT') {
       const body: any = await request.json().catch(() => ({}));
       for (const key of ['ratingReward', 'likeReward', 'keywordReward', 'keywordRewardLimit', 'commentThreadLimit', 'replyReward', 'luckyCost', 'vipUploadCost']) {
         if (!validTenth(body[key])) return json({ error: `${key} 必須為 0 至 1000 張，且以 0.1 為單位` }, 400);
       }
-      const extraFields: Record<string,string> = {profileReward:'profile_reward_units',luckyCompleteReward:'lucky_complete_units',luckyDailyLimit:'lucky_daily_limit_units',toastSeconds:'toast_seconds_units',profileHintSeconds:'profile_hint_seconds_units',luckyHintSeconds:'lucky_hint_seconds_units'};
+      const extraFields: Record<string,string> = {profileReward:'profile_reward_units',luckyCompleteReward:'lucky_complete_units',luckyDailyLimit:'lucky_daily_limit_units',toastSeconds:'toast_seconds_units',profileHintSeconds:'profile_hint_seconds_units'};
       for (const key of Object.keys(extraFields)) if (body[key] !== undefined && (!validTenth(body[key]) || (key.endsWith('Seconds') && (body[key]<0.1 || body[key]>60)) || (key==='luckyDailyLimit' && !Number.isInteger(body[key])))) return json({error:'時間需為0.1–60秒，每日次數為整數，張數為0–1000'},400);
+      const rankFields: Record<string,string> = {platinumRankBaseReward:'platinum_rank_base_units',emeraldRankReward:'emerald_rank_reward_units',diamondRankReward:'diamond_rank_reward_units'};
+      const hasRankFields = [...Object.keys(rankFields),'platinumRankMultiplier'].some(key => body[key] !== undefined);
+      if (hasRankFields && !isSuperAdmin(actor)) return json({error:'只有超級管理員可修改獎銜貼紙獎勵'},403);
+      for (const key of Object.keys(rankFields)) if (body[key] !== undefined && !validTenth(body[key])) return json({error:'獎銜貼紙張數需為0至1000張'},400);
+      if (body.platinumRankMultiplier !== undefined && (!Number.isFinite(Number(body.platinumRankMultiplier)) || Number(body.platinumRankMultiplier)<0 || Number(body.platinumRankMultiplier)>100 || Math.abs(Number(body.platinumRankMultiplier)*10-Math.round(Number(body.platinumRankMultiplier)*10))>1e-8)) return json({error:'白金獎勵倍數需為0至100倍，且以0.1為單位'},400);
       for (const key of ['profileHintText','luckyHintText']) if (body[key] !== undefined && (typeof body[key]!=='string' || !body[key].trim() || body[key].length>500)) return json({error:'提示文字需為1–500字'},400);
       const now = Date.now();
       const updates: Record<string, number> = {
@@ -650,6 +739,8 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
         vip_upload_cost_units: stickersToUnits(body.vipUploadCost)
       };
       for (const [key,setting] of Object.entries(extraFields)) if (body[key]!==undefined) updates[setting]=stickersToUnits(body[key]);
+      for (const [key,setting] of Object.entries(rankFields)) if (body[key]!==undefined) updates[setting]=stickersToUnits(body[key]);
+      if (body.platinumRankMultiplier!==undefined) updates.platinum_rank_multiplier_tenths=Math.round(Number(body.platinumRankMultiplier)*10);
       const textUpdates=['profileHintText','luckyHintText'].filter(key=>body[key]!==undefined).map(key=>db.prepare('INSERT OR REPLACE INTO sticker_text_settings VALUES (?,?)').bind(key,body[key].trim()));
       await db.batch([...textUpdates,...Object.entries(updates).map(([key, value]) =>
         db.prepare(`INSERT INTO sticker_settings(key, valueUnits, updatedAt, updatedBy)
@@ -657,7 +748,7 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
           ON CONFLICT(key) DO UPDATE SET valueUnits = excluded.valueUnits, updatedAt = excluded.updatedAt, updatedBy = excluded.updatedBy`)
           .bind(key, value, now, actor.id)
       )]);
-      return json({ success: true, settings: settingsForClient(await settingMap(db)) });
+      return json({ success: true, settings: settingsForClient(await settingMap(db), isSuperAdmin(actor)) });
     }
     return json({ error: 'Method not allowed' }, 405);
   }
@@ -783,25 +874,48 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
       if (!isDownlineOf(target, actor)) return json({ error: '白金以上會員只能幫自己的下線會員加貼紙' }, 403);
     }
     const uniqueKey = `manual-grant:${actor.id}:${operationId}`;
+    const debitKey = `manual-grant-debit:${actor.id}:${operationId}`;
     const prior: any = await db.prepare('SELECT userId, deltaUnits FROM sticker_transactions WHERE uniqueKey = ?').bind(uniqueKey).first();
     if (prior && (prior.userId !== target.id || prior.deltaUnits !== units)) return json({ error: '操作識別碼已用於其他加貼紙紀錄' }, 409);
-    const result = await addStickerTransaction(db, {
-      userId: target.id,
-      deltaUnits: units,
-      type: 'manual_grant',
-      sourceId: operationId, relatedUserId: actor.id,
-      description: `${actor.name || '會員'}人工加貼紙：${reason}`,
-      actorUserId: actor.id,
-      uniqueKey
-    });
-    if (result.transaction?.id && result.transaction.userId === target.id) {
+    if (!prior) {
+      await ensureInitialStickers(db, target.id);
+      if (!isSuperAdmin(actor)) await ensureInitialStickers(db, actor.id);
+      const now = Date.now();
+      const grantId = `st-${crypto.randomUUID()}`;
+      if (isSuperAdmin(actor)) {
+        await db.prepare(`INSERT OR IGNORE INTO sticker_transactions
+          (id,userId,deltaUnits,balanceAfterUnits,type,sourceId,description,actorUserId,uniqueKey,createdAt,relatedUserId)
+          SELECT ?, ?, ?, COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?),0)+?,
+            'manual_grant', ?, ?, ?, ?, ?, ?`)
+          .bind(grantId,target.id,units,target.id,units,operationId,`${actor.name || '會員'}人工加貼紙：${reason}`,actor.id,uniqueKey,now,actor.id).run();
+      } else {
+        const debitId = `st-${crypto.randomUUID()}`;
+        await db.batch([
+          db.prepare(`INSERT OR IGNORE INTO sticker_transactions
+            (id,userId,deltaUnits,balanceAfterUnits,type,sourceId,description,actorUserId,uniqueKey,createdAt,relatedUserId)
+            SELECT ?, ?, ?, COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?),0)-?,
+              'manual_grant_debit', ?, ?, ?, ?, ?, ?
+            WHERE COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?),0) >= ?`)
+            .bind(debitId,actor.id,-units,actor.id,units,operationId,`加發 ${formatStickerAmount(amount)} 張貼紙給${target.name || '下線會員'}：${reason}`,actor.id,debitKey,now,target.id,actor.id,units),
+          db.prepare(`INSERT OR IGNORE INTO sticker_transactions
+            (id,userId,deltaUnits,balanceAfterUnits,type,sourceId,description,actorUserId,uniqueKey,createdAt,relatedUserId)
+            SELECT ?, ?, ?, COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?),0)+?,
+              'manual_grant', ?, ?, ?, ?, ?, ?
+            WHERE EXISTS(SELECT 1 FROM sticker_transactions WHERE uniqueKey = ?)`)
+            .bind(grantId,target.id,units,target.id,units,operationId,`${actor.name || '會員'}人工加貼紙：${reason}`,actor.id,uniqueKey,now,actor.id,debitKey)
+        ]);
+      }
+    }
+    const transaction: any = await db.prepare('SELECT * FROM sticker_transactions WHERE uniqueKey = ?').bind(uniqueKey).first();
+    if (!transaction) return json({ error: '自己的貼紙不足，無法加發給下線會員' }, 402);
+    if (!prior) {
       const amountText = formatStickerAmount(amount);
       await db.prepare(`INSERT OR IGNORE INTO member_notifications
         (id, userId, type, title, message, createdAt, readAt, sourceId)
         VALUES (?, ?, 'sticker_grant', '收到貼紙', ?, ?, NULL, ?)`)
-        .bind(`notice-${crypto.randomUUID()}`, target.id, `${actor.name || '會員'} 幫你加了 ${amountText} 張貼紙。原因：${reason}`, Date.now(), result.transaction.id).run();
+        .bind(`notice-${crypto.randomUUID()}`, target.id, `${actor.name || '會員'} 幫你加了 ${amountText} 張貼紙。原因：${reason}`, Date.now(), transaction.id).run();
     }
-    return json({ success: true, added: amount, balance: unitsToStickers(result.balanceUnits), duplicate: !result.inserted });
+    return json({ success: true, added: amount, balance: unitsToStickers(await stickerBalanceUnits(db,target.id)), duplicate: Boolean(prior), issuerBalance: isSuperAdmin(actor) ? undefined : unitsToStickers(await stickerBalanceUnits(db,actor.id)) });
   }
 
   if (path === '/api/stickers/tracks/batch' && method === 'PUT') {
@@ -920,6 +1034,14 @@ export default {
     if (path === '/api/users/google-sync' && method === 'POST') {
       const data: any = await response.clone().json().catch(() => null);
       if (data?.user?.id) await ensureInitialStickers(env.DB, data.user.id);
+      return response;
+    }
+
+    const rankAudit = method === 'PUT' ? path.match(/^\/api\/users\/([^/]+)\/audit-rank$/) : null;
+    if (rankAudit) {
+      const targetId = decodeURIComponent(rankAudit[1]);
+      const target: any = await env.DB.prepare('SELECT id,name,rank,approvedRank,rankApproved FROM users WHERE id = ?').bind(targetId).first();
+      if (target) await awardRankApprovalReward(env.DB, target, actor?.id || 'system');
       return response;
     }
 

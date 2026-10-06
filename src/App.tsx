@@ -326,7 +326,7 @@ export default function App() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [allComments, setAllComments] = useState<Comment[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
-  const [stickerSummary, setStickerSummary] = useState<{ balance: number; unlockedTrackIds: string[]; unreadNotifications: number; canGrant: boolean; isSuperAdmin: boolean } | null>(null);
+  const [stickerSummary, setStickerSummary] = useState<{ balance: number; unlockedTrackIds: string[]; commentRewardTrackIds: string[]; unreadNotifications: number; canGrant: boolean; isSuperAdmin: boolean } | null>(null);
   const [isStickersOpen, setIsStickersOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(() => (readHomeCache()?.tracks || []).length === 0);
   const homeCacheValidatedAtRef = useRef(readHomeCache()?.savedAt || 0);
@@ -383,6 +383,7 @@ export default function App() {
       setStickerSummary({
         balance: Number(data.balance || 0),
         unlockedTrackIds: Array.isArray(data.unlockedTrackIds) ? data.unlockedTrackIds : [],
+        commentRewardTrackIds: Array.isArray(data.commentRewardTrackIds) ? data.commentRewardTrackIds : [],
         unreadNotifications: Number(data.unreadNotifications || 0),
         canGrant: Boolean(data.canGrant),
         isSuperAdmin: Boolean(data.isSuperAdmin)
@@ -543,6 +544,7 @@ export default function App() {
   const [luckyPhase, setLuckyPhase] = useState<'idle' | 'spin' | 'win'>('idle');
   const [luckyOrderIds, setLuckyOrderIds] = useState<string[] | null>(null);
   const [luckyWinnerId, setLuckyWinnerId] = useState<string | null>(null);
+  const [luckyAnswerText, setLuckyAnswerText] = useState<string | null>(null);
   const luckyTimersRef = useRef<number[]>([]);
   const luckyAudioContextRef = useRef<AudioContext | null>(null);
 
@@ -556,6 +558,7 @@ export default function App() {
     setLuckyPhase('idle');
     setLuckyOrderIds(null);
     setLuckyWinnerId(null);
+    setLuckyAnswerText(null);
   }, [clearLuckyTimers]);
 
   useEffect(() => {
@@ -571,6 +574,13 @@ export default function App() {
     document.addEventListener('pointerdown', dismissLuckyWinnerOnBlank, { passive: true });
     return () => document.removeEventListener('pointerdown', dismissLuckyWinnerOnBlank);
   }, [luckyPhase, resetLuckyDrawState]);
+
+  useEffect(() => {
+    if (!luckyAnswerText) return;
+    const dismissLuckyAnswer = () => setLuckyAnswerText(null);
+    document.addEventListener('pointerdown', dismissLuckyAnswer, { passive: true });
+    return () => document.removeEventListener('pointerdown', dismissLuckyAnswer);
+  }, [luckyAnswerText]);
 
   useEffect(() => () => {
     clearLuckyTimers();
@@ -2077,6 +2087,7 @@ export default function App() {
   const handleLuckyDraw = async (anchor: HTMLElement) => {
     if (luckyPhase === 'spin' || luckyRequestPending.current) return;
     setIsSearchFocused(false);
+    setLuckyAnswerText(null);
     clearLuckyTimers();
 
     // Private VIP stays a separate third group and is never surfaced by random discovery.
@@ -2113,7 +2124,10 @@ export default function App() {
       setLuckyOrderIds(moveTrackIdToSecondSlot(baseIds, winner.id));
       setLuckyWinnerId(winner.id);
       setLuckyPhase('win');
-      if(luckyNotice) {setFeedbackRules(luckyNotice.settings);showStickerNotice(luckyNotice.settings.luckyHintText.replaceAll('{x}',String(luckyNotice.bonus)),luckyNotice.settings.luckyHintSeconds);}
+      if(luckyNotice) {
+        setFeedbackRules(luckyNotice.settings);
+        setLuckyAnswerText(luckyNotice.settings.luckyHintText.replaceAll('{x}',String(luckyNotice.bonus)));
+      }
       playLuckyWin();
     };
 
@@ -2494,9 +2508,9 @@ export default function App() {
                 disabled={luckyPhase === 'spin'}
                 className="h-[46px] px-3.5 sm:px-4 py-0 rounded-2xl text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1 shadow-2xs hover:brightness-105 shrink-0 active:scale-95 transition-all cursor-pointer disabled:cursor-wait disabled:opacity-80"
                 style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
-                title="從目前條件下可播放的音檔中抽一張好手氣"
+                title="從目前條件下可播放的音檔中召喚繁星解答"
               >
-                <span>{luckyPhase === 'spin' ? '🫵轉運中' : '🫵好手氣'}</span>
+                <span>💫召喚繁星解答</span>
               </button>
 
               <div ref={searchContainerRef} className="relative flex-1">
@@ -2802,6 +2816,11 @@ export default function App() {
                       data-track-card-id={track.id}
                       data-lucky-winner={luckyWinnerId === track.id ? 'true' : undefined}
                     >
+                    {luckyPhase === 'win' && luckyWinnerId === track.id && luckyAnswerText && (
+                      <div className="lucky-answer-notice" role="status" aria-live="polite">
+                        {luckyAnswerText.split(/([+]\d+(?:\.\d+)?)/g).map((part,index)=><span key={index} className={part.startsWith('+')?'text-red-500':undefined}>{part}</span>)}
+                      </div>
+                    )}
                     {luckyPhase === 'win' && luckyWinnerId === track.id && (
                       <div className="lucky-winner-badge" aria-live="polite">✨ 好手氣！✨</div>
                     )}
@@ -2813,6 +2832,7 @@ export default function App() {
                       isVipUnlocked={isVipUnlocked}
                       tutorialTarget={trackIndex === 0}
                       progressMemory={playbackMemories[track.id]}
+                      commentRewardClaimed={Boolean(stickerSummary?.commentRewardTrackIds?.includes(track.id))}
                       userRating={trackRating}
                       hasLiked={hasLiked}
                       onClick={() => {

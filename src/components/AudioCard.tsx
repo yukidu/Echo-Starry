@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, MessageSquare, Heart, Clock, Lock, CheckCircle2 } from 'lucide-react';
+import { Star, MessageSquare, Heart, Clock, Lock } from 'lucide-react';
 import { Track } from '../types';
 import { AudioMemory } from '../utils/audio';
 import './AudioCard.css';
@@ -16,6 +16,7 @@ interface AudioCardProps {
   hasLiked?: boolean;
   isVipUnlocked?: boolean;
   tutorialTarget?: boolean;
+  commentRewardClaimed?: boolean;
   onClick: () => void;
   onTogglePlay?: (anchor?: HTMLElement) => void;
   onRate?: (score: number) => void;
@@ -36,6 +37,7 @@ export const AudioCard: React.FC<AudioCardProps> = ({
   hasLiked = false,
   isVipUnlocked = true,
   tutorialTarget = false,
+  commentRewardClaimed = false,
   onClick,
   onTogglePlay,
   onRate,
@@ -116,27 +118,26 @@ export const AudioCard: React.FC<AudioCardProps> = ({
 
             {isCompleted ? (
               <div
-                className="absolute top-0 inset-x-0 text-white text-[7px] sm:text-[8px] font-bold text-center px-1 py-1 whitespace-nowrap overflow-hidden flex items-center justify-center gap-0.5 z-30 shadow-2xs leading-none"
+                className="absolute top-0 inset-x-0 text-white text-[6px] sm:text-[7px] font-bold text-center px-0.5 py-1 whitespace-nowrap flex items-center justify-center z-30 shadow-2xs leading-none tracking-[-0.03em]"
                 style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
               >
-                <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
-                <span className="whitespace-nowrap">[已聽完]</span>
+                <span className="whitespace-nowrap">[已聽100%]{commentRewardClaimed ? '已發' : '寫心得'}<span className="text-red-500">+{track.commentStickerReward || 0}</span><span className="text-white">張貼紙</span></span>
               </div>
             ) : progressRatio > 0 ? (
               <div
-                className="absolute top-0 inset-x-0 text-white text-[7px] sm:text-[8px] font-bold text-center px-1 py-1 font-mono z-30 shadow-2xs whitespace-nowrap overflow-hidden leading-none"
+                className="absolute top-0 inset-x-0 text-white text-[6px] sm:text-[7px] font-bold text-center px-0.5 py-1 font-mono z-30 shadow-2xs whitespace-nowrap leading-none tracking-[-0.03em]"
                 style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
               >
-                [已聽 {Math.round(progressRatio * 100)}%]
+                <span className="whitespace-nowrap">[已聽{Math.round(progressRatio * 100)}%]聽完<span className="text-red-500">+{track.commentStickerReward || 0}</span><span className="text-white">張貼紙</span></span>
               </div>
-            ) : <div className="absolute top-0 inset-x-0 z-30 bg-black/50 text-center py-1 text-[7px] sm:text-[8px] text-white">寫心得<span className="text-red-500">+{track.commentStickerReward || 0}張貼紙</span></div>}
+            ) : <div className="absolute top-0 inset-x-0 z-30 bg-black/50 text-center py-1 text-[6px] sm:text-[7px] leading-none tracking-[-0.03em] text-white whitespace-nowrap">寫心得<span className="text-red-500">+{track.commentStickerReward || 0}</span><span className="text-white">張貼紙</span></div>}
 
             <div
-              className="absolute bottom-0 inset-x-0 z-30 flex items-center justify-center gap-0.5 bg-black/35 px-1 py-[2px] sm:py-0.5 text-[7px] sm:text-[8px] leading-none font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)] whitespace-nowrap overflow-hidden"
+              className="absolute bottom-0 inset-x-0 z-30 flex items-center justify-center gap-0.5 bg-black/35 px-0.5 py-[2px] sm:py-0.5 text-[6px] sm:text-[7px] leading-none font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)] whitespace-nowrap tracking-[-0.03em]"
               title={`收聽權限：${permissionStickerLabel}`}
             >
               {displayRequiredRank !== '公開' && <Lock className="w-2.5 h-2.5 shrink-0" />}
-              <span className="truncate">{displayRequiredRank}{stickerUnlockCost>0 && <>│<span className="text-emerald-400">-{stickerUnlockCost}張貼紙</span></>}</span>
+              <span className="whitespace-nowrap">{displayRequiredRank}{stickerUnlockCost>0 && <>│<span className="text-emerald-400">-{stickerUnlockCost}</span><span className="text-white">張貼紙</span></>}</span>
             </div>
           </button>
 

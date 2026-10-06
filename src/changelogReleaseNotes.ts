@@ -11,7 +11,6 @@ type ChangelogEntry = {
 export const HEALTHCHECK_RELEASE_NOTES: ChangelogEntry = {
   version: 'v3.9',
   date: '2026/10/04',
-  isLatest: true,
   summary:
     '進行一次全站功能健檢，把近期多次改版留下的衝突風險重新盤查。這次特別檢查個人學習紀錄圖卡、訪客與會員流程、分類、分享、播放、登入、PWA 與部署測試，並修正實際找到的問題。',
   added: [
@@ -91,14 +90,32 @@ export const CUMULATIVE_RELEASE_NOTES: ChangelogEntry = {
 };
 
 export const STICKER_PAGES_RELEASE_NOTES: ChangelogEntry = {
-  version: 'v4.0', date: '2026/10/06', isLatest: true,
+  version: 'v4.0', date: '2026/10/06',
   summary: '貼紙簿與個人中心改為完整頁面，新增完善資料與好手氣獎勵、全站貼紙提示、上手名單管理及播放清單排序。',
   added: ['全站貼紙增加以紅字、減少以綠字提示，顯示在操作位置上方，時間可在其他規則調整。', '完善個人資料可領一次貼紙；未填完整提醒的文字、秒數及獎勵可自訂。', '好手氣抽中尚未聽完的錄音，當日完成可領額外貼紙；提示文字、秒數、張數與每日上限可自訂。', '後台新增上手名單，支援新增、編輯、多選合併與刪除，連動會員欄位。'],
   modified: ['我的貼紙簿、個人中心與iOS安裝教學改為完整頁面，支援返回導覽。', '選單僅貼紙數字保持大字，其餘文字與其他選項一致；貼紙明細改負綠正紅、小字且不粗體。', '上手白金、上手鑽石分開顯示；推薦人取消自動關聯詞。', '已購買錄音優先排序；新增貼紙成本低至高／心得獎勵高至低排序，移除獎銜篩選並移動時間按鈕。', '未開始收聽的照片顯示寫心得獎勵，正紅負綠，字體與權限一致。', '貼紙清單獨立載入並保留快取，管理分頁與補發結算不再阻擋首屏。'],
   removed: ['移除我的貼紙與個人中心的彈出視窗呈現。']
 };
 
-const RELEASE_NOTES = [STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
+export const RANK_STICKER_RELEASE_NOTES: ChangelogEntry = {
+  version: 'v4.1', date: '2026/10/06', isLatest: true,
+  summary: '新增白金以上獎銜審核貼紙獎勵、下線貼紙轉贈扣款，並調整首頁貼紙文案與召喚繁星解答提示。',
+  added: [
+    '白金以上會員獎銜審核通過會自動獲得貼紙：預設白金為50張基礎×2倍＝100張、翡翠以上300張、鑽石以上500張；既有符合會員會一次補發目前最高符合級別。',
+    '超級管理員可在「我的貼紙＞其他規則」修改白金基礎張數、白金倍數、翡翠與鑽石獎勵張數；同級別永久只發一次，降級不會重複領低級獎勵。',
+    '白金以上會員人工加貼紙給自己的下線時，改為從本人貼紙餘額扣除；餘額不足不能發放。超級管理員的管理發放不扣本人貼紙。'
+  ],
+  modified: [
+    '首頁封面貼紙字樣統一：只有+張數使用紅字、-張數使用綠字，「張貼紙」固定白字；收聽進度移除多餘空格並完整顯示，不再用省略號。',
+    '封面進度改為「[已聽x%]聽完+x張貼紙」；100%但尚未取得心得獎勵顯示「寫心得+x張貼紙」，真正取得後才顯示「已發+x張貼紙」。',
+    '「好手氣」改名「💫召喚繁星解答」；抽中的宇宙答案固定顯示在中獎卡片上方，點畫面任意位置才關閉。'
+  ],
+  removed: [
+    '移除「其他規則」中的好手氣提示秒數；宇宙答案不再依秒數自動消失。'
+  ]
+};
+
+const RELEASE_NOTES = [RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
 
 const runtime = window as Window &
   typeof globalThis & {

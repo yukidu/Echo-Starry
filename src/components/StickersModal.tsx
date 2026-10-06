@@ -7,7 +7,7 @@ import { ThemedSelect } from './ThemedSelect';
 
 export type StickerSource = { kind: 'track' | 'member' | 'feature'; trackId?: string; commentId?: string; userId?: string; label: string; available: boolean };
 type StickerTransaction = { id: string; delta: number; description: string; type: string; createdAt: number; source?: StickerSource | null };
-type StickerSettings = { ratingReward: number; likeReward: number; keywordReward: number; keywordRewardLimit: number; commentThreadLimit: number; replyReward: number; luckyCost: number; vipUploadCost: number; profileReward:number; luckyCompleteReward:number; luckyDailyLimit:number; toastSeconds:number; profileHintSeconds:number; luckyHintSeconds:number; profileHintText:string; luckyHintText:string };
+type StickerSettings = { ratingReward: number; likeReward: number; keywordReward: number; keywordRewardLimit: number; commentThreadLimit: number; replyReward: number; luckyCost: number; vipUploadCost: number; profileReward:number; luckyCompleteReward:number; luckyDailyLimit:number; toastSeconds:number; profileHintSeconds:number; profileHintText:string; luckyHintText:string; platinumRankBaseReward?:number; platinumRankMultiplier?:number; emeraldRankReward?:number; diamondRankReward?:number };
 type StickerSummary = { balance: number; transactions?: StickerTransaction[]; canGrant: boolean; isSuperAdmin: boolean };
 interface StickersModalProps {
   isOpen: boolean; onClose: () => void; currentUser: UserProfile | null; tracks: Track[];
@@ -18,7 +18,7 @@ interface StickersModalProps {
 const historyCache = new Map<string, StickerTransaction[]>();
 const field = 'w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100';
 const primary = { backgroundColor: 'var(--color-primary,#c06c84)' };
-const actions: Record<string,string> = {profile_reward:'完善個人資料',lucky_complete_reward:'好手氣完聽獎勵',initial:'會員初始貼紙',rating_reward:'評價錄音',like_reward:'按讚錄音',keyword_reward:'新增網友關鍵字',comment_reward:'聽完後分享心得',reply_reward:'回覆他人心得',comment_like_reward:'按讚他人心得',comment_reward_reversal:'刪除心得扣回',track_unlock_cost:'解鎖錄音',vip_upload_cost:'建立私秘VIP',lucky_cost:'好手氣',manual_grant:'人工加貼紙'};
+const actions: Record<string,string> = {profile_reward:'完善個人資料',rank_approval_reward:'獎銜審核獎勵',lucky_complete_reward:'好手氣完聽獎勵',initial:'會員初始貼紙',rating_reward:'評價錄音',like_reward:'按讚錄音',keyword_reward:'新增網友關鍵字',comment_reward:'聽完後分享心得',reply_reward:'回覆他人心得',comment_like_reward:'按讚他人心得',comment_reward_reversal:'刪除心得扣回',track_unlock_cost:'解鎖錄音',vip_upload_cost:'建立私秘VIP',lucky_cost:'好手氣',manual_grant:'人工加貼紙',manual_grant_debit:'加發貼紙給下線'};
 async function requestJson(url: string, options?: RequestInit) {
   const response = await fetch(url, options); const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || '操作失敗，請稍後再試');
@@ -113,6 +113,7 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
           {error && <div role="alert" className="p-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs">{error}</div>}
           {tab==='history' && <><div className="rounded-2xl p-3 text-white text-center" style={primary}><p className="text-xs">目前可用貼紙</p><p className="text-4xl font-black mt-1">{summary?formatStickerAmount(summary.balance):'—'} 張</p></div><h3 className="font-black">來源與消耗紀錄</h3>{transactions(summary?.transactions || [])}</>}
           {tab==='grant' && canGrant && <div className="space-y-3">
+            {!superAdmin && <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 px-3 py-2 text-xs leading-relaxed">加發給下線的貼紙會從你自己的餘額扣除。目前可用：<strong>{formatStickerAmount(summary?.balance || 0)} 張</strong>。</div>}
             <input aria-label="搜尋下線名字" value={targetSearch} onChange={e=>setTargetSearch(e.target.value)} placeholder={superAdmin?'搜尋會員名字':'搜尋下線名字'} className={field}/>
             <ThemedSelect aria-label="選擇下線" value={targetUserId} onChange={e=>setTargetUserId(e.target.value)} className={field}><option value="">{superAdmin?'選擇會員':'選擇下線'}</option>{filteredTargets.map(target=><option key={target.id} value={target.id}>{target.name}（{target.approvedRank || target.rank || '會員'}）</option>)}</ThemedSelect>
             <label className="block font-bold">加貼紙張數<ThemedSelect value={grantAmount} onChange={e=>setGrantAmount(e.target.value)} className={`${field} mt-1`}>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n} 張</option>)}</ThemedSelect></label>
@@ -130,11 +131,16 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
           {tab==='rules' && canManageRules && (settings?<form className="space-y-3" onSubmit={e=>{e.preventDefault();void saveRules();}}>
             {([{title:'獲取貼紙',items:[['評價','ratingReward'],['按讚（錄音或他人心得）','likeReward'],['新增網友關鍵字','keywordReward'],['每人每支錄音關鍵字獎勵上限','keywordRewardLimit'],['同篇心得區可獲得貼紙總上限（本人心得＋回覆他人留言）','commentThreadLimit'],['回覆他人心得','replyReward']]},{title:'消耗貼紙',items:[['好手氣','luckyCost'],['上傳私秘VIP','vipUploadCost']]}] as const).map(group=><div key={group.title} className="rounded-2xl bg-slate-50 dark:bg-slate-800/70 p-3 space-y-3 border border-slate-200 dark:border-slate-700"><h3 className="font-black">{group.title}</h3>{group.items.map(([label,key])=><label key={key} className="flex items-center justify-between gap-3 text-xs font-bold"><span className="leading-snug">{label}</span><span className="flex items-center gap-1 shrink-0"><input aria-label={label} type="number" min="0" max="1000" step="0.1" required value={Number.isNaN(settings[key])?'':settings[key]} onChange={e=>setSettings({...settings,[key]:e.target.value===''?NaN:Number(e.target.value)})} className={`${field} !w-20 !px-2`}/>張</span></label>)}</div>)}
             <div className="rounded-2xl border border-slate-200 dark:border-slate-700 p-3 space-y-3"><h3 className="font-bold">個人資料、好手氣與提示</h3>{([
-              ['完整個人資料獎勵','profileReward','張'],['好手氣完聽額外獎勵','luckyCompleteReward','張'],['好手氣每日領取上限','luckyDailyLimit','次'],['全站貼紙異動提示秒數','toastSeconds','秒'],['資料未填完整提示秒數','profileHintSeconds','秒'],['好手氣提示秒數','luckyHintSeconds','秒']
+              ['完整個人資料獎勵','profileReward','張'],['好手氣完聽額外獎勵','luckyCompleteReward','張'],['好手氣每日領取上限','luckyDailyLimit','次'],['全站貼紙異動提示秒數','toastSeconds','秒'],['資料未填完整提示秒數','profileHintSeconds','秒']
             ] as const).map(([label,key,unit])=><label key={key} className="flex justify-between items-center gap-2 text-xs"><span>{label}</span><span><input aria-label={label} required type="number" min={unit==='秒'?0.1:0} max={unit==='秒'?60:1000} step={unit==='次'?1:0.1} value={Number.isNaN(settings[key])?'':settings[key]} onChange={e=>setSettings({...settings,[key]:e.target.value===''?NaN:Number(e.target.value)})} className={`${field} !w-24`}/> {unit}</span></label>)}
               {([['未填完整提示文字','profileHintText'],['好手氣提示文字','luckyHintText']] as const).map(([label,key])=><label key={key} className="block text-xs">{label}（用 {'{x}'} 代入張數）<textarea required maxLength={500} rows={3} value={settings[key]} onChange={e=>setSettings({...settings,[key]:e.target.value})} className={`${field} mt-1`}/></label>)}
-              <p className="text-xs text-slate-500">完善資料每會員領一次。好手氣抽中尚未聽完的錄音，當日聽完可領；同一錄音不重複領取，每日依台灣時間計算。</p>
+              <p className="text-xs text-slate-500">完善資料每會員領一次。好手氣抽中尚未聽完的錄音，當日聽完可領；同一錄音不重複領取，每日依台灣時間計算。好手氣答案會固定顯示在抽中卡片上方，點畫面任意處才關閉。</p>
             </div>
+            {superAdmin && <div className="rounded-2xl border border-slate-200 dark:border-slate-700 p-3 space-y-3"><h3 className="font-bold">白金以上獎銜審核獎勵</h3>
+              {([['白金基礎獎勵','platinumRankBaseReward','張'],['白金獎勵倍數','platinumRankMultiplier','倍'],['翡翠以上審核獎勵','emeraldRankReward','張'],['鑽石以上審核獎勵','diamondRankReward','張']] as const).map(([label,key,unit])=><label key={key} className="flex justify-between items-center gap-2 text-xs"><span>{label}</span><span><input aria-label={label} required type="number" min="0" max={unit==='倍'?100:1000} step="0.1" value={Number.isNaN(Number(settings[key]))?'':settings[key] ?? ''} onChange={e=>setSettings({...settings,[key]:e.target.value===''?NaN:Number(e.target.value)})} className={`${field} !w-24`}/> {unit}</span></label>)}
+              <div className="rounded-xl bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs">目前白金實際發放：<strong>{formatStickerAmount(Number(settings.platinumRankBaseReward || 0) * Number(settings.platinumRankMultiplier || 0))} 張</strong></div>
+              <p className="text-xs text-slate-500">同一會員同一級別只發一次；升到更高級別審核通過時再發該級別獎勵，降級後不會重複領取較低級別獎勵。既有符合會員由系統一次性補發目前最高符合級別。</p>
+            </div>}
             <button type="submit" disabled={busy} className="w-full py-2.5 rounded-xl text-white font-bold disabled:opacity-50" style={primary}>儲存貼紙規則</button>
           </form>:<p role="status" className="text-center text-slate-400 py-4">載入規則中…</p>)}
         </div>

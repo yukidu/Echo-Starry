@@ -25,6 +25,8 @@ test('後端建立貼紙帳本、永久解鎖、規則與通知資料表', () =>
     'member_notifications',
     "'comment_reward_reversal'",
     "'manual_grant'",
+    "'manual_grant_debit'",
+    "'rank_approval_reward'",
     "'lucky_cost'",
     "'vip_upload_cost'",
     'keyword_reward_limit',
@@ -45,6 +47,9 @@ test('錄音解鎖貼紙欄位支援 0 到 50 且 0 保留免貼紙語意', () =
   assert.match(upload, /解鎖本錄音所需貼紙/);
   assert.match(upload, /聽完後留言心得獲得貼紙/);
   assert.match(card, /張貼紙/);
+  assert.match(card, /\[已聽100%\]/);
+  assert.match(card, /commentRewardClaimed/);
+  assert.doesNotMatch(card, /truncate\">\{displayRequiredRank/);
   assert.match(detail, /commentStickerReward/);
   assert.match(read('src/components/CommentsSection.tsx'), /按這裡寫下您的心得收穫/);
 });

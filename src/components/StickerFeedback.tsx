@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 let lastPoint: {x:number;y:number}|null=null;
 let pointTime=0;
 let serial=0;
-let rules:any={toastSeconds:1,profileHintSeconds:1,luckyHintSeconds:2,profileReward:1,luckyCompleteReward:1,profileHintText:'尚有欄位未填，完整填寫可+{x}張貼紙',luckyHintText:'這是宇宙給你的答案\n聽完貼紙額外+{x}張'};
+let rules:any={toastSeconds:1,profileHintSeconds:1,profileReward:1,luckyCompleteReward:1,profileHintText:'尚有欄位未填，完整填寫可+{x}張貼紙',luckyHintText:'這是宇宙給你的答案\n聽完貼紙額外+{x}張'};
 export function setFeedbackRules(next:any){rules={...rules,...next};}
 export function getFeedbackRules(){return rules;}
 export function showStickerNotice(text:string,seconds=rules.toastSeconds){window.dispatchEvent(new CustomEvent('echostars:feedback',{detail:{id:++serial,text,seconds,point:Date.now()-pointTime<3000?lastPoint:null}}));}
