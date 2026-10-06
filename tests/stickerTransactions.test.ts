@@ -77,6 +77,20 @@ test('member initialization is idempotent, cookie sessions work, guests and bloc
   assert.equal((await call(db, token, '/api/stickers/me')).status, 401);
 });
 
+test('initial sticker reward uses the earning multiplier only when first credited and never rewrites history', async () => {
+  const db=database();
+  const platinum=await session(db,'platinum');
+  const member=await session(db,'member');
+  assert.equal(await balance(db,platinum),112);
+  const platinumInitial:any=db.sqlite.prepare("SELECT deltaUnits FROM sticker_transactions WHERE userId='platinum' AND type='initial'").get();
+  const memberInitial:any=db.sqlite.prepare("SELECT deltaUnits FROM sticker_transactions WHERE userId='member' AND type='initial'").get();
+  assert.equal(platinumInitial.deltaUnits,120);
+  assert.equal(memberInitial.deltaUnits,60);
+  db.sqlite.exec("UPDATE sticker_settings SET valueUnits=30 WHERE key='platinum_rank_multiplier_tenths'");
+  assert.equal(await balance(db,platinum),112);
+  assert.equal(db.sqlite.prepare("SELECT deltaUnits FROM sticker_transactions WHERE userId='platinum' AND type='initial'").get()?.deltaUnits,120);
+});
+
 test('parallel unlock is permanent, charges once and cannot bypass rank or VIP', async () => {
   const db = database(); const token = await session(db, 'member');
   db.sqlite.exec("UPDATE tracks SET stickerUnlockCost = 2, requiredRank = '白金' WHERE id = 'track'");
@@ -166,10 +180,10 @@ test('manual grant is limited to approved platinum downlines, retry has one cred
   const body = { targetUserId:'member', amount:3, reason:'鼓勵學習', operationId:'grant-1' };
   assert.equal((await call(db,token,'/api/stickers/grant','POST',{...body,targetUserId:'other'})).status,403);
   assert.equal((await call(db,token,'/api/stickers/grant','POST',{...body,amount:-1})).status,400);
-  assert.equal(await balance(db,token),106);
+  assert.equal(await balance(db,token),112);
   await call(db,token,'/api/stickers/grant','POST',body);
   await call(db,token,'/api/stickers/grant','POST',body);
-  assert.equal(await balance(db,member),9); assert.equal(await balance(db,token),103);
+  assert.equal(await balance(db,member),9); assert.equal(await balance(db,token),109);
   assert.equal(count(db,'manual_grant'),1); assert.equal(count(db,'manual_grant_debit'),1);
   const notices = await call(db,member,'/api/stickers/notifications');
   assert.equal(notices.data.notifications.length,1);
@@ -182,15 +196,15 @@ test('downline grants cannot overdraw the issuer while super-admin grants do not
   const db=database();const platinum=await session(db,'platinum');const admin=await session(db,'admin');const member=await session(db,'member');
   await call(db,platinum,'/api/stickers/summary');
   db.sqlite.exec("DELETE FROM sticker_transactions WHERE userId='platinum' AND type='rank_approval_reward'");
-  assert.equal(await balance(db,platinum),6);
-  assert.equal((await call(db,platinum,'/api/stickers/grant','POST',{targetUserId:'member',amount:5,reason:'先發五張',operationId:'debit-1'})).status,200);
-  assert.equal(await balance(db,platinum),1);
-  assert.equal((await call(db,platinum,'/api/stickers/grant','POST',{targetUserId:'member',amount:2,reason:'餘額不足',operationId:'debit-2'})).status,402);
-  assert.equal(await balance(db,member),11);
+  assert.equal(await balance(db,platinum),12);
+  assert.equal((await call(db,platinum,'/api/stickers/grant','POST',{targetUserId:'member',amount:10,reason:'先發十張',operationId:'debit-1'})).status,200);
+  assert.equal(await balance(db,platinum),2);
+  assert.equal((await call(db,platinum,'/api/stickers/grant','POST',{targetUserId:'member',amount:3,reason:'餘額不足',operationId:'debit-2'})).status,402);
+  assert.equal(await balance(db,member),16);
   const adminBefore=await balance(db,admin);
   assert.equal((await call(db,admin,'/api/stickers/grant','POST',{targetUserId:'member',amount:2,reason:'管理發放',operationId:'admin-free'})).status,200);
   assert.equal(await balance(db,admin),adminBefore);
-  assert.equal(await balance(db,member),13);
+  assert.equal(await balance(db,member),18);
 });
 
 test('existing and future approved leaders receive configurable one-time rank sticker rewards', async () => {
@@ -200,8 +214,8 @@ test('existing and future approved leaders receive configurable one-time rank st
   const defaults=(await call(db,admin,'/api/stickers/settings')).data.settings;
   assert.equal(defaults.platinumRankReward,100);assert.equal(defaults.platinumEarningMultiplier,2);
   assert.equal(defaults.emeraldRankReward,300);assert.equal(defaults.diamondRankReward,500);
-  assert.equal(Number((db.sqlite.prepare("SELECT SUM(deltaUnits)/10.0 AS n FROM sticker_transactions WHERE userId='platinum'").get() as any).n),106);
-  assert.equal(Number((db.sqlite.prepare("SELECT SUM(deltaUnits)/10.0 AS n FROM sticker_transactions WHERE userId='emerald'").get() as any).n),306);
+  assert.equal(Number((db.sqlite.prepare("SELECT SUM(deltaUnits)/10.0 AS n FROM sticker_transactions WHERE userId='platinum'").get() as any).n),112);
+  assert.equal(Number((db.sqlite.prepare("SELECT SUM(deltaUnits)/10.0 AS n FROM sticker_transactions WHERE userId='emerald'").get() as any).n),312);
   assert.equal(count(db,'rank_approval_reward'),3);
   assert.equal((await call(db,admin,'/api/stickers/settings','PUT',{...defaults,platinumRankReward:120,platinumEarningMultiplier:2.5,emeraldRankReward:350,diamondRankReward:550})).status,200);
   const audit=(rank:string)=>{db.sqlite.prepare("UPDATE users SET rank=?,rankApproved=0,rankAuditStatus='pending' WHERE id='candidate'").run(rank);return call(db,admin,'/api/users/candidate/audit-rank','PUT',{auditorEmail:'yukidu@gmail.com',rank});};

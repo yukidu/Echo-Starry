@@ -54,7 +54,7 @@ export function buildStickerGuideRows(guide: StickerGuidePayload, tracks: Sticke
   const commentRange = range(tracks.map(track => earned(Number(track.commentStickerReward || 0))), '+') || '+0 張';
   const unlockRange = range(tracks.map(track => Number(track.stickerUnlockCost || 0)), '-');
   const rows: StickerGuideRow[] = [
-    { kind: '增加', behavior: '成為會員', amount: amount(guide.initialReward, '+'), detail: '每個會員帳號一次。' },
+    { kind: '增加', behavior: '成為會員', amount: amount(earned(guide.initialReward), '+'), detail: '每個會員帳號一次；若初始貼紙入帳當下已是已審核白金級以上，會套用目前倍數。' },
     { kind: '增加', behavior: '完整填寫個人資料', amount: amount(earned(settings.profileReward), '+'), detail: '完整填寫所有必要欄位後，每位會員一次。' },
     { kind: '增加', behavior: '首次評價錄音', amount: amount(earned(settings.ratingReward), '+'), detail: '同一支錄音首次有效評價。' },
     { kind: '增加', behavior: '按讚錄音或他人心得', amount: amount(earned(settings.likeReward), '+'), detail: '首次有效按讚；自己的內容不能靠互動取得貼紙。' },
