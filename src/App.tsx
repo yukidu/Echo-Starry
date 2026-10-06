@@ -2084,7 +2084,7 @@ export default function App() {
   };
 
   const luckyRequestPending = useRef(false);
-  const handleLuckyDraw = async (anchor: HTMLElement) => {
+  const handleLuckyDraw = (anchor: HTMLElement) => {
     if (luckyPhase === 'spin' || luckyRequestPending.current) return;
     setIsSearchFocused(false);
     setLuckyAnswerText(null);
@@ -2097,68 +2097,100 @@ export default function App() {
       return;
     }
 
-    // Initial call happens directly inside the user click, so mobile browsers allow Web Audio.
+    // Start the reel immediately from the user's gesture. Server sticker validation runs in parallel.
     getLuckyAudioContext();
     const baseIds = filteredTracks.map(track => track.id);
     const winner = candidates[Math.floor(Math.random() * candidates.length)];
-    let luckyNotice:any={bonus:0,settings:getFeedbackRules()};
-    if (currentUser) {
-      luckyRequestPending.current = true;
-      try {
-        luckyNotice = await apiJson('/api/stickers/lucky-spend', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ operationId: crypto.randomUUID(), trackId: winner.id })
-        });
-        await refreshStickerSummary();
-      } catch (error) {
-        showPermissionAlert(error instanceof Error ? error.message : '貼紙不足，無法使用好手氣', anchor);
-        return;
-      } finally {
-        luckyRequestPending.current = false;
-      }
-    }
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const minSpinSteps = Math.max(16, Math.min(26, candidates.length * 4));
+    let spinStep = 0;
+    let approvalState: 'pending' | 'approved' | 'failed' = currentUser ? 'pending' : 'approved';
+    let approvalError: unknown = null;
+    let luckyNotice: any = { bonus: 0, settings: getFeedbackRules() };
+
+    luckyRequestPending.current = true;
+    setLuckyOrderIds(baseIds);
+    setLuckyWinnerId(null);
+    setLuckyPhase('spin');
+
+    const fail = () => {
+      clearLuckyTimers();
+      luckyRequestPending.current = false;
+      setLuckyPhase('idle');
+      setLuckyOrderIds(null);
+      setLuckyWinnerId(null);
+      setLuckyAnswerText(null);
+      showPermissionAlert(approvalError instanceof Error ? approvalError.message : '貼紙不足或連線失敗，無法召喚繁星解答', anchor);
+    };
 
     const finish = () => {
+      clearLuckyTimers();
+      luckyRequestPending.current = false;
       setLuckyOrderIds(moveTrackIdToSecondSlot(baseIds, winner.id));
       setLuckyWinnerId(winner.id);
       setLuckyPhase('win');
-      if(luckyNotice) {
+      if (luckyNotice) {
         setFeedbackRules(luckyNotice.settings);
-        setLuckyAnswerText(luckyNotice.settings.luckyHintText.replaceAll('{x}',String(luckyNotice.bonus)));
+        setLuckyAnswerText(luckyNotice.settings.luckyHintText.replaceAll('{x}', String(luckyNotice.bonus)));
       }
       playLuckyWin();
     };
 
+    const approvalPromise = currentUser
+      ? apiJson('/api/stickers/lucky-spend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ operationId: crypto.randomUUID(), trackId: winner.id })
+        }).then(data => {
+          luckyNotice = data;
+          approvalState = 'approved';
+          void refreshStickerSummary();
+        }).catch(error => {
+          approvalError = error;
+          approvalState = 'failed';
+        })
+      : Promise.resolve();
+
+    const approvalTimeout = window.setTimeout(() => {
+      if (approvalState === 'pending') {
+        approvalError = new Error('連線時間過久，請再試一次。');
+        approvalState = 'failed';
+      }
+    }, 20000);
+    luckyTimersRef.current.push(approvalTimeout);
+
     if (reducedMotion || candidates.length === 1 || filteredTracks.length === 1) {
-      finish();
+      void approvalPromise.then(() => approvalState === 'approved' ? finish() : fail());
       return;
     }
 
-    const spinSteps = Math.max(16, Math.min(26, candidates.length * 4));
-    const reel = Array.from({ length: spinSteps - 1 }, () =>
-      candidates[Math.floor(Math.random() * candidates.length)]
-    );
-    reel.push(winner);
-
-    const spin = (index: number) => {
-      if (index >= reel.length - 1) {
+    const spin = () => {
+      if (approvalState === 'failed') {
+        fail();
+        return;
+      }
+      if (spinStep >= minSpinSteps && approvalState === 'approved') {
         finish();
         return;
       }
-      const candidate = reel[index];
+
+      const candidate = candidates[Math.floor(Math.random() * candidates.length)];
       setLuckyOrderIds(moveTrackIdToSecondSlot(baseIds, candidate.id));
       setLuckyWinnerId(null);
       setLuckyPhase('spin');
-      playLuckyTick(index);
-      const progress = index / Math.max(1, reel.length - 1);
-      const delay = Math.round(58 + progress * progress * 190);
-      const timer = window.setTimeout(() => spin(index + 1), delay);
+      playLuckyTick(spinStep);
+
+      const progress = Math.min(1, spinStep / Math.max(1, minSpinSteps - 1));
+      const delay = spinStep < minSpinSteps
+        ? Math.round(58 + progress * progress * 190)
+        : 140;
+      spinStep += 1;
+      const timer = window.setTimeout(spin, delay);
       luckyTimersRef.current.push(timer);
     };
 
-    spin(0);
+    spin();
+    void approvalPromise;
   };
 
   // Rated tracks by current user for BW export
@@ -2345,9 +2377,31 @@ export default function App() {
       )}
 
       {/* Main Container */}
-      <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-5 pb-28">
+      <main className={`flex-1 w-full mx-auto px-4 sm:px-6 py-5 pb-28 ${isAdminOpen ? 'max-w-6xl' : 'max-w-3xl'}`}>
         {/* Requirement 16 & 9: 優先切換排行榜與公開通知分頁 */}
-        {isProfileOpen ? (<Suspense fallback={<div role="status" className="py-12 text-center text-slate-500">載入功能中…</div>}>
+        {isAdminOpen ? (<Suspense fallback={<div role="status" className="py-12 text-center text-slate-500">載入功能中…</div>}>
+      <AdminModal
+        presentation="page"
+        onUplinesChanged={()=>{void fetchAllUsers(true);if(currentUser)void apiJson(`/api/users/profile?email=${encodeURIComponent(currentUser.email)}`).then(data=>{if(data.user)setCurrentUser(previous=>{if(!previous || previous.id!==data.user.id)return previous;const updated={...previous,platinumUpline:data.user.platinumUpline,diamondUpline:data.user.diamondUpline};localStorage.setItem('sq_current_user_v1',JSON.stringify(updated));return updated;});}).catch(()=>{});}}
+        isOpen={isAdminOpen}
+        onClose={handleReturnToHomePlaylist}
+        isAdmin={isAdmin}
+        currentUser={currentUser}
+        comments={comments}
+        users={allUsers}
+        tracks={tracks}
+        onUpdateUserFull={handleAdminUpdateUser}
+        onBatchUpdateUsers={handleBatchUpdateUsers}
+        onToggleBlockUser={handleToggleBlockUser}
+        onToggleContributor={handleToggleContributor}
+        onToggleAdminUser={handleToggleAdminUser}
+        onDeleteTrack={handleDeleteTrack}
+        onEditTrack={track => { setTrackToEdit(track); setIsUploadOpen(true); }}
+        onUpdateTrack={handleUpdateTrack}
+        onSwitchToAdmin={() => { setIsAdminOpen(false); setIsProfileOpen(true); }}
+        onCategoriesUpdated={fetchCategories}
+      />
+      </Suspense>) : isProfileOpen ? (<Suspense fallback={<div role="status" className="py-12 text-center text-slate-500">載入功能中…</div>}>
       <ProfileModal
         isOpen={isProfileOpen}
         onClose={handleReturnToHomePlaylist}
@@ -2979,33 +3033,6 @@ export default function App() {
             handlePlayTrack(normalizedTrack, savedPreferredMode);
           }
         }}
-      />
-      </Suspense>}
-
-      {/* Admin Management Modal (Requirement 4, 5, 17: 權限控制、正常進入修改視窗與刪除) */}
-      {isAdminOpen && <Suspense fallback={<div role="status" className="fixed inset-0 z-50 grid place-items-center bg-black/50 text-white">載入功能中…</div>}>
-      <AdminModal
-        onUplinesChanged={()=>{void fetchAllUsers(true);if(currentUser)void apiJson(`/api/users/profile?email=${encodeURIComponent(currentUser.email)}`).then(data=>{if(data.user)setCurrentUser(previous=>{if(!previous || previous.id!==data.user.id)return previous;const updated={...previous,platinumUpline:data.user.platinumUpline,diamondUpline:data.user.diamondUpline};localStorage.setItem('sq_current_user_v1',JSON.stringify(updated));return updated;});}).catch(()=>{});}}
-        isOpen={isAdminOpen}
-        onClose={() => setIsAdminOpen(false)}
-        isAdmin={isAdmin}
-        currentUser={currentUser}
-        comments={comments}
-        users={allUsers}
-        tracks={tracks}
-        onUpdateUserFull={handleAdminUpdateUser}
-        onBatchUpdateUsers={handleBatchUpdateUsers}
-        onToggleBlockUser={handleToggleBlockUser}
-        onToggleContributor={handleToggleContributor}
-        onToggleAdminUser={handleToggleAdminUser}
-        onDeleteTrack={handleDeleteTrack}
-        onEditTrack={track => {
-          setTrackToEdit(track);
-          setIsUploadOpen(true);
-        }}
-        onUpdateTrack={handleUpdateTrack}
-        onSwitchToAdmin={() => { setIsAdminOpen(false); setIsProfileOpen(true); }}
-        onCategoriesUpdated={fetchCategories}
       />
       </Suspense>}
 
