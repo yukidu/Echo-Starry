@@ -682,6 +682,19 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
   if (!path.startsWith('/api/stickers')) return null;
   if (path === '/api/stickers/public-settings' && method === 'GET') return json({settings:settingsForClient(await settingMap(db))});
   if (!actor) return json({ error: '貼紙為會員專屬，請先登入' }, 401);
+  if (path === '/api/stickers/guide' && method === 'GET') {
+    const values = await settingMap(db);
+    const tier = actor.rankApproved ? rankRewardTier(actor.approvedRank || actor.rank) : null;
+    const rankUnits = tier ? rankRewardUnits(values, tier) : 0;
+    return json({ guide: {
+      initialReward: unitsToStickers(INITIAL_STICKER_UNITS),
+      settings: settingsForClient(values),
+      rankReward: tier && rankUnits > 0 ? { tier, label: rankRewardLabel(tier), amount: unitsToStickers(rankUnits) } : null,
+      canGrant: canGrantStickers(actor),
+      isSuperAdmin: isSuperAdmin(actor),
+      canUploadVip: isSuperAdmin(actor) || Boolean(actor.canUpload) || Boolean(actor.isContributor)
+    } });
+  }
   await ensureInitialStickers(db, actor.id);
 
   if (path === '/api/stickers/reconcile' && method === 'POST') {
