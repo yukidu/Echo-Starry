@@ -18,22 +18,31 @@ jobs:
         with:
           ref: safe/v102-ui-admin-lucky-upline
           fetch-depth: 0
-      - name: Insert helper block into current sticker router
+      - name: Insert helper block from original prepared patch
         shell: bash
         run: |
           set -euo pipefail
+          git show 93baef42c1cc8bef879892b01d2cefc6829afc45:scripts/v102-couple.patch.gz.b64 | base64 -d | gzip -d > /tmp/v102-couple.patch
           python - <<'PY'
           from pathlib import Path
-          import base64, gzip
+          patch = Path('/tmp/v102-couple.patch').read_text()
+          start = patch.index("+type UplineKind = 'platinum' | 'diamond';")
+          end = patch.index(" async function awardRankApprovalReward", start)
+          helper_lines = []
+          for line in patch[start:end].splitlines():
+              if line.startswith('+'):
+                  helper_lines.append(line[1:])
+              elif line.startswith(' '):
+                  helper_lines.append(line[1:])
+          helper = '\n'.join(helper_lines).rstrip() + '\n\n'
           router = Path('worker/stickerRouter.ts')
           text = router.read_text()
-          helper = gzip.decompress(base64.b64decode(Path('scripts/v102-helper.ts.gz.b64').read_text().strip())).decode()
           if 'async function handleCoupleApi(' not in text:
               marker = "const RANK_TIER_PRIORITY: Record<RankRewardTier, number>"
               idx = text.find(marker)
               if idx < 0:
                   raise SystemExit('RANK_TIER_PRIORITY marker not found')
-              text = text[:idx] + helper + "\n" + text[idx:]
+              text = text[:idx] + helper + text[idx:]
               router.write_text(text)
           PY
           rm -f scripts/v102-helper.ts.gz.b64 .github/workflows/insert-v102-helper.yml
