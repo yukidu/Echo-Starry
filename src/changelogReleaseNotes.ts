@@ -136,8 +136,24 @@ export const ORGANIZATION_RELEASE_NOTES: ChangelogEntry = {
   ]
 };
 
+export const PLATINUM_MULTIPLIER_RELEASE_NOTES: ChangelogEntry = {
+  version: 'v4.4', date: '2026/10/07', isLatest: true,
+  summary: '修正白金級以上獲取貼紙倍數，讓倍數真正套用到所有一般貼紙收入，並與固定獎銜審核獎勵分開。',
+  added: [
+    '「如何獲得貼紙？」規則表會依登入會員身分直接顯示目前適用的白金級以上獲取貼紙倍數，以及乘完後的實際獎勵張數。'
+  ],
+  modified: [
+    '已審核白金級以上會員的完整資料、評價、按讚、關鍵字、心得、回覆、召喚繁星完成獎勵與人工收到貼紙等一般正數收入，統一套用超級管理員設定的倍數。',
+    '白金級以上倍數只作用在一般系統獎勵，不放大任何貼紙消耗；人工加貼紙完全不套倍數，加幾張就扣幾張、收幾張。',
+    '白金、翡翠、鑽石獎銜審核獎勵維持各自設定張數，不套用白金級以上獲取倍數。'
+  ],
+  removed: [
+    '移除過去把「白金獎勵倍數」只拿來計算白金獎銜審核獎勵的錯誤邏輯。'
+  ]
+};
+
 export const STICKER_GUIDE_RELEASE_NOTES: ChangelogEntry = {
-  version: 'v4.3', date: '2026/10/07', isLatest: true,
+  version: 'v4.3', date: '2026/10/07',
   summary: '我的貼紙紀錄新增可收合的貼紙取得／消耗規則表，依登入會員身分與目前設定顯示實際張數。',
   added: [
     '「我的貼紙＞貼紙紀錄」最上方新增「如何獲得貼紙？ ▼展開」，點一下以表格查看所有貼紙增加與消耗方式，再點一次可收起。',
@@ -150,7 +166,7 @@ export const STICKER_GUIDE_RELEASE_NOTES: ChangelogEntry = {
   removed: []
 };
 
-const RELEASE_NOTES = [STICKER_GUIDE_RELEASE_NOTES, ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
+const RELEASE_NOTES = [PLATINUM_MULTIPLIER_RELEASE_NOTES, STICKER_GUIDE_RELEASE_NOTES, ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
 
 const runtime = window as Window &
   typeof globalThis & {

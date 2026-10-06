@@ -198,19 +198,35 @@ test('existing and future approved leaders receive configurable one-time rank st
   db.sqlite.exec("INSERT INTO users(id,name,email,rank,approvedRank,rankApproved,canUpload) VALUES ('emerald','翡翠會員','emerald@example.com','翡翠','翡翠',1,0),('candidate','候選會員','candidate@example.com','白金','無',0,0)");
   const admin=await session(db,'admin');
   const defaults=(await call(db,admin,'/api/stickers/settings')).data.settings;
-  assert.equal(defaults.platinumRankBaseReward,50);assert.equal(defaults.platinumRankMultiplier,2);
+  assert.equal(defaults.platinumRankReward,100);assert.equal(defaults.platinumEarningMultiplier,2);
   assert.equal(defaults.emeraldRankReward,300);assert.equal(defaults.diamondRankReward,500);
   assert.equal(Number((db.sqlite.prepare("SELECT SUM(deltaUnits)/10.0 AS n FROM sticker_transactions WHERE userId='platinum'").get() as any).n),106);
   assert.equal(Number((db.sqlite.prepare("SELECT SUM(deltaUnits)/10.0 AS n FROM sticker_transactions WHERE userId='emerald'").get() as any).n),306);
   assert.equal(count(db,'rank_approval_reward'),3);
-  assert.equal((await call(db,admin,'/api/stickers/settings','PUT',{...defaults,platinumRankBaseReward:60,platinumRankMultiplier:2.5,emeraldRankReward:350,diamondRankReward:550})).status,200);
+  assert.equal((await call(db,admin,'/api/stickers/settings','PUT',{...defaults,platinumRankReward:120,platinumEarningMultiplier:2.5,emeraldRankReward:350,diamondRankReward:550})).status,200);
   const audit=(rank:string)=>{db.sqlite.prepare("UPDATE users SET rank=?,rankApproved=0,rankAuditStatus='pending' WHERE id='candidate'").run(rank);return call(db,admin,'/api/users/candidate/audit-rank','PUT',{auditorEmail:'yukidu@gmail.com',rank});};
   assert.equal((await audit('白金')).status,200);
-  const candidate=await session(db,'candidate');assert.equal(await balance(db,candidate),156);
-  assert.equal((await audit('白金')).status,200);assert.equal(await balance(db,candidate),156);
-  assert.equal((await audit('翡翠')).status,200);assert.equal(await balance(db,candidate),506);
-  assert.equal((await audit('鑽石')).status,200);assert.equal(await balance(db,candidate),1056);
-  assert.equal((await audit('白金')).status,200);assert.equal(await balance(db,candidate),1056);
+  const candidate=await session(db,'candidate');assert.equal(await balance(db,candidate),126);
+  assert.equal((await audit('白金')).status,200);assert.equal(await balance(db,candidate),126);
+  assert.equal((await audit('翡翠')).status,200);assert.equal(await balance(db,candidate),476);
+  assert.equal((await audit('鑽石')).status,200);assert.equal(await balance(db,candidate),1026);
+  assert.equal((await audit('白金')).status,200);assert.equal(await balance(db,candidate),1026);
+});
+
+test('approved platinum ordinary earnings use the configured multiplier while rank rewards stay fixed', async () => {
+  const db=database();const platinum=await session(db,'platinum');const admin=await session(db,'admin');
+  const rules=(await call(db,admin,'/api/stickers/settings')).data.settings;
+  assert.equal((await call(db,admin,'/api/stickers/settings','PUT',{...rules,platinumEarningMultiplier:2.5,platinumRankReward:100})).status,200);
+  assert.equal((await call(db,platinum,'/api/tracks/track/rate','POST',{score:5})).status,200);
+  const rating:any=db.sqlite.prepare("SELECT deltaUnits FROM sticker_transactions WHERE userId='platinum' AND type='rating_reward'").get();
+  assert.equal(rating.deltaUnits,3);
+  assert.equal((await call(db,admin,'/api/stickers/grant','POST',{targetUserId:'platinum',amount:2,reason:'倍數測試',operationId:'multiplier-grant'})).status,200);
+  const grant:any=db.sqlite.prepare("SELECT deltaUnits FROM sticker_transactions WHERE userId='platinum' AND type='manual_grant' AND sourceId='multiplier-grant'").get();
+  assert.equal(grant.deltaUnits,20);
+  const rank:any=db.sqlite.prepare("SELECT deltaUnits FROM sticker_transactions WHERE userId='platinum' AND type='rank_approval_reward'").get();
+  assert.equal(rank.deltaUnits,1000);
+  const guide=(await call(db,platinum,'/api/stickers/guide')).data.guide;
+  assert.equal(guide.earningMultiplier,2.5);assert.equal(guide.rankReward.amount,100);
 });
 
 test('batch recording settings support more than 100 ids and preserve omitted fields', async () => {
