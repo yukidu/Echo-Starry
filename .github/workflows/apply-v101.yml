@@ -16,12 +16,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: safe/v101-sticker-rank-lucky-ui
-      - name: Apply prepared patch
+      - name: Reassemble and apply v101 patch
         run: |
-          base64 -d scripts/v101.patch.gz.b64 | gzip -d > /tmp/v101.patch
+          cat scripts/v101.b64.part* | base64 -d | gzip -d > /tmp/v101.patch
           git apply -p2 --check /tmp/v101.patch
           git apply -p2 /tmp/v101.patch
-          rm scripts/v101.patch.gz.b64 .github/workflows/apply-v101.yml
+          rm -f scripts/v101.b64.part* scripts/v101.patch.gz.b64 scripts/v101-part01.patch .github/workflows/apply-v101.yml
       - name: Commit v101 changes
         run: |
           git config user.name "github-actions[bot]"
