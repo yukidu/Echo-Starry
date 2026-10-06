@@ -1,0 +1,36 @@
+name: Wire v102 organization architecture
+
+on:
+  push:
+    branches: [safe/v102-clean-architecture]
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: safe/v102-clean-architecture
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Wire organization model into existing routes
+        run: node .github/scripts/wire-v102-organization.mjs
+      - name: Verify TypeScript and build
+        run: |
+          npm install --no-audit --no-fund
+          npm run lint
+          npm run build
+      - name: Commit wiring and remove temporary tooling
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/scripts/wire-v102-organization.mjs .github/workflows/wire-v102-organization.yml
+          git add worker/categoryIntegrityRouter.ts worker/stickerRouter.ts worker/adminUserDeleteRouter.ts
+          git commit -m "v102: wire canonical organization relationships"
+          git push origin HEAD:safe/v102-clean-architecture
