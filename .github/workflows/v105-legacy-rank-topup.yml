@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Apply patch
-        run: python scripts/v105_topup_patch.py
+        run: python scripts/v105_topup_patch_fix.py && python scripts/v105_topup_patch.py
       - name: Full test suite
         run: npm test
       - name: TypeScript diagnostic
