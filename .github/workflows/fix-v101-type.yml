@@ -1,0 +1,36 @@
+name: Fix v101 type check
+
+on:
+  push:
+    branches:
+      - safe/v101-sticker-rank-lucky-ui
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ !contains(github.event.head_commit.message, '[v101 type fixed]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: safe/v101-sticker-rank-lucky-ui
+      - name: Fix strict sqlite test typing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('tests/stickerTransactions.test.ts')
+          s=p.read_text()
+          s=s.replace("Number(db.sqlite.prepare(\"SELECT SUM(deltaUnits)/10.0 AS n FROM sticker_transactions WHERE userId='platinum'\").get().n)", "Number((db.sqlite.prepare(\"SELECT SUM(deltaUnits)/10.0 AS n FROM sticker_transactions WHERE userId='platinum'\").get() as any).n)")
+          s=s.replace("Number(db.sqlite.prepare(\"SELECT SUM(deltaUnits)/10.0 AS n FROM sticker_transactions WHERE userId='emerald'\").get().n)", "Number((db.sqlite.prepare(\"SELECT SUM(deltaUnits)/10.0 AS n FROM sticker_transactions WHERE userId='emerald'\").get() as any).n)")
+          p.write_text(s)
+          PY
+          rm .github/workflows/fix-v101-type.yml
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "test: 修正 v101 嚴格型別檢查 [v101 type fixed]"
+          git push origin HEAD:safe/v101-sticker-rank-lucky-ui
