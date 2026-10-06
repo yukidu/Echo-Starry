@@ -7,6 +7,7 @@ const learningRouter = readFileSync(new URL('../worker/learningCardRouter.ts', i
 const playbackRouter = readFileSync(new URL('../worker/playbackOwnerRouter.ts', import.meta.url), 'utf8');
 const sessionCookieRouter = readFileSync(new URL('../worker/sessionCookieRouter.ts', import.meta.url), 'utf8');
 const categoryRouter = readFileSync(new URL('../worker/categoryIntegrityRouter.ts', import.meta.url), 'utf8');
+const organizationRouter = readFileSync(new URL('../worker/organizationRouter.ts', import.meta.url), 'utf8');
 const adminUserDeleteRouter = readFileSync(new URL('../worker/adminUserDeleteRouter.ts', import.meta.url), 'utf8');
 const privacyRouter = readFileSync(new URL('../worker/privacyCrawlerRouter.ts', import.meta.url), 'utf8');
 const bridge = readFileSync(new URL('../src/googleIdentityBridge.ts', import.meta.url), 'utf8');
@@ -86,11 +87,12 @@ test('sensitive write routes bind identity to the verified session', () => {
   assert.match(authRouter, /只有超級管理員可執行此操作/);
 });
 
-test('wrapper order preserves privacy, member deletion, categories, cookie continuity, playback and auth security', () => {
+test('wrapper order preserves privacy, member deletion, categories, organizations, cookie continuity, playback and auth security', () => {
   assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
   assert.match(privacyRouter, /import appWorker from '\.\/adminUserDeleteRouter'/);
   assert.match(adminUserDeleteRouter, /import appWorker from '\.\/categoryIntegrityRouter'/);
-  assert.match(categoryRouter, /import appWorker from '\.\/stickerRouter'/);
+  assert.match(categoryRouter, /import appWorker from '\.\/organizationRouter'/);
+  assert.match(organizationRouter, /import appWorker from '\.\/stickerRouter'/);
   const stickerRouter = readFileSync(new URL('../worker/stickerRouter.ts', import.meta.url), 'utf8');
   assert.match(stickerRouter, /import appWorker from '\.\/sessionCookieRouter'/);
   assert.match(sessionCookieRouter, /import appWorker from '\.\/playbackOwnerRouter'/);

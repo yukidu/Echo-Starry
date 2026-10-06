@@ -1,6 +1,6 @@
 import { setFeedbackRules } from './StickerFeedback';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Trophy, X, History, SlidersHorizontal, ListChecks, PlusCircle, Search, ArrowUpRight } from 'lucide-react';
+import { Trophy, X, History, SlidersHorizontal, ListChecks, PlusCircle, Search, ArrowUpRight, Copy, Share2 } from 'lucide-react';
 import type { Track, UserProfile } from '../types';
 import { formatStickerAmount, isPlatinumOrAboveRank } from '../../shared/stickers';
 import { ThemedSelect } from './ThemedSelect';
@@ -14,6 +14,7 @@ interface StickersModalProps {
   initialSummary?: StickerSummary | null;
   onTracksUpdated?: (tracks: Track[]) => void; onStickerChanged?: () => void;
   onOpenSource?: (source: StickerSource) => void;
+  onRequireProfileEdit?: () => void;
 }
 const historyCache = new Map<string, StickerTransaction[]>();
 const field = 'w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100';
@@ -24,11 +25,12 @@ async function requestJson(url: string, options?: RequestInit) {
   if (!response.ok) throw new Error(data.error || '操作失敗，請稍後再試');
   return data;
 }
-export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,currentUser,tracks,initialSummary,onTracksUpdated,onStickerChanged,onOpenSource}) => {
+export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,currentUser,tracks,initialSummary,onTracksUpdated,onStickerChanged,onOpenSource,onRequireProfileEdit}) => {
   // Tabs are available from the signed-in profile immediately; every API still checks the live session.
   const superAdmin = currentUser?.email?.trim().toLowerCase() === 'yukidu@gmail.com' || currentUser?.role === '超級管理員';
   const canManageRules = superAdmin || Boolean(currentUser?.isAdminUser) || currentUser?.role === '管理員';
   const canGrant = superAdmin || Boolean(currentUser?.rankApproved && isPlatinumOrAboveRank(currentUser.approvedRank || currentUser.rank));
+  const canCreateDownlineInvite = Boolean(currentUser?.rankApproved && isPlatinumOrAboveRank(currentUser.approvedRank || currentUser.rank));
   const [summary,setSummary] = useState<StickerSummary | null>(initialSummary || null);
   const [tab,setTab] = useState<'history'|'grant'|'batch'|'rules'>('history');
   const [error,setError] = useState(''); const [busy,setBusy] = useState(false); const [loading,setLoading] = useState(true);
@@ -38,6 +40,9 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
   const [grantAmount,setGrantAmount] = useState('1'); const [grantReason,setGrantReason] = useState('');
   const [trackSearch,setTrackSearch] = useState(''); const [selectedTrackIds,setSelectedTrackIds] = useState<string[]>([]);
   const [batchUnlockCost,setBatchUnlockCost] = useState(''); const [batchCommentReward,setBatchCommentReward] = useState('');
+  const [inviteInfo,setInviteInfo] = useState<{url:string;dealerId:string;displayName:string;kind:'platinum'|'diamond'} | null>(null);
+  const [inviteBusy,setInviteBusy] = useState(false);
+  const [inviteNotice,setInviteNotice] = useState('');
   const requestSequence = useRef(0); const mutationPending = useRef(false);
   const grantOperation = useRef<{signature:string;id:string} | null>(null);
   const notifyChanged = () => { onStickerChanged?.(); window.dispatchEvent(new CustomEvent('echostars:sticker-changed')); };
@@ -87,6 +92,33 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
     const data=await requestJson('/api/stickers/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(settings)});
     setSettings(data.settings);setFeedbackRules(data.settings);notifyChanged();
   });
+  const copyText = async (text: string) => {
+    if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return; }
+    const input=document.createElement('textarea');input.value=text;input.style.position='fixed';input.style.opacity='0';document.body.appendChild(input);input.select();document.execCommand('copy');input.remove();
+  };
+  const ensureInviteInfo = async () => {
+    if (!currentUser?.amwayId?.trim()) { onRequireProfileEdit?.(); return null; }
+    if (inviteInfo) return inviteInfo;
+    setInviteBusy(true);setInviteNotice('');setError('');
+    try {
+      const data=await requestJson('/api/organization/invite-link');
+      const info={url:String(data.url||''),dealerId:String(data.dealerId||''),displayName:String(data.displayName||currentUser.name||''),kind:data.kind as 'platinum'|'diamond'};
+      setInviteInfo(info);return info;
+    } catch(reason) { setError(reason instanceof Error?reason.message:'無法產生專屬網址');return null; }
+    finally { setInviteBusy(false); }
+  };
+  const copyInvite = async () => {
+    const info=await ensureInviteInfo();if(!info)return;
+    try { await copyText(info.url);setInviteNotice('專屬網址已複製'); } catch { setError('無法複製網址，請再試一次'); }
+  };
+  const shareInvite = async () => {
+    const info=await ensureInviteInfo();if(!info)return;
+    const text=`點開連結並登入繁星回聲，即可綁定成為 ${info.displayName} 的下線。`;
+    try {
+      if (navigator.share) await navigator.share({title:'綁定成為我下線',text,url:info.url});
+      else { await copyText(info.url);setInviteNotice('此裝置沒有分享選單，已幫您複製網址'); }
+    } catch(reason:any) { if (reason?.name!=='AbortError') setError('分享失敗，請再試一次'); }
+  };
   const transactions = (rows: StickerTransaction[]) => <div className="space-y-1">
     {loading && !rows.length ? <p role="status" className="text-center text-slate-400 py-4">載入紀錄中…</p> : !rows.length ? <p className="text-center text-slate-400 py-4">目前沒有紀錄</p> : rows.map(tx => <div key={tx.id} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700">
       <div className="min-w-0 flex-1 leading-tight">
@@ -113,6 +145,12 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
           {error && <div role="alert" className="p-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs">{error}</div>}
           {tab==='history' && <><div className="rounded-2xl p-3 text-white text-center" style={primary}><p className="text-xs">目前可用貼紙</p><p className="text-4xl font-black mt-1">{summary?formatStickerAmount(summary.balance):'—'} 張</p></div><h3 className="font-black">來源與消耗紀錄</h3>{transactions(summary?.transactions || [])}</>}
           {tab==='grant' && canGrant && <div className="space-y-3">
+            {canCreateDownlineInvite && <section aria-label="綁定成為我下線" className="rounded-2xl border border-slate-200 dark:border-slate-700 p-3 space-y-2 bg-slate-50 dark:bg-slate-800/60">
+              <div><h3 className="font-black">綁定成為我下線</h3><p className="text-xs text-slate-500 dark:text-slate-400 mt-1">分享您的專屬網址。已登入會員點開後，系統會依您或夫妻共同事業體的最高已審核獎銜，自動綁定上手白金或上手鑽石。</p></div>
+              {currentUser?.amwayId?.trim() ? <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs break-all"><p className="font-bold">直銷商編號：{currentUser.amwayId.trim()}</p>{inviteInfo?.displayName && <p className="text-slate-500 mt-0.5">共同顯示：{inviteInfo.displayName}</p>}{inviteInfo?.url && <p className="text-slate-500 mt-1">{inviteInfo.url}</p>}</div> : <button type="button" onClick={onRequireProfileEdit} className="w-full rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs font-bold text-amber-700 dark:text-amber-300">請先填寫基本資料的「直銷商編號」</button>}
+              {inviteNotice && <p role="status" className="text-xs font-bold text-emerald-600">{inviteNotice}</p>}
+              <div className="grid grid-cols-2 gap-2"><button type="button" disabled={inviteBusy} onClick={()=>void copyInvite()} className="py-2.5 rounded-xl text-white font-bold flex items-center justify-center gap-1.5 disabled:opacity-50" style={primary}><Copy className="w-4 h-4"/>複製網址</button><button type="button" disabled={inviteBusy} onClick={()=>void shareInvite()} className="py-2.5 rounded-xl text-white font-bold flex items-center justify-center gap-1.5 disabled:opacity-50" style={primary}><Share2 className="w-4 h-4"/>傳 LINE 或 APP</button></div>
+            </section>}
             {!superAdmin && <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 px-3 py-2 text-xs leading-relaxed">加發給下線的貼紙會從你自己的餘額扣除。目前可用：<strong>{formatStickerAmount(summary?.balance || 0)} 張</strong>。</div>}
             <input aria-label="搜尋下線名字" value={targetSearch} onChange={e=>setTargetSearch(e.target.value)} placeholder={superAdmin?'搜尋會員名字':'搜尋下線名字'} className={field}/>
             <ThemedSelect aria-label="選擇下線" value={targetUserId} onChange={e=>setTargetUserId(e.target.value)} className={field}><option value="">{superAdmin?'選擇會員':'選擇下線'}</option>{filteredTargets.map(target=><option key={target.id} value={target.id}>{target.name}（{target.approvedRank || target.rank || '會員'}）</option>)}</ThemedSelect>

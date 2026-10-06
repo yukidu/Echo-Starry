@@ -247,3 +247,29 @@ CREATE TABLE IF NOT EXISTS sticker_lucky_draws (operationId TEXT PRIMARY KEY,use
 CREATE INDEX IF NOT EXISTS sticker_lucky_member ON sticker_lucky_draws(userId,day);
 CREATE TABLE IF NOT EXISTS upline_names (kind TEXT NOT NULL,name TEXT NOT NULL,PRIMARY KEY(kind,name));
 CREATE TABLE IF NOT EXISTS upline_owners (kind TEXT NOT NULL,name TEXT NOT NULL,userId TEXT NOT NULL,PRIMARY KEY(kind,name));
+
+
+-- v102 canonical shared-business organization. Personal member data remains independent.
+CREATE TABLE IF NOT EXISTS organization_groups (
+  id TEXT PRIMARY KEY,
+  dealerId TEXT NOT NULL UNIQUE,
+  createdAt INTEGER NOT NULL,
+  updatedAt INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS organization_members (
+  groupId TEXT NOT NULL,
+  userId TEXT NOT NULL UNIQUE,
+  memberOrder INTEGER NOT NULL DEFAULT 0,
+  joinedAt INTEGER NOT NULL,
+  PRIMARY KEY(groupId,userId)
+);
+CREATE INDEX IF NOT EXISTS organization_members_group ON organization_members(groupId,memberOrder);
+CREATE TABLE IF NOT EXISTS upline_bindings (
+  memberId TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  groupId TEXT NOT NULL,
+  createdAt INTEGER NOT NULL,
+  updatedAt INTEGER NOT NULL,
+  PRIMARY KEY(memberId,kind)
+);
+CREATE INDEX IF NOT EXISTS upline_bindings_group ON upline_bindings(groupId,kind);

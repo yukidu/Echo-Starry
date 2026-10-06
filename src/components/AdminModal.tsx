@@ -52,6 +52,7 @@ import { VipTracksTab } from './VipTracksTab';
 
 interface AdminModalProps {
   isOpen: boolean;
+  presentation?: 'modal' | 'page';
   onClose: () => void;
   isAdmin: boolean;
   currentUser?: UserProfile | null;
@@ -77,6 +78,7 @@ interface AdminModalProps {
 
 export const AdminModal: React.FC<AdminModalProps> = ({
   isOpen,
+  presentation = 'modal',
   onClose,
   isAdmin,
   currentUser,
@@ -643,9 +645,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     }
   };
 
+  const isPagePresentation = presentation === 'page';
+
   return (
-    <div className="app-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl border border-rose-100/60 dark:border-slate-800 my-8">
+    <div className={isPagePresentation ? 'w-full' : 'app-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto'}>
+      <div className={isPagePresentation
+        ? 'bg-white dark:bg-slate-900 rounded-3xl w-full overflow-hidden border border-rose-100/60 dark:border-slate-800'
+        : 'bg-white dark:bg-slate-900 rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl border border-rose-100/60 dark:border-slate-800 my-8'}>
         {/* Header - Requirement 20: 統一底色與麥克風相同色 */}
         <div
           className="p-4 sm:p-5 flex items-center justify-between text-white"
@@ -680,8 +686,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           <button
             onClick={onClose}
             className="p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/20"
+            title={isPagePresentation ? '返回首頁' : '關閉'}
+            aria-label={isPagePresentation ? '返回首頁' : '關閉'}
           >
-            <X className="w-5 h-5" />
+            {isPagePresentation ? <ChevronLeft className="w-5 h-5" /> : <X className="w-5 h-5" />}
           </button>
         </div>
 
@@ -831,7 +839,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         </div>
 
         {/* Tab Content */}
-        <div className="p-4 sm:p-5 max-h-[65vh] overflow-y-auto space-y-3.5 text-xs">
+        <div className={isPagePresentation ? 'p-4 sm:p-5 space-y-3.5 text-xs' : 'p-4 sm:p-5 max-h-[65vh] overflow-y-auto space-y-3.5 text-xs'}>
           {activeTab==='uplines' && <UplineManagement onChanged={onUplinesChanged}/>}
           {/* TAB: 數據中心 (Requirement 2: 白金以上專屬) */}
           {activeTab === 'data-center' && isPlatinumOrAbove && (

@@ -15,17 +15,39 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Full regression suite
-        run: npm test
-      - name: Personal learning card and image exports
-        run: node --import tsx --test tests/imageExportQuality.test.ts tests/learningHistoryAccess.test.ts tests/learningHistoryCompatibility.test.ts tests/learningProgress.test.ts
-      - name: Login session and playback ownership
-        run: node --import tsx --test tests/googleAuthSecurity.test.ts tests/playbackOwnerRouter.test.ts tests/publicLearningHistoryRoute.test.ts
-      - name: Categories community and upload flows
-        run: node --import tsx --test tests/categoryIntegrity.test.ts tests/categoryManagementPolicy.test.ts tests/community.test.ts tests/uploadModalPresentationPolicy.test.ts
-      - name: Sharing PWA privacy and mobile navigation
-        run: node --import tsx --test tests/shareLinks.test.ts tests/releaseIntegrity.test.ts tests/privacyCrawler.test.ts tests/mediaSessionPolicy.test.ts tests/mobileMenuHalfLayout.test.ts tests/mobileMenuWidth.test.ts tests/vipAutoplay.test.ts
+
+      - name: Run every regression test file and report all failures
+        id: tests
+        shell: bash
+        run: |
+          set +e
+          failed=0
+          total=0
+          passed=0
+          for test_file in tests/*.test.ts; do
+            total=$((total + 1))
+            echo ""
+            echo "============================================================"
+            echo "TEST FILE: ${test_file}"
+            echo "============================================================"
+            node --import tsx --test "${test_file}"
+            status=$?
+            if [ ${status} -eq 0 ]; then
+              passed=$((passed + 1))
+              echo "PASS: ${test_file}"
+            else
+              failed=1
+              echo "FAIL: ${test_file} (exit ${status})"
+            fi
+          done
+          echo ""
+          echo "Regression files passed: ${passed}/${total}"
+          exit ${failed}
+
       - name: TypeScript diagnostic
+        if: always()
         run: npm run lint
+
       - name: Production build
+        if: always()
         run: npm run build

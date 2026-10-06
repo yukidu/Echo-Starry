@@ -2,6 +2,7 @@ import { missingProfileFields } from '../shared/profileCompletion';
 import appWorker from './sessionCookieRouter';
 import type { Env } from './index';
 import { canonicalProgressPercent } from '../shared/learningProgress';
+import { canonicalDownlineUserIds, isCanonicalDownlineOf } from './organizationModel';
 import {
   INITIAL_STICKER_UNITS,
   formatStickerAmount,
@@ -848,9 +849,10 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
   if (path === '/api/stickers/grant-targets' && method === 'GET') {
     if (!canGrantStickers(actor)) return json({ error: '目前獎銜沒有加貼紙權限' }, 403);
     const { results } = await db.prepare('SELECT id, name, email, rank, approvedRank, platinumUpline, diamondUpline FROM users WHERE COALESCE(isBlocked, 0) = 0 ORDER BY name').all();
+    const canonicalIds = isSuperAdmin(actor) ? new Set<string>() : new Set(await canonicalDownlineUserIds(db, actor.id));
     const targets = isSuperAdmin(actor)
       ? (results || [])
-      : (results || []).filter((target: any) => target.id !== actor.id && isDownlineOf(target, actor));
+      : (results || []).filter((target: any) => target.id !== actor.id && (canonicalIds.has(target.id) || isDownlineOf(target, actor)));
     return json({ targets });
   }
 
@@ -871,7 +873,8 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
     if (!target) return json({ error: '找不到可用會員' }, 404);
     if (!isSuperAdmin(actor)) {
       if (target.id === actor.id) return json({ error: '不可幫自己加貼紙' }, 403);
-      if (!isDownlineOf(target, actor)) return json({ error: '白金以上會員只能幫自己的下線會員加貼紙' }, 403);
+      const canonicalDownline = await isCanonicalDownlineOf(db, target.id, actor.id);
+      if (!canonicalDownline && !isDownlineOf(target, actor)) return json({ error: '白金以上會員只能幫自己的下線會員加貼紙' }, 403);
     }
     const uniqueKey = `manual-grant:${actor.id}:${operationId}`;
     const debitKey = `manual-grant-debit:${actor.id}:${operationId}`;

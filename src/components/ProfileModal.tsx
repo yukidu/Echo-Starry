@@ -66,6 +66,8 @@ interface ProfileModalProps {
   onRateTrack?: (trackId: string, rating: number) => void;
   onClearListeningHistory?: () => Promise<void>;
   allUsers?: UserProfile[];
+  forceEdit?: boolean;
+  onForceEditHandled?: () => void;
 }
 
 function decodeGoogleJwt(token: string) {
@@ -98,7 +100,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onSelectCategory,
   onRateTrack,
   onClearListeningHistory,
-  allUsers = []
+  allUsers = [],
+  forceEdit = false,
+  onForceEditHandled
 }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'ratings' | 'comments' | 'listening'>('profile');
   const [listeningRecords, setListeningRecords] = useState<Record<string, UserListeningRecord>>({});
@@ -156,6 +160,21 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [organizationDisplayName,setOrganizationDisplayName] = useState('');
+
+  const refreshOrganizationDisplay = async () => {
+    if (!currentUser?.id || !currentUser.amwayId?.trim()) { setOrganizationDisplayName(''); return; }
+    try {
+      const response=await fetch('/api/organization/me');
+      const data=await response.json().catch(()=>({}));
+      if (response.ok) setOrganizationDisplayName(String(data.displayName || currentUser.name || ''));
+    } catch { /* display falls back to the member's own name */ }
+  };
+  useEffect(()=>{ if(isOpen && currentUser) void refreshOrganizationDisplay(); },[isOpen,currentUser?.id,currentUser?.name,currentUser?.amwayId]);
+  useEffect(()=>{
+    if(!isOpen || !forceEdit || !currentUser)return;
+    setName(currentUser.name || '');setAmwayId(currentUser.amwayId || '');setPhone(currentUser.phone || '');setResidence(currentUser.residence || '臺北');setCenter(currentUser.center || '無');setRank(currentUser.rank || '無');setJoinReason(currentUser.joinReason || '事業');setStayReason(currentUser.stayReason || '未填寫');setSponsor(currentUser.sponsor || '');setPlatinumUpline(currentUser.platinumUpline || '');setDiamondUpline(currentUser.diamondUpline || '');setBirthday(currentUser.birthday || '');setAvatar(currentUser.avatar || '');setIsEditing(true);onForceEditHandled?.();
+  },[isOpen,forceEdit,currentUser?.id]);
 
   // Standard Google OAuth 2.0 Sign In
   const handleGoogleSignIn = () => {
@@ -351,6 +370,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
     try {
       await onUpdateProfile(payload);
+      await refreshOrganizationDisplay();
       setIsEditing(false);
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : '資料儲存失敗，請重試。');
@@ -618,7 +638,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                           <div>
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <h3 className="font-bold text-base text-slate-800 dark:text-slate-100">
-                                {currentUser.name}
+                                {organizationDisplayName || currentUser.name}
                               </h3>
                               <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300">
                                 {currentUser.rank}
@@ -631,7 +651,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                             </div>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400">{currentUser.email}</p>
                             <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 font-medium">
-                              安麗編號: {currentUser.amwayId || '未填寫'} • 居住: {currentUser.residence || '未填寫'} • 中心: {currentUser.center || '無'}
+                              直銷商編號: {currentUser.amwayId || '未填寫'} • 居住: {currentUser.residence || '未填寫'} • 中心: {currentUser.center || '無'}
                             </p>
                             <p className="text-[10px] text-slate-400 mt-0.5">
                               本月頭像更換: {currentUploadCount} / 5 次 • 本月資料修改: {currentProfileEditCount} / 5 次
@@ -749,7 +769,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
                         <div>
                           <label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                            安麗編號
+                            直銷商編號
                           </label>
                           <input
                             type="text"
