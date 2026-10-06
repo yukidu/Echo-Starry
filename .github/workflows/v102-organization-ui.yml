@@ -1,0 +1,43 @@
+name: Apply v102 organization UI
+
+on:
+  push:
+    branches:
+      - safe/v102-clean-architecture
+    paths:
+      - scripts/apply-v102-organization-ui.mjs
+      - .github/workflows/v102-organization-ui.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: safe/v102-clean-architecture
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Apply organization UI integration
+        run: node scripts/apply-v102-organization-ui.mjs
+      - name: Full tests
+        run: npm test
+      - name: TypeScript diagnostic
+        run: npm run lint
+      - name: Production build
+        run: npm run build
+      - name: Commit verified integration and remove temporary tools
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm scripts/apply-v102-organization-ui.mjs .github/workflows/v102-organization-ui.yml
+          git add -A
+          git commit -m "v102: connect couple organization and downline invite UI"
+          git push origin HEAD:safe/v102-clean-architecture
