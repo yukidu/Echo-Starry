@@ -1,0 +1,137 @@
+diff -ruN '--exclude=node_modules' echostars_base/echostars/public/sw.js echostars_tmp/echostars/public/sw.js
+--- echostars_base/echostars/public/sw.js	2026-10-06 22:01:38.000000000 +0000
++++ echostars_tmp/echostars/public/sw.js	2026-10-06 15:48:56.337337603 +0000
+@@ -1,4 +1,4 @@
+-const CACHE_NAME = 'echostars-shell-v100';
++const CACHE_NAME = 'echostars-shell-v101';
+ const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-monochrome.svg', '/icon-192.png', '/icon-512.png'];
+ 
+ self.addEventListener('install', event => {
+diff -ruN '--exclude=node_modules' echostars_base/echostars/src/App.tsx echostars_tmp/echostars/src/App.tsx
+--- echostars_base/echostars/src/App.tsx	2026-10-06 22:01:38.000000000 +0000
++++ echostars_tmp/echostars/src/App.tsx	2026-10-06 15:43:53.021318734 +0000
+@@ -326,7 +326,7 @@
+   const [comments, setComments] = useState<Comment[]>([]);
+   const [allComments, setAllComments] = useState<Comment[]>([]);
+   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+-  const [stickerSummary, setStickerSummary] = useState<{ balance: number; unlockedTrackIds: string[]; unreadNotifications: number; canGrant: boolean; isSuperAdmin: boolean } | null>(null);
++  const [stickerSummary, setStickerSummary] = useState<{ balance: number; unlockedTrackIds: string[]; commentRewardTrackIds: string[]; unreadNotifications: number; canGrant: boolean; isSuperAdmin: boolean } | null>(null);
+   const [isStickersOpen, setIsStickersOpen] = useState(false);
+   const [isLoading, setIsLoading] = useState(() => (readHomeCache()?.tracks || []).length === 0);
+   const homeCacheValidatedAtRef = useRef(readHomeCache()?.savedAt || 0);
+@@ -383,6 +383,7 @@
+       setStickerSummary({
+         balance: Number(data.balance || 0),
+         unlockedTrackIds: Array.isArray(data.unlockedTrackIds) ? data.unlockedTrackIds : [],
++        commentRewardTrackIds: Array.isArray(data.commentRewardTrackIds) ? data.commentRewardTrackIds : [],
+         unreadNotifications: Number(data.unreadNotifications || 0),
+         canGrant: Boolean(data.canGrant),
+         isSuperAdmin: Boolean(data.isSuperAdmin)
+@@ -543,6 +544,7 @@
+   const [luckyPhase, setLuckyPhase] = useState<'idle' | 'spin' | 'win'>('idle');
+   const [luckyOrderIds, setLuckyOrderIds] = useState<string[] | null>(null);
+   const [luckyWinnerId, setLuckyWinnerId] = useState<string | null>(null);
++  const [luckyAnswerText, setLuckyAnswerText] = useState<string | null>(null);
+   const luckyTimersRef = useRef<number[]>([]);
+   const luckyAudioContextRef = useRef<AudioContext | null>(null);
+ 
+@@ -556,6 +558,7 @@
+     setLuckyPhase('idle');
+     setLuckyOrderIds(null);
+     setLuckyWinnerId(null);
++    setLuckyAnswerText(null);
+   }, [clearLuckyTimers]);
+ 
+   useEffect(() => {
+@@ -572,6 +575,13 @@
+     return () => document.removeEventListener('pointerdown', dismissLuckyWinnerOnBlank);
+   }, [luckyPhase, resetLuckyDrawState]);
+ 
++  useEffect(() => {
++    if (!luckyAnswerText) return;
++    const dismissLuckyAnswer = () => setLuckyAnswerText(null);
++    document.addEventListener('pointerdown', dismissLuckyAnswer, { passive: true });
++    return () => document.removeEventListener('pointerdown', dismissLuckyAnswer);
++  }, [luckyAnswerText]);
++
+   useEffect(() => () => {
+     clearLuckyTimers();
+     const context = luckyAudioContextRef.current;
+@@ -2077,6 +2087,7 @@
+   const handleLuckyDraw = async (anchor: HTMLElement) => {
+     if (luckyPhase === 'spin' || luckyRequestPending.current) return;
+     setIsSearchFocused(false);
++    setLuckyAnswerText(null);
+     clearLuckyTimers();
+ 
+     // Private VIP stays a separate third group and is never surfaced by random discovery.
+@@ -2113,7 +2124,10 @@
+       setLuckyOrderIds(moveTrackIdToSecondSlot(baseIds, winner.id));
+       setLuckyWinnerId(winner.id);
+       setLuckyPhase('win');
+-      if(luckyNotice) {setFeedbackRules(luckyNotice.settings);showStickerNotice(luckyNotice.settings.luckyHintText.replaceAll('{x}',String(luckyNotice.bonus)),luckyNotice.settings.luckyHintSeconds);}
++      if(luckyNotice) {
++        setFeedbackRules(luckyNotice.settings);
++        setLuckyAnswerText(luckyNotice.settings.luckyHintText.replaceAll('{x}',String(luckyNotice.bonus)));
++      }
+       playLuckyWin();
+     };
+ 
+@@ -2494,9 +2508,9 @@
+                 disabled={luckyPhase === 'spin'}
+                 className="h-[46px] px-3.5 sm:px-4 py-0 rounded-2xl text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1 shadow-2xs hover:brightness-105 shrink-0 active:scale-95 transition-all cursor-pointer disabled:cursor-wait disabled:opacity-80"
+                 style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
+-                title="從目前條件下可播放的音檔中抽一張好手氣"
++                title="從目前條件下可播放的音檔中召喚繁星解答"
+               >
+-                <span>{luckyPhase === 'spin' ? '🫵轉運中' : '🫵好手氣'}</span>
++                <span>💫召喚繁星解答</span>
+               </button>
+ 
+               <div ref={searchContainerRef} className="relative flex-1">
+@@ -2802,6 +2816,11 @@
+                       data-track-card-id={track.id}
+                       data-lucky-winner={luckyWinnerId === track.id ? 'true' : undefined}
+                     >
++                    {luckyPhase === 'win' && luckyWinnerId === track.id && luckyAnswerText && (
++                      <div className="lucky-answer-notice" role="status" aria-live="polite">
++                        {luckyAnswerText.split(/([+]\d+(?:\.\d+)?)/g).map((part,index)=><span key={index} className={part.startsWith('+')?'text-red-500':undefined}>{part}</span>)}
++                      </div>
++                    )}
+                     {luckyPhase === 'win' && luckyWinnerId === track.id && (
+                       <div className="lucky-winner-badge" aria-live="polite">✨ 好手氣！✨</div>
+                     )}
+@@ -2813,6 +2832,7 @@
+                       isVipUnlocked={isVipUnlocked}
+                       tutorialTarget={trackIndex === 0}
+                       progressMemory={playbackMemories[track.id]}
++                      commentRewardClaimed={Boolean(stickerSummary?.commentRewardTrackIds?.includes(track.id))}
+                       userRating={trackRating}
+                       hasLiked={hasLiked}
+                       onClick={() => {
+diff -ruN '--exclude=node_modules' echostars_base/echostars/src/changelogReleaseNotes.ts echostars_tmp/echostars/src/changelogReleaseNotes.ts
+--- echostars_base/echostars/src/changelogReleaseNotes.ts	2026-10-06 22:01:38.000000000 +0000
++++ echostars_tmp/echostars/src/changelogReleaseNotes.ts	2026-10-06 15:52:02.858984807 +0000
+@@ -11,7 +11,6 @@
+ export const HEALTHCHECK_RELEASE_NOTES: ChangelogEntry = {
+   version: 'v3.9',
+   date: '2026/10/04',
+-  isLatest: true,
+   summary:
+     '進行一次全站功能健檢，把近期多次改版留下的衝突風險重新盤查。這次特別檢查個人學習紀錄圖卡、訪客與會員流程、分類、分享、播放、登入、PWA 與部署測試，並修正實際找到的問題。',
+   added: [
+@@ -91,14 +90,32 @@
+ };
+ 
+ export const STICKER_PAGES_RELEASE_NOTES: ChangelogEntry = {
+-  version: 'v4.0', date: '2026/10/06', isLatest: true,
++  version: 'v4.0', date: '2026/10/06',
+   summary: '貼紙簿與個人中心改為完整頁面，新增完善資料與好手氣獎勵、全站貼紙提示、上手名單管理及播放清單排序。',
+   added: ['全站貼紙增加以紅字、減少以綠字提示，顯示在操作位置上方，時間可在其他規則調整。', '完善個人資料可領一次貼紙；未填完整提醒的文字、秒數及獎勵可自訂。', '好手氣抽中尚未聽完的錄音，當日完成可領額外貼紙；提示文字、秒數、張數與每日上限可自訂。', '後台新增上手名單，支援新增、編輯、多選合併與刪除，連動會員欄位。'],
+   modified: ['我的貼紙簿、個人中心與iOS安裝教學改為完整頁面，支援返回導覽。', '選單僅貼紙數字保持大字，其餘文字與其他選項一致；貼紙明細改負綠正紅、小字且不粗體。', '上手白金、上手鑽石分開顯示；推薦人取消自動關聯詞。', '已購買錄音優先排序；新增貼紙成本低至高／心得獎勵高至低排序，移除獎銜篩選並移動時間按鈕。', '未開始收聽的照片顯示寫心得獎勵，正紅負綠，字體與權限一致。', '貼紙清單獨立載入並保留快取，管理分頁與補發結算不再阻擋首屏。'],
+   removed: ['移除我的貼紙與個人中心的彈出視窗呈現。']
+ };
+ 
+-export const RANK_STICKER_RELEASE_NOTES: ChangelogEntry = {
++export const RANK_STICKER_RELEASE_NOTES: ChangelogEntry = {
++  version: 'v4.1', date: '2026/10/06', isLatest: true,
