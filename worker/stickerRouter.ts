@@ -31,7 +31,7 @@ const SETTING_DEFAULTS: Record<string, number> = {
   toast_seconds_units: 10,
   profile_hint_seconds_units: 10,
   vip_upload_cost_units: 1,
-  platinum_rank_base_units: 500,
+  platinum_rank_reward_units: 1000,
   platinum_rank_multiplier_tenths: 20,
   emerald_rank_reward_units: 3000,
   diamond_rank_reward_units: 5000
@@ -274,6 +274,26 @@ async function stickerBalanceUnits(db: any, userId: string) {
   return Number(row?.balanceUnits || 0);
 }
 
+function earningMultiplierTenths(actor: any, values: Record<string, number>) {
+  if (!actor?.rankApproved || !isPlatinumOrAboveRank(effectiveRank(actor))) return 10;
+  const configured = Number(values.platinum_rank_multiplier_tenths);
+  return Number.isFinite(configured) ? Math.max(0, Math.round(configured)) : 10;
+}
+
+function multiplyStickerUnits(units: number, multiplierTenths: number) {
+  if (units <= 0) return units;
+  return Math.max(0, Math.round(units * multiplierTenths / 10));
+}
+
+async function earningMultiplierTenthsForUser(db: any, userId: string) {
+  const row: any = await db.prepare(`SELECT rank,approvedRank,rankApproved,
+    COALESCE((SELECT valueUnits FROM sticker_settings WHERE key='platinum_rank_multiplier_tenths'),20) AS multiplierTenths
+    FROM users WHERE id=? LIMIT 1`).bind(userId).first();
+  if (!row?.rankApproved || !isPlatinumOrAboveRank(String(row.approvedRank || row.rank || '').trim())) return 10;
+  const configured = Number(row.multiplierTenths);
+  return Number.isFinite(configured) ? Math.max(0, Math.round(configured)) : 10;
+}
+
 type TransactionResult = {
   inserted: boolean;
   balanceUnits: number;
@@ -286,17 +306,24 @@ async function addStickerTransaction(db: any, input: {
   actorUserId?: string; uniqueKey: string; allowNegative?: boolean;
   trackId?: string; commentId?: string; relatedUserId?: string;
   capUnits?: number; capTypes?: string[]; dailyLimit?: number; dayStart?: number;
+  earningMultiplierTenths?: number; skipEarningMultiplier?: boolean;
 }): Promise<TransactionResult> {
   await ensureInitialStickers(db, input.userId);
   const existing: any = await db.prepare('SELECT * FROM sticker_transactions WHERE uniqueKey = ? LIMIT 1').bind(input.uniqueKey).first();
   if (existing) return { inserted: false, balanceUnits: await stickerBalanceUnits(db, input.userId), transaction: existing };
   const track: any = await db.prepare('SELECT id,title,speaker,speakerRank FROM tracks WHERE id = ?').bind(input.trackId || input.sourceId || '').first();
   const id = `st-${crypto.randomUUID()}`;
+  const shouldMultiply = input.deltaUnits > 0 && !input.skipEarningMultiplier && !['rank_approval_reward','manual_grant'].includes(input.type);
+  const multiplierTenths = shouldMultiply
+    ? (input.earningMultiplierTenths ?? await earningMultiplierTenthsForUser(db, input.userId))
+    : 10;
+  const deltaUnits = shouldMultiply ? multiplyStickerUnits(input.deltaUnits, multiplierTenths) : input.deltaUnits;
+  const capUnits = input.capUnits !== undefined && shouldMultiply ? multiplyStickerUnits(input.capUnits, multiplierTenths) : input.capUnits;
   const capTypes = input.capTypes || [input.type];
-  const capped = input.capUnits !== undefined && input.deltaUnits > 0;
+  const capped = capUnits !== undefined && deltaUnits > 0;
   const amountSql = capped ? `MIN(?, MAX(0, ? - COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions
     WHERE userId = ? AND trackId = ? AND deltaUnits > 0 AND type IN (${capTypes.map(() => '?').join(',')})), 0)))` : '?';
-  const amountArgs = capped ? [input.deltaUnits, input.capUnits, input.userId, input.trackId || track?.id || '', ...capTypes] : [input.deltaUnits];
+  const amountArgs = capped ? [deltaUnits, capUnits, input.userId, input.trackId || track?.id || '', ...capTypes] : [deltaUnits];
   // The cap and balance are computed within the same INSERT, including concurrent requests.
   const result: any = await db.prepare(`WITH award(amount) AS (SELECT ${amountSql})
     INSERT OR IGNORE INTO sticker_transactions
@@ -309,7 +336,7 @@ async function addStickerTransaction(db: any, input: {
   `).bind(...amountArgs, id, input.userId, input.userId, input.type, input.sourceId || null,
     input.description, input.actorUserId || null, input.uniqueKey, Date.now(), input.trackId || track?.id || null,
     input.commentId || null, input.relatedUserId || null, track ? trackLabel(track) : null,
-    input.allowNegative || input.deltaUnits >= 0 ? 1 : 0, input.userId, capped ? 1 : 0, input.dailyLimit ?? -1, input.userId, input.type, input.dayStart || 0, (input.dayStart || 0) + 86400000, input.dailyLimit ?? -1).run();
+    input.allowNegative || deltaUnits >= 0 ? 1 : 0, input.userId, capped ? 1 : 0, input.dailyLimit ?? -1, input.userId, input.type, input.dayStart || 0, (input.dayStart || 0) + 86400000, input.dailyLimit ?? -1).run();
   const transaction: any = await db.prepare('SELECT * FROM sticker_transactions WHERE uniqueKey = ?').bind(input.uniqueKey).first();
   return { inserted: Boolean(result?.meta?.changes), balanceUnits: await stickerBalanceUnits(db, input.userId),
     transaction, insufficient: !transaction && input.deltaUnits < 0 };
@@ -368,8 +395,8 @@ function settingsForClient(values: Record<string, number>, includeRankRewards = 
     luckyCost: unitsToStickers(values.lucky_cost_units),
     vipUploadCost: unitsToStickers(values.vip_upload_cost_units),
     ...(includeRankRewards ? {
-      platinumRankBaseReward: unitsToStickers(values.platinum_rank_base_units),
-      platinumRankMultiplier: Number(values.platinum_rank_multiplier_tenths || 0) / 10,
+      platinumRankReward: unitsToStickers(values.platinum_rank_reward_units),
+      platinumEarningMultiplier: Number(values.platinum_rank_multiplier_tenths || 0) / 10,
       emeraldRankReward: unitsToStickers(values.emerald_rank_reward_units),
       diamondRankReward: unitsToStickers(values.diamond_rank_reward_units)
     } : {})
@@ -389,7 +416,7 @@ function rankRewardTier(value: unknown): RankRewardTier | null {
 function rankRewardUnits(values: Record<string, number>, tier: RankRewardTier) {
   if (tier === 'diamond') return Number(values.diamond_rank_reward_units || 0);
   if (tier === 'emerald') return Number(values.emerald_rank_reward_units || 0);
-  return Math.max(0, Math.round(Number(values.platinum_rank_base_units || 0) * Number(values.platinum_rank_multiplier_tenths || 0) / 10));
+  return Number(values.platinum_rank_reward_units || 0);
 }
 
 function rankRewardLabel(tier: RankRewardTier) {
@@ -414,7 +441,8 @@ async function awardRankApprovalReward(db: any, user: any, actorUserId = 'system
     sourceId: tier,
     description: `${rankRewardLabel(tier)}獎銜審核通過獎勵`,
     actorUserId,
-    uniqueKey: `rank-approval:${user.id}:${tier}`
+    uniqueKey: `rank-approval:${user.id}:${tier}`,
+    skipEarningMultiplier: true
   });
 }
 
@@ -689,6 +717,7 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
     return json({ guide: {
       initialReward: unitsToStickers(INITIAL_STICKER_UNITS),
       settings: settingsForClient(values),
+      earningMultiplier: earningMultiplierTenths(actor, values) / 10,
       rankReward: tier && rankUnits > 0 ? { tier, label: rankRewardLabel(tier), amount: unitsToStickers(rankUnits) } : null,
       canGrant: canGrantStickers(actor),
       isSuperAdmin: isSuperAdmin(actor),
@@ -735,11 +764,12 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
       }
       const extraFields: Record<string,string> = {profileReward:'profile_reward_units',luckyCompleteReward:'lucky_complete_units',luckyDailyLimit:'lucky_daily_limit_units',toastSeconds:'toast_seconds_units',profileHintSeconds:'profile_hint_seconds_units'};
       for (const key of Object.keys(extraFields)) if (body[key] !== undefined && (!validTenth(body[key]) || (key.endsWith('Seconds') && (body[key]<0.1 || body[key]>60)) || (key==='luckyDailyLimit' && !Number.isInteger(body[key])))) return json({error:'時間需為0.1–60秒，每日次數為整數，張數為0–1000'},400);
-      const rankFields: Record<string,string> = {platinumRankBaseReward:'platinum_rank_base_units',emeraldRankReward:'emerald_rank_reward_units',diamondRankReward:'diamond_rank_reward_units'};
-      const hasRankFields = [...Object.keys(rankFields),'platinumRankMultiplier'].some(key => body[key] !== undefined);
+      const rankFields: Record<string,string> = {platinumRankReward:'platinum_rank_reward_units',emeraldRankReward:'emerald_rank_reward_units',diamondRankReward:'diamond_rank_reward_units'};
+      const hasRankFields = [...Object.keys(rankFields),'platinumEarningMultiplier','platinumRankMultiplier'].some(key => body[key] !== undefined);
       if (hasRankFields && !isSuperAdmin(actor)) return json({error:'只有超級管理員可修改獎銜貼紙獎勵'},403);
       for (const key of Object.keys(rankFields)) if (body[key] !== undefined && !validTenth(body[key])) return json({error:'獎銜貼紙張數需為0至1000張'},400);
-      if (body.platinumRankMultiplier !== undefined && (!Number.isFinite(Number(body.platinumRankMultiplier)) || Number(body.platinumRankMultiplier)<0 || Number(body.platinumRankMultiplier)>100 || Math.abs(Number(body.platinumRankMultiplier)*10-Math.round(Number(body.platinumRankMultiplier)*10))>1e-8)) return json({error:'白金獎勵倍數需為0至100倍，且以0.1為單位'},400);
+      const earningMultiplierInput = body.platinumEarningMultiplier ?? body.platinumRankMultiplier;
+      if (earningMultiplierInput !== undefined && (!Number.isFinite(Number(earningMultiplierInput)) || Number(earningMultiplierInput)<0 || Number(earningMultiplierInput)>100 || Math.abs(Number(earningMultiplierInput)*10-Math.round(Number(earningMultiplierInput)*10))>1e-8)) return json({error:'白金級以上獲取貼紙倍數需為0至100倍，且以0.1為單位'},400);
       for (const key of ['profileHintText','luckyHintText']) if (body[key] !== undefined && (typeof body[key]!=='string' || !body[key].trim() || body[key].length>500)) return json({error:'提示文字需為1–500字'},400);
       const now = Date.now();
       const updates: Record<string, number> = {
@@ -754,7 +784,7 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
       };
       for (const [key,setting] of Object.entries(extraFields)) if (body[key]!==undefined) updates[setting]=stickersToUnits(body[key]);
       for (const [key,setting] of Object.entries(rankFields)) if (body[key]!==undefined) updates[setting]=stickersToUnits(body[key]);
-      if (body.platinumRankMultiplier!==undefined) updates.platinum_rank_multiplier_tenths=Math.round(Number(body.platinumRankMultiplier)*10);
+      if (earningMultiplierInput!==undefined) updates.platinum_rank_multiplier_tenths=Math.round(Number(earningMultiplierInput)*10);
       const textUpdates=['profileHintText','luckyHintText'].filter(key=>body[key]!==undefined).map(key=>db.prepare('INSERT OR REPLACE INTO sticker_text_settings VALUES (?,?)').bind(key,body[key].trim()));
       await db.batch([...textUpdates,...Object.entries(updates).map(([key, value]) =>
         db.prepare(`INSERT INTO sticker_settings(key, valueUnits, updatedAt, updatedBy)
@@ -879,8 +909,8 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
     const operationId = String(body.operationId || '').trim();
     if (!targetId || !operationId) return json({ error: '缺少會員或操作識別碼' }, 400);
     if (!reason || reason.length > 500) return json({ error: '人工加貼紙原因需為 1 至 500 字' }, 400);
-    if (!Number.isInteger(amount) || amount < 1 || amount > 5) {
-      return json({ error: '人工加貼紙需為 1 至 5 張整數' }, 400);
+    if (!validTenth(amount) || amount <= 0) {
+      return json({ error: '人工加貼紙需為 0.1 至 1000 張，最多小數一位' }, 400);
     }
     const target: any = await db.prepare('SELECT * FROM users WHERE id = ? AND COALESCE(isBlocked,0)=0').bind(targetId).first();
     if (!target) return json({ error: '找不到可用會員' }, 404);

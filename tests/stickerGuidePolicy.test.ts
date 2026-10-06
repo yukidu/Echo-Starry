@@ -5,6 +5,7 @@ import { buildStickerGuideRows, type StickerGuidePayload } from '../src/stickerG
 
 const base: StickerGuidePayload = {
   initialReward: 6,
+  earningMultiplier: 1,
   settings: {
     profileReward: 10,
     luckyCompleteReward: 12,
@@ -39,9 +40,13 @@ test('regular member guide lists current reward and spend amounts from rules and
 });
 
 test('approved platinum guide includes rank reward and personal debit for downline grants', () => {
-  const rows = buildStickerGuideRows({ ...base, canGrant: true, rankReward: { tier: 'platinum', label: '白金以上', amount: 100 } }, tracks);
+  const rows = buildStickerGuideRows({ ...base, earningMultiplier: 2, canGrant: true, rankReward: { tier: 'platinum', label: '白金以上', amount: 100 } }, tracks);
+  assert.equal(rows.find(row => row.behavior === '白金級以上獲取貼紙倍數')?.amount, '×2');
+  assert.equal(rows.find(row => row.behavior === '首次評價錄音')?.amount, '+0.2 張');
+  assert.equal(rows.find(row => row.behavior === '100%聽完後分享心得')?.amount, '+4～20 張');
+  assert.equal(rows.find(row => row.behavior === '上手人工加貼紙')?.amount, '+0.1～1000 張');
   assert.equal(rows.find(row => row.behavior === '白金以上獎銜審核通過')?.amount, '+100 張');
-  assert.equal(rows.find(row => row.behavior === '人工加貼紙給自己的下線')?.amount, '-1～5 張');
+  assert.equal(rows.find(row => row.behavior === '人工加貼紙給自己的下線')?.amount, '-0.1～1000 張');
 });
 
 test('super admin guide does not claim sticker unlock or downline grant deductions', () => {
