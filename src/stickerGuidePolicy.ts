@@ -62,7 +62,7 @@ export function buildStickerGuideRows(guide: StickerGuidePayload, tracks: Sticke
     { kind: '增加', behavior: '100%聽完後分享心得', amount: commentRange, detail: `依各錄音設定；本人心得＋回覆他人心得合計，每支錄音最多 ${amount(earned(settings.commentThreadLimit), '+')}。` },
     { kind: '增加', behavior: '回覆他人心得', amount: `${amount(earned(settings.replyReward), '+')}／則`, detail: `與本人心得共用每支錄音 ${amount(earned(settings.commentThreadLimit), '+')} 上限。` },
     { kind: '增加', behavior: '召喚繁星抽中後當日聽完', amount: amount(earned(settings.luckyCompleteReward), '+'), detail: `同一錄音不重複，每日最多 ${formatStickerAmount(settings.luckyDailyLimit)} 次。` },
-    { kind: '增加', behavior: '上手人工加貼紙', amount: '+1～5 張', detail: '人工加貼紙不套用白金級以上獲取倍數；加幾張就實際收到幾張。' }
+    { kind: '增加', behavior: '上手人工加貼紙', amount: '+0.1～1000 張', detail: '由上手自行輸入張數；人工加貼紙不套用白金級以上獲取倍數，加幾張就實際收到幾張。' }
   ];
 
   if (multiplier !== 1) {
@@ -86,7 +86,7 @@ export function buildStickerGuideRows(guide: StickerGuidePayload, tracks: Sticke
     rows.push({ kind: '消耗', behavior: '建立私秘 VIP 錄音', amount: amount(settings.vipUploadCost, '-'), detail: '只有具備音檔上傳權限的會員會顯示此項。' });
   }
   if (guide.canGrant && !guide.isSuperAdmin) {
-    rows.push({ kind: '消耗', behavior: '人工加貼紙給自己的下線', amount: '-1～5 張', detail: '每次發放多少張，就從自己的貼紙餘額扣除多少張。' });
+    rows.push({ kind: '消耗', behavior: '人工加貼紙給自己的下線', amount: '-0.1～1000 張', detail: '張數可自行輸入；每次發放多少張，就從自己的貼紙餘額扣除多少張。' });
   }
   rows.push({ kind: '消耗', behavior: '刪除曾取得獎勵的心得／回覆', amount: '-原已領張數', detail: '刪除已領過貼紙的內容時，原獎勵會被扣回。' });
   return rows;

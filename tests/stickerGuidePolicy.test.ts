@@ -44,9 +44,9 @@ test('approved platinum guide includes rank reward and personal debit for downli
   assert.equal(rows.find(row => row.behavior === '白金級以上獲取貼紙倍數')?.amount, '×2');
   assert.equal(rows.find(row => row.behavior === '首次評價錄音')?.amount, '+0.2 張');
   assert.equal(rows.find(row => row.behavior === '100%聽完後分享心得')?.amount, '+4～20 張');
-  assert.equal(rows.find(row => row.behavior === '上手人工加貼紙')?.amount, '+1～5 張');
+  assert.equal(rows.find(row => row.behavior === '上手人工加貼紙')?.amount, '+0.1～1000 張');
   assert.equal(rows.find(row => row.behavior === '白金以上獎銜審核通過')?.amount, '+100 張');
-  assert.equal(rows.find(row => row.behavior === '人工加貼紙給自己的下線')?.amount, '-1～5 張');
+  assert.equal(rows.find(row => row.behavior === '人工加貼紙給自己的下線')?.amount, '-0.1～1000 張');
 });
 
 test('super admin guide does not claim sticker unlock or downline grant deductions', () => {

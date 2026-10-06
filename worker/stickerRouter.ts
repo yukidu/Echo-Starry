@@ -909,8 +909,8 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
     const operationId = String(body.operationId || '').trim();
     if (!targetId || !operationId) return json({ error: '缺少會員或操作識別碼' }, 400);
     if (!reason || reason.length > 500) return json({ error: '人工加貼紙原因需為 1 至 500 字' }, 400);
-    if (!Number.isInteger(amount) || amount < 1 || amount > 5) {
-      return json({ error: '人工加貼紙需為 1 至 5 張整數' }, 400);
+    if (!validTenth(amount) || amount <= 0) {
+      return json({ error: '人工加貼紙需為 0.1 至 1000 張，最多小數一位' }, 400);
     }
     const target: any = await db.prepare('SELECT * FROM users WHERE id = ? AND COALESCE(isBlocked,0)=0').bind(targetId).first();
     if (!target) return json({ error: '找不到可用會員' }, 404);

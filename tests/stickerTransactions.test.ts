@@ -348,10 +348,12 @@ test('wallet recovers missed regular-member completed comments using email-owned
   assert.equal(db.sqlite.prepare("SELECT sourceId FROM sticker_transactions WHERE type='comment_reward'").get()?.sourceId,'missed');
 });
 
-test('manual grant history is scoped to issuer, fractional counts rejected, and unlock range reaches 50', async () => {
+test('manual grant history is scoped to issuer, custom decimal amounts are accepted, and unlock range reaches 50', async () => {
   const db=database();const platinum=await session(db,'platinum');const admin=await session(db,'admin');const member=await session(db,'member');
-  const body={targetUserId:'member',amount:5,reason:'完整原因',operationId:'history'};
-  assert.equal((await call(db,platinum,'/api/stickers/grant','POST',{...body,amount:1.5})).status,400);
+  const body={targetUserId:'member',amount:5.5,reason:'完整原因',operationId:'history'};
+  assert.equal((await call(db,platinum,'/api/stickers/grant','POST',{...body,amount:0})).status,400);
+  assert.equal((await call(db,platinum,'/api/stickers/grant','POST',{...body,amount:1000.1})).status,400);
+  assert.equal((await call(db,platinum,'/api/stickers/grant','POST',{...body,amount:1.23})).status,400);
   assert.equal((await call(db,platinum,'/api/stickers/grant','POST',body)).status,200);
   const history=(await call(db,platinum,'/api/stickers/grant-history')).data.transactions;
   assert.equal(history.length,1);assert.equal(history[0].source.userId,'member');
