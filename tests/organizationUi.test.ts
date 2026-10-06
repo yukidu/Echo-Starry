@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 const app=readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
 const stickers=readFileSync(new URL('../src/components/StickersModal.tsx',import.meta.url),'utf8');
 const profile=readFileSync(new URL('../src/components/ProfileModal.tsx',import.meta.url),'utf8');
