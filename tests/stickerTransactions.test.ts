@@ -150,6 +150,7 @@ test('root comment rewards require 95% completion; edit/reply/delete/repost cann
   assert.equal(reply.status,201); assert.equal(count(db, 'comment_reward'),1);
   const earned = await call(db, token, '/api/tracks/track/comments', 'POST', { content:'聽完心得' });
   assert.equal(earned.status,201); assert.equal(await balance(db, token),8);
+  assert.deepEqual((await call(db,token,'/api/stickers/summary')).data.commentRewardTrackIds,['track']);
   await call(db, token, `/api/comments/${early.data.id}`, 'PUT', { content:'編輯',userEmail:'member@example.com' });
   assert.equal(count(db,'comment_reward'),1);
   const deleted = await call(db, token, `/api/comments/${early.data.id}`, 'DELETE', { userEmail:'member@example.com' });
@@ -165,14 +166,51 @@ test('manual grant is limited to approved platinum downlines, retry has one cred
   const body = { targetUserId:'member', amount:3, reason:'鼓勵學習', operationId:'grant-1' };
   assert.equal((await call(db,token,'/api/stickers/grant','POST',{...body,targetUserId:'other'})).status,403);
   assert.equal((await call(db,token,'/api/stickers/grant','POST',{...body,amount:-1})).status,400);
+  assert.equal(await balance(db,token),106);
   await call(db,token,'/api/stickers/grant','POST',body);
   await call(db,token,'/api/stickers/grant','POST',body);
-  assert.equal(await balance(db,member),9); assert.equal(count(db,'manual_grant'),1);
+  assert.equal(await balance(db,member),9); assert.equal(await balance(db,token),103);
+  assert.equal(count(db,'manual_grant'),1); assert.equal(count(db,'manual_grant_debit'),1);
   const notices = await call(db,member,'/api/stickers/notifications');
   assert.equal(notices.data.notifications.length,1);
   assert.match(notices.data.notifications[0].message,/3.*鼓勵學習/);
   await call(db,member,'/api/stickers/notifications/read','POST');
   assert.equal((await call(db,member,'/api/stickers/me')).data.unreadNotifications,0);
+});
+
+test('downline grants cannot overdraw the issuer while super-admin grants do not debit the admin', async () => {
+  const db=database();const platinum=await session(db,'platinum');const admin=await session(db,'admin');const member=await session(db,'member');
+  await call(db,platinum,'/api/stickers/summary');
+  db.sqlite.exec("DELETE FROM sticker_transactions WHERE userId='platinum' AND type='rank_approval_reward'");
+  assert.equal(await balance(db,platinum),6);
+  assert.equal((await call(db,platinum,'/api/stickers/grant','POST',{targetUserId:'member',amount:5,reason:'先發五張',operationId:'debit-1'})).status,200);
+  assert.equal(await balance(db,platinum),1);
+  assert.equal((await call(db,platinum,'/api/stickers/grant','POST',{targetUserId:'member',amount:2,reason:'餘額不足',operationId:'debit-2'})).status,402);
+  assert.equal(await balance(db,member),11);
+  const adminBefore=await balance(db,admin);
+  assert.equal((await call(db,admin,'/api/stickers/grant','POST',{targetUserId:'member',amount:2,reason:'管理發放',operationId:'admin-free'})).status,200);
+  assert.equal(await balance(db,admin),adminBefore);
+  assert.equal(await balance(db,member),13);
+});
+
+test('existing and future approved leaders receive configurable one-time rank sticker rewards', async () => {
+  const db=database();
+  db.sqlite.exec("INSERT INTO users(id,name,email,rank,approvedRank,rankApproved,canUpload) VALUES ('emerald','翡翠會員','emerald@example.com','翡翠','翡翠',1,0),('candidate','候選會員','candidate@example.com','白金','無',0,0)");
+  const admin=await session(db,'admin');
+  const defaults=(await call(db,admin,'/api/stickers/settings')).data.settings;
+  assert.equal(defaults.platinumRankBaseReward,50);assert.equal(defaults.platinumRankMultiplier,2);
+  assert.equal(defaults.emeraldRankReward,300);assert.equal(defaults.diamondRankReward,500);
+  assert.equal(Number((db.sqlite.prepare("SELECT SUM(deltaUnits)/10.0 AS n FROM sticker_transactions WHERE userId='platinum'").get() as any).n),106);
+  assert.equal(Number((db.sqlite.prepare("SELECT SUM(deltaUnits)/10.0 AS n FROM sticker_transactions WHERE userId='emerald'").get() as any).n),306);
+  assert.equal(count(db,'rank_approval_reward'),3);
+  assert.equal((await call(db,admin,'/api/stickers/settings','PUT',{...defaults,platinumRankBaseReward:60,platinumRankMultiplier:2.5,emeraldRankReward:350,diamondRankReward:550})).status,200);
+  const audit=(rank:string)=>{db.sqlite.prepare("UPDATE users SET rank=?,rankApproved=0,rankAuditStatus='pending' WHERE id='candidate'").run(rank);return call(db,admin,'/api/users/candidate/audit-rank','PUT',{auditorEmail:'yukidu@gmail.com',rank});};
+  assert.equal((await audit('白金')).status,200);
+  const candidate=await session(db,'candidate');assert.equal(await balance(db,candidate),156);
+  assert.equal((await audit('白金')).status,200);assert.equal(await balance(db,candidate),156);
+  assert.equal((await audit('翡翠')).status,200);assert.equal(await balance(db,candidate),506);
+  assert.equal((await audit('鑽石')).status,200);assert.equal(await balance(db,candidate),1056);
+  assert.equal((await audit('白金')).status,200);assert.equal(await balance(db,candidate),1056);
 });
 
 test('batch recording settings support more than 100 ids and preserve omitted fields', async () => {

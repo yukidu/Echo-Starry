@@ -6,7 +6,7 @@ const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
 
 test('home search-side action is the accessible-track lucky draw', () => {
-  assert.match(app, /🫵好手氣/);
+  assert.match(app, /💫召喚繁星解答/);
   assert.match(app, /filteredTracks\.filter\(track => !track\.isPrivateVip && checkCanAccess\(track\) && isTrackStickerUnlocked\(track\)\)/);
   assert.match(app, /moveTrackIdToSecondSlot/);
   assert.match(app, /prefers-reduced-motion: reduce/);
@@ -24,15 +24,18 @@ test('lucky draw acts directly on the home card grid with a spotlight and winner
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 });
 
-test('lucky winner stays pinned without scrolling and dismisses from blank space', () => {
+test('lucky winner stays pinned and the answer notice waits for the next pointer action', () => {
   assert.match(app, /if \(luckyPhase !== 'win'\) return/);
   assert.match(app, /document\.addEventListener\('pointerdown', dismissLuckyWinnerOnBlank/);
   assert.doesNotMatch(app, /winnerElement\?\.scrollIntoView/);
   assert.doesNotMatch(app, /setLuckyPhase\('idle'\), 2400/);
+  assert.match(app, /lucky-answer-notice/);
+  assert.match(app, /document\.addEventListener\('pointerdown', dismissLuckyAnswer/);
+  assert.doesNotMatch(app, /luckyHintSeconds/);
 });
 
 test('lucky draw sits to the left of the search field', () => {
-  const luckyIndex = app.indexOf('title="從目前條件下可播放的音檔中抽一張好手氣"');
+  const luckyIndex = app.indexOf('title="從目前條件下可播放的音檔中召喚繁星解答"');
   const searchIndex = app.indexOf('ref={searchContainerRef}');
   assert.ok(luckyIndex >= 0 && searchIndex >= 0 && luckyIndex < searchIndex);
 });
