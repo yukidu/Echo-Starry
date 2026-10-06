@@ -26,6 +26,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Connect sticker guide to current v102 code
         run: python3 scripts/patch-v103-sticker-guide.py
+      - name: Remove obsolete temporary integration files
+        run: rm -f scripts/apply-v103-sticker-guide.mjs .github/workflows/v103-sticker-guide.yml
       - name: Full tests
         run: npm test
       - name: TypeScript diagnostic
@@ -36,7 +38,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm -f scripts/apply-v103-sticker-guide.mjs scripts/patch-v103-sticker-guide.py .github/workflows/v103-sticker-guide.yml .github/workflows/v103-sticker-guide-patch.yml
+          rm -f scripts/patch-v103-sticker-guide.py .github/workflows/v103-sticker-guide-patch.yml
           git add -A
           git commit -m "v103: connect personalized sticker guide to history page"
           git push origin HEAD:safe/v103-sticker-guide-table
