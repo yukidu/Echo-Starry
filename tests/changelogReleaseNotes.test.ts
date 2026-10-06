@@ -25,7 +25,7 @@ test('v3.8 cumulative changelog remains available for recent user-facing release
 });
 
 test('changelog release patch merges both maintained releases and only intercepts GET changelog requests', () => {
-  assert.match(notes, /RELEASE_NOTES = \[RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES\]/);
+  assert.match(notes, /RELEASE_NOTES = \[ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES\]/);
   assert.match(notes, /method !== 'GET'/);
   assert.match(notes, /url\.pathname === '\/api\/changelog'/);
   assert.match(notes, /return nativeFetch\(\.\.\.args\)/);

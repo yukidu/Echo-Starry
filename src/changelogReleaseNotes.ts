@@ -98,7 +98,7 @@ export const STICKER_PAGES_RELEASE_NOTES: ChangelogEntry = {
 };
 
 export const RANK_STICKER_RELEASE_NOTES: ChangelogEntry = {
-  version: 'v4.1', date: '2026/10/06', isLatest: true,
+  version: 'v4.1', date: '2026/10/06',
   summary: '新增白金以上獎銜審核貼紙獎勵、下線貼紙轉贈扣款，並調整首頁貼紙文案與召喚繁星解答提示。',
   added: [
     '白金以上會員獎銜審核通過會自動獲得貼紙：預設白金為50張基礎×2倍＝100張、翡翠以上300張、鑽石以上500張；既有符合會員會一次補發目前最高符合級別。',
@@ -115,7 +115,28 @@ export const RANK_STICKER_RELEASE_NOTES: ChangelogEntry = {
   ]
 };
 
-const RELEASE_NOTES = [RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
+export const ORGANIZATION_RELEASE_NOTES: ChangelogEntry = {
+  version: 'v4.2', date: '2026/10/07', isLatest: true,
+  summary: '重新整理測試與組織關係架構，讓召喚繁星立即啟動、後台真正整頁顯示，並新增夫妻共同直銷商編號與專屬下線綁定網址。',
+  added: [
+    '「我的貼紙＞人工加貼紙」新增「綁定成為我下線」：白金級以上可複製專屬網址或直接呼叫 LINE／其他 APP 分享；網址尾端使用直銷商編號。',
+    '登入會員開啟專屬網址後，會依發送者或夫妻共同事業體的最高已審核獎銜，自動更新上手白金或上手鑽石。',
+    '兩位會員輸入相同直銷商編號時，系統會詢問是否建立夫妻關係；單方確認即可成立，超過兩位同編號則停止自動綁定並要求管理處理。'
+  ],
+  modified: [
+    '夫妻只共用直銷商編號、下線組織與專屬邀請網址；貼紙、播放進度、心得、按讚、評價、通知與其他個人紀錄全部維持各自獨立。',
+    '夫妻個人姓名仍各自保存與編輯；基本資料非修改狀態自動顯示 A&B，任何一方改名後共同組織名稱會同步更新。',
+    '首頁照片上、下方進度與權限文字只恢復到改版前的字體大小，其餘貼紙文案與判定不變。',
+    '「💫召喚繁星解答」按下後立即開始轉輪動畫，貼紙與資格驗證在動畫進行時同步完成，不再先等待網路回應。',
+    '後台管理改為真正的網頁整頁模式，不再用彈出視窗假裝全頁。',
+    '部署測試改為每個測試檔都完整執行，單一失敗不會遮住其他結果；TypeScript 與正式建置也會持續檢查。'
+  ],
+  removed: [
+    '移除夫妻與下線組織以姓名當作唯一關聯依據的做法，改用固定會員 ID 與共同事業體 ID 保存關係。'
+  ]
+};
+
+const RELEASE_NOTES = [ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
 
 const runtime = window as Window &
   typeof globalThis & {

@@ -658,6 +658,8 @@ export default function App() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profileEditRequested,setProfileEditRequested] = useState(false);
+  const uplineInviteHandledRef = useRef('');
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isBwExportOpen, setIsBwExportOpen] = useState(false);
   const [bwExportMode, setBwExportMode] = useState<'comments' | 'rated'>('comments');
@@ -844,6 +846,24 @@ export default function App() {
       : Math.max(8, rect.top - estimatedHeight - 8);
     setPermissionAlertPosition({ left, top });
   }, []);
+
+  useEffect(()=>{
+    if(typeof window==='undefined')return;
+    const match=window.location.pathname.match(/^\/upline\/([^/]+)\/?$/);
+    if(!match)return;
+    const dealerId=decodeURIComponent(match[1] || '').trim();
+    if(!dealerId)return;
+    if(!currentUser){setIsProfileOpen(true);return;}
+    const operationKey=`${currentUser.id}:${dealerId}`;
+    if(uplineInviteHandledRef.current===operationKey)return;
+    uplineInviteHandledRef.current=operationKey;
+    void apiJson('/api/organization/invite-accept',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dealerId})}).then(data=>{
+      if(data.user){const updated={...currentUser,...data.user};setCurrentUser(updated);localStorage.setItem('sq_current_user_v1',JSON.stringify(updated));setAllUsers(prev=>[...prev.filter(user=>user.id!==updated.id),updated]);}
+      showStickerNotice(data.message || `已完成下線綁定：${data.displayName || ''}`,2);
+      setIsProfileOpen(false);setIsStickersOpen(false);setCurrentTab('home');
+      window.history.replaceState({echostars:true,view:'home'},'',window.location.origin + '/');
+    }).catch(error=>{showPermissionAlert(error instanceof Error?error.message:'下線綁定失敗，請重新開啟邀請連結');});
+  },[currentUser?.id,showPermissionAlert]);
 
   // Requirement 5: 分類標籤同步函數 (後台增刪改後首頁下拉選單同步更新)
   const fetchCategories = async (providedCategories?: string[], change?: { oldName: string; newName?: string }) => {
@@ -1750,6 +1770,19 @@ export default function App() {
   const handleUpdateProfile = async (updatedProfile: Partial<UserProfile>) => {
     if (!currentUser) return;
 
+    const requestedDealerId=String(updatedProfile.amwayId ?? currentUser.amwayId ?? '').trim();
+    if(requestedDealerId){
+      const candidateResponse=await fetch(`/api/organization/couple-candidate?dealerId=${encodeURIComponent(requestedDealerId)}`);
+      const candidateData=await candidateResponse.json().catch(()=>({}));
+      if(!candidateResponse.ok) throw new Error(candidateData.error || '無法確認直銷商編號');
+      if(candidateData.candidate && !candidateData.linked){
+        const partnerName=String(candidateData.candidate.name || '此會員');
+        const accepted=window.confirm(`是否要綁定與${partnerName}為夫妻關係嗎？`);
+        if(!accepted) throw new Error('此直銷商編號已由其他會員使用。若不是夫妻，請改成正確的直銷商編號後再儲存。');
+        await apiJson('/api/organization/couple-bind',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dealerId:requestedDealerId,partnerUserId:candidateData.candidate.id})});
+      }
+    }
+
     const isRankChanged = updatedProfile.rank && updatedProfile.rank !== currentUser.rank;
     const isOwner = isSuperAdminEmail(currentUser.email);
 
@@ -2421,6 +2454,8 @@ export default function App() {
         onRateTrack={(trackId, score) => handleRateTrack(trackId, score)}
         onClearListeningHistory={handleClearListeningHistory}
         allUsers={allUsers}
+        forceEdit={profileEditRequested}
+        onForceEditHandled={()=>setProfileEditRequested(false)}
       />
       </Suspense>) : isStickersOpen ? (<Suspense fallback={<div role="status" className="py-12 text-center text-slate-500">載入功能中…</div>}>
       <StickersModal
@@ -2429,6 +2464,7 @@ export default function App() {
         currentUser={currentUser}
         tracks={tracks}
         initialSummary={stickerSummary}
+        onRequireProfileEdit={()=>{setIsStickersOpen(false);setProfileEditRequested(true);setIsProfileOpen(true);}}
         onOpenSource={source => {
           if (source.kind === 'track') {
             const track = tracks.find(item => item.id === source.trackId);
