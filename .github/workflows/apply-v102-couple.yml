@@ -1,0 +1,33 @@
+name: Apply v102 couple organization patch
+
+on:
+  push:
+    branches:
+      - safe/v102-ui-admin-lucky-upline
+    paths:
+      - .github/workflows/apply-v102-couple.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: safe/v102-ui-admin-lucky-upline
+          fetch-depth: 0
+      - name: Apply prepared patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d scripts/v102-couple.patch.gz.b64 | gzip -d > /tmp/v102-couple.patch
+          git apply --check /tmp/v102-couple.patch
+          git apply /tmp/v102-couple.patch
+          rm -f scripts/v102-couple.patch.gz.b64 .github/workflows/apply-v102-couple.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "v102: 夫妻共同組織與下線綁定"
+          git push origin HEAD:safe/v102-ui-admin-lucky-upline
