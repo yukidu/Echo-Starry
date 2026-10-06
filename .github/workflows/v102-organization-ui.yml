@@ -1,5 +1,6 @@
 name: Apply v102 organization UI
 
+# One-time verified integration workflow for the clean v102 branch.
 on:
   push:
     branches:
