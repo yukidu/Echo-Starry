@@ -1,3 +1,4 @@
+import { missingProfileFields } from '../shared/profileCompletion';
 import appWorker from './sessionCookieRouter';
 import type { Env } from './index';
 import { canonicalProgressPercent } from '../shared/learningProgress';
@@ -23,6 +24,12 @@ const SETTING_DEFAULTS: Record<string, number> = {
   comment_thread_cap_units: 200,
   reply_reward_units: 1,
   lucky_cost_units: 1,
+  profile_reward_units: 10,
+  lucky_complete_units: 10,
+  lucky_daily_limit_units: 30,
+  toast_seconds_units: 10,
+  profile_hint_seconds_units: 10,
+  lucky_hint_seconds_units: 20,
   vip_upload_cost_units: 1
 };
 
@@ -95,7 +102,7 @@ function isDownlineOf(target: any, actor: any) {
   if (!owner) return false;
   return [target?.platinumUpline, target?.diamondUpline]
     .map(normalizeMemberName)
-    .some(name => Boolean(name) && name === owner);
+    .some(name => Boolean(name) && (name === owner || (actor.uplineAliases || []).includes(name)));
 }
 
 function parseJson(value: any, fallback: any) {
@@ -203,6 +210,11 @@ async function ensureStickerSchema(db: any) {
       )`).run();
       await db.prepare('CREATE INDEX IF NOT EXISTS sticker_pending_member_track ON sticker_comment_rewards(userId, trackId)').run();
       await db.prepare('CREATE INDEX IF NOT EXISTS sticker_transactions_member_track ON sticker_transactions(userId, trackId, type)').run();
+      await db.prepare('CREATE TABLE IF NOT EXISTS sticker_text_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)').run();
+      await db.prepare('CREATE TABLE IF NOT EXISTS sticker_lucky_draws (operationId TEXT PRIMARY KEY, userId TEXT NOT NULL, trackId TEXT NOT NULL, rewardUnits INTEGER NOT NULL, day TEXT NOT NULL, createdAt INTEGER NOT NULL)').run();
+      await db.prepare('CREATE INDEX IF NOT EXISTS sticker_lucky_member ON sticker_lucky_draws(userId,day)').run();
+      await db.prepare('CREATE TABLE IF NOT EXISTS upline_owners (kind TEXT NOT NULL,name TEXT NOT NULL,userId TEXT NOT NULL,PRIMARY KEY(kind,name))').run();
+      await db.prepare('CREATE TABLE IF NOT EXISTS upline_names (kind TEXT NOT NULL, name TEXT NOT NULL, PRIMARY KEY(kind,name))').run();
       const now = Date.now();
       // v98 stored this setting as a count. The configured number now means stickers.
       await db.prepare(`INSERT OR IGNORE INTO sticker_settings(key,valueUnits,updatedAt,updatedBy)
@@ -263,7 +275,7 @@ async function addStickerTransaction(db: any, input: {
   userId: string; deltaUnits: number; type: string; sourceId?: string; description: string;
   actorUserId?: string; uniqueKey: string; allowNegative?: boolean;
   trackId?: string; commentId?: string; relatedUserId?: string;
-  capUnits?: number; capTypes?: string[];
+  capUnits?: number; capTypes?: string[]; dailyLimit?: number; dayStart?: number;
 }): Promise<TransactionResult> {
   await ensureInitialStickers(db, input.userId);
   const existing: any = await db.prepare('SELECT * FROM sticker_transactions WHERE uniqueKey = ? LIMIT 1').bind(input.uniqueKey).first();
@@ -283,10 +295,11 @@ async function addStickerTransaction(db: any, input: {
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM award
     WHERE (? = 1 OR COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?),0) + amount >= 0)
       AND (? = 0 OR amount > 0)
+      AND (? < 0 OR (SELECT COUNT(*) FROM sticker_transactions WHERE userId = ? AND type = ? AND deltaUnits > 0 AND createdAt >= ? AND createdAt < ?) < ?)
   `).bind(...amountArgs, id, input.userId, input.userId, input.type, input.sourceId || null,
     input.description, input.actorUserId || null, input.uniqueKey, Date.now(), input.trackId || track?.id || null,
     input.commentId || null, input.relatedUserId || null, track ? trackLabel(track) : null,
-    input.allowNegative || input.deltaUnits >= 0 ? 1 : 0, input.userId, capped ? 1 : 0).run();
+    input.allowNegative || input.deltaUnits >= 0 ? 1 : 0, input.userId, capped ? 1 : 0, input.dailyLimit ?? -1, input.userId, input.type, input.dayStart || 0, (input.dayStart || 0) + 86400000, input.dailyLimit ?? -1).run();
   const transaction: any = await db.prepare('SELECT * FROM sticker_transactions WHERE uniqueKey = ?').bind(input.uniqueKey).first();
   return { inserted: Boolean(result?.meta?.changes), balanceUnits: await stickerBalanceUnits(db, input.userId),
     transaction, insufficient: !transaction && input.deltaUnits < 0 };
@@ -322,11 +335,21 @@ async function settingMap(db: any) {
   const { results } = await db.prepare('SELECT key, valueUnits FROM sticker_settings').all();
   const values: Record<string, number> = { ...SETTING_DEFAULTS };
   for (const row of results || []) values[String((row as any).key)] = Number((row as any).valueUnits || 0);
+  const texts = await db.prepare('SELECT key,value FROM sticker_text_settings').all();
+  for (const row of texts.results || []) (values as any)[row.key] = row.value;
   return values;
 }
 
 function settingsForClient(values: Record<string, number>) {
   return {
+    profileReward: unitsToStickers(values.profile_reward_units),
+    luckyCompleteReward: unitsToStickers(values.lucky_complete_units),
+    luckyDailyLimit: unitsToStickers(values.lucky_daily_limit_units),
+    toastSeconds: unitsToStickers(values.toast_seconds_units),
+    profileHintSeconds: unitsToStickers(values.profile_hint_seconds_units),
+    luckyHintSeconds: unitsToStickers(values.lucky_hint_seconds_units),
+    profileHintText: (values as any).profileHintText || '尚有欄位未填，完整填寫可+{x}張貼紙',
+    luckyHintText: (values as any).luckyHintText || '這是宇宙給你的答案\n聽完貼紙額外+{x}張',
     ratingReward: unitsToStickers(values.rating_reward_units),
     likeReward: unitsToStickers(values.like_reward_units),
     keywordReward: unitsToStickers(values.keyword_reward_units),
@@ -427,7 +450,10 @@ async function reconcileCommentRewards(db: any, actor: any, trackId?: string, vi
   }
   const { results: pending } = await db.prepare(`SELECT p.* FROM sticker_comment_rewards p
     JOIN comments c ON c.id = p.commentId
-    WHERE p.userId = ? AND (? = '' OR p.trackId = ?) ORDER BY p.createdAt, p.commentId`)
+    WHERE p.userId = ? AND (? = '' OR p.trackId = ?) AND p.rewardUnits > 0
+      AND NOT EXISTS (SELECT 1 FROM sticker_transactions tx WHERE tx.uniqueKey =
+        CASE WHEN p.kind = 'reply_reward' THEN 'reply-reward:' || p.userId || ':' || p.commentId ELSE 'comment-reward:' || p.userId || ':' || p.trackId END)
+      ORDER BY p.createdAt, p.commentId`)
     .bind(actor.id,trackId || '',trackId || '').all();
   const completed = new Map<string, boolean>();
   for (const item of pending || []) {
@@ -571,35 +597,47 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
   const path = url.pathname;
   const method = request.method.toUpperCase();
   if (!path.startsWith('/api/stickers')) return null;
+  if (path === '/api/stickers/public-settings' && method === 'GET') return json({settings:settingsForClient(await settingMap(db))});
   if (!actor) return json({ error: '貼紙為會員專屬，請先登入' }, 401);
   await ensureInitialStickers(db, actor.id);
 
-  if (path === '/api/stickers/me' && method === 'GET') {
-    await reconcileCommentRewards(db, actor);
-    const balanceUnits = await stickerBalanceUnits(db, actor.id);
-    const transactions = await transactionHistory(db, actor);
-    const { results: unlocks } = await db.prepare('SELECT trackId FROM sticker_unlocks WHERE userId = ?').bind(actor.id).all();
-    const unread: any = await db.prepare('SELECT COUNT(*) AS count FROM member_notifications WHERE userId = ? AND readAt IS NULL')
-      .bind(actor.id).first();
-    return json({
-      balanceUnits,
-      balance: unitsToStickers(balanceUnits),
-      unlockedTrackIds: (unlocks || []).map((row: any) => row.trackId),
-      unreadNotifications: Number(unread?.count || 0),
-      canGrant: canGrantStickers(actor),
-      isSuperAdmin: isSuperAdmin(actor),
-      transactions
-    });
+  if (path === '/api/stickers/reconcile' && method === 'POST') {
+    await reconcileCommentRewards(db,actor); await reconcileLuckyRewards(db,actor);
+    return json({success:true});
   }
 
+  if ((path === '/api/stickers/me' || path === '/api/stickers/summary') && method === 'GET') {
+    const quick = path.endsWith('/summary');
+    if (!quick) { await reconcileCommentRewards(db, actor); await reconcileLuckyRewards(db,actor); }
+    const after = Math.max(0, Number(url.searchParams.get('after')) || 0);
+    // One query returns a consistent balance/cursor/changes snapshot.
+    const snapshot:any=await db.prepare(`SELECT COALESCE(SUM(deltaUnits),0) AS balanceUnits,COALESCE(MAX(rowid),0) AS cursor,
+      (SELECT json_group_array(json_object('id',id,'delta',deltaUnits/10.0)) FROM
+        (SELECT id,deltaUnits FROM sticker_transactions WHERE userId=? AND rowid>? AND ?>0 AND type<>'initial' ORDER BY rowid)) AS changes
+      FROM sticker_transactions WHERE userId=?`).bind(actor.id,after,after,actor.id).first();
+    const balanceUnits=Number(snapshot.balanceUnits);const cursor=Number(snapshot.cursor);const changes=parseJson(snapshot.changes,[]);
+    const [unlocks, unread] = await Promise.all([
+      db.prepare('SELECT trackId FROM sticker_unlocks WHERE userId = ? AND transactionId IS NOT NULL').bind(actor.id).all(),
+      db.prepare('SELECT COUNT(*) AS count FROM member_notifications WHERE userId = ? AND readAt IS NULL').bind(actor.id).first()
+    ]);
+    return json({balanceUnits,balance:unitsToStickers(balanceUnits),cursor,changes,
+      unlockedTrackIds:(unlocks.results || []).map((row:any)=>row.trackId),unreadNotifications:Number((unread as any)?.count || 0),
+      canGrant:canGrantStickers(actor),isSuperAdmin:isSuperAdmin(actor),canManageRules:canManageRules(actor),
+      ...(quick ? {} : {transactions:await transactionHistory(db,actor)})});
+  }
+  if (path === '/api/stickers/history' && method === 'GET') return json({transactions:await transactionHistory(db,actor)});
+
   if (path === '/api/stickers/settings') {
-    if (!isSuperAdmin(actor)) return json({ error: '只有超級管理員可管理貼紙規則' }, 403);
+    if (!canManageRules(actor)) return json({ error: '只有超級管理員可管理貼紙規則，或授權管理員可修改' }, 403);
     if (method === 'GET') return json({ settings: settingsForClient(await settingMap(db)) });
     if (method === 'PUT') {
       const body: any = await request.json().catch(() => ({}));
       for (const key of ['ratingReward', 'likeReward', 'keywordReward', 'keywordRewardLimit', 'commentThreadLimit', 'replyReward', 'luckyCost', 'vipUploadCost']) {
         if (!validTenth(body[key])) return json({ error: `${key} 必須為 0 至 1000 張，且以 0.1 為單位` }, 400);
       }
+      const extraFields: Record<string,string> = {profileReward:'profile_reward_units',luckyCompleteReward:'lucky_complete_units',luckyDailyLimit:'lucky_daily_limit_units',toastSeconds:'toast_seconds_units',profileHintSeconds:'profile_hint_seconds_units',luckyHintSeconds:'lucky_hint_seconds_units'};
+      for (const key of Object.keys(extraFields)) if (body[key] !== undefined && (!validTenth(body[key]) || (key.endsWith('Seconds') && (body[key]<0.1 || body[key]>60)) || (key==='luckyDailyLimit' && !Number.isInteger(body[key])))) return json({error:'時間需為0.1–60秒，每日次數為整數，張數為0–1000'},400);
+      for (const key of ['profileHintText','luckyHintText']) if (body[key] !== undefined && (typeof body[key]!=='string' || !body[key].trim() || body[key].length>500)) return json({error:'提示文字需為1–500字'},400);
       const now = Date.now();
       const updates: Record<string, number> = {
         rating_reward_units: stickersToUnits(body.ratingReward),
@@ -611,12 +649,14 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
         lucky_cost_units: stickersToUnits(body.luckyCost),
         vip_upload_cost_units: stickersToUnits(body.vipUploadCost)
       };
-      await db.batch(Object.entries(updates).map(([key, value]) =>
+      for (const [key,setting] of Object.entries(extraFields)) if (body[key]!==undefined) updates[setting]=stickersToUnits(body[key]);
+      const textUpdates=['profileHintText','luckyHintText'].filter(key=>body[key]!==undefined).map(key=>db.prepare('INSERT OR REPLACE INTO sticker_text_settings VALUES (?,?)').bind(key,body[key].trim()));
+      await db.batch([...textUpdates,...Object.entries(updates).map(([key, value]) =>
         db.prepare(`INSERT INTO sticker_settings(key, valueUnits, updatedAt, updatedBy)
           VALUES (?, ?, ?, ?)
           ON CONFLICT(key) DO UPDATE SET valueUnits = excluded.valueUnits, updatedAt = excluded.updatedAt, updatedBy = excluded.updatedBy`)
           .bind(key, value, now, actor.id)
-      ));
+      )]);
       return json({ success: true, settings: settingsForClient(await settingMap(db)) });
     }
     return json({ error: 'Method not allowed' }, 405);
@@ -630,6 +670,8 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
     if (!track || track.isPrivateVip || !await canEarnFromTrack(db, actor, track)) return json({ error: '沒有可抽選的錄音' }, 403);
     const settings = await settingMap(db);
     const cost = Number(settings.lucky_cost_units || 0);
+    const previousDraw:any=await db.prepare('SELECT trackId FROM sticker_lucky_draws WHERE operationId=?').bind(`${actor.id}:${operationId}`).first();
+    if(previousDraw && previousDraw.trackId!==track.id)return json({error:'此抽選識別碼已使用於另一錄音'},409);
     const result = await addStickerTransaction(db, {
       userId: actor.id,
       deltaUnits: -cost,
@@ -640,7 +682,14 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
       uniqueKey: `lucky:${actor.id}:${operationId}`
     });
     if (result.insufficient) return json({ error: '貼紙不足，無法使用好手氣', balance: unitsToStickers(result.balanceUnits) }, 402);
-    return json({ success: true, charged: unitsToStickers(cost), balance: unitsToStickers(result.balanceUnits), duplicate: !result.inserted });
+    const day = taipeiDay();
+    const alreadyCompleted = await playbackCompleted(db,actor,track.id);
+    const claimed = await db.prepare('SELECT id FROM sticker_transactions WHERE uniqueKey = ?').bind(`lucky-complete:${actor.id}:${track.id}`).first();
+    const earnedToday:any = await db.prepare("SELECT COUNT(*) AS n FROM sticker_transactions WHERE userId = ? AND type = 'lucky_complete_reward' AND createdAt >= ?").bind(actor.id,dayStart()).first();
+    const eligible = !alreadyCompleted && !claimed && Number(earnedToday?.n || 0)<unitsToStickers(settings.lucky_daily_limit_units);
+    await db.prepare('INSERT OR IGNORE INTO sticker_lucky_draws VALUES (?,?,?,?,?,?)').bind(`${actor.id}:${operationId}`,actor.id,track.id,eligible?settings.lucky_complete_units:0,day,Date.now()).run();
+    const draw:any = await db.prepare('SELECT rewardUnits FROM sticker_lucky_draws WHERE operationId = ?').bind(`${actor.id}:${operationId}`).first();
+    return json({ success:true,charged:unitsToStickers(cost),balance:unitsToStickers(result.balanceUnits),duplicate:!result.inserted,bonus:unitsToStickers(draw.rewardUnits),settings:settingsForClient(settings) });
   }
 
   if (path === '/api/stickers/vip-preflight' && method === 'POST') {
@@ -802,7 +851,7 @@ export default {
     const method = request.method.toUpperCase();
     if (!env.DB) return appWorker.fetch(request, env);
 
-    const relevant = path.startsWith('/api/stickers') || path.startsWith('/api/tracks') || path.startsWith('/api/comments') || path === '/api/users/google-sync' || path === '/api/playback/record' || path === '/api/playback/claim-local';
+    const relevant = path.startsWith('/api/stickers') || path.startsWith('/api/tracks') || path.startsWith('/api/comments') || path.startsWith('/api/users/') || path.startsWith('/api/admin/uplines') || path === '/api/playback/record' || path === '/api/playback/claim-local';
     if (relevant) {
       try { await ensureStickerSchema(env.DB); }
       catch (error) {
@@ -812,6 +861,8 @@ export default {
     }
 
     const actor = relevant ? await verifiedActor(request, env).catch(() => null) : null;
+    if(actor && path.startsWith('/api/stickers/grant')) actor.uplineAliases=((await env.DB.prepare('SELECT name FROM upline_owners WHERE userId=?').bind(actor.id).all()).results || []).map((r:any)=>normalizeMemberName(r.name));
+    if (path.startsWith('/api/admin/uplines')) return handleUplines(request,env.DB,actor);
     const stickerResponse = await handleStickerApi(request, env, actor);
     if (stickerResponse) return stickerResponse;
 
@@ -872,8 +923,17 @@ export default {
       return response;
     }
 
+    if (method === 'PUT' && actor && path === `/api/users/${encodeURIComponent(actor.id)}`) {
+      const saved:any=await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(actor.id).first();
+      const rules=await settingMap(env.DB);
+      const missing=missingProfileFields(saved || {});
+      if (!missing.length && rules.profile_reward_units>0) await addStickerTransaction(env.DB,{userId:actor.id,deltaUnits:rules.profile_reward_units,type:'profile_reward',sourceId:actor.id,relatedUserId:actor.id,description:'完整填寫個人資料',actorUserId:actor.id,uniqueKey:`profile-complete:${actor.id}`});
+      const data:any=await response.clone().json();
+      return jsonFromBase({...data,profileCompletion:{complete:!missing.length,missing,settings:settingsForClient(rules)}},response);
+    }
     const settings = actor && (trackAction || keywordPost || commentLike || commentPost) ? await settingMap(env.DB) : null;
     if (playbackWrite && actor) {
+      await reconcileLuckyRewards(env.DB,actor,requestBody?.trackId);
       await reconcileCommentRewards(env.DB,actor,requestBody?.trackId,String(requestBody?.vipPassword || ''));
       return response;
     }
@@ -951,3 +1011,56 @@ export default {
     return response;
   }
 };
+
+function canManageRules(actor:any) { return isSuperAdmin(actor) || Boolean(actor?.isAdminUser) || actor?.role==='管理員'; }
+function taipeiDay() { return new Date(Date.now()+8*3600000).toISOString().slice(0,10); }
+function dayStart() { return Date.parse(taipeiDay()+'T00:00:00+08:00'); }
+async function reconcileLuckyRewards(db:any,actor:any,trackId?:string) {
+  const settings=await settingMap(db);
+  const rows=(await db.prepare(`SELECT * FROM sticker_lucky_draws d WHERE userId=? AND day=? AND rewardUnits>0 AND (?='' OR trackId=?)
+    AND NOT EXISTS(SELECT 1 FROM sticker_transactions t WHERE t.uniqueKey='lucky-complete:' || d.userId || ':' || d.trackId) ORDER BY createdAt`).bind(actor.id,taipeiDay(),trackId || '',trackId || '').all()).results || [];
+  for (const row of rows) {
+    if (!await playbackCompleted(db,actor,row.trackId)) continue;
+    const track=await db.prepare('SELECT * FROM tracks WHERE id=?').bind(row.trackId).first();
+    if (!await canEarnFromTrack(db,actor,track)) continue;
+    await addStickerTransaction(db,{userId:actor.id,deltaUnits:row.rewardUnits,type:'lucky_complete_reward',sourceId:row.trackId,trackId:row.trackId,description:'好手氣完聽額外獎勵',actorUserId:actor.id,uniqueKey:`lucky-complete:${actor.id}:${row.trackId}`,dailyLimit:unitsToStickers(settings.lucky_daily_limit_units),dayStart:dayStart()});
+  }
+}
+async function handleUplines(request:Request,db:any,actor:any) {
+  if (!canManageRules(actor)) return json({error:'需要管理員權限'},403);
+  const columns={platinum:'platinumUpline',diamond:'diamondUpline'} as const;
+  if (request.method==='GET') {
+    const results=[];
+    for (const [kind,column] of Object.entries(columns)) {
+      const rows=(await db.prepare(`SELECT n.name,COUNT(u.id) AS members FROM (
+        SELECT TRIM(${column}) AS name FROM users WHERE TRIM(COALESCE(${column},''))<>'' UNION SELECT name FROM upline_names WHERE kind=?) n
+        LEFT JOIN users u ON TRIM(u.${column})=n.name GROUP BY n.name ORDER BY n.name`).bind(kind).all()).results || [];
+      results.push(...rows.map((row:any)=>({...row,kind})));
+    }
+    return json({uplines:results});
+  }
+  if (request.method!=='POST') return json({error:'不支援此操作'},405);
+  const body:any=await request.json().catch(()=>({}));const column=columns[body.kind as keyof typeof columns];
+  const names=Array.isArray(body.names)?[...new Set(body.names.map((x:any)=>String(x).trim()).filter(Boolean))] as string[]:[];
+  const target=String(body.target || '').trim();
+  if (!column || !['save','merge','delete'].includes(body.action) || names.length>200 || target.length>100 || names.some(x=>x.length>100) || (body.action!=='delete'&&!target) || (body.action!=='save'&&!names.length)) return json({error:'請選擇名單與有效名稱'},400);
+  const statements=[];
+  if(body.action!=='delete') {
+    const targetOwner:any=await db.prepare('SELECT id FROM users WHERE TRIM(name)=?').bind(target).first();
+    const owners=new Set<string>();
+    for(const name of names) {
+      const existing:any=await db.prepare('SELECT userId AS id FROM upline_owners WHERE kind=? AND name=? UNION SELECT id FROM users WHERE TRIM(name)=?').bind(body.kind,name,name).all();
+      for(const row of existing.results || []) owners.add(row.id);
+    }
+    if(!targetOwner && owners.size>1)return json({error:'所選姓名屬於不同會員，請以正確上手會員姓名作為合併目標'},409);
+    const ownerId=targetOwner?.id || [...owners][0];
+    if(ownerId)statements.push(db.prepare('INSERT OR REPLACE INTO upline_owners VALUES (?,?,?)').bind(body.kind,target,ownerId));
+  }
+  if (body.action!=='delete') statements.push(db.prepare('INSERT OR IGNORE INTO upline_names VALUES (?,?)').bind(body.kind,target));
+  for (const name of names) {
+    statements.push(db.prepare(`UPDATE users SET ${column}=? WHERE TRIM(${column})=?`).bind(body.action==='delete'?'':target,name));
+    if (name!==target || body.action==='delete') {statements.push(db.prepare('DELETE FROM upline_names WHERE kind=? AND name=?').bind(body.kind,name));statements.push(db.prepare('DELETE FROM upline_owners WHERE kind=? AND name=?').bind(body.kind,name));}
+  }
+  if (statements.length) await db.batch(statements);
+  return json({success:true});
+}

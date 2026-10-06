@@ -116,27 +116,27 @@ export const AudioCard: React.FC<AudioCardProps> = ({
 
             {isCompleted ? (
               <div
-                className="absolute top-0 inset-x-0 text-white text-[8px] sm:text-[9px] font-bold text-center px-1 py-1 whitespace-nowrap overflow-hidden flex items-center justify-center gap-0.5 z-30 shadow-2xs leading-none"
+                className="absolute top-0 inset-x-0 text-white text-[7px] sm:text-[8px] font-bold text-center px-1 py-1 whitespace-nowrap overflow-hidden flex items-center justify-center gap-0.5 z-30 shadow-2xs leading-none"
                 style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
               >
                 <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
                 <span className="whitespace-nowrap">[已聽完]</span>
               </div>
-            ) : hasListened2Min ? (
+            ) : progressRatio > 0 ? (
               <div
-                className="absolute top-0 inset-x-0 text-white text-[8px] sm:text-[9px] font-bold text-center px-1 py-1 font-mono z-30 shadow-2xs whitespace-nowrap overflow-hidden leading-none"
+                className="absolute top-0 inset-x-0 text-white text-[7px] sm:text-[8px] font-bold text-center px-1 py-1 font-mono z-30 shadow-2xs whitespace-nowrap overflow-hidden leading-none"
                 style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
               >
                 [已聽 {Math.round(progressRatio * 100)}%]
               </div>
-            ) : null}
+            ) : <div className="absolute top-0 inset-x-0 z-30 bg-black/50 text-center py-1 text-[7px] sm:text-[8px] text-white">寫心得<span className="text-red-500">+{track.commentStickerReward || 0}張貼紙</span></div>}
 
             <div
               className="absolute bottom-0 inset-x-0 z-30 flex items-center justify-center gap-0.5 bg-black/35 px-1 py-[2px] sm:py-0.5 text-[7px] sm:text-[8px] leading-none font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)] whitespace-nowrap overflow-hidden"
               title={`收聽權限：${permissionStickerLabel}`}
             >
               {displayRequiredRank !== '公開' && <Lock className="w-2.5 h-2.5 shrink-0" />}
-              <span className="truncate">{permissionStickerLabel}</span>
+              <span className="truncate">{displayRequiredRank}{stickerUnlockCost>0 && <>│<span className="text-emerald-400">-{stickerUnlockCost}張貼紙</span></>}</span>
             </div>
           </button>
 

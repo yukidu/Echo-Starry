@@ -5,7 +5,7 @@ import { VisitorIdentity } from '../utils/visitor';
 import { TwinklingStars } from './TwinklingStars';
 import { InstallAppButton } from './InstallAppButton';
 
-export type NavTab = 'home' | 'stats' | 'notifications' | 'profile' | 'upload' | 'admin';
+export type NavTab = 'home' | 'stats' | 'notifications' | 'profile' | 'upload' | 'admin' | 'stickers' | 'install';
 
 interface NavbarProps {
   currentTab: NavTab;
@@ -21,6 +21,7 @@ interface NavbarProps {
   pendingAuditCount?: number;
   stickerBalance?: number;
   onOpenStickers?: () => void;
+  onInstallGuide?: () => void;
   visitor?: VisitorIdentity;
 }
 
@@ -38,6 +39,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   pendingAuditCount = 0,
   stickerBalance,
   onOpenStickers,
+  onInstallGuide,
   visitor
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -256,11 +258,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             title={stickerMenuTitle}
             className="px-2.5 py-2 rounded-xl text-xs font-black text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap"
           >
-            <Trophy className="w-5 h-5" /> {stickerMenuTitle}
+            <Trophy className="w-5 h-5" /> {currentUser ? <>我的貼紙 <span className="text-2xl font-normal">{stickerBalanceText}</span> 張</> : stickerMenuTitle}
           </button>
 
           {/* PWA install is shown directly whenever desktop/landscape navigation replaces the hamburger menu. */}
           <InstallAppButton
+            onOpenIOSGuide={onInstallGuide}
             compact
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap"
           />
@@ -412,7 +415,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           {currentUser && <button type="button" onClick={() => handleMobileNav('notifications')} className="notification-menu-row w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold whitespace-nowrap" style={{color:'var(--color-primary,#c06c84)'}}><Bell className="w-4 h-4 shrink-0"/><span>{canAudit ? `通知 ${pendingAuditCount} 待審核` : '通知'}</span></button>}
-          <button type="button" onClick={() => {onOpenStickers?.();setIsMobileMenuOpen(false);}} className="sticker-menu-row w-full flex items-center gap-2 px-3 py-2.5 font-bold whitespace-nowrap" style={{color:'var(--color-primary,#c06c84)',fontSize:'28px'}}><Trophy className="w-6 h-6 shrink-0"/><span>{stickerMenuTitle}</span></button>
+          <button type="button" onClick={() => {onOpenStickers?.();setIsMobileMenuOpen(false);}} className="sticker-menu-row w-full flex items-center gap-2 px-3 py-2.5 font-bold whitespace-nowrap" style={{color:'var(--color-primary,#c06c84)'}}><Trophy className="w-6 h-6 shrink-0"/><span>{currentUser ? <>我的貼紙 <span className="sticker-menu-amount">{stickerBalanceText}</span> 張</> : stickerMenuTitle}</span></button>
 
           {canUpload && (
             <button
@@ -440,7 +443,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>個人中心</span>
           </button>
 
-          <InstallAppButton />
+          <InstallAppButton onOpenIOSGuide={() => {setIsMobileMenuOpen(false);onInstallGuide?.();}} />
 
           {canAccessSettings && (
             <button

@@ -1,3 +1,4 @@
+import { getFeedbackRules, showStickerNotice } from './StickerFeedback';
 import { ThemedSelect } from './ThemedSelect';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
@@ -208,17 +209,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     }
   };
 
-  // Item 4: Autocomplete suggestions for sponsor, platinumUpline, diamondUpline
-  const [activeSuggestField, setActiveSuggestField] = useState<'sponsor' | 'platinum' | 'diamond' | null>(null);
-
-  const sponsorSuggestions = useMemo(() => {
-    const set = new Set<string>();
-    allUsers.forEach(u => {
-      if (u.name) set.add(u.name);
-      if (u.sponsor) set.add(u.sponsor);
-    });
-    return Array.from(set).filter(n => n.toLowerCase().includes((sponsor || '').toLowerCase()));
-  }, [allUsers, sponsor]);
+  // Item 4: Autocomplete suggestions for platinumUpline and diamondUpline
+  const [activeSuggestField, setActiveSuggestField] = useState<'platinum' | 'diamond' | null>(null);
 
   const platinumSuggestions = useMemo(() => {
     const set = new Set<string>();
@@ -328,7 +320,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   const handleSaveProfile = async () => {
-    if (!name.trim() || isSaving) return;
+    if (isSaving) return;
+    if (!name.trim()) {const rules=getFeedbackRules();showStickerNotice(rules.profileHintText.replaceAll('{x}',String(rules.profileReward)),rules.profileHintSeconds);return;}
     setIsSaving(true);
     setSaveError(null);
 
@@ -421,8 +414,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     });
 
   return (
-    <div className="app-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3.5 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-rose-100/60 dark:border-slate-800 my-8">
+    <div className="profile-page w-full min-h-[70dvh]">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl w-full overflow-hidden border border-rose-100/60 dark:border-slate-800">
         {saveError && <p role="alert" className="px-4 py-3 text-sm text-red-600 bg-red-50 dark:bg-red-950">{saveError}</p>}
         {/* Header - Requirement 20: 統一底色與麥克風相同色 */}
         <div
@@ -597,7 +590,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               </button>
             </div>
 
-            <div className="p-4 sm:p-5 max-h-[65vh] overflow-y-auto space-y-3.5 text-xs">
+            <div className="p-4 sm:p-5  overflow-y-auto space-y-3.5 text-xs">
               {/* TAB 1: Profile & Edit Fields */}
               {activeTab === 'profile' && (
                 <div className="space-y-3">
@@ -693,11 +686,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                           </span>
                         </div>
                         <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700">
-                          <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-semibold">上手白金 / 鑽石</span>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-semibold">上手白金</span>
                           <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
-                            {currentUser.platinumUpline || '-'} / {currentUser.diamondUpline || '-'}
+                            {currentUser.platinumUpline || '-'}
                           </span>
                         </div>
+                        <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700"><span className="text-[10px] text-slate-500 dark:text-slate-400 block font-semibold">上手鑽石</span><span className="font-semibold text-slate-800 dark:text-slate-200">{currentUser.diamondUpline || '-'}</span></div>
                         <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700">
                           <div className="flex items-center justify-between mb-0.5">
                             <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">西元生日</span>
@@ -864,42 +858,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                           </ThemedSelect>
                         </div>
 
-                        {/* 推薦人 with Autocomplete (Item 4) */}
-                        <div className="relative">
-                          <label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                            推薦人
-                          </label>
-                          <input
-                            type="text"
-                            value={sponsor}
-                            onChange={e => {
-                              setSponsor(e.target.value);
-                              setActiveSuggestField('sponsor');
-                            }}
-                            onFocus={() => setActiveSuggestField('sponsor')}
-                            placeholder="輸入或點選已有名稱..."
-                            className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-hidden"
-                          />
-                          {activeSuggestField === 'sponsor' && sponsorSuggestions.length > 0 && (
-                            <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-20 max-h-36 overflow-y-auto p-1 text-xs">
-                              <div className="text-[10px] text-slate-400 px-2 py-0.5 font-bold">點選帶入推薦人：</div>
-                              {sponsorSuggestions.slice(0, 8).map((nameItem, idx) => (
-                                <button
-                                  key={idx}
-                                  type="button"
-                                  onClick={() => {
-                                    setSponsor(nameItem);
-                                    setActiveSuggestField(null);
-                                  }}
-                                  className="w-full text-left px-2 py-1 rounded-lg hover:bg-rose-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium cursor-pointer"
-                                >
-                                  {nameItem}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
+                        <div><label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">推薦人</label><input type="text" autoComplete="off" value={sponsor} onChange={e=>setSponsor(e.target.value)} placeholder="輸入推薦人姓名" className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"/></div>
                         {/* 上手白金 with Autocomplete (Item 4) */}
                         <div className="relative">
                           <label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">

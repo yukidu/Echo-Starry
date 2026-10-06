@@ -1,3 +1,4 @@
+import { setFeedbackRules } from './StickerFeedback';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Trophy, X, History, SlidersHorizontal, ListChecks, PlusCircle, Search, ArrowUpRight } from 'lucide-react';
 import type { Track, UserProfile } from '../types';
@@ -6,7 +7,7 @@ import { ThemedSelect } from './ThemedSelect';
 
 export type StickerSource = { kind: 'track' | 'member' | 'feature'; trackId?: string; commentId?: string; userId?: string; label: string; available: boolean };
 type StickerTransaction = { id: string; delta: number; description: string; type: string; createdAt: number; source?: StickerSource | null };
-type StickerSettings = { ratingReward: number; likeReward: number; keywordReward: number; keywordRewardLimit: number; commentThreadLimit: number; replyReward: number; luckyCost: number; vipUploadCost: number };
+type StickerSettings = { ratingReward: number; likeReward: number; keywordReward: number; keywordRewardLimit: number; commentThreadLimit: number; replyReward: number; luckyCost: number; vipUploadCost: number; profileReward:number; luckyCompleteReward:number; luckyDailyLimit:number; toastSeconds:number; profileHintSeconds:number; luckyHintSeconds:number; profileHintText:string; luckyHintText:string };
 type StickerSummary = { balance: number; transactions?: StickerTransaction[]; canGrant: boolean; isSuperAdmin: boolean };
 interface StickersModalProps {
   isOpen: boolean; onClose: () => void; currentUser: UserProfile | null; tracks: Track[];
@@ -14,9 +15,10 @@ interface StickersModalProps {
   onTracksUpdated?: (tracks: Track[]) => void; onStickerChanged?: () => void;
   onOpenSource?: (source: StickerSource) => void;
 }
+const historyCache = new Map<string, StickerTransaction[]>();
 const field = 'w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100';
 const primary = { backgroundColor: 'var(--color-primary,#c06c84)' };
-const actions: Record<string,string> = {initial:'會員初始貼紙',rating_reward:'評價錄音',like_reward:'按讚錄音',keyword_reward:'新增網友關鍵字',comment_reward:'聽完後分享心得',reply_reward:'回覆他人心得',comment_like_reward:'按讚他人心得',comment_reward_reversal:'刪除心得扣回',track_unlock_cost:'解鎖錄音',vip_upload_cost:'建立私秘VIP',lucky_cost:'好手氣',manual_grant:'人工加貼紙'};
+const actions: Record<string,string> = {profile_reward:'完善個人資料',lucky_complete_reward:'好手氣完聽獎勵',initial:'會員初始貼紙',rating_reward:'評價錄音',like_reward:'按讚錄音',keyword_reward:'新增網友關鍵字',comment_reward:'聽完後分享心得',reply_reward:'回覆他人心得',comment_like_reward:'按讚他人心得',comment_reward_reversal:'刪除心得扣回',track_unlock_cost:'解鎖錄音',vip_upload_cost:'建立私秘VIP',lucky_cost:'好手氣',manual_grant:'人工加貼紙'};
 async function requestJson(url: string, options?: RequestInit) {
   const response = await fetch(url, options); const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || '操作失敗，請稍後再試');
@@ -25,6 +27,7 @@ async function requestJson(url: string, options?: RequestInit) {
 export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,currentUser,tracks,initialSummary,onTracksUpdated,onStickerChanged,onOpenSource}) => {
   // Tabs are available from the signed-in profile immediately; every API still checks the live session.
   const superAdmin = currentUser?.email?.trim().toLowerCase() === 'yukidu@gmail.com' || currentUser?.role === '超級管理員';
+  const canManageRules = superAdmin || Boolean(currentUser?.isAdminUser) || currentUser?.role === '管理員';
   const canGrant = superAdmin || Boolean(currentUser?.rankApproved && isPlatinumOrAboveRank(currentUser.approvedRank || currentUser.rank));
   const [summary,setSummary] = useState<StickerSummary | null>(initialSummary || null);
   const [tab,setTab] = useState<'history'|'grant'|'batch'|'rules'>('history');
@@ -43,18 +46,22 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
     const sequence = ++requestSequence.current;
     setLoading(true);
     try {
-      const [data, grants, rules, history] = await Promise.all([
-        requestJson('/api/stickers/me'),
-        canGrant ? requestJson('/api/stickers/grant-targets') : null,
-        superAdmin ? requestJson('/api/stickers/settings') : null,
-        canGrant ? requestJson('/api/stickers/grant-history') : null
-      ]);
-      if (sequence !== requestSequence.current) return;
-      setSummary(data); setTargets(grants?.targets || []); setSettings(rules?.settings || null); setGrantHistory(history?.transactions || []);
+      // Paint the ledger independently; management requests never block the first page.
+      const historyTask=requestJson('/api/stickers/history').then(data=>{if(sequence===requestSequence.current){historyCache.set(currentUser.id,data.transactions);setSummary(prev=>({...prev!,transactions:data.transactions}));}});
+      const summaryTask=requestJson('/api/stickers/summary').then(data=>{if(sequence===requestSequence.current)setSummary(prev=>({...data,transactions:prev?.transactions}));});
+      const grantsTask=canGrant?requestJson('/api/stickers/grant-targets').then(data=>{if(sequence===requestSequence.current)setTargets(data.targets || []);}):Promise.resolve();
+      const rulesTask=canManageRules?requestJson('/api/stickers/settings').then(data=>{if(sequence===requestSequence.current)setSettings(data.settings);}):Promise.resolve();
+      const outgoingTask=canGrant?requestJson('/api/stickers/grant-history').then(data=>{if(sequence===requestSequence.current)setGrantHistory(data.transactions || []);}):Promise.resolve();
+      await Promise.all([historyTask.then(()=>{if(sequence===requestSequence.current)setLoading(false);}),summaryTask,grantsTask,rulesTask,outgoingTask]);
+      // Recovery runs after the history is visible, then refreshes it without blanking it.
+      await requestJson('/api/stickers/reconcile',{method:'POST'});
+      const fresh=await requestJson('/api/stickers/history');
+      if(sequence===requestSequence.current){historyCache.set(currentUser.id,fresh.transactions);setSummary(prev=>({...prev!,transactions:fresh.transactions}));}
+      notifyChanged();
     } catch (reason) { if (sequence === requestSequence.current) setError(reason instanceof Error ? reason.message : '無法讀取貼紙資料'); }
     finally { if (sequence === requestSequence.current) setLoading(false); }
   };
-  useEffect(() => { if (isOpen) { setTab('history'); setError(''); setSummary(initialSummary || null); void load(); } return () => {requestSequence.current += 1;}; }, [isOpen,currentUser?.id]);
+  useEffect(() => { if (isOpen) { setTab('history'); setError(''); setSummary({...initialSummary!,transactions:historyCache.get(currentUser?.id || '')}); void load(); } return () => {requestSequence.current += 1;}; }, [isOpen,currentUser?.id]);
   const filteredTracks = useMemo(() => tracks.filter(track => [track.title,track.speaker,track.series].some(value => String(value || '').toLocaleLowerCase('zh-Hant').includes(trackSearch.trim().toLocaleLowerCase('zh-Hant')))),[tracks,trackSearch]);
   const filteredTargets = useMemo(() => targets.filter(target => target.name.toLocaleLowerCase('zh-Hant').includes(targetSearch.trim().toLocaleLowerCase('zh-Hant'))),[targets,targetSearch]);
   if (!isOpen) return null;
@@ -78,7 +85,7 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
   });
   const saveRules = () => mutate(async () => {
     const data=await requestJson('/api/stickers/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(settings)});
-    setSettings(data.settings);notifyChanged();
+    setSettings(data.settings);setFeedbackRules(data.settings);notifyChanged();
   });
   const transactions = (rows: StickerTransaction[]) => <div className="space-y-1">
     {loading && !rows.length ? <p role="status" className="text-center text-slate-400 py-4">載入紀錄中…</p> : !rows.length ? <p className="text-center text-slate-400 py-4">目前沒有紀錄</p> : rows.map(tx => <div key={tx.id} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700">
@@ -91,12 +98,12 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
         {tx.source && !tx.source.available && <span className="text-[10px] text-slate-400">（來源已移除）</span>}
         <p className="text-[10px] text-slate-400">{new Date(tx.createdAt).toLocaleString('zh-TW')}</p>
       </div>
-      <strong className={`text-4xl sm:text-5xl font-black tabular-nums leading-none shrink-0 ${tx.delta >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{tx.delta>=0?'+':''}{formatStickerAmount(tx.delta)}</strong>
+      <strong className={`text-2xl font-normal tabular-nums leading-none shrink-0 ${tx.delta >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>{tx.delta>=0?'+':''}{formatStickerAmount(tx.delta)}<span className="text-xs">張貼紙</span></strong>
     </div>)}
   </div>;
-  const tabs = [{id:'history',label:'貼紙紀錄',Icon:History},...(canGrant?[{id:'grant',label:'人工加貼紙',Icon:PlusCircle}]:[]),...(superAdmin?[{id:'batch',label:'批次修改',Icon:ListChecks},{id:'rules',label:'其他規則',Icon:SlidersHorizontal}]:[])] as const;
-  return <div className="app-modal-overlay fixed inset-0 z-[190] bg-black/60 backdrop-blur-sm flex items-start justify-center p-3 overflow-y-auto" onMouseDown={event=>event.target===event.currentTarget&&onClose()}>
-    <div role="dialog" aria-modal="true" aria-labelledby="sticker-book-title" className="w-full max-w-2xl max-h-[calc(100dvh-32px)] overflow-hidden rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col">
+  const tabs = [{id:'history',label:'貼紙紀錄',Icon:History},...(canGrant?[{id:'grant',label:'人工加貼紙',Icon:PlusCircle}]:[]),...(superAdmin?[{id:'batch',label:'批次修改',Icon:ListChecks}]:[]),...(canManageRules?[{id:'rules',label:'其他規則',Icon:SlidersHorizontal}]:[])] as const;
+  return <div className="sticker-page w-full min-h-[70dvh]">
+    <div role="region" aria-labelledby="sticker-book-title" className="w-full overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex flex-col">
       <div className="px-4 py-3 flex items-center justify-between text-white shrink-0" style={primary}><h2 id="sticker-book-title" className="font-black text-lg flex items-center gap-2"><Trophy className="w-5 h-5"/>我的貼紙簿</h2><button type="button" onClick={onClose} className="p-2 rounded-xl hover:bg-white/20" aria-label="關閉"><X className="w-5 h-5"/></button></div>
       {!currentUser ? <div className="p-8 text-center font-bold">我的貼紙是會員專屬功能，請先登入。</div> : <>
         <div role="tablist" aria-label="貼紙簿分頁" className={`grid ${tabs.length>2?'grid-cols-2 sm:grid-cols-4':tabs.length>1?'grid-cols-2':'grid-cols-1'} gap-1 p-2 border-b border-slate-100 dark:border-slate-800 shrink-0`}>
@@ -120,8 +127,14 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
             <div className="max-h-72 overflow-y-auto space-y-1 border border-slate-200 dark:border-slate-700 rounded-2xl p-2">{filteredTracks.map(track=><label key={track.id} className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"><input type="checkbox" checked={selectedTrackIds.includes(track.id)} onChange={e=>setSelectedTrackIds(prev=>e.target.checked?[...prev,track.id]:prev.filter(id=>id!==track.id))}/><div className="min-w-0 flex-1"><p className="font-bold text-xs">{track.speaker}{track.speakerRank==='無'?'':track.speakerRank}-{track.title}</p><p className="text-[10px] text-slate-400">解鎖 {track.stickerUnlockCost || 0}｜心得 +{track.commentStickerReward || 0}</p></div></label>)}</div>
             <button type="button" disabled={busy||!selectedTrackIds.length} onClick={batch} className="w-full py-2.5 rounded-xl text-white font-bold disabled:opacity-50" style={primary}>套用批次修改（{selectedTrackIds.length} 筆）</button>
           </div>}
-          {tab==='rules' && superAdmin && (settings?<form className="space-y-3" onSubmit={e=>{e.preventDefault();void saveRules();}}>
+          {tab==='rules' && canManageRules && (settings?<form className="space-y-3" onSubmit={e=>{e.preventDefault();void saveRules();}}>
             {([{title:'獲取貼紙',items:[['評價','ratingReward'],['按讚（錄音或他人心得）','likeReward'],['新增網友關鍵字','keywordReward'],['每人每支錄音關鍵字獎勵上限','keywordRewardLimit'],['同篇心得區可獲得貼紙總上限（本人心得＋回覆他人留言）','commentThreadLimit'],['回覆他人心得','replyReward']]},{title:'消耗貼紙',items:[['好手氣','luckyCost'],['上傳私秘VIP','vipUploadCost']]}] as const).map(group=><div key={group.title} className="rounded-2xl bg-slate-50 dark:bg-slate-800/70 p-3 space-y-3 border border-slate-200 dark:border-slate-700"><h3 className="font-black">{group.title}</h3>{group.items.map(([label,key])=><label key={key} className="flex items-center justify-between gap-3 text-xs font-bold"><span className="leading-snug">{label}</span><span className="flex items-center gap-1 shrink-0"><input aria-label={label} type="number" min="0" max="1000" step="0.1" required value={Number.isNaN(settings[key])?'':settings[key]} onChange={e=>setSettings({...settings,[key]:e.target.value===''?NaN:Number(e.target.value)})} className={`${field} !w-20 !px-2`}/>張</span></label>)}</div>)}
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 p-3 space-y-3"><h3 className="font-bold">個人資料、好手氣與提示</h3>{([
+              ['完整個人資料獎勵','profileReward','張'],['好手氣完聽額外獎勵','luckyCompleteReward','張'],['好手氣每日領取上限','luckyDailyLimit','次'],['全站貼紙異動提示秒數','toastSeconds','秒'],['資料未填完整提示秒數','profileHintSeconds','秒'],['好手氣提示秒數','luckyHintSeconds','秒']
+            ] as const).map(([label,key,unit])=><label key={key} className="flex justify-between items-center gap-2 text-xs"><span>{label}</span><span><input aria-label={label} required type="number" min={unit==='秒'?0.1:0} max={unit==='秒'?60:1000} step={unit==='次'?1:0.1} value={Number.isNaN(settings[key])?'':settings[key]} onChange={e=>setSettings({...settings,[key]:e.target.value===''?NaN:Number(e.target.value)})} className={`${field} !w-24`}/> {unit}</span></label>)}
+              {([['未填完整提示文字','profileHintText'],['好手氣提示文字','luckyHintText']] as const).map(([label,key])=><label key={key} className="block text-xs">{label}（用 {'{x}'} 代入張數）<textarea required maxLength={500} rows={3} value={settings[key]} onChange={e=>setSettings({...settings,[key]:e.target.value})} className={`${field} mt-1`}/></label>)}
+              <p className="text-xs text-slate-500">完善資料每會員領一次。好手氣抽中尚未聽完的錄音，當日聽完可領；同一錄音不重複領取，每日依台灣時間計算。</p>
+            </div>
             <button type="submit" disabled={busy} className="w-full py-2.5 rounded-xl text-white font-bold disabled:opacity-50" style={primary}>儲存貼紙規則</button>
           </form>:<p role="status" className="text-center text-slate-400 py-4">載入規則中…</p>)}
         </div>

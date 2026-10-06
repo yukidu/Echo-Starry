@@ -240,3 +240,10 @@ CREATE TABLE IF NOT EXISTS sticker_comment_rewards (
   rewardUnits INTEGER NOT NULL, kind TEXT NOT NULL, createdAt INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS sticker_pending_member_track ON sticker_comment_rewards(userId,trackId);
+
+-- v100 configurable feedback, lucky completion, and maintained upline names.
+CREATE TABLE IF NOT EXISTS sticker_text_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS sticker_lucky_draws (operationId TEXT PRIMARY KEY,userId TEXT NOT NULL,trackId TEXT NOT NULL,rewardUnits INTEGER NOT NULL,day TEXT NOT NULL,createdAt INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS sticker_lucky_member ON sticker_lucky_draws(userId,day);
+CREATE TABLE IF NOT EXISTS upline_names (kind TEXT NOT NULL,name TEXT NOT NULL,PRIMARY KEY(kind,name));
+CREATE TABLE IF NOT EXISTS upline_owners (kind TEXT NOT NULL,name TEXT NOT NULL,userId TEXT NOT NULL,PRIMARY KEY(kind,name));
