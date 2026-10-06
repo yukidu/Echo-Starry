@@ -246,6 +246,7 @@ async function ensureStickerSchema(db: any) {
       const initialUsers = (await db.prepare('SELECT id FROM users').all()).results || [];
       for (const user of initialUsers as any[]) await ensureInitialStickers(db, String(user.id || ''));
       await backfillExistingRankApprovalRewards(db);
+      await topUpLegacyRankStickerInventory(db);
     })();
     schemaReady.set(key, task);
     task.catch(() => schemaReady.delete(key));
@@ -466,6 +467,43 @@ async function backfillExistingRankApprovalRewards(db: any) {
       SELECT ?, ?, ?, COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?),0) + ?,
         'rank_approval_reward', ?, ?, 'system', ?, ?`)
       .bind(uniqueKey, user.id, units, user.id, units, tier, `${rankRewardLabel(tier)}獎銜審核通過獎勵（既有會員補發）`, uniqueKey, now));
+  }
+  for (let offset = 0; offset < statements.length; offset += 50) {
+    await db.batch(statements.slice(offset, offset + 50));
+  }
+  await db.prepare('INSERT OR IGNORE INTO app_migrations(name) VALUES (?)').bind(migration).run();
+}
+
+
+const LEGACY_RANK_INVENTORY_TARGET_UNITS: Record<RankRewardTier, number> = {
+  platinum: 1000,
+  emerald: 2000,
+  diamond: 3000
+};
+
+async function topUpLegacyRankStickerInventory(db: any) {
+  await db.prepare('CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY)').run();
+  const migration = 'legacy-rank-inventory-topup-v105';
+  if (await db.prepare('SELECT name FROM app_migrations WHERE name = ?').bind(migration).first()) return;
+
+  const users = (await db.prepare(`SELECT id,name,rank,approvedRank,rankApproved
+    FROM users WHERE COALESCE(rankApproved,0)=1`).all()).results || [];
+  const statements: any[] = [];
+  const now = Date.now();
+  for (const user of users as any[]) {
+    const tier = rankRewardTier(user.approvedRank || user.rank);
+    if (!tier) continue;
+    const targetUnits = LEGACY_RANK_INVENTORY_TARGET_UNITS[tier];
+    if (!targetUnits) continue;
+    const uniqueKey = `legacy-rank-inventory-topup-v105:${user.id}`;
+    statements.push(db.prepare(`INSERT OR IGNORE INTO sticker_transactions
+      (id,userId,deltaUnits,balanceAfterUnits,type,sourceId,description,actorUserId,uniqueKey,createdAt)
+      SELECT ?, ?, ? - COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?),0), ?,
+        'legacy_rank_inventory_topup', ?, ?, 'system', ?, ?
+      WHERE COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?),0) < ?`)
+      .bind(uniqueKey, user.id, targetUnits, user.id, targetUnits, tier,
+        `${rankRewardLabel(tier)}舊會員貼紙一次性補發至 ${formatStickerAmount(unitsToStickers(targetUnits))} 張`,
+        uniqueKey, now, user.id, targetUnits));
   }
   for (let offset = 0; offset < statements.length; offset += 50) {
     await db.batch(statements.slice(offset, offset + 50));

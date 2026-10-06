@@ -227,6 +227,31 @@ test('existing and future approved leaders receive configurable one-time rank st
   assert.equal((await audit('白金')).status,200);assert.equal(await balance(db,candidate),1026);
 });
 
+
+test('one-time legacy rank inventory top-up fills approved leaders to 100, 200 and 300 without repeating', async () => {
+  const db=database();
+  db.sqlite.exec(`INSERT OR REPLACE INTO sticker_settings VALUES
+      ('platinum_rank_reward_units',0,1,'test'),
+      ('emerald_rank_reward_units',0,1,'test'),
+      ('diamond_rank_reward_units',0,1,'test');
+    INSERT INTO users(id,name,email,rank,approvedRank,rankApproved,canUpload) VALUES
+      ('emerald-topup','翡翠補發','emerald-topup@example.com','翡翠','翡翠',1,0);`);
+  const platinum=await session(db,'platinum');
+  const emerald=await session(db,'emerald-topup');
+  const diamond=await session(db,'admin');
+  const member=await session(db,'member');
+  assert.equal(await balance(db,platinum),100);
+  assert.equal(await balance(db,emerald),200);
+  assert.equal(await balance(db,diamond),300);
+  assert.equal(await balance(db,member),6);
+  assert.equal(count(db,'legacy_rank_inventory_topup'),3);
+  await Promise.all([balance(db,platinum),balance(db,emerald),balance(db,diamond)]);
+  assert.equal(count(db,'legacy_rank_inventory_topup'),3);
+  const amounts=(db.sqlite.prepare("SELECT userId,deltaUnits FROM sticker_transactions WHERE type='legacy_rank_inventory_topup' ORDER BY userId").all() as any[])
+    .map(row=>[row.userId,row.deltaUnits]);
+  assert.deepEqual(amounts,[['admin',2880],['emerald-topup',1880],['platinum',880]]);
+});
+
 test('approved platinum ordinary earnings use the configured multiplier while rank rewards stay fixed', async () => {
   const db=database();const platinum=await session(db,'platinum');const admin=await session(db,'admin');
   const rules=(await call(db,admin,'/api/stickers/settings')).data.settings;
