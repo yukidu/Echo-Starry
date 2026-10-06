@@ -200,8 +200,8 @@ test('existing and future approved leaders receive configurable one-time rank st
   const defaults=(await call(db,admin,'/api/stickers/settings')).data.settings;
   assert.equal(defaults.platinumRankBaseReward,50);assert.equal(defaults.platinumRankMultiplier,2);
   assert.equal(defaults.emeraldRankReward,300);assert.equal(defaults.diamondRankReward,500);
-  assert.equal(Number(db.sqlite.prepare("SELECT SUM(deltaUnits)/10.0 AS n FROM sticker_transactions WHERE userId='platinum'").get().n),106);
-  assert.equal(Number(db.sqlite.prepare("SELECT SUM(deltaUnits)/10.0 AS n FROM sticker_transactions WHERE userId='emerald'").get().n),306);
+  assert.equal(Number((db.sqlite.prepare("SELECT SUM(deltaUnits)/10.0 AS n FROM sticker_transactions WHERE userId='platinum'").get() as any).n),106);
+  assert.equal(Number((db.sqlite.prepare("SELECT SUM(deltaUnits)/10.0 AS n FROM sticker_transactions WHERE userId='emerald'").get() as any).n),306);
   assert.equal(count(db,'rank_approval_reward'),3);
   assert.equal((await call(db,admin,'/api/stickers/settings','PUT',{...defaults,platinumRankBaseReward:60,platinumRankMultiplier:2.5,emeraldRankReward:350,diamondRankReward:550})).status,200);
   const audit=(rank:string)=>{db.sqlite.prepare("UPDATE users SET rank=?,rankApproved=0,rankAuditStatus='pending' WHERE id='candidate'").run(rank);return call(db,admin,'/api/users/candidate/audit-rank','PUT',{auditorEmail:'yukidu@gmail.com',rank});};
