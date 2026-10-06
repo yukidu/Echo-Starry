@@ -90,7 +90,24 @@ async function deleteMember(request: Request, env: Env, targetKey: string) {
     return json({ error: '超級管理員帳號不可刪除' }, 403);
   }
 
+  let coupleCleanup: { oldLabel: string; survivorLabel: string } | null = null;
+  if (await tableExists(env.DB, 'couple_links')) {
+    const link: any = await env.DB.prepare('SELECT * FROM couple_links WHERE userAId = ? OR userBId = ? LIMIT 1').bind(target.id, target.id).first();
+    if (link) {
+      const survivorId = link.userAId === target.id ? link.userBId : link.userAId;
+      const survivor: any = await env.DB.prepare('SELECT id,name FROM users WHERE id = ? LIMIT 1').bind(survivorId).first();
+      if (survivor) {
+        const ordered = link.userAId === target.id ? [target.name, survivor.name] : [survivor.name, target.name];
+        coupleCleanup = { oldLabel: ordered.map((name: unknown) => String(name || '').trim()).filter(Boolean).join('&'), survivorLabel: String(survivor.name || '').trim() };
+      }
+    }
+  }
+
   const statements: any[] = [];
+  if (coupleCleanup?.oldLabel && coupleCleanup.survivorLabel) {
+    statements.push(env.DB.prepare(`UPDATE users SET platinumUpline = ? WHERE TRIM(COALESCE(platinumUpline,'')) = ?`).bind(coupleCleanup.survivorLabel, coupleCleanup.oldLabel));
+    statements.push(env.DB.prepare(`UPDATE users SET diamondUpline = ? WHERE TRIM(COALESCE(diamondUpline,'')) = ?`).bind(coupleCleanup.survivorLabel, coupleCleanup.oldLabel));
+  }
   if (await tableExists(env.DB, 'auth_sessions')) {
     statements.push(env.DB.prepare('DELETE FROM auth_sessions WHERE userId = ?').bind(target.id));
   }
@@ -118,6 +135,7 @@ async function deleteMember(request: Request, env: Env, targetKey: string) {
     );
   }
   for (const table of ['sticker_lucky_draws','upline_owners']) if(await tableExists(env.DB,table)) statements.push(env.DB.prepare(`DELETE FROM ${table} WHERE userId = ?`).bind(target.id));
+  if(await tableExists(env.DB,'couple_links')) statements.push(env.DB.prepare('DELETE FROM couple_links WHERE userAId = ? OR userBId = ?').bind(target.id,target.id));
   if (await tableExists(env.DB, 'sticker_comment_rewards')) {
     statements.push(env.DB.prepare('DELETE FROM sticker_comment_rewards WHERE userId = ?').bind(target.id));
   }

@@ -76,7 +76,7 @@ async function verifiedActor(request: Request, env: Env) {
   if (!TOKEN_PATTERN.test(token)) return null;
   const tokenHash = await hashToken(token);
   const actor: any = await env.DB.prepare(`
-    SELECT u.id, u.email, u.name, u.role, u.rank, u.approvedRank, u.rankApproved,
+    SELECT u.id, u.email, u.name, u.role, u.rank, u.approvedRank, u.rankApproved, u.amwayId,
            u.isAdminUser, u.isBlocked, u.canUpload, u.isContributor, u.platinumUpline, u.diamondUpline, s.expiresAt
     FROM auth_sessions s
     JOIN users u ON u.id = s.userId
@@ -223,6 +223,13 @@ async function ensureStickerSchema(db: any) {
       await db.prepare('CREATE INDEX IF NOT EXISTS sticker_lucky_member ON sticker_lucky_draws(userId,day)').run();
       await db.prepare('CREATE TABLE IF NOT EXISTS upline_owners (kind TEXT NOT NULL,name TEXT NOT NULL,userId TEXT NOT NULL,PRIMARY KEY(kind,name))').run();
       await db.prepare('CREATE TABLE IF NOT EXISTS upline_names (kind TEXT NOT NULL, name TEXT NOT NULL, PRIMARY KEY(kind,name))').run();
+      await db.prepare(`CREATE TABLE IF NOT EXISTS couple_links (
+        amwayId TEXT PRIMARY KEY,
+        userAId TEXT NOT NULL UNIQUE,
+        userBId TEXT NOT NULL UNIQUE,
+        createdBy TEXT NOT NULL,
+        createdAt INTEGER NOT NULL
+      )`).run();
       const now = Date.now();
       // v98 stored this setting as a count. The configured number now means stickers.
       await db.prepare(`INSERT OR IGNORE INTO sticker_settings(key,valueUnits,updatedAt,updatedBy)
@@ -965,7 +972,7 @@ export default {
     const method = request.method.toUpperCase();
     if (!env.DB) return appWorker.fetch(request, env);
 
-    const relevant = path.startsWith('/api/stickers') || path.startsWith('/api/tracks') || path.startsWith('/api/comments') || path.startsWith('/api/users/') || path.startsWith('/api/admin/uplines') || path === '/api/playback/record' || path === '/api/playback/claim-local';
+    const relevant = path.startsWith('/api/stickers') || path.startsWith('/api/tracks') || path.startsWith('/api/comments') || path.startsWith('/api/users/') || path.startsWith('/api/admin/uplines') || path.startsWith('/api/couples') || path.startsWith('/api/upline-invite') || path === '/api/playback/record' || path === '/api/playback/claim-local';
     if (relevant) {
       try { await ensureStickerSchema(env.DB); }
       catch (error) {
@@ -975,7 +982,17 @@ export default {
     }
 
     const actor = relevant ? await verifiedActor(request, env).catch(() => null) : null;
-    if(actor && path.startsWith('/api/stickers/grant')) actor.uplineAliases=((await env.DB.prepare('SELECT name FROM upline_owners WHERE userId=?').bind(actor.id).all()).results || []).map((r:any)=>normalizeMemberName(r.name));
+    if(actor && path.startsWith('/api/stickers/grant')) {
+      actor.uplineAliases=((await env.DB.prepare('SELECT name FROM upline_owners WHERE userId=?').bind(actor.id).all()).results || []).map((r:any)=>normalizeMemberName(r.name));
+      const group=await senderGroupForUser(env.DB,actor.id);
+      if(group?.displayName && group.members.length===2) {
+        actor.uplineAliases.push(normalizeMemberName(group.displayName));
+        actor.uplineAliases.push(...group.members.map((member:any)=>normalizeMemberName(member.name)));
+        actor.uplineAliases=[...new Set(actor.uplineAliases.filter(Boolean))];
+      }
+    }
+    if (path.startsWith('/api/couples')) return handleCoupleApi(request,env.DB,actor);
+    if (path.startsWith('/api/upline-invite')) return handleUplineInviteApi(request,env.DB,actor);
     if (path.startsWith('/api/admin/uplines')) return handleUplines(request,env.DB,actor);
     const stickerResponse = await handleStickerApi(request, env, actor);
     if (stickerResponse) return stickerResponse;
@@ -992,12 +1009,13 @@ export default {
     const commentLike = method === 'POST' ? path.match(/^\/api\/comments\/([^/]+)\/like$/) : null;
     const playbackWrite = method === 'POST' && (path === '/api/playback/record' || path === '/api/playback/claim-local');
     const commentDelete = method === 'DELETE' ? path.match(/^\/api\/comments\/([^/]+)$/) : null;
+    const profileWrite = Boolean(actor && method === 'PUT' && path === `/api/users/${encodeURIComponent(actor.id)}`);
 
     let beforeTrack: any = null;
     let beforeCommentReward: any = null;
     const likedComment: any = commentLike ? await env.DB.prepare('SELECT * FROM comments WHERE id = ?').bind(commentLike[1]).first() : null;
     let requestBody: any = null;
-    if ((trackAction && method === 'POST') || keywordPost || commentPost || commentLike || playbackWrite) {
+    if ((trackAction && method === 'POST') || keywordPost || commentPost || commentLike || playbackWrite || profileWrite) {
       requestBody = await request.clone().json().catch(() => ({}));
     }
     if (trackAction && method === 'POST' && actor) {
@@ -1015,6 +1033,30 @@ export default {
       beforeCommentReward = await env.DB.prepare(
         "SELECT * FROM sticker_transactions WHERE type IN ('comment_reward','reply_reward') AND sourceId = ? AND deltaUnits > 0 ORDER BY createdAt ASC LIMIT 1"
       ).bind(commentId).first();
+    }
+
+    let previousUplineLabel = '';
+    if (profileWrite && actor) {
+      const group = await senderGroupForUser(env.DB, actor.id);
+      previousUplineLabel = group?.displayName || String(actor.name || '').trim();
+      if (requestBody && Object.prototype.hasOwnProperty.call(requestBody,'amwayId')) {
+        const nextDealerId = normalizeDealerId(requestBody.amwayId);
+        const link: any = await coupleRowForUser(env.DB, actor.id);
+        if (link && nextDealerId !== normalizeDealerId(link.amwayId)) {
+          return json({ error: '夫妻共同經營使用同一個直銷商編號；如需變更共同編號，請聯絡管理員處理' }, 409);
+        }
+        if (nextDealerId) {
+          const duplicates = (await env.DB.prepare(`SELECT id,name FROM users WHERE id <> ? AND COALESCE(isBlocked,0)=0
+            AND TRIM(COALESCE(amwayId,'')) = ?`).bind(actor.id,nextDealerId).all()).results || [];
+          if (duplicates.length > 1) return json({ error: '此直銷商編號已有超過一位其他會員，請聯絡管理員處理' }, 409);
+          if (duplicates.length === 1) {
+            const couple: any = await coupleRowForUser(env.DB, actor.id);
+            const otherId = duplicates[0].id;
+            const isLinked = couple && (couple.userAId === otherId || couple.userBId === otherId);
+            if (!isLinked) return json({ error: `此直銷商編號已由 ${duplicates[0].name} 使用，請先確認夫妻關係或更正編號` }, 409);
+          }
+        }
+      }
     }
 
     let delegated = request;
@@ -1046,6 +1088,7 @@ export default {
     }
 
     if (method === 'PUT' && actor && path === `/api/users/${encodeURIComponent(actor.id)}`) {
+      if (previousUplineLabel) await syncUplineDisplayName(env.DB, actor.id, previousUplineLabel);
       const saved:any=await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(actor.id).first();
       const rules=await settingMap(env.DB);
       const missing=missingProfileFields(saved || {});

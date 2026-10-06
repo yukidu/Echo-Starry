@@ -21,3 +21,24 @@ test('admin management is visually promoted from overlay modal to normal full-pa
   assert.match(html, /\.app-modal-overlay \{[\s\S]*position: static !important/);
   assert.match(html, /max-height: none !important/);
 });
+
+
+const profile = readFileSync(new URL('../src/components/ProfileModal.tsx', import.meta.url), 'utf8');
+const stickers = readFileSync(new URL('../src/components/StickersModal.tsx', import.meta.url), 'utf8');
+const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+
+test('couple dealer id flow asks once and keeps personal names separate from A&B display', () => {
+  assert.match(profile, /是否要綁定與 \$\{data\.candidate\.name\} 為夫妻關係嗎/);
+  assert.match(profile, /\/api\/couples\/bind/);
+  assert.match(profile, /name:\s*name\.trim\(\)/);
+  assert.match(profile, /coupleDisplayName \|\| currentUser\.name/);
+});
+
+test('platinum grant page exposes shared dealer-id invite copy and app sharing', () => {
+  assert.match(stickers, /綁定成為我下線/);
+  assert.match(stickers, /複製網址/);
+  assert.match(stickers, /傳 LINE 或 APP/);
+  assert.match(stickers, /\/api\/upline-invite\/link/);
+  assert.match(app, /\/upline\/\(\[\^\/\]\+\)/);
+  assert.match(app, /\/api\/upline-invite\/accept/);
+});

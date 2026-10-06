@@ -247,3 +247,10 @@ CREATE TABLE IF NOT EXISTS sticker_lucky_draws (operationId TEXT PRIMARY KEY,use
 CREATE INDEX IF NOT EXISTS sticker_lucky_member ON sticker_lucky_draws(userId,day);
 CREATE TABLE IF NOT EXISTS upline_names (kind TEXT NOT NULL,name TEXT NOT NULL,PRIMARY KEY(kind,name));
 CREATE TABLE IF NOT EXISTS upline_owners (kind TEXT NOT NULL,name TEXT NOT NULL,userId TEXT NOT NULL,PRIMARY KEY(kind,name));
+CREATE TABLE IF NOT EXISTS couple_links (
+  amwayId TEXT PRIMARY KEY,
+  userAId TEXT NOT NULL UNIQUE,
+  userBId TEXT NOT NULL UNIQUE,
+  createdBy TEXT NOT NULL,
+  createdAt INTEGER NOT NULL
+);

@@ -66,6 +66,7 @@ interface ProfileModalProps {
   onRateTrack?: (trackId: string, rating: number) => void;
   onClearListeningHistory?: () => Promise<void>;
   allUsers?: UserProfile[];
+  autoEditKey?: number;
 }
 
 function decodeGoogleJwt(token: string) {
@@ -98,7 +99,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onSelectCategory,
   onRateTrack,
   onClearListeningHistory,
-  allUsers = []
+  allUsers = [],
+  autoEditKey = 0
 }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'ratings' | 'comments' | 'listening'>('profile');
   const [listeningRecords, setListeningRecords] = useState<Record<string, UserListeningRecord>>({});
@@ -156,6 +158,88 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [coupleDisplayName, setCoupleDisplayName] = useState('');
+  const lastCouplePromptRef = useRef('');
+
+  useEffect(() => {
+    if (!isOpen || !currentUser || !autoEditKey) return;
+    const month = new Date().toISOString().substring(0, 7);
+    const count = currentUser.profileEditMonth === month ? (currentUser.profileEditCount || 0) : 0;
+    if (count >= 5) {
+      setSaveError('本月基本資料修改次數已達上限，暫時無法補填直銷商編號。');
+      return;
+    }
+    setName(currentUser.name || '');
+    setAmwayId(currentUser.amwayId || '');
+    setPhone(currentUser.phone || '');
+    setResidence(currentUser.residence || '臺北');
+    setCenter(currentUser.center || '無');
+    setRank(currentUser.rank || '無');
+    setJoinReason(currentUser.joinReason || '事業');
+    setStayReason(currentUser.stayReason || '未填寫');
+    setSponsor(currentUser.sponsor || '');
+    setPlatinumUpline(currentUser.platinumUpline || '');
+    setDiamondUpline(currentUser.diamondUpline || '');
+    setBirthday(currentUser.birthday || '');
+    setAvatar(currentUser.avatar || '');
+    setIsEditing(true);
+  }, [autoEditKey, isOpen, currentUser?.id]);
+
+  useEffect(() => {
+    if (!isOpen || !currentUser?.amwayId?.trim()) {
+      if (!isEditing) setCoupleDisplayName('');
+      return;
+    }
+    let cancelled = false;
+    void fetch(`/api/couples/candidate?amwayId=${encodeURIComponent(currentUser.amwayId.trim())}`)
+      .then(async response => ({ response, data: await response.json().catch(() => ({})) }))
+      .then(({ response, data }) => {
+        if (cancelled) return;
+        if (response.ok && data.linked) setCoupleDisplayName(data.displayName || '');
+        else if (!isEditing) setCoupleDisplayName('');
+      })
+      .catch(() => { if (!cancelled && !isEditing) setCoupleDisplayName(''); });
+    return () => { cancelled = true; };
+  }, [isOpen, isEditing, currentUser?.id, currentUser?.name, currentUser?.amwayId]);
+
+  useEffect(() => {
+    if (!isOpen || !isEditing || !currentUser) return;
+    const dealerId = amwayId.trim();
+    if (!dealerId) {
+      setCoupleDisplayName('');
+      lastCouplePromptRef.current = '';
+      return;
+    }
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/couples/candidate?amwayId=${encodeURIComponent(dealerId)}`);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || '無法檢查直銷商編號');
+        if (data.linked) {
+          setCoupleDisplayName(data.displayName || data.candidate?.name || '');
+          return;
+        }
+        setCoupleDisplayName('');
+        if (!data.candidate) return;
+        const promptKey = `${dealerId}:${data.candidate.id}`;
+        if (lastCouplePromptRef.current === promptKey) return;
+        lastCouplePromptRef.current = promptKey;
+        if (!window.confirm(`偵測到相同直銷商編號。是否要綁定與 ${data.candidate.name} 為夫妻關係嗎？`)) return;
+        const bindResponse = await fetch('/api/couples/bind', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amwayId: dealerId, partnerUserId: data.candidate.id })
+        });
+        const bindData = await bindResponse.json().catch(() => ({}));
+        if (!bindResponse.ok) throw new Error(bindData.error || '夫妻關係綁定失敗');
+        setCoupleDisplayName(bindData.displayName || `${data.candidate.name}&${name.trim()}`);
+        setSaveError(null);
+      } catch (error) {
+        setSaveError(error instanceof Error ? error.message : '無法檢查夫妻關係');
+      }
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [amwayId, isEditing, isOpen, currentUser?.id]);
 
   // Standard Google OAuth 2.0 Sign In
   const handleGoogleSignIn = () => {
@@ -618,7 +702,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                           <div>
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <h3 className="font-bold text-base text-slate-800 dark:text-slate-100">
-                                {currentUser.name}
+                                {coupleDisplayName || currentUser.name}
                               </h3>
                               <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300">
                                 {currentUser.rank}
@@ -631,7 +715,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                             </div>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400">{currentUser.email}</p>
                             <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 font-medium">
-                              安麗編號: {currentUser.amwayId || '未填寫'} • 居住: {currentUser.residence || '未填寫'} • 中心: {currentUser.center || '無'}
+                              直銷商編號: {currentUser.amwayId || '未填寫'} • 居住: {currentUser.residence || '未填寫'} • 中心: {currentUser.center || '無'}
                             </p>
                             <p className="text-[10px] text-slate-400 mt-0.5">
                               本月頭像更換: {currentUploadCount} / 5 次 • 本月資料修改: {currentProfileEditCount} / 5 次
@@ -749,15 +833,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
                         <div>
                           <label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                            安麗編號
+                            直銷商編號
                           </label>
                           <input
                             type="text"
                             value={amwayId}
-                            onChange={e => setAmwayId(e.target.value)}
+                            onChange={e => { setAmwayId(e.target.value); if (e.target.value.trim() !== amwayId.trim()) setCoupleDisplayName(''); }}
                             placeholder="例：12345678"
                             className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-hidden"
                           />
+                          {coupleDisplayName && <div className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400">共同經營人：{coupleDisplayName}（姓名仍各自獨立）</div>}
                         </div>
 
                         <div>
