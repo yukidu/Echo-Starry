@@ -240,14 +240,11 @@ async function ensureStickerSchema(db: any) {
           .bind(settingKey, value, now, 'system')
       ));
 
-      // Launch policy: every member present when v98 first reaches an installation
-      // starts with 6 stickers. INSERT OR IGNORE keeps this permanently idempotent.
-      await db.prepare(`
-        INSERT OR IGNORE INTO sticker_transactions
-          (id, userId, deltaUnits, balanceAfterUnits, type, sourceId, description, actorUserId, uniqueKey, createdAt)
-        SELECT 'initial:' || id, id, ?, ?, 'initial', id, '會員初始貼紙', 'system', 'initial:' || id, ?
-        FROM users
-      `).bind(INITIAL_STICKER_UNITS, INITIAL_STICKER_UNITS, now).run();
+      // Launch policy: every member receives the one-time initial reward through
+      // the same per-user path. INSERT OR IGNORE preserves all existing ledgers and
+      // never retroactively recalculates a reward that was already credited.
+      const initialUsers = (await db.prepare('SELECT id FROM users').all()).results || [];
+      for (const user of initialUsers as any[]) await ensureInitialStickers(db, String(user.id || ''));
       await backfillExistingRankApprovalRewards(db);
     })();
     schemaReady.set(key, task);
@@ -258,12 +255,16 @@ async function ensureStickerSchema(db: any) {
 
 async function ensureInitialStickers(db: any, userId: string) {
   if (!userId) return;
+  const existing = await db.prepare('SELECT id FROM sticker_transactions WHERE uniqueKey = ? LIMIT 1').bind(`initial:${userId}`).first();
+  if (existing) return;
+  const multiplierTenths = await earningMultiplierTenthsForUser(db, userId);
+  const initialUnits = multiplyStickerUnits(INITIAL_STICKER_UNITS, multiplierTenths);
   const now = Date.now();
   await db.prepare(`
     INSERT OR IGNORE INTO sticker_transactions
       (id, userId, deltaUnits, balanceAfterUnits, type, sourceId, description, actorUserId, uniqueKey, createdAt)
     VALUES (?, ?, ?, ?, 'initial', ?, '會員初始貼紙', 'system', ?, ?)
-  `).bind(`initial:${userId}`, userId, INITIAL_STICKER_UNITS, INITIAL_STICKER_UNITS, userId, `initial:${userId}`, now).run();
+  `).bind(`initial:${userId}`, userId, initialUnits, initialUnits, userId, `initial:${userId}`, now).run();
 }
 
 async function stickerBalanceUnits(db: any, userId: string) {
