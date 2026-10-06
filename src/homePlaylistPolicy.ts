@@ -69,3 +69,8 @@ export function moveTrackIdToSecondSlot(ids: readonly string[], targetId: string
   next.splice(insertAt, 0, targetId);
   return next;
 }
+
+export function sortStickerTracks<T extends HomePlaylistTrack & {stickerUnlockCost?:number;commentStickerReward?:number}>(tracks:readonly T[],purchasedIds:readonly string[],mode:'cost'|'reward'):T[]{
+  const purchased=new Set(purchasedIds);
+  return [...tracks].sort((a,b)=>Number(purchased.has(b.id))-Number(purchased.has(a.id)) || (mode==='cost'?(a.stickerUnlockCost || 0)-(b.stickerUnlockCost || 0):(b.commentStickerReward || 0)-(a.commentStickerReward || 0)));
+}

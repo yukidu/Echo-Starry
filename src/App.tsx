@@ -1,3 +1,6 @@
+import { sortStickerTracks } from './homePlaylistPolicy';
+import { StickerFeedback, showStickerDelta, showStickerNotice, setFeedbackRules, getFeedbackRules } from './components/StickerFeedback';
+import { IOSInstallPage } from './components/IOSInstallPage';
 import { StickerSpendDialog } from './components/StickerSpendDialog';
 import { vipPasswordForTrack } from '../shared/stickers';
 import { baseSpeakerRank } from './utils/ranks';
@@ -88,7 +91,7 @@ type AppHistoryState = {
   echostars?: true;
   view?: 'guard' | 'home' | 'detail' | 'tab';
   trackId?: string;
-  tab?: 'stats' | 'notifications';
+  tab?: 'stats' | 'notifications' | 'profile' | 'stickers' | 'install';
 };
 
 function shouldProtectBrowserBack() {
@@ -363,6 +366,8 @@ export default function App() {
   };
 
   const stickerSummaryRequest = useRef(0);
+  const stickerCursor = useRef<{userId:string;value:number}>({userId:'',value:0});
+  const seenStickerChanges=useRef(new Set<string>());
   const refreshStickerSummary = useCallback(async () => {
     const requestId = ++stickerSummaryRequest.current;
     if (!currentUser) {
@@ -370,8 +375,11 @@ export default function App() {
       return;
     }
     try {
-      const data = await apiJson('/api/stickers/me');
+      const after=stickerCursor.current.userId===currentUser.id?stickerCursor.current.value:0;
+      const data = await apiJson(`/api/stickers/summary?after=${after}`);
       if (requestId !== stickerSummaryRequest.current) return;
+      for(const change of data.changes || []) if(!seenStickerChanges.current.has(change.id)){seenStickerChanges.current.add(change.id);showStickerDelta(change.delta);}
+      stickerCursor.current={userId:currentUser.id,value:data.cursor};
       setStickerSummary({
         balance: Number(data.balance || 0),
         unlockedTrackIds: Array.isArray(data.unlockedTrackIds) ? data.unlockedTrackIds : [],
@@ -386,12 +394,16 @@ export default function App() {
 
   useEffect(() => {
     void refreshStickerSummary();
+    void apiJson('/api/stickers/public-settings').then(data=>setFeedbackRules(data.settings)).catch(()=>{});
+    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refreshStickerSummary();},15000);
+    return()=>window.clearInterval(timer);
   }, [refreshStickerSummary]);
 
   useEffect(() => {
-    const refresh = () => { void refreshStickerSummary(); };
+    let timer:number;
+    const refresh = () => { window.clearTimeout(timer);timer=window.setTimeout(()=>void refreshStickerSummary(),200); };
     window.addEventListener('echostars:sticker-changed', refresh);
-    return () => window.removeEventListener('echostars:sticker-changed', refresh);
+    return () => {window.clearTimeout(timer);window.removeEventListener('echostars:sticker-changed', refresh);};
   }, [refreshStickerSummary]);
 
   // Requirement 9, 10 & 12: 未審核通過名單總數 + 被 @ 標記提醒總數（用於通知鈴鐺徽章提醒）
@@ -587,6 +599,7 @@ export default function App() {
   const [detailNavigation, setDetailNavigation] = useState({ sequence: 0, target: 'audio-timeline' });
   const [commentsTrackId, setCommentsTrackId] = useState<string | null>(null);
   const openTrackDetail = (track: Track, commentId?: string) => {
+    setIsProfileOpen(false);setIsStickersOpen(false);
     setSelectedDetailTrack(track);
     setCurrentTab('home');
     setPlayerMode('expanded');
@@ -689,8 +702,8 @@ export default function App() {
       setIsUploadOpen(false);
       setIsAdminOpen(false);
       setIsProfileOpen(false);
-      setIsChangelogOpen(false);
       setIsStickersOpen(false);
+      setIsChangelogOpen(false);
       setCommentPreviewTrack(null);
       setPreviewMember(null);
       setTrackToEdit(null);
@@ -716,6 +729,8 @@ export default function App() {
       closeTransientUi();
 
       const state = event.state as AppHistoryState | null;
+      setIsProfileOpen(state?.tab === 'profile');
+      setIsStickersOpen(state?.tab === 'stickers');
 
       if (state?.echostars && state.view === 'detail' && state.trackId) {
         const track = tracksHistoryRef.current.find(item => item.id === state.trackId);
@@ -730,11 +745,11 @@ export default function App() {
       } else if (
         state?.echostars &&
         state.view === 'tab' &&
-        (state.tab === 'stats' || state.tab === 'notifications')
+        (['stats','notifications','profile','stickers','install'].includes(state.tab || ''))
       ) {
         setSelectedDetailTrack(null);
         setPlayerModeState(savedPreferredModeHistoryRef.current);
-        setCurrentTab(state.tab);
+        setCurrentTab(state.tab!);
       } else {
         showHomeFromHistory();
       }
@@ -775,9 +790,11 @@ export default function App() {
       (currentTrack && playerMode === 'expanded' ? currentTrack : null);
 
     let nextState: AppHistoryState;
-    if (detailTrack) {
+    if (isProfileOpen || isStickersOpen) {
+      nextState={echostars:true,view:'tab',tab:isProfileOpen?'profile':'stickers'};
+    } else if (detailTrack) {
       nextState = { echostars: true, view: 'detail', trackId: detailTrack.id };
-    } else if (currentTab === 'stats' || currentTab === 'notifications') {
+    } else if (currentTab === 'stats' || currentTab === 'notifications' || currentTab === 'install') {
       nextState = { echostars: true, view: 'tab', tab: currentTab };
     } else {
       nextState = { echostars: true, view: 'home' };
@@ -795,6 +812,8 @@ export default function App() {
     }
   }, [
     currentTab,
+    isProfileOpen,
+    isStickersOpen,
     selectedDetailTrack?.id,
     currentTrack?.id,
     playerMode
@@ -864,8 +883,8 @@ export default function App() {
     setIsUploadOpen(false);
     setIsAdminOpen(false);
     setIsProfileOpen(false);
-    setIsChangelogOpen(false);
     setIsStickersOpen(false);
+    setIsChangelogOpen(false);
     setIsShareOpen(false);
     setIsBwExportOpen(false);
     setCommentPreviewTrack(null);
@@ -1013,6 +1032,7 @@ export default function App() {
       currentTab === 'stats' ||
       isAdminOpen ||
       isProfileOpen ||
+      isStickersOpen ||
       Boolean(commentPreviewTrack) ||
       Boolean(selectedDetailTrack);
 
@@ -1026,7 +1046,7 @@ export default function App() {
     ) {
       void fetchAllComments();
     }
-  }, [currentTab, isAdminOpen, isProfileOpen, commentPreviewTrack, selectedDetailTrack]);
+  }, [currentTab, isAdminOpen, isProfileOpen, isStickersOpen, commentPreviewTrack, selectedDetailTrack]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -1713,6 +1733,7 @@ export default function App() {
     setStickerSummary(null);
     localStorage.removeItem('sq_current_user_v1');
     setIsProfileOpen(false);
+    setIsStickersOpen(false);
   };
 
   // Requirement 12: 會員初次設定或修改獎銜，自動標記待審核
@@ -1750,7 +1771,10 @@ export default function App() {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...updatedProfile, ...rankAuditFields, email: updated.email })
     });
-    Object.assign(updated, saved.user || saved);
+    const completion=saved.profileCompletion;
+    if(completion){setFeedbackRules(completion.settings);if(!completion.complete)showStickerNotice(completion.settings.profileHintText.replaceAll('{x}',String(completion.settings.profileReward)),completion.settings.profileHintSeconds);}
+    const {profileCompletion,...savedProfile}=saved.user || saved;
+    Object.assign(updated, savedProfile);
     setCurrentUser(updated);
     localStorage.setItem('sq_current_user_v1', JSON.stringify(updated));
     setAllUsers(prev => prev.map(u => (u.id === updated.id || (u.email && u.email.toLowerCase().trim() === updated.email?.toLowerCase().trim()) ? updated : u)));
@@ -1877,6 +1901,7 @@ export default function App() {
   const handleSortClick = (field: SortField) => {
     resetLuckyDrawState();
     setUseDefaultHomeOrder(false);
+    if (field === '貼紙') {setSortField(field);setSortDirection(sortField==='貼紙' && sortDirection==='asc'?'desc':'asc');return;}
     if (sortField === field) {
       setSortDirection(prev => (prev === 'desc' ? 'asc' : 'desc'));
     } else {
@@ -1925,10 +1950,13 @@ export default function App() {
         getUploadTimestamp: track => getUploadTimestamp(track.uploadDate),
         getUploadSequence,
         shuffleSeed: homeShuffleSeed
-      });
+      }).sort((a,b)=>Number(stickerSummary?.unlockedTrackIds.includes(b.id))-Number(stickerSummary?.unlockedTrackIds.includes(a.id)));
     }
 
+    if(sortField==='貼紙')return sortStickerTracks(filtered,stickerSummary?.unlockedTrackIds || [],sortDirection==='asc'?'cost':'reward');
     return filtered.sort((a, b) => {
+      const purchased=Number(stickerSummary?.unlockedTrackIds.includes(b.id))-Number(stickerSummary?.unlockedTrackIds.includes(a.id));
+      if(purchased)return purchased;
       let diff = 0;
       switch (sortField) {
         case '時間': {
@@ -1978,7 +2006,8 @@ export default function App() {
     homeShuffleSeed,
     currentUser,
     isSuperAdmin,
-    isAdministrator
+    isAdministrator,
+    stickerSummary
   ]);
 
   useEffect(() => {
@@ -2061,10 +2090,11 @@ export default function App() {
     getLuckyAudioContext();
     const baseIds = filteredTracks.map(track => track.id);
     const winner = candidates[Math.floor(Math.random() * candidates.length)];
+    let luckyNotice:any={bonus:0,settings:getFeedbackRules()};
     if (currentUser) {
       luckyRequestPending.current = true;
       try {
-        await apiJson('/api/stickers/lucky-spend', {
+        luckyNotice = await apiJson('/api/stickers/lucky-spend', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ operationId: crypto.randomUUID(), trackId: winner.id })
@@ -2083,6 +2113,7 @@ export default function App() {
       setLuckyOrderIds(moveTrackIdToSecondSlot(baseIds, winner.id));
       setLuckyWinnerId(winner.id);
       setLuckyPhase('win');
+      if(luckyNotice) {setFeedbackRules(luckyNotice.settings);showStickerNotice(luckyNotice.settings.luckyHintText.replaceAll('{x}',String(luckyNotice.bonus)),luckyNotice.settings.luckyHintSeconds);}
       playLuckyWin();
     };
 
@@ -2184,10 +2215,15 @@ export default function App() {
         </div>
       )}
 
+      <StickerFeedback />
       {/* Top Navbar */}
       <Navbar
         currentTab={currentTab}
         onSelectTab={tab => {
+          setIsProfileOpen(false);
+    setIsStickersOpen(false);
+          setSelectedDetailTrack(null);
+          if (playerMode==='expanded') setPlayerMode(savedPreferredMode);
           if (tab === 'home') {
             handleReturnToHomePlaylist();
           } else {
@@ -2218,12 +2254,14 @@ export default function App() {
         pendingNotificationsCount={pendingNotificationsCount}
         pendingAuditCount={pendingAuditCount}
         stickerBalance={stickerSummary?.balance}
-        onOpenStickers={() => setIsStickersOpen(true)}
+        onOpenStickers={() => {setIsProfileOpen(false);setIsStickersOpen(true);setSelectedDetailTrack(null);setCurrentTab('stickers');if(playerMode==='expanded')setPlayerMode(savedPreferredMode);window.scrollTo(0,0);}}
+        onInstallGuide={() => {setIsProfileOpen(false);setIsStickersOpen(false);setSelectedDetailTrack(null);setCurrentTab('install');if(playerMode==='expanded')setPlayerMode(savedPreferredMode);window.scrollTo(0,0);}}
       />
 
       <TutorialSpotlight
         active={
           showHomeTutorial &&
+          !isProfileOpen && !isStickersOpen &&
           currentTab === 'home' &&
           !selectedDetailTrack &&
           filteredTracks.length > 0
@@ -2295,7 +2333,52 @@ export default function App() {
       {/* Main Container */}
       <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-5 pb-28">
         {/* Requirement 16 & 9: 優先切換排行榜與公開通知分頁 */}
-        {currentTab === 'stats' ? (
+        {isProfileOpen ? (<Suspense fallback={<div role="status" className="py-12 text-center text-slate-500">載入功能中…</div>}>
+      <ProfileModal
+        isOpen={isProfileOpen}
+        onClose={handleReturnToHomePlaylist}
+        currentUser={currentUser}
+        tracks={tracks}
+        comments={allComments}
+        identityKeys={identityKeys(currentUser, visitor.deviceId)}
+        onLoginWithGoogle={handleLoginWithGoogle}
+        onLogout={handleLogout}
+        onUpdateProfile={handleUpdateProfile}
+        onSelectTrack={openTrackDetail}
+        onSelectCategory={cat => {
+          setIsProfileOpen(false);
+          setSelectedCategory(cat);
+          setCurrentTab('home');
+        }}
+        onRateTrack={(trackId, score) => handleRateTrack(trackId, score)}
+        onClearListeningHistory={handleClearListeningHistory}
+        allUsers={allUsers}
+      />
+      </Suspense>) : isStickersOpen ? (<Suspense fallback={<div role="status" className="py-12 text-center text-slate-500">載入功能中…</div>}>
+      <StickersModal
+        isOpen={isStickersOpen}
+        onClose={handleReturnToHomePlaylist}
+        currentUser={currentUser}
+        tracks={tracks}
+        initialSummary={stickerSummary}
+        onOpenSource={source => {
+          if (source.kind === 'track') {
+            const track = tracks.find(item => item.id === source.trackId);
+            if (track) { setIsStickersOpen(false); openTrackDetail(track, source.commentId); }
+          } else if (source.kind === 'member') {
+            const member = [currentUser,...allUsers].find(item => item?.id === source.userId);
+            if (member) { setIsStickersOpen(false); setPreviewMember(member); }
+          } else { setIsStickersOpen(false); setCurrentTab('home'); }
+        }}
+        onStickerChanged={refreshStickerSummary}
+        onTracksUpdated={savedTracks => {
+          const byId = new Map(savedTracks.map(track => [track.id, track]));
+          setTracks(prev => prev.map(track => byId.get(track.id) || track));
+          setCurrentTrack(prev => prev ? byId.get(prev.id) || prev : prev);
+          setSelectedDetailTrack(prev => prev ? byId.get(prev.id) || prev : prev);
+        }}
+      />
+      </Suspense>) : currentTab === 'install' ? (<IOSInstallPage onBack={handleReturnToHomePlaylist}/>) : currentTab === 'stats' ? (
           <StatisticsView
             tracks={tracks}
             users={allUsers}
@@ -2601,7 +2684,7 @@ export default function App() {
             {/* Requirement 18, 19 & 20: 排序選項排成一列緊密排序，分類改成下拉式選單排在最右側，底色統一 */}
             <div className={`sort-toolbar relative grid gap-1 w-full max-w-full px-0 pt-0.5 ${(isSpeakerRankDropdownOpen || isCategoryDropdownOpen) ? 'z-[100]' : 'z-20'}`}>
               {/* v3.7: large/landscape shows seven controls; portrait phones hide 評價/按讚 and keep five columns. */}
-              {(['權限', '時間', '評價', '留言', '按讚'] as SortField[]).map(field => {
+              {(['權限', '評價', '留言', '按讚', '貼紙', '時間'] as SortField[]).map(field => {
                 const isActive = sortField === field;
                 const displayField = field === '留言' ? '心得' : field;
                 const hideOnPortraitPhone = field === '評價' || field === '按讚';
@@ -2616,7 +2699,7 @@ export default function App() {
                           : 'text-white/85 hover:text-white hover:brightness-105 opacity-90 hover:opacity-100'
                       }`}
                       style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
-                      title={`依${displayField}排序，重複點擊切換遞增/遞減`}
+                      title={field==='貼紙'?'貼紙：首次成本低至高，再次心得獎勵高至低':`依${displayField}排序，重複點擊切換遞增/遞減`}
                     >
                       <span className="truncate">{displayField}</span>
                       {isActive && (
@@ -2632,64 +2715,6 @@ export default function App() {
                   </div>
                 );
               })}
-
-              {/* Right: Dropdowns (分類選單與講師獎銜指標篩選) */}
-              {/* 1. 講師獎銜篩選下拉選單 */}
-              <div className="sort-toolbar-item relative min-w-0">
-                  <button
-                    type="button"
-                    onClick={e => {
-                      e.stopPropagation();
-                      setIsSpeakerRankDropdownOpen(prev => !prev);
-                      setIsCategoryDropdownOpen(false);
-                    }}
-                    className={`w-full h-[46px] min-w-0 px-0 py-0 rounded-xl text-[10px] sm:text-xs font-bold text-white flex items-center justify-center gap-0 shadow-2xs hover:brightness-105 transition-all ${
-                      selectedSpeakerRank !== '全部' ? 'ring-2 ring-amber-300' : ''
-                    }`}
-                    style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
-                    title="點擊依講師獎銜篩選"
-                  >
-                    <span className="truncate min-w-0">
-                      獎銜
-                    </span>
-                    <ChevronDown className="w-3 h-3 text-white/90 shrink-0" />
-                  </button>
-
-                  {isSpeakerRankDropdownOpen && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-[90]"
-                        onClick={() => setIsSpeakerRankDropdownOpen(false)}
-                      />
-                      <div
-                        className="absolute right-0 top-full mt-1.5 z-[110] w-44 max-h-64 overflow-y-auto rounded-2xl shadow-xl py-1 border border-white/20 animate-in fade-in zoom-in-95 text-white scrollbar-thin"
-                        style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
-                        onClick={e => e.stopPropagation()}
-                      >
-                        {speakerRankFilterOptions.map(rOpt => {
-                          const isSelected = selectedSpeakerRank === rOpt;
-                          return (
-                            <button
-                              key={rOpt}
-                              onClick={() => {
-                                setSelectedSpeakerRank(rOpt);
-                                setIsSpeakerRankDropdownOpen(false);
-                              }}
-                              className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between transition-colors ${
-                                isSelected
-                                  ? 'bg-white/25 text-white font-black'
-                                  : 'text-white/90 hover:bg-white/15'
-                              }`}
-                            >
-                              <span className="truncate">{rOpt === '全部' ? '全部獎銜' : rOpt}</span>
-                              {isSelected && <Check className="w-3.5 h-3.5 text-white font-bold shrink-0 ml-1" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
-                </div>
 
               {/* 2. Category Dropdown */}
               <div className="sort-toolbar-item relative min-w-0">
@@ -2940,6 +2965,7 @@ export default function App() {
       {/* Admin Management Modal (Requirement 4, 5, 17: 權限控制、正常進入修改視窗與刪除) */}
       {isAdminOpen && <Suspense fallback={<div role="status" className="fixed inset-0 z-50 grid place-items-center bg-black/50 text-white">載入功能中…</div>}>
       <AdminModal
+        onUplinesChanged={()=>{void fetchAllUsers(true);if(currentUser)void apiJson(`/api/users/profile?email=${encodeURIComponent(currentUser.email)}`).then(data=>{if(data.user)setCurrentUser(previous=>{if(!previous || previous.id!==data.user.id)return previous;const updated={...previous,platinumUpline:data.user.platinumUpline,diamondUpline:data.user.diamondUpline};localStorage.setItem('sq_current_user_v1',JSON.stringify(updated));return updated;});}).catch(()=>{});}}
         isOpen={isAdminOpen}
         onClose={() => setIsAdminOpen(false)}
         isAdmin={isAdmin}
@@ -2964,27 +2990,7 @@ export default function App() {
       </Suspense>}
 
       {/* Profile & Google Binding Modal (With Amway Fields & Numerology) */}
-      {isProfileOpen && <Suspense fallback={<div role="status" className="fixed inset-0 z-50 grid place-items-center bg-black/50 text-white">載入功能中…</div>}>
-      <ProfileModal
-        isOpen={isProfileOpen}
-        onClose={() => setIsProfileOpen(false)}
-        currentUser={currentUser}
-        tracks={tracks}
-        comments={allComments}
-        identityKeys={identityKeys(currentUser, visitor.deviceId)}
-        onLoginWithGoogle={handleLoginWithGoogle}
-        onLogout={handleLogout}
-        onUpdateProfile={handleUpdateProfile}
-        onSelectTrack={openTrackDetail}
-        onSelectCategory={cat => {
-          setSelectedCategory(cat);
-          setCurrentTab('home');
-        }}
-        onRateTrack={(trackId, score) => handleRateTrack(trackId, score)}
-        onClearListeningHistory={handleClearListeningHistory}
-        allUsers={allUsers}
-      />
-      </Suspense>}
+
 
       {/* Member Profile & Numerology Preview Modal (Clicking any comment author) */}
       {!!previewMember && <Suspense fallback={<div role="status" className="fixed inset-0 z-50 grid place-items-center bg-black/50 text-white">載入功能中…</div>}>
@@ -3055,31 +3061,7 @@ export default function App() {
       )}
 
       {stickerSpend && <StickerSpendDialog {...stickerSpend} balance={stickerSummary?.balance} onResolve={resolveStickerSpend} />}
-      {isStickersOpen && <Suspense fallback={<div role="status" className="fixed inset-0 z-50 grid place-items-center bg-black/50 text-white">載入功能中…</div>}>
-      <StickersModal
-        isOpen={isStickersOpen}
-        onClose={() => setIsStickersOpen(false)}
-        currentUser={currentUser}
-        tracks={tracks}
-        initialSummary={stickerSummary}
-        onOpenSource={source => {
-          if (source.kind === 'track') {
-            const track = tracks.find(item => item.id === source.trackId);
-            if (track) { setIsStickersOpen(false); openTrackDetail(track, source.commentId); }
-          } else if (source.kind === 'member') {
-            const member = [currentUser,...allUsers].find(item => item?.id === source.userId);
-            if (member) { setIsStickersOpen(false); setPreviewMember(member); }
-          } else { setIsStickersOpen(false); setCurrentTab('home'); }
-        }}
-        onStickerChanged={refreshStickerSummary}
-        onTracksUpdated={savedTracks => {
-          const byId = new Map(savedTracks.map(track => [track.id, track]));
-          setTracks(prev => prev.map(track => byId.get(track.id) || track));
-          setCurrentTrack(prev => prev ? byId.get(prev.id) || prev : prev);
-          setSelectedDetailTrack(prev => prev ? byId.get(prev.id) || prev : prev);
-        }}
-      />
-      </Suspense>}
+
 
       {/* Version Changelog Modal */}
       {isChangelogOpen && <Suspense fallback={<div role="status" className="fixed inset-0 z-50 grid place-items-center bg-black/50 text-white">載入功能中…</div>}>

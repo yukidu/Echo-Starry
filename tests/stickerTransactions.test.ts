@@ -18,7 +18,9 @@ function database() {
   const db = {
     sqlite,
     failTrackSave: false,
+    queries: [] as string[],
     prepare(sql: string) {
+      db.queries.push(sql);
       let values: any[] = [];
       const statement = {
         sql,
@@ -321,4 +323,84 @@ test('v98 migration preserves balances and translates keyword count to sticker c
   const history=(await call(db,token,'/api/stickers/me')).data.transactions;
   assert.equal(history.find((t:any)=>t.id==='old-reward').source.trackId,'track');
   assert.equal(await balance(db,token),8);
+});
+
+
+test('complete profile rewards once and incomplete saves return configurable hint without credit', async () => {
+  const db=database();const member=await session(db,'member');const admin=await session(db,'admin');
+  const rules=(await call(db,admin,'/api/stickers/settings')).data.settings;
+  assert.equal((await call(db,admin,'/api/stickers/settings','PUT',{...rules,profileReward:2,profileHintSeconds:1.5,profileHintText:'請補齊，可+{x}張貼紙'})).status,200);
+  const incomplete=await call(db,member,'/api/users/member','PUT',{phone:'0912345678'});
+  assert.equal(incomplete.status,200,JSON.stringify(incomplete.data));
+  assert.equal(incomplete.data.profileCompletion.complete,false);
+  assert.equal(incomplete.data.profileCompletion.settings.profileHintSeconds,1.5);
+  assert.equal(count(db,'profile_reward'),0);
+  const complete={name:'下線',avatar:'https://example.com/a.png',amwayId:'123',phone:'0912345678',residence:'台中',center:'豐宇台中',rank:'無',joinReason:'事業',stayReason:'打造自己的事業與團隊',sponsor:'推薦人',platinumUpline:'白金會員',diamondUpline:'鑽石會員',birthday:'1990-01-01'};
+  const saved=await call(db,member,'/api/users/member','PUT',complete);
+  assert.equal(saved.status,200,JSON.stringify(saved.data));assert.equal(saved.data.profileCompletion.complete,true);
+  await Promise.all([call(db,member,'/api/users/member','PUT',complete),call(db,member,'/api/users/member','PUT',complete)]);
+  assert.equal(count(db,'profile_reward'),1);assert.equal(await balance(db,member),8);
+  await call(db,member,'/api/users/member','PUT',{sponsor:''});await call(db,member,'/api/users/member','PUT',{sponsor:'推薦人'});
+  assert.equal(count(db,'profile_reward'),1);
+  assert.equal((await call(db,member,'/api/users/other','PUT',complete)).status,403);
+});
+
+test('lucky completion uses draw snapshot, enforces atomic daily cap, and never rewards already-completed recordings', async () => {
+  const db=database();const member=await session(db,'member');const admin=await session(db,'admin');
+  const rules=(await call(db,admin,'/api/stickers/settings')).data.settings;
+  await call(db,admin,'/api/stickers/settings','PUT',{...rules,luckyCompleteReward:2,luckyDailyLimit:1,luckyCost:0});
+  db.sqlite.exec("INSERT INTO tracks(id,title,speaker,audioUrl,requiredRank) VALUES ('second','第二支','講者','/two.mp3','無')");
+  const draw=await call(db,member,'/api/stickers/lucky-spend','POST',{trackId:'track',operationId:'draw'});
+  assert.equal(draw.data.bonus,2);
+  assert.equal((await call(db,member,'/api/stickers/lucky-spend','POST',{trackId:'second',operationId:'draw'})).status,409);
+  await call(db,member,'/api/stickers/lucky-spend','POST',{trackId:'second',operationId:'draw2'});
+  await call(db,admin,'/api/stickers/settings','PUT',{...rules,luckyCompleteReward:4,luckyDailyLimit:1,luckyCost:0});
+  await Promise.all(['track','second'].map(trackId=>call(db,member,'/api/playback/record','POST',{trackId,userIdOrDeviceId:'member@example.com',currentTime:100,duration:100})));
+  assert.equal(count(db,'lucky_complete_reward'),1);assert.equal(await balance(db,member),8);
+  assert.equal((await call(db,member,'/api/stickers/lucky-spend','POST',{trackId:'track',operationId:'completed'})).data.bonus,0);
+  await call(db,member,'/api/stickers/reconcile','POST',{});assert.equal(count(db,'lucky_complete_reward'),1);
+  db.sqlite.exec("UPDATE sticker_lucky_draws SET day='2000-01-01'");
+  await call(db,admin,'/api/stickers/settings','PUT',{...rules,luckyDailyLimit:10});
+  await call(db,member,'/api/stickers/reconcile','POST',{});assert.equal(count(db,'lucky_complete_reward'),1);
+});
+
+test('ledger summary provides individual signed changes and history fast path avoids pending-reward scans', async () => {
+  const db=database();const member=await session(db,'member');const platinum=await session(db,'platinum');
+  const initial=(await call(db,member,'/api/stickers/summary')).data;
+  assert.deepEqual(initial.changes,[]);
+  await call(db,platinum,'/api/stickers/grant','POST',{targetUserId:'member',amount:3,reason:'鼓勵',operationId:'feed'});
+  db.sqlite.exec('UPDATE tracks SET stickerUnlockCost=2');await call(db,member,'/api/stickers/unlock/track','POST',{});
+  const changed=(await call(db,member,`/api/stickers/summary?after=${initial.cursor}`)).data;
+  assert.deepEqual(changed.changes.map((x:any)=>x.delta),[3,-2]);
+  assert.equal(changed.balance,7);
+  assert.deepEqual((await call(db,member,`/api/stickers/summary?after=${changed.cursor}`)).data.changes,[]);
+  db.queries.length=0;assert.equal((await call(db,member,'/api/stickers/history')).status,200);
+  assert.ok(db.queries.length<=4,`history query count=${db.queries.length}`);
+  assert.ok(!db.queries.some(sql=>sql.includes('sticker_comment_rewards')));
+});
+
+test('upline rename, merge, and deletion update member fields and preserve authenticated downline grants', async () => {
+  const db=database();const admin=await session(db,'admin');const platinum=await session(db,'platinum');const member=await session(db,'member');
+  assert.equal((await call(db,member,'/api/admin/uplines')).status,403);
+  const list=await call(db,admin,'/api/admin/uplines');assert.equal(list.status,200,JSON.stringify(list.data));
+  assert.ok(list.data.uplines.some((r:any)=>r.kind==='platinum'&&r.name==='白金會員'&&r.members===1));
+  assert.equal((await call(db,admin,'/api/admin/uplines','POST',{action:'save',kind:'platinum',names:['白金會員'],target:'上手別名'})).status,200);
+  assert.equal(db.sqlite.prepare("SELECT platinumUpline FROM users WHERE id='member'").get()?.platinumUpline,'上手別名');
+  assert.deepEqual((await call(db,platinum,'/api/stickers/grant-targets')).data.targets.map((u:any)=>u.id),['member']);
+  assert.equal((await call(db,platinum,'/api/stickers/grant','POST',{targetUserId:'member',amount:1,reason:'改名後仍可發放',operationId:'alias'})).status,200);
+  await call(db,admin,'/api/admin/uplines','POST',{action:'merge',kind:'platinum',names:['上手別名','其他上手'],target:'白金會員'});
+  assert.equal((await call(db,platinum,'/api/stickers/grant-targets')).data.targets.length,2);
+  await call(db,admin,'/api/admin/uplines','POST',{action:'delete',kind:'platinum',names:['白金會員']});
+  assert.equal((await call(db,platinum,'/api/stickers/grant-targets')).data.targets.length,0);
+  assert.equal(count(db,'manual_grant'),1);
+});
+
+test('authorized administrators can manage feedback rules and invalid limits cannot partially change them', async () => {
+  const db=database();const token=await session(db,'other');const member=await session(db,'member');
+  db.sqlite.exec("UPDATE users SET isAdminUser=1 WHERE id='other'");
+  const initial=await call(db,token,'/api/stickers/settings');assert.equal(initial.status,200);
+  for(const patch of [{toastSeconds:0},{profileHintSeconds:61},{luckyDailyLimit:1.2},{luckyCompleteReward:-1},{profileHintText:''}])assert.equal((await call(db,token,'/api/stickers/settings','PUT',{...initial.data.settings,...patch})).status,400);
+  assert.equal((await call(db,member,'/api/stickers/settings','PUT',initial.data.settings)).status,403);
+  assert.equal((await call(db,token,'/api/stickers/settings','PUT',{...initial.data.settings,toastSeconds:2,luckyHintText:'你的答案\n聽完+{x}張貼紙'})).status,200);
+  assert.equal((await call(db,member,'/api/stickers/public-settings')).data.settings.toastSeconds,2);
 });

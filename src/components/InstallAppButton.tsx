@@ -132,8 +132,10 @@ if (typeof window !== 'undefined') {
 }
 
 export function InstallAppButton({
+  onOpenIOSGuide,
   className = ''
 }: {
+  onOpenIOSGuide?: () => void;
   compact?: boolean;
   className?: string;
 }) {
@@ -283,6 +285,7 @@ export function InstallAppButton({
 
       setIsPreparing(false);
       setShowInstaller(false);
+      if (onOpenIOSGuide) { onOpenIOSGuide(); return; }
       setShowIOSInstallGuide(true);
       return;
     }

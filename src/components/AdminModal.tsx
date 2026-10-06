@@ -1,3 +1,4 @@
+import { UplineManagement } from './UplineManagement';
 import { ThemedSelect } from './ThemedSelect';
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -70,6 +71,7 @@ interface AdminModalProps {
     options?: { persist?: boolean }
   ) => Promise<void> | void;
   onSwitchToAdmin: () => void;
+  onUplinesChanged?: () => void;
   onCategoriesUpdated?: (categories?: string[], change?: { oldName: string; newName?: string }) => void;
 }
 
@@ -90,7 +92,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   onEditTrack,
   onUpdateTrack,
   onSwitchToAdmin,
-  onCategoriesUpdated
+  onCategoriesUpdated,
+  onUplinesChanged
 }) => {
   // Requirement 4 & 5: Check permissions (Yukidu is always super admin)
   const cleanEmail = currentUser?.email?.toLowerCase().trim();
@@ -133,7 +136,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const isContributorOnly = currentUser?.isContributor === true && !isEffectiveAdmin && !isDiamondOrAbove;
 
   // Requirement 1, 2, 4 & 6: Tabs: 數據中心, 會員, 音檔, 分類標籤, 網友關鍵字, 私秘VIP, 權限
-  const [activeTab, setActiveTab] = useState<'data-center' | 'users' | 'tracks' | 'categories' | 'keywords' | 'vip' | 'permissions'>(
+  const [activeTab, setActiveTab] = useState<'data-center' | 'users' | 'tracks' | 'categories' | 'keywords' | 'vip' | 'permissions' | 'uplines'>(
     isContributorOnly ? 'tracks' : 'data-center'
   );
 
@@ -802,6 +805,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
               </button>
             )}
 
+            {(isEffectiveAdmin || currentUser?.isAdminUser || currentUser?.role==='管理員') && <button onClick={()=>setActiveTab('uplines')} className="pb-1.5 px-2 font-bold shrink-0" style={{color:activeTab==='uplines'?'var(--color-primary)':undefined}}>上手名單</button>}
             {/* 7. 權限表 (Requirement 2: 改為權限表) */}
             <button
               onClick={() => setActiveTab('permissions')}
@@ -828,6 +832,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
         {/* Tab Content */}
         <div className="p-4 sm:p-5 max-h-[65vh] overflow-y-auto space-y-3.5 text-xs">
+          {activeTab==='uplines' && <UplineManagement onChanged={onUplinesChanged}/>}
           {/* TAB: 數據中心 (Requirement 2: 白金以上專屬) */}
           {activeTab === 'data-center' && isPlatinumOrAbove && (
             <DataCenterTab users={users} />

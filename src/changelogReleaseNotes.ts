@@ -90,7 +90,15 @@ export const CUMULATIVE_RELEASE_NOTES: ChangelogEntry = {
   ]
 };
 
-const RELEASE_NOTES = [HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
+export const STICKER_PAGES_RELEASE_NOTES: ChangelogEntry = {
+  version: 'v4.0', date: '2026/10/06', isLatest: true,
+  summary: '貼紙簿與個人中心改為完整頁面，新增完善資料與好手氣獎勵、全站貼紙提示、上手名單管理及播放清單排序。',
+  added: ['全站貼紙增加以紅字、減少以綠字提示，顯示在操作位置上方，時間可在其他規則調整。', '完善個人資料可領一次貼紙；未填完整提醒的文字、秒數及獎勵可自訂。', '好手氣抽中尚未聽完的錄音，當日完成可領額外貼紙；提示文字、秒數、張數與每日上限可自訂。', '後台新增上手名單，支援新增、編輯、多選合併與刪除，連動會員欄位。'],
+  modified: ['我的貼紙簿、個人中心與iOS安裝教學改為完整頁面，支援返回導覽。', '選單僅貼紙數字保持大字，其餘文字與其他選項一致；貼紙明細改負綠正紅、小字且不粗體。', '上手白金、上手鑽石分開顯示；推薦人取消自動關聯詞。', '已購買錄音優先排序；新增貼紙成本低至高／心得獎勵高至低排序，移除獎銜篩選並移動時間按鈕。', '未開始收聽的照片顯示寫心得獎勵，正紅負綠，字體與權限一致。', '貼紙清單獨立載入並保留快取，管理分頁與補發結算不再阻擋首屏。'],
+  removed: ['移除我的貼紙與個人中心的彈出視窗呈現。']
+};
+
+const RELEASE_NOTES = [STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
 
 const runtime = window as Window &
   typeof globalThis & {

@@ -121,7 +121,7 @@ export type StayReason = typeof STAY_REASONS[number];
 
 export type CategoryType = '全部' | '事業' | '心態思維' | '營養' | '安麗產品' | '影集' | '未分類' | string;
 
-export type SortField = '時間' | '權限' | '評價' | '留言' | '按讚' | '演講人';
+export type SortField = '時間' | '權限' | '評價' | '留言' | '按讚' | '演講人' | '貼紙';
 export type SortDirection = 'asc' | 'desc';
 export type SortType = '最新上傳' | '評價最高' | '留言最多' | '按讚最多' | '演講者';
 

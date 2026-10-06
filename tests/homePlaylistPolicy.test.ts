@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { moveTrackIdToSecondSlot, sortDefaultHomeTracks } from '../src/homePlaylistPolicy';
+import { moveTrackIdToSecondSlot, sortDefaultHomeTracks, sortStickerTracks } from '../src/homePlaylistPolicy';
 
 type MockTrack = {
   id: string;
@@ -60,4 +60,14 @@ test('lucky draw moves the highlighted candidate to the second card without losi
   assert.deepEqual(moveTrackIdToSecondSlot(source, 'd'), ['a', 'd', 'b', 'c']);
   assert.deepEqual(source, ['a', 'b', 'c', 'd']);
   assert.deepEqual(moveTrackIdToSecondSlot(['only'], 'only'), ['only']);
+});
+
+
+test('sticker sorting keeps actual purchases first and switches between cost ascending and reward descending',()=>{
+ const tracks=[{id:'free-low',stickerUnlockCost:0,commentStickerReward:1},{id:'paid-high',stickerUnlockCost:9,commentStickerReward:2},{id:'locked',stickerUnlockCost:3,commentStickerReward:8},{id:'paid-low',stickerUnlockCost:2,commentStickerReward:6}];
+ const purchased=['paid-high','paid-low'];
+ assert.deepEqual(sortStickerTracks(tracks,purchased,'cost').map(t=>t.id),['paid-low','paid-high','free-low','locked']);
+ assert.deepEqual(sortStickerTracks(tracks,purchased,'reward').map(t=>t.id),['paid-low','paid-high','locked','free-low']);
+ assert.deepEqual(sortStickerTracks(tracks,[],'cost').map(t=>t.id),['free-low','paid-low','locked','paid-high']);
+ assert.equal(tracks[0].id,'free-low');
 });

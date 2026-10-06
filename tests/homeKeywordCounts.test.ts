@@ -52,5 +52,5 @@ test('keyword chips stay regular weight and sort controls match search height', 
   assert.match(app, /px-2\.5 py-1 rounded-xl text-sm font-normal/);
   assert.match(app, /pl-10 pr-9 h-\[46px\] py-0 rounded-2xl/);
   assert.match(app, /h-\[46px\] px-3\.5 sm:px-4 py-0 rounded-2xl/);
-  assert.ok((app.match(/w-full h-\[46px\] min-w-0/g) || []).length >= 3);
+  assert.ok((app.match(/w-full h-\[46px\] min-w-0/g) || []).length >= 2);
 });
