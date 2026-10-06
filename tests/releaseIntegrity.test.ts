@@ -22,10 +22,13 @@ test('service worker never caches API responses or personalized share HTML as ap
   assert.doesNotMatch(sw, /cacheableNavigation[\s\S]*url\.pathname\.startsWith\('\/share\/'\)/);
 });
 
-test('release verification keeps regression tests and the production build as explicit gates', () => {
+test('release verification runs every test file and still executes diagnostics and production build', () => {
   assert.equal(pkg.scripts.verify, 'npm test && npm run build');
-  assert.match(workflow, /run: npm test/);
-  assert.match(workflow, /run: npm run build/);
+  assert.match(workflow, /for test_file in tests\/\*\.test\.ts/);
+  assert.match(workflow, /node --import tsx --test "\$\{test_file\}"/);
+  assert.match(workflow, /Regression files passed:/);
+  assert.match(workflow, /TypeScript diagnostic[\s\S]*if: always\(\)[\s\S]*run: npm run lint/);
+  assert.match(workflow, /Production build[\s\S]*if: always\(\)[\s\S]*run: npm run build/);
   assert.match(wrangler, /\[build\][\s\S]*command = "npm run build"/);
   assert.doesNotMatch(wrangler, /command = "npm run verify"/);
 });
