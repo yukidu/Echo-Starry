@@ -1,5 +1,6 @@
 import appWorker from './categoryIntegrityRouter';
 import type { Env } from './index';
+import { deleteOrganizationStateForUser } from './organizationModel';
 
 const SUPER_ADMIN_EMAIL = 'yukidu@gmail.com';
 const SESSION_COOKIE = 'echostars_session';
@@ -134,6 +135,7 @@ async function deleteMember(request: Request, env: Env, targetKey: string) {
 
   statements.push(env.DB.prepare('DELETE FROM users WHERE id = ?').bind(target.id));
   await env.DB.batch(statements);
+  await deleteOrganizationStateForUser(env.DB, target.id);
 
   return json({
     success: true,
