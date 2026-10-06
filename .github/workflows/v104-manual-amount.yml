@@ -1,0 +1,38 @@
+name: v104 manual amount
+
+on:
+  push:
+    branches:
+      - safe/v104-platinum-earning-multiplier
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Apply custom manual sticker amount
+        run: python3 scripts/apply_v104_manual_custom_amount.py
+      - name: Full test suite
+        run: npm test
+      - name: TypeScript diagnostic
+        run: npm run lint
+      - name: Production build
+        run: npm run build
+      - name: Commit verified change
+        run: |
+          rm -f scripts/apply_v104_manual_custom_amount.py .github/workflows/v104-manual-amount.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "v104: allow custom manual sticker amounts"
+          git push origin HEAD:safe/v104-platinum-earning-multiplier
