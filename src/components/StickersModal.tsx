@@ -4,6 +4,7 @@ import { Trophy, X, History, SlidersHorizontal, ListChecks, PlusCircle, Search, 
 import type { Track, UserProfile } from '../types';
 import { formatStickerAmount, isPlatinumOrAboveRank } from '../../shared/stickers';
 import { ThemedSelect } from './ThemedSelect';
+import { StickerGuideTable } from './StickerGuideTable';
 
 export type StickerSource = { kind: 'track' | 'member' | 'feature'; trackId?: string; commentId?: string; userId?: string; label: string; available: boolean };
 type StickerTransaction = { id: string; delta: number; description: string; type: string; createdAt: number; source?: StickerSource | null };
@@ -143,7 +144,7 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
         </div>
         <div role="tabpanel" className="overflow-y-auto min-h-0 p-3 space-y-3 text-sm text-slate-800 dark:text-slate-100">
           {error && <div role="alert" className="p-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs">{error}</div>}
-          {tab==='history' && <><div className="rounded-2xl p-3 text-white text-center" style={primary}><p className="text-xs">目前可用貼紙</p><p className="text-4xl font-black mt-1">{summary?formatStickerAmount(summary.balance):'—'} 張</p></div><h3 className="font-black">來源與消耗紀錄</h3>{transactions(summary?.transactions || [])}</>}
+          {tab==='history' && <><StickerGuideTable currentUser={currentUser} tracks={tracks}/><div className="rounded-2xl p-3 text-white text-center" style={primary}><p className="text-xs">目前可用貼紙</p><p className="text-4xl font-black mt-1">{summary?formatStickerAmount(summary.balance):'—'} 張</p></div><h3 className="font-black">來源與消耗紀錄</h3>{transactions(summary?.transactions || [])}</>}
           {tab==='grant' && canGrant && <div className="space-y-3">
             {canCreateDownlineInvite && <section aria-label="綁定成為我下線" className="rounded-2xl border border-slate-200 dark:border-slate-700 p-3 space-y-2 bg-slate-50 dark:bg-slate-800/60">
               <div><h3 className="font-black">綁定成為我下線</h3><p className="text-xs text-slate-500 dark:text-slate-400 mt-1">分享您的專屬網址。已登入會員點開後，系統會依您或夫妻共同事業體的最高已審核獎銜，自動綁定上手白金或上手鑽石。</p></div>

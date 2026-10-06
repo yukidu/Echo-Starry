@@ -116,7 +116,7 @@ export const RANK_STICKER_RELEASE_NOTES: ChangelogEntry = {
 };
 
 export const ORGANIZATION_RELEASE_NOTES: ChangelogEntry = {
-  version: 'v4.2', date: '2026/10/07', isLatest: true,
+  version: 'v4.2', date: '2026/10/07',
   summary: '重新整理測試與組織關係架構，讓召喚繁星立即啟動、後台真正整頁顯示，並新增夫妻共同直銷商編號與專屬下線綁定網址。',
   added: [
     '「我的貼紙＞人工加貼紙」新增「綁定成為我下線」：白金級以上可複製專屬網址或直接呼叫 LINE／其他 APP 分享；網址尾端使用直銷商編號。',
@@ -136,7 +136,21 @@ export const ORGANIZATION_RELEASE_NOTES: ChangelogEntry = {
   ]
 };
 
-const RELEASE_NOTES = [ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
+export const STICKER_GUIDE_RELEASE_NOTES: ChangelogEntry = {
+  version: 'v4.3', date: '2026/10/07', isLatest: true,
+  summary: '我的貼紙紀錄新增可收合的貼紙取得／消耗規則表，依登入會員身分與目前設定顯示實際張數。',
+  added: [
+    '「我的貼紙＞貼紙紀錄」最上方新增「如何獲得貼紙？ ▼展開」，點一下以表格查看所有貼紙增加與消耗方式，再點一次可收起。',
+    '表格會依登入會員身分顯示適用項目，例如白金以上的下線加發扣款、目前獎銜審核獎勵，以及具上傳權限會員的私秘 VIP 費用。'
+  ],
+  modified: [
+    '貼紙規則表直接讀取目前後端設定與錄音貼紙設定；管理員日後修改張數後，會員展開時會看到最新數值。',
+    '規則資料採按需載入並在同一次網站使用期間快取，未展開時不增加額外 API 請求。'
+  ],
+  removed: []
+};
+
+const RELEASE_NOTES = [STICKER_GUIDE_RELEASE_NOTES, ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
 
 const runtime = window as Window &
   typeof globalThis & {
