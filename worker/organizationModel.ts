@@ -188,7 +188,7 @@ export async function bindCouple(db: any, actorId: string, partnerId: string, de
   if (groupId) {
     const summary = await organizationSummary(db, groupId);
     if (summary && summary.dealerId !== dealerId) return { error: '既有共同事業體使用不同直銷商編號', status: 409 } as const;
-    if (summary && summary.members.length >= 2 && !summary.members.some((member:any)=>member.id===actorId && member.id===partnerId)) {
+    if (summary && summary.members.length >= 2) {
       const ids = summary.members.map((member:any)=>member.id);
       if (!(ids.includes(actorId) && ids.includes(partnerId))) return { error: '共同事業體已經有兩位成員', status: 409 } as const;
     }
@@ -203,7 +203,10 @@ export async function bindCouple(db: any, actorId: string, partnerId: string, de
   const now = Date.now();
   const existingMembers = await groupMembers(db, groupId!);
   const existingIds = existingMembers.map((row:any)=>row.id);
-  const orderedIds = [...existingIds, actorId, partnerId].filter((id,index,array)=>array.indexOf(id)===index).slice(0,2);
+  // Keep A&B stable: preserve an existing organization member first; otherwise use dealer-id registration order.
+  const orderedIds = existingIds.length
+    ? [...existingIds, actorId, partnerId].filter((id,index,array)=>array.indexOf(id)===index).slice(0,2)
+    : rows.map((row:any)=>String(row.id)).slice(0,2);
   for (let index=0; index<orderedIds.length; index++) {
     await db.prepare('INSERT OR IGNORE INTO organization_members(groupId,userId,memberOrder,joinedAt) VALUES (?,?,?,?)').bind(groupId,orderedIds[index],index,now).run();
   }
