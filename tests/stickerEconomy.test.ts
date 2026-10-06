@@ -65,10 +65,12 @@ test('主選單與貼紙專區保留訪客會員界線及超管分頁', () => {
   assert.match(modal, /keywordRewardLimit/);
 });
 
-test('貼紙路由串在 session cookie 後端驗證之前且刪會員同步清理貼紙資料', () => {
+test('貼紙路由經過共同組織層再進入 session cookie 後端驗證，且刪會員同步清理貼紙資料', () => {
   const categoryRouter = read('worker/categoryIntegrityRouter.ts');
+  const organizationRouter = read('worker/organizationRouter.ts');
   const deleteRouter = read('worker/adminUserDeleteRouter.ts');
-  assert.match(categoryRouter, /\.\/stickerRouter/);
+  assert.match(categoryRouter, /\.\/organizationRouter/);
+  assert.match(organizationRouter, /\.\/stickerRouter/);
   for (const table of ['sticker_transactions', 'sticker_unlocks', 'member_notifications']) {
     assert.match(deleteRouter, new RegExp(table));
   }
