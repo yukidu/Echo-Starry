@@ -1,0 +1,38 @@
+name: v104 initial multiplier
+
+on:
+  push:
+    branches:
+      - safe/v104-initial-reward-multiplier
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Apply initial sticker multiplier completion
+        run: python3 scripts/apply_v104_initial_multiplier.py
+      - name: Full test suite
+        run: npm test
+      - name: TypeScript diagnostic
+        run: npm run lint
+      - name: Production build
+        run: npm run build
+      - name: Commit verified change
+        run: |
+          rm -f scripts/apply_v104_initial_multiplier.py .github/workflows/v104-initial-multiplier.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "v104: include initial stickers in platinum earning multiplier"
+          git push origin HEAD:safe/v104-initial-reward-multiplier
