@@ -442,3 +442,73 @@ test('authorized administrators can manage feedback rules and invalid limits can
   assert.equal((await call(db,token,'/api/stickers/settings','PUT',{...initial.data.settings,toastSeconds:2,luckyHintText:'你的答案\n聽完+{x}張貼紙'})).status,200);
   assert.equal((await call(db,member,'/api/stickers/public-settings')).data.settings.toastSeconds,2);
 });
+
+
+test('couple organization link shares only dealer identity while personal stickers stay independent', async () => {
+  const db = database();
+  db.sqlite.exec(`
+    UPDATE users SET amwayId = 'D100' WHERE id = 'platinum';
+    INSERT INTO users(id,name,email,rank,approvedRank,rankApproved,canUpload,amwayId)
+      VALUES ('spouse','配偶','spouse@example.com','鑽石','鑽石',1,0,'D100');
+  `);
+  const platinum = await session(db,'platinum');
+  const spouse = await session(db,'spouse');
+  const member = await session(db,'member');
+  const other = await session(db,'other');
+  const platinumBalance = await balance(db,platinum);
+  const spouseBalance = await balance(db,spouse);
+
+  const candidate = await call(db,spouse,'/api/couples/candidate?amwayId=D100');
+  assert.equal(candidate.status,200);
+  assert.equal(candidate.data.candidate.id,'platinum');
+  const bound = await call(db,spouse,'/api/couples/bind','POST',{amwayId:'D100',partnerUserId:'platinum'});
+  assert.equal(bound.status,200);
+  assert.equal(bound.data.displayName,'白金會員&配偶');
+
+  const identities = db.sqlite.prepare("SELECT id,name,amwayId FROM users WHERE id IN ('platinum','spouse') ORDER BY id").all() as any[];
+  assert.deepEqual(identities.map(row=>row.name).sort(),['白金會員','配偶'].sort());
+  assert.ok(identities.every(row=>row.amwayId==='D100'));
+  assert.equal(await balance(db,platinum),platinumBalance);
+  assert.equal(await balance(db,spouse),spouseBalance);
+  assert.notEqual(platinumBalance,spouseBalance);
+
+  const existingDownline = db.sqlite.prepare("SELECT platinumUpline FROM users WHERE id='member'").get() as any;
+  assert.equal(existingDownline.platinumUpline,'白金會員&配偶');
+  const invite = await call(db,platinum,'/api/upline-invite/link');
+  assert.equal(invite.status,200);
+  assert.equal(invite.data.url,'https://test.example/upline/D100');
+  assert.equal(invite.data.displayName,'白金會員&配偶');
+  assert.equal(invite.data.kind,'diamond');
+
+  const accepted = await call(db,other,'/api/upline-invite/accept','POST',{amwayId:'D100'});
+  assert.equal(accepted.status,200);
+  const otherRow = db.sqlite.prepare("SELECT platinumUpline,diamondUpline FROM users WHERE id='other'").get() as any;
+  assert.equal(otherRow.platinumUpline,'其他上手');
+  assert.equal(otherRow.diamondUpline,'白金會員&配偶');
+
+  const renamed = await call(db,spouse,'/api/users/spouse','PUT',{name:'新配偶'});
+  assert.equal(renamed.status,200);
+  const names = db.sqlite.prepare("SELECT id,name FROM users WHERE id IN ('platinum','spouse') ORDER BY id").all() as any[];
+  assert.deepEqual(names.map(row=>row.name).sort(),['白金會員','新配偶'].sort());
+  assert.equal((db.sqlite.prepare("SELECT platinumUpline FROM users WHERE id='member'").get() as any).platinumUpline,'白金會員&新配偶');
+  assert.equal((db.sqlite.prepare("SELECT diamondUpline FROM users WHERE id='other'").get() as any).diamondUpline,'白金會員&新配偶');
+  assert.equal(await balance(db,platinum),platinumBalance);
+  assert.equal(await balance(db,spouse),spouseBalance);
+});
+
+test('dealer id safeguards reject a third member and self-upline binding', async () => {
+  const db = database();
+  db.sqlite.exec(`
+    UPDATE users SET amwayId='D200' WHERE id='platinum';
+    INSERT INTO users(id,name,email,rank,approvedRank,rankApproved,amwayId) VALUES
+      ('spouse2','第二人','spouse2@example.com','白金','白金',1,'D200'),
+      ('third','第三人','third@example.com','無','無',1,'D200');
+  `);
+  const platinum=await session(db,'platinum');
+  const spouse=await session(db,'spouse2');
+  assert.equal((await call(db,spouse,'/api/couples/candidate?amwayId=D200')).status,409);
+  assert.equal((await call(db,platinum,'/api/upline-invite/link')).status,409);
+  db.sqlite.exec("DELETE FROM users WHERE id='third'");
+  assert.equal((await call(db,spouse,'/api/couples/bind','POST',{amwayId:'D200',partnerUserId:'platinum'})).status,200);
+  assert.equal((await call(db,platinum,'/api/upline-invite/accept','POST',{amwayId:'D200'})).status,400);
+});

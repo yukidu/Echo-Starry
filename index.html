@@ -34,10 +34,75 @@
         window.__ECHOSTARS_INSTALL_PROMPT__ = null;
       });
     </script>
+
+    <style id="echostars-v102-ui-fixes">
+      /* v102: restore only the cover label font size to the v100 7/8px values. */
+      .audio-card button[title^="點擊照片"] > div.absolute.top-0,
+      .audio-card button[title^="點擊照片"] > div.absolute.bottom-0 { font-size: 7px !important; }
+      @media (min-width: 640px) {
+        .audio-card button[title^="點擊照片"] > div.absolute.top-0,
+        .audio-card button[title^="點擊照片"] > div.absolute.bottom-0 { font-size: 8px !important; }
+      }
+
+      /* v102: immediate lucky-draw visual prelude while the existing server request is pending. */
+      .audio-card-grid.lucky-immediate-active > .lucky-card {
+        filter: brightness(0.34) saturate(0.55); opacity: 0.48; z-index: 10;
+        animation: echostars-lucky-reel 180ms cubic-bezier(.35,0,.65,1) infinite alternate;
+      }
+      .audio-card-grid.lucky-immediate-active > .lucky-card:nth-child(3n + 1) { animation-delay: -55ms; }
+      .audio-card-grid.lucky-immediate-active > .lucky-card:nth-child(3n + 3) { animation-delay: -105ms; animation-direction: alternate-reverse; }
+      .audio-card-grid.lucky-immediate-active > .lucky-card:nth-child(2) {
+        filter: brightness(1.18) saturate(1.2); opacity: 1; z-index: 20;
+        box-shadow: 0 0 0 3px var(--color-primary, #c06c84), 0 0 30px var(--color-primary, #c06c84);
+        animation: echostars-lucky-reel-focus 170ms ease-in-out infinite alternate;
+      }
+
+      /* v102: present the existing admin component as normal full-page content, like leaderboard. */
+      body:has(.app-modal-overlay) main { display: none !important; }
+      .app-modal-overlay {
+        position: static !important; inset: auto !important; z-index: auto !important; display: block !important;
+        width: 100% !important; max-width: 48rem !important; min-height: 70dvh; margin: 0 auto !important;
+        padding: 1.25rem 1rem 7rem !important; background: transparent !important; backdrop-filter: none !important; overflow: visible !important;
+      }
+      .app-modal-overlay > div { max-width: none !important; margin: 0 !important; border-radius: 1rem !important; box-shadow: none !important; }
+      .app-modal-overlay > div > .max-h-\[65vh\] { max-height: none !important; overflow: visible !important; }
+      @media (prefers-reduced-motion: reduce) { .audio-card-grid.lucky-immediate-active > .lucky-card { animation: none !important; } }
+    </style>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
     <div id="root"></div>
+
+    <script>
+      // v102: start the visible lucky reel on the user gesture itself. React still chooses/finalizes the real winner.
+      (function () {
+        var title = '從目前條件下可播放的音檔中召喚繁星解答';
+        var timer = 0;
+        var observer = null;
+        function stop() {
+          if (timer) clearTimeout(timer);
+          timer = 0;
+          if (observer) observer.disconnect();
+          observer = null;
+          var grid = document.querySelector('.audio-card-grid');
+          if (grid) grid.classList.remove('lucky-immediate-active');
+        }
+        document.addEventListener('pointerdown', function (event) {
+          var target = event.target instanceof Element ? event.target : null;
+          var button = target && target.closest('button[title="' + title + '"]');
+          if (!button || button.disabled || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+          var grid = document.querySelector('.audio-card-grid');
+          if (!grid) return;
+          stop();
+          grid.classList.add('lucky-immediate-active');
+          observer = new MutationObserver(function () {
+            if (grid.classList.contains('lucky-spin-active') || grid.classList.contains('lucky-win-active')) stop();
+          });
+          observer.observe(grid, { attributes: true, attributeFilter: ['class'] });
+          timer = setTimeout(stop, 15000);
+        }, true);
+      })();
+    </script>
     <script type="module" src="/src/changelogReleaseNotes.ts"></script>
     <script type="module" src="/src/changelogV37PublicPolicy.ts"></script>
     <script type="module" src="/src/jpegExportPolicy.ts"></script>

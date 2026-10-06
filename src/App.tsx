@@ -328,10 +328,38 @@ export default function App() {
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [stickerSummary, setStickerSummary] = useState<{ balance: number; unlockedTrackIds: string[]; commentRewardTrackIds: string[]; unreadNotifications: number; canGrant: boolean; isSuperAdmin: boolean } | null>(null);
   const [isStickersOpen, setIsStickersOpen] = useState(false);
+  const [profileAutoEditKey, setProfileAutoEditKey] = useState(0);
   const [isLoading, setIsLoading] = useState(() => (readHomeCache()?.tracks || []).length === 0);
   const homeCacheValidatedAtRef = useRef(readHomeCache()?.savedAt || 0);
   const hasFetchedAllCommentsRef = useRef(false);
   const hasFetchedAllUsersRef = useRef(false);
+  const uplineInviteHandledRef = useRef('');
+
+  useEffect(() => {
+    if (!currentUser || typeof window === 'undefined') return;
+    const match = window.location.pathname.match(/^\/upline\/([^/]+)\/?$/);
+    if (!match) return;
+    const dealerId = decodeURIComponent(match[1] || '').trim();
+    if (!dealerId) return;
+    const key = `${currentUser.id}:${dealerId}`;
+    if (uplineInviteHandledRef.current === key) return;
+    uplineInviteHandledRef.current = key;
+    void apiJson('/api/upline-invite/accept', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amwayId: dealerId })
+    }).then(data => {
+      const updated = { ...currentUser, ...(data.user || {}) };
+      setCurrentUser(updated);
+      localStorage.setItem('sq_current_user_v1', JSON.stringify(updated));
+      setAllUsers(prev => prev.map(user => user.id === updated.id ? updated : user));
+      window.history.replaceState({}, '', '/');
+      alert(data.message || '已完成上手綁定');
+    }).catch(error => {
+      window.history.replaceState({}, '', '/');
+      alert(error instanceof Error ? error.message : '下線綁定失敗');
+    });
+  }, [currentUser?.id]);
 
   // Heavy community datasets are loaded only when a view actually needs them.
   const fetchAllComments = async (force = false) => {
@@ -2367,11 +2395,17 @@ export default function App() {
         onRateTrack={(trackId, score) => handleRateTrack(trackId, score)}
         onClearListeningHistory={handleClearListeningHistory}
         allUsers={allUsers}
+        autoEditKey={profileAutoEditKey}
       />
       </Suspense>) : isStickersOpen ? (<Suspense fallback={<div role="status" className="py-12 text-center text-slate-500">載入功能中…</div>}>
       <StickersModal
         isOpen={isStickersOpen}
         onClose={handleReturnToHomePlaylist}
+        onRequestProfileEdit={() => {
+          setIsStickersOpen(false);
+          setIsProfileOpen(true);
+          setProfileAutoEditKey(key => key + 1);
+        }}
         currentUser={currentUser}
         tracks={tracks}
         initialSummary={stickerSummary}

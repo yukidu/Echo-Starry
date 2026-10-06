@@ -76,7 +76,7 @@ async function verifiedActor(request: Request, env: Env) {
   if (!TOKEN_PATTERN.test(token)) return null;
   const tokenHash = await hashToken(token);
   const actor: any = await env.DB.prepare(`
-    SELECT u.id, u.email, u.name, u.role, u.rank, u.approvedRank, u.rankApproved,
+    SELECT u.id, u.email, u.name, u.role, u.rank, u.approvedRank, u.rankApproved, u.amwayId,
            u.isAdminUser, u.isBlocked, u.canUpload, u.isContributor, u.platinumUpline, u.diamondUpline, s.expiresAt
     FROM auth_sessions s
     JOIN users u ON u.id = s.userId
@@ -223,6 +223,13 @@ async function ensureStickerSchema(db: any) {
       await db.prepare('CREATE INDEX IF NOT EXISTS sticker_lucky_member ON sticker_lucky_draws(userId,day)').run();
       await db.prepare('CREATE TABLE IF NOT EXISTS upline_owners (kind TEXT NOT NULL,name TEXT NOT NULL,userId TEXT NOT NULL,PRIMARY KEY(kind,name))').run();
       await db.prepare('CREATE TABLE IF NOT EXISTS upline_names (kind TEXT NOT NULL, name TEXT NOT NULL, PRIMARY KEY(kind,name))').run();
+      await db.prepare(`CREATE TABLE IF NOT EXISTS couple_links (
+        amwayId TEXT PRIMARY KEY,
+        userAId TEXT NOT NULL UNIQUE,
+        userBId TEXT NOT NULL UNIQUE,
+        createdBy TEXT NOT NULL,
+        createdAt INTEGER NOT NULL
+      )`).run();
       const now = Date.now();
       // v98 stored this setting as a count. The configured number now means stickers.
       await db.prepare(`INSERT OR IGNORE INTO sticker_settings(key,valueUnits,updatedAt,updatedBy)
@@ -393,6 +400,170 @@ function rankRewardUnits(values: Record<string, number>, tier: RankRewardTier) {
 
 function rankRewardLabel(tier: RankRewardTier) {
   return tier === 'diamond' ? '鑽石以上' : tier === 'emerald' ? '翡翠以上' : '白金以上';
+}
+
+type UplineKind = 'platinum' | 'diamond';
+
+function normalizeDealerId(value: unknown) {
+  return String(value || '').trim();
+}
+
+async function coupleRowForUser(db: any, userId: string) {
+  return db.prepare('SELECT * FROM couple_links WHERE userAId = ? OR userBId = ? LIMIT 1').bind(userId, userId).first();
+}
+
+async function senderGroupForUser(db: any, userId: string) {
+  const member: any = await db.prepare('SELECT id,name,amwayId,rank,approvedRank,rankApproved,isBlocked FROM users WHERE id = ? LIMIT 1').bind(userId).first();
+  if (!member || member.isBlocked) return null;
+  const link: any = await coupleRowForUser(db, userId);
+  let members: any[] = [member];
+  if (link) {
+    const rows = (await db.prepare('SELECT id,name,amwayId,rank,approvedRank,rankApproved,isBlocked FROM users WHERE id IN (?,?)').bind(link.userAId, link.userBId).all()).results || [];
+    members = [link.userAId, link.userBId].map((id: string) => rows.find((row: any) => row.id === id)).filter(Boolean);
+  }
+  const amwayId = normalizeDealerId(link?.amwayId || member.amwayId);
+  const displayName = members.map(row => String(row.name || '').trim()).filter(Boolean).join('&');
+  const approved = members.filter(row => row.rankApproved && !row.isBlocked);
+  const tier = approved.reduce<RankRewardTier | null>((best, row) => {
+    const current = rankRewardTier(row.approvedRank || row.rank);
+    if (!current) return best;
+    const score = current === 'diamond' ? 3 : current === 'emerald' ? 2 : 1;
+    const bestScore = best === 'diamond' ? 3 : best === 'emerald' ? 2 : best === 'platinum' ? 1 : 0;
+    return score > bestScore ? current : best;
+  }, null);
+  const kind: UplineKind | null = tier === 'diamond' ? 'diamond' : tier ? 'platinum' : null;
+  return { link, members, amwayId, displayName, tier, kind };
+}
+
+async function groupForDealerId(db: any, dealerId: string) {
+  const amwayId = normalizeDealerId(dealerId);
+  if (!amwayId) return { error: '缺少直銷商編號', status: 400 };
+  const rows = (await db.prepare(`SELECT id,name,amwayId,rank,approvedRank,rankApproved,isBlocked
+    FROM users WHERE TRIM(COALESCE(amwayId,'')) = ? AND COALESCE(isBlocked,0)=0 ORDER BY registerDate ASC, id ASC`).bind(amwayId).all()).results || [];
+  if (!rows.length) return { error: '找不到此直銷商編號', status: 404 };
+  if (rows.length > 2) return { error: '此直銷商編號有超過兩位會員，請聯絡管理員處理重複資料', status: 409 };
+  if (rows.length === 2) {
+    const link: any = await db.prepare(`SELECT * FROM couple_links WHERE amwayId = ? AND
+      ((userAId = ? AND userBId = ?) OR (userAId = ? AND userBId = ?)) LIMIT 1`)
+      .bind(amwayId, rows[0].id, rows[1].id, rows[1].id, rows[0].id).first();
+    if (!link) return { error: '此編號已有兩位會員，但尚未確認夫妻關係，暫時不能使用此綁定網址', status: 409 };
+    const ordered = [link.userAId, link.userBId].map((id: string) => rows.find((row: any) => row.id === id)).filter(Boolean);
+    const approved = ordered.filter((row: any) => row.rankApproved);
+    const tier = approved.reduce<RankRewardTier | null>((best: RankRewardTier | null, row: any) => {
+      const current = rankRewardTier(row.approvedRank || row.rank);
+      const score = current === 'diamond' ? 3 : current === 'emerald' ? 2 : current === 'platinum' ? 1 : 0;
+      const bestScore = best === 'diamond' ? 3 : best === 'emerald' ? 2 : best === 'platinum' ? 1 : 0;
+      return score > bestScore ? current : best;
+    }, null);
+    return { members: ordered, displayName: ordered.map((row: any) => row.name).join('&'), tier, kind: tier === 'diamond' ? 'diamond' : tier ? 'platinum' : null, amwayId };
+  }
+  const row = rows[0];
+  const tier = row.rankApproved ? rankRewardTier(row.approvedRank || row.rank) : null;
+  return { members: rows, displayName: String(row.name || '').trim(), tier, kind: tier === 'diamond' ? 'diamond' : tier ? 'platinum' : null, amwayId };
+}
+
+async function syncUplineDisplayName(db: any, userId: string, previousLabel: string) {
+  const group = await senderGroupForUser(db, userId);
+  const nextLabel = String(group?.displayName || '').trim();
+  const oldLabel = String(previousLabel || '').trim();
+  if (!oldLabel || !nextLabel || oldLabel === nextLabel) return;
+  await db.batch([
+    db.prepare(`UPDATE users SET platinumUpline = ? WHERE TRIM(COALESCE(platinumUpline,'')) = ?`).bind(nextLabel, oldLabel),
+    db.prepare(`UPDATE users SET diamondUpline = ? WHERE TRIM(COALESCE(diamondUpline,'')) = ?`).bind(nextLabel, oldLabel),
+    db.prepare('INSERT OR IGNORE INTO upline_names(kind,name) SELECT kind,? FROM upline_names WHERE name=?').bind(nextLabel, oldLabel),
+    db.prepare('DELETE FROM upline_names WHERE name=?').bind(oldLabel),
+    db.prepare('INSERT OR IGNORE INTO upline_owners(kind,name,userId) SELECT kind,?,userId FROM upline_owners WHERE name=? AND userId=?').bind(nextLabel, oldLabel, userId),
+    db.prepare('DELETE FROM upline_owners WHERE name=? AND userId=?').bind(oldLabel, userId)
+  ]);
+}
+
+async function handleCoupleApi(request: Request, db: any, actor: any) {
+  if (!actor) return json({ error: '請先登入會員' }, 401);
+  const url = new URL(request.url);
+  const path = url.pathname;
+  if (path === '/api/couples/candidate' && request.method === 'GET') {
+    const amwayId = normalizeDealerId(url.searchParams.get('amwayId'));
+    if (!amwayId) return json({ candidate: null, linked: false });
+    const existing: any = await coupleRowForUser(db, actor.id);
+    if (existing) {
+      if (normalizeDealerId(existing.amwayId) !== amwayId) return json({ error: '夫妻共同經營使用同一個直銷商編號；如需變更共同編號，請聯絡管理員處理' }, 409);
+      const partnerId = existing.userAId === actor.id ? existing.userBId : existing.userAId;
+      const partner: any = await db.prepare('SELECT id,name,amwayId FROM users WHERE id = ?').bind(partnerId).first();
+      return json({ linked: true, candidate: partner ? { id: partner.id, name: partner.name } : null, displayName: (await senderGroupForUser(db, actor.id))?.displayName || actor.name });
+    }
+    const rows = (await db.prepare(`SELECT id,name FROM users WHERE id <> ? AND COALESCE(isBlocked,0)=0
+      AND TRIM(COALESCE(amwayId,'')) = ? ORDER BY registerDate ASC, id ASC`).bind(actor.id, amwayId).all()).results || [];
+    if (rows.length > 1) return json({ error: '此直銷商編號已有超過一位其他會員，請聯絡管理員處理重複資料' }, 409);
+    const candidate = rows[0] || null;
+    if (candidate && await coupleRowForUser(db, candidate.id)) return json({ error: `${candidate.name} 已綁定其他共同經營人，請聯絡管理員處理` }, 409);
+    return json({ linked: false, candidate });
+  }
+  if (path === '/api/couples/bind' && request.method === 'POST') {
+    const body: any = await request.json().catch(() => ({}));
+    const amwayId = normalizeDealerId(body.amwayId);
+    const partnerId = String(body.partnerUserId || '').trim();
+    if (!amwayId || !partnerId || partnerId === actor.id) return json({ error: '夫妻綁定資料不完整' }, 400);
+    const partner: any = await db.prepare('SELECT id,name,amwayId,isBlocked FROM users WHERE id = ?').bind(partnerId).first();
+    if (!partner || partner.isBlocked || normalizeDealerId(partner.amwayId) !== amwayId) return json({ error: '對方會員或直銷商編號已變更，請重新輸入' }, 409);
+    const duplicates = (await db.prepare(`SELECT id,name FROM users WHERE id <> ? AND COALESCE(isBlocked,0)=0 AND TRIM(COALESCE(amwayId,'')) = ?`).bind(actor.id, amwayId).all()).results || [];
+    if (duplicates.length !== 1 || duplicates[0].id !== partnerId) return json({ error: '此直銷商編號資料不唯一，請聯絡管理員處理' }, 409);
+    const actorLink: any = await coupleRowForUser(db, actor.id);
+    const partnerLink: any = await coupleRowForUser(db, partnerId);
+    if (actorLink && !(actorLink.userAId === partnerId || actorLink.userBId === partnerId)) return json({ error: '你已綁定其他共同經營人，請先解除原關係' }, 409);
+    if (partnerLink && !(partnerLink.userAId === actor.id || partnerLink.userBId === actor.id)) return json({ error: `${partner.name} 已綁定其他共同經營人` }, 409);
+    if (!actorLink && !partnerLink) {
+      const displayName = `${String(partner.name || '').trim()}&${String(actor.name || '').trim()}`;
+      await db.batch([
+        db.prepare('UPDATE users SET amwayId = ? WHERE id IN (?,?)').bind(amwayId, partnerId, actor.id),
+        db.prepare('INSERT INTO couple_links(amwayId,userAId,userBId,createdBy,createdAt) VALUES (?,?,?,?,?)').bind(amwayId, partnerId, actor.id, actor.id, Date.now()),
+        // A couple shares only the organization identity. Convert existing downlines that referenced either spouse.
+        db.prepare(`UPDATE users SET platinumUpline = ? WHERE TRIM(COALESCE(platinumUpline,'')) IN (?,?)`).bind(displayName, String(partner.name || '').trim(), String(actor.name || '').trim()),
+        db.prepare(`UPDATE users SET diamondUpline = ? WHERE TRIM(COALESCE(diamondUpline,'')) IN (?,?)`).bind(displayName, String(partner.name || '').trim(), String(actor.name || '').trim()),
+        db.prepare(`INSERT OR IGNORE INTO upline_names(kind,name) SELECT kind,? FROM upline_names WHERE name IN (?,?)`).bind(displayName, String(partner.name || '').trim(), String(actor.name || '').trim())
+      ]);
+    }
+    const group = await senderGroupForUser(db, actor.id);
+    return json({ success: true, linked: true, partner: { id: partner.id, name: partner.name }, displayName: group?.displayName || `${partner.name}&${actor.name}` });
+  }
+  if (path === '/api/couples/bind' && request.method === 'DELETE') {
+    const link: any = await coupleRowForUser(db, actor.id);
+    if (link) await db.prepare('DELETE FROM couple_links WHERE amwayId = ?').bind(link.amwayId).run();
+    return json({ success: true });
+  }
+  return json({ error: '找不到夫妻綁定功能' }, 404);
+}
+
+async function handleUplineInviteApi(request: Request, db: any, actor: any) {
+  if (!actor) return json({ error: '請先登入會員' }, 401);
+  const url = new URL(request.url);
+  const path = url.pathname;
+  if (path === '/api/upline-invite/link' && request.method === 'GET') {
+    const group = await senderGroupForUser(db, actor.id);
+    if (!group?.amwayId) return json({ error: '請先在基本資料填寫直銷商編號', code: 'MISSING_AMWAY_ID' }, 409);
+    if (!group.kind) return json({ error: '此功能只提供已審核白金級以上會員使用' }, 403);
+    const validated: any = await groupForDealerId(db, group.amwayId);
+    if (validated.error) return json({ error: validated.error }, validated.status);
+    return json({
+      url: `${url.origin}/upline/${encodeURIComponent(group.amwayId)}`,
+      displayName: validated.displayName,
+      kind: validated.kind,
+      amwayId: group.amwayId
+    });
+  }
+  if (path === '/api/upline-invite/accept' && request.method === 'POST') {
+    const body: any = await request.json().catch(() => ({}));
+    const group: any = await groupForDealerId(db, body.amwayId);
+    if (group.error) return json({ error: group.error }, group.status);
+    if (!group.kind) return json({ error: '此邀請來源尚未通過白金級以上獎銜審核' }, 403);
+    if (group.members.some((row: any) => row.id === actor.id)) return json({ error: '不能把自己綁定成自己的下線' }, 400);
+    const column = group.kind === 'diamond' ? 'diamondUpline' : 'platinumUpline';
+    await db.prepare(`UPDATE users SET ${column} = ? WHERE id = ?`).bind(group.displayName, actor.id).run();
+    await db.prepare('INSERT OR IGNORE INTO upline_names(kind,name) VALUES (?,?)').bind(group.kind, group.displayName).run();
+    if (group.members.length === 1) await db.prepare('INSERT OR REPLACE INTO upline_owners(kind,name,userId) VALUES (?,?,?)').bind(group.kind, group.displayName, group.members[0].id).run();
+    const user: any = await db.prepare('SELECT * FROM users WHERE id = ?').bind(actor.id).first();
+    return json({ success: true, kind: group.kind, displayName: group.displayName, user, message: `已自動綁定${group.kind === 'diamond' ? '上手鑽石' : '上手白金'}：${group.displayName}` });
+  }
+  return json({ error: '找不到下線綁定功能' }, 404);
 }
 
 const RANK_TIER_PRIORITY: Record<RankRewardTier, number> = { platinum: 1, emerald: 2, diamond: 3 };
@@ -965,7 +1136,7 @@ export default {
     const method = request.method.toUpperCase();
     if (!env.DB) return appWorker.fetch(request, env);
 
-    const relevant = path.startsWith('/api/stickers') || path.startsWith('/api/tracks') || path.startsWith('/api/comments') || path.startsWith('/api/users/') || path.startsWith('/api/admin/uplines') || path === '/api/playback/record' || path === '/api/playback/claim-local';
+    const relevant = path.startsWith('/api/stickers') || path.startsWith('/api/tracks') || path.startsWith('/api/comments') || path.startsWith('/api/users/') || path.startsWith('/api/admin/uplines') || path.startsWith('/api/couples') || path.startsWith('/api/upline-invite') || path === '/api/playback/record' || path === '/api/playback/claim-local';
     if (relevant) {
       try { await ensureStickerSchema(env.DB); }
       catch (error) {
@@ -975,7 +1146,17 @@ export default {
     }
 
     const actor = relevant ? await verifiedActor(request, env).catch(() => null) : null;
-    if(actor && path.startsWith('/api/stickers/grant')) actor.uplineAliases=((await env.DB.prepare('SELECT name FROM upline_owners WHERE userId=?').bind(actor.id).all()).results || []).map((r:any)=>normalizeMemberName(r.name));
+    if(actor && path.startsWith('/api/stickers/grant')) {
+      actor.uplineAliases=((await env.DB.prepare('SELECT name FROM upline_owners WHERE userId=?').bind(actor.id).all()).results || []).map((r:any)=>normalizeMemberName(r.name));
+      const group=await senderGroupForUser(env.DB,actor.id);
+      if(group?.displayName && group.members.length===2) {
+        actor.uplineAliases.push(normalizeMemberName(group.displayName));
+        actor.uplineAliases.push(...group.members.map((member:any)=>normalizeMemberName(member.name)));
+        actor.uplineAliases=[...new Set(actor.uplineAliases.filter(Boolean))];
+      }
+    }
+    if (path.startsWith('/api/couples')) return handleCoupleApi(request,env.DB,actor);
+    if (path.startsWith('/api/upline-invite')) return handleUplineInviteApi(request,env.DB,actor);
     if (path.startsWith('/api/admin/uplines')) return handleUplines(request,env.DB,actor);
     const stickerResponse = await handleStickerApi(request, env, actor);
     if (stickerResponse) return stickerResponse;
@@ -992,12 +1173,13 @@ export default {
     const commentLike = method === 'POST' ? path.match(/^\/api\/comments\/([^/]+)\/like$/) : null;
     const playbackWrite = method === 'POST' && (path === '/api/playback/record' || path === '/api/playback/claim-local');
     const commentDelete = method === 'DELETE' ? path.match(/^\/api\/comments\/([^/]+)$/) : null;
+    const profileWrite = Boolean(actor && method === 'PUT' && path === `/api/users/${encodeURIComponent(actor.id)}`);
 
     let beforeTrack: any = null;
     let beforeCommentReward: any = null;
     const likedComment: any = commentLike ? await env.DB.prepare('SELECT * FROM comments WHERE id = ?').bind(commentLike[1]).first() : null;
     let requestBody: any = null;
-    if ((trackAction && method === 'POST') || keywordPost || commentPost || commentLike || playbackWrite) {
+    if ((trackAction && method === 'POST') || keywordPost || commentPost || commentLike || playbackWrite || profileWrite) {
       requestBody = await request.clone().json().catch(() => ({}));
     }
     if (trackAction && method === 'POST' && actor) {
@@ -1015,6 +1197,30 @@ export default {
       beforeCommentReward = await env.DB.prepare(
         "SELECT * FROM sticker_transactions WHERE type IN ('comment_reward','reply_reward') AND sourceId = ? AND deltaUnits > 0 ORDER BY createdAt ASC LIMIT 1"
       ).bind(commentId).first();
+    }
+
+    let previousUplineLabel = '';
+    if (profileWrite && actor) {
+      const group = await senderGroupForUser(env.DB, actor.id);
+      previousUplineLabel = group?.displayName || String(actor.name || '').trim();
+      if (requestBody && Object.prototype.hasOwnProperty.call(requestBody,'amwayId')) {
+        const nextDealerId = normalizeDealerId(requestBody.amwayId);
+        const link: any = await coupleRowForUser(env.DB, actor.id);
+        if (link && nextDealerId !== normalizeDealerId(link.amwayId)) {
+          return json({ error: '夫妻共同經營使用同一個直銷商編號；如需變更共同編號，請聯絡管理員處理' }, 409);
+        }
+        if (nextDealerId) {
+          const duplicates = (await env.DB.prepare(`SELECT id,name FROM users WHERE id <> ? AND COALESCE(isBlocked,0)=0
+            AND TRIM(COALESCE(amwayId,'')) = ?`).bind(actor.id,nextDealerId).all()).results || [];
+          if (duplicates.length > 1) return json({ error: '此直銷商編號已有超過一位其他會員，請聯絡管理員處理' }, 409);
+          if (duplicates.length === 1) {
+            const couple: any = await coupleRowForUser(env.DB, actor.id);
+            const otherId = duplicates[0].id;
+            const isLinked = couple && (couple.userAId === otherId || couple.userBId === otherId);
+            if (!isLinked) return json({ error: `此直銷商編號已由 ${duplicates[0].name} 使用，請先確認夫妻關係或更正編號` }, 409);
+          }
+        }
+      }
     }
 
     let delegated = request;
@@ -1046,6 +1252,7 @@ export default {
     }
 
     if (method === 'PUT' && actor && path === `/api/users/${encodeURIComponent(actor.id)}`) {
+      if (previousUplineLabel) await syncUplineDisplayName(env.DB, actor.id, previousUplineLabel);
       const saved:any=await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(actor.id).first();
       const rules=await settingMap(env.DB);
       const missing=missingProfileFields(saved || {});

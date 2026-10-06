@@ -14,6 +14,7 @@ interface StickersModalProps {
   initialSummary?: StickerSummary | null;
   onTracksUpdated?: (tracks: Track[]) => void; onStickerChanged?: () => void;
   onOpenSource?: (source: StickerSource) => void;
+  onRequestProfileEdit?: () => void;
 }
 const historyCache = new Map<string, StickerTransaction[]>();
 const field = 'w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100';
@@ -24,7 +25,7 @@ async function requestJson(url: string, options?: RequestInit) {
   if (!response.ok) throw new Error(data.error || '操作失敗，請稍後再試');
   return data;
 }
-export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,currentUser,tracks,initialSummary,onTracksUpdated,onStickerChanged,onOpenSource}) => {
+export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,currentUser,tracks,initialSummary,onTracksUpdated,onStickerChanged,onOpenSource,onRequestProfileEdit}) => {
   // Tabs are available from the signed-in profile immediately; every API still checks the live session.
   const superAdmin = currentUser?.email?.trim().toLowerCase() === 'yukidu@gmail.com' || currentUser?.role === '超級管理員';
   const canManageRules = superAdmin || Boolean(currentUser?.isAdminUser) || currentUser?.role === '管理員';
@@ -36,6 +37,7 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
   const [targets,setTargets] = useState<UserProfile[]>([]); const [grantHistory,setGrantHistory] = useState<StickerTransaction[]>([]);
   const [targetSearch,setTargetSearch] = useState(''); const [targetUserId,setTargetUserId] = useState('');
   const [grantAmount,setGrantAmount] = useState('1'); const [grantReason,setGrantReason] = useState('');
+  const [inviteBusy,setInviteBusy] = useState(false);
   const [trackSearch,setTrackSearch] = useState(''); const [selectedTrackIds,setSelectedTrackIds] = useState<string[]>([]);
   const [batchUnlockCost,setBatchUnlockCost] = useState(''); const [batchCommentReward,setBatchCommentReward] = useState('');
   const requestSequence = useRef(0); const mutationPending = useRef(false);
@@ -71,6 +73,36 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
     try { await action(); } catch (reason) { setError(reason instanceof Error ? reason.message : '操作失敗，請重試'); }
     finally { mutationPending.current = false; setBusy(false); }
   };
+  const getInviteLink = async () => {
+    if (!currentUser?.amwayId?.trim()) {
+      onRequestProfileEdit?.();
+      return null;
+    }
+    setInviteBusy(true); setError('');
+    try {
+      const data=await requestJson('/api/upline-invite/link');
+      return data as {url:string;displayName:string;kind:'platinum'|'diamond';amwayId:string};
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '無法產生下線綁定網址');
+      return null;
+    } finally { setInviteBusy(false); }
+  };
+  const copyInviteLink = async () => {
+    const data=await getInviteLink(); if(!data) return;
+    try { await navigator.clipboard.writeText(data.url); alert('專屬下線綁定網址已複製'); }
+    catch { window.prompt('請複製專屬下線綁定網址',data.url); }
+  };
+  const shareInviteLink = async () => {
+    const data=await getInviteLink(); if(!data) return;
+    const text=`${data.displayName} 邀請你綁定成為下線。登入繁星回聲後開啟此網址即可自動設定${data.kind==='diamond'?'上手鑽石':'上手白金'}。`;
+    try {
+      if(navigator.share) await navigator.share({title:'繁星回聲｜綁定成為我下線',text,url:data.url});
+      else { await navigator.clipboard.writeText(`${text}\n${data.url}`); alert('分享內容已複製，可貼到 LINE 或其他 APP'); }
+    } catch (reason) {
+      if((reason as any)?.name!=='AbortError') setError(reason instanceof Error?reason.message:'分享失敗');
+    }
+  };
+
   const grant = () => mutate(async () => {
     if (!targetUserId || !grantReason.trim()) throw new Error('請選擇下線並填寫加貼紙原因');
     const signature = JSON.stringify([targetUserId,grantAmount,grantReason.trim()]);
@@ -113,6 +145,17 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
           {error && <div role="alert" className="p-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs">{error}</div>}
           {tab==='history' && <><div className="rounded-2xl p-3 text-white text-center" style={primary}><p className="text-xs">目前可用貼紙</p><p className="text-4xl font-black mt-1">{summary?formatStickerAmount(summary.balance):'—'} 張</p></div><h3 className="font-black">來源與消耗紀錄</h3>{transactions(summary?.transactions || [])}</>}
           {tab==='grant' && canGrant && <div className="space-y-3">
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 p-3 space-y-2">
+              <div>
+                <h3 className="font-black">綁定成為我下線</h3>
+                <p className="text-xs text-slate-500 mt-1">分享你的專屬網址給已登入會員；對方開啟後會自動綁定你的上手白金或上手鑽石。夫妻共同經營時顯示 A&amp;B，並依兩人已審核的最高獎銜判定。</p>
+              </div>
+              {!currentUser?.amwayId?.trim() && <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">尚未填寫直銷商編號，按下按鈕會先開啟基本資料修改頁。</div>}
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" disabled={inviteBusy} onClick={()=>void copyInviteLink()} className="py-2.5 rounded-xl text-white font-bold disabled:opacity-50" style={primary}>複製網址</button>
+                <button type="button" disabled={inviteBusy} onClick={()=>void shareInviteLink()} className="py-2.5 rounded-xl text-white font-bold disabled:opacity-50" style={primary}>傳 LINE 或 APP</button>
+              </div>
+            </div>
             {!superAdmin && <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 px-3 py-2 text-xs leading-relaxed">加發給下線的貼紙會從你自己的餘額扣除。目前可用：<strong>{formatStickerAmount(summary?.balance || 0)} 張</strong>。</div>}
             <input aria-label="搜尋下線名字" value={targetSearch} onChange={e=>setTargetSearch(e.target.value)} placeholder={superAdmin?'搜尋會員名字':'搜尋下線名字'} className={field}/>
             <ThemedSelect aria-label="選擇下線" value={targetUserId} onChange={e=>setTargetUserId(e.target.value)} className={field}><option value="">{superAdmin?'選擇會員':'選擇下線'}</option>{filteredTargets.map(target=><option key={target.id} value={target.id}>{target.name}（{target.approvedRank || target.rank || '會員'}）</option>)}</ThemedSelect>

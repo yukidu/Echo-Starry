@@ -25,7 +25,7 @@ test('v3.8 cumulative changelog remains available for recent user-facing release
 });
 
 test('changelog release patch merges both maintained releases and only intercepts GET changelog requests', () => {
-  assert.match(notes, /RELEASE_NOTES = \[RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES\]/);
+  assert.match(notes, /RELEASE_NOTES = \[COUPLE_UPLINE_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES\]/);
   assert.match(notes, /method !== 'GET'/);
   assert.match(notes, /url\.pathname === '\/api\/changelog'/);
   assert.match(notes, /return nativeFetch\(\.\.\.args\)/);
@@ -36,4 +36,12 @@ test('release notes patch loads before the other runtime policies', () => {
   const firstExistingPolicy = indexHtml.indexOf('/src/jpegExportPolicy.ts');
   assert.ok(notesIndex >= 0);
   assert.ok(firstExistingPolicy > notesIndex);
+});
+
+
+test('v4.2 records couple organization sharing without merging personal sticker data', () => {
+  assert.match(notes, /version:\s*'v4\.2'/);
+  assert.match(notes, /A&B/);
+  assert.match(notes, /貼紙餘額、貼紙交易、播放進度/);
+  assert.match(notes, /共用同一個直銷商編號/);
 });
