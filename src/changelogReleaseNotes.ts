@@ -136,6 +136,20 @@ export const ORGANIZATION_RELEASE_NOTES: ChangelogEntry = {
   ]
 };
 
+export const STICKER_LEADERBOARD_RELEASE_NOTES: ChangelogEntry = {
+  version: 'v4.4',
+  date: '2026/10/07',
+  summary: '排行榜新增貼紙排位賽與會員基本資料關鍵字搜尋，快速比較貼紙現況並找到會員。',
+  added: [
+    '排行榜新增「貼紙排位賽」，列出現有貼紙、累積已消費與累積已獲得總數前 20 名，依現有貼紙排序。',
+    '貼紙排位賽可用會員基本資料關鍵字搜尋並顯示關聯詞；點會員姓名可開啟既有會員資訊卡。'
+  ],
+  modified: [
+    '搜尋建議不主動顯示電話、生日、Email、直銷商編號等敏感值；已登入會員仍可用已知資料精確搜尋。'
+  ],
+  removed: []
+};
+
 export const PLATINUM_MULTIPLIER_RELEASE_NOTES: ChangelogEntry = {
   version: 'v4.4', date: '2026/10/07', isLatest: true,
   summary: '修正白金級以上獲取貼紙倍數，讓倍數真正套用到所有一般貼紙收入，並與固定獎銜審核獎勵分開。',
