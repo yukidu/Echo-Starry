@@ -34,18 +34,18 @@ export function StickerGuideTable({ currentUser, tracks }: { currentUser: UserPr
     if (next && !guide && !loading) void loadGuide();
   };
 
-  return <section className="rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-800/60">
-    <button type="button" onClick={toggle} aria-expanded={expanded} className="w-full px-3 py-3 flex items-center justify-between gap-3 text-left font-black">
+  return <section className="rounded-2xl border border-amber-200/80 dark:border-amber-800 overflow-hidden bg-amber-50 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200">
+    <button type="button" onClick={toggle} aria-expanded={expanded} className="w-full px-3 py-3 flex items-center justify-between gap-3 text-left font-black text-amber-900 dark:text-amber-200">
       <span>如何獲得貼紙？</span>
-      <span className="text-xs whitespace-nowrap" style={{color:'var(--color-primary,#c06c84)'}}>{expanded ? '▲收起' : '▼展開'}</span>
+      <span className="text-xs whitespace-nowrap text-amber-700 dark:text-amber-300">{expanded ? '▲收起' : '▼展開'}</span>
     </button>
-    {expanded && <div className="border-t border-slate-200 dark:border-slate-700 p-2">
-      {loading && <p role="status" className="py-4 text-center text-xs text-slate-400">讀取目前貼紙規則中…</p>}
+    {expanded && <div className="border-t border-amber-200/80 dark:border-amber-800 p-2 bg-white/55 dark:bg-slate-900/35">
+      {loading && <p role="status" className="py-4 text-center text-xs text-amber-700/70 dark:text-amber-300/70">讀取目前貼紙規則中…</p>}
       {error && <p role="alert" className="p-2 rounded-xl bg-rose-50 text-rose-700 text-xs">{error}</p>}
-      {guide && <div className="overflow-x-auto">
+      {guide && <div className="overflow-x-auto text-slate-800 dark:text-slate-100">
         <table className="w-full min-w-[620px] text-xs border-collapse">
           <thead><tr className="text-left text-slate-500 dark:text-slate-400"><th className="p-2">類型</th><th className="p-2">行為</th><th className="p-2 whitespace-nowrap">貼紙變化</th><th className="p-2">條件／限制</th></tr></thead>
-          <tbody>{rows.map((row, index) => <tr key={`${row.kind}-${row.behavior}-${index}`} className="border-t border-slate-200 dark:border-slate-700 align-top">
+          <tbody>{rows.map((row, index) => <tr key={`${row.kind}-${row.behavior}-${index}`} className="border-t border-amber-200/60 dark:border-amber-800/70 align-top">
             <td className="p-2 font-bold whitespace-nowrap">{row.kind}</td>
             <td className="p-2 font-bold">{row.behavior}</td>
             <td className={`p-2 text-base font-black whitespace-nowrap ${row.kind === '增加' ? 'text-red-500' : 'text-emerald-500'}`}>{row.amount}</td>
