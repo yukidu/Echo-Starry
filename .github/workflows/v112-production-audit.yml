@@ -1,0 +1,104 @@
+name: v112 production integrity audit
+
+on:
+  push:
+    branches:
+      - audit/v112-production-integrity-20261007
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit all registered members without exposing personal fields
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, math, time, urllib.parse, urllib.request
+
+          ORIGIN='https://echostars.yukidu.workers.dev'
+          headers={'User-Agent':'Mozilla/5.0 (v112 integrity audit)'}
+          def get_json(url):
+              req=urllib.request.Request(url,headers=headers)
+              with urllib.request.urlopen(req,timeout=30) as r:
+                  return json.load(r)
+
+          users=get_json(ORIGIN+'/api/users')
+          registered=[u for u in users if u.get('id') and u.get('email') and str(u.get('email')).lower()!='guest' and not str(u.get('id')).startswith('guest-') and not str(u.get('name','')).startswith('訪客') and not u.get('isBlocked')]
+
+          approved_mismatch=0
+          approved_missing=0
+          stale_approved_on_unapproved=0
+          for u in registered:
+              raw=str(u.get('rank') or '').strip()
+              approved=str(u.get('approvedRank') or '').strip()
+              ok=bool(u.get('rankApproved'))
+              if ok and approved and approved!=raw: approved_mismatch+=1
+              if ok and not approved: approved_missing+=1
+              if not ok and approved and approved!=raw: stale_approved_on_unapproved+=1
+
+          negative=[]
+          nonfinite=[]
+          unresolved=[]
+          queried=0
+          snapshots={}
+          target_hashes={
+            'e5ac816c42dcc65366df37f14662523ae508418cc5b771c7f69074e5558eb821':'target-a',
+            '4ef0f2491370e12d02e983194a63cd99f813e42c57a15b093335619058b20993':'target-b',
+            '486d6d2f11d2e3ddfa57c3950bfdff0b89ce50436af46773abb64f6a7f5a5a90':'target-c'
+          }
+          def normalized_name(value): return ''.join(str(value or '').strip().lower().split())
+
+          for u in registered:
+              name=str(u.get('name') or '').strip()
+              if not name:
+                  unresolved.append(u.get('id'))
+                  continue
+              q=urllib.parse.quote(name)
+              try:
+                  data=get_json(ORIGIN+'/api/stickers/leaderboard?q='+q)
+              except Exception:
+                  unresolved.append(u.get('id'))
+                  continue
+              queried+=1
+              entry=next((e for e in data.get('entries',[]) if str(e.get('user',{}).get('id'))==str(u.get('id'))),None)
+              if not entry:
+                  unresolved.append(u.get('id'))
+                  continue
+              value=entry.get('current')
+              try: numeric=float(value)
+              except Exception:
+                  nonfinite.append(u.get('id')); continue
+              if not math.isfinite(numeric): nonfinite.append(u.get('id'))
+              if numeric < 0: negative.append(u.get('id'))
+              h=hashlib.sha256(normalized_name(name).encode()).hexdigest()
+              if h in target_hashes:
+                  snapshots[target_hashes[h]]={'current':numeric,'earned':entry.get('earned'),'spent':entry.get('spent'),'rank':entry.get('user',{}).get('rank')}
+              time.sleep(0.03)
+
+          targeted_ids=set()
+          for u in registered:
+              h=hashlib.sha256(normalized_name(u.get('name')).encode()).hexdigest()
+              if h in target_hashes: targeted_ids.add(str(u.get('id')))
+          unrelated_negative=[x for x in negative if str(x) not in targeted_ids]
+
+          print(json.dumps({
+            'registered_members':len(registered),
+            'members_queried':queried,
+            'unresolved_member_searches':len(unresolved),
+            'nonfinite_balances':len(nonfinite),
+            'negative_balances_total':len(negative),
+            'negative_balances_outside_three_targets':len(unrelated_negative),
+            'approved_rank_differs_from_raw_rank':approved_mismatch,
+            'approved_but_missing_approvedRank':approved_missing,
+            'unapproved_with_stale_different_approvedRank':stale_approved_on_unapproved,
+            'three_target_snapshots':snapshots
+          },ensure_ascii=False,sort_keys=True))
+
+          if nonfinite or unrelated_negative:
+              raise SystemExit('production integrity anomaly outside the known v111 target set')
+          PY
