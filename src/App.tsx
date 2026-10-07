@@ -3,7 +3,7 @@ import { StickerFeedback, showStickerDelta, showStickerNotice, setFeedbackRules,
 import { IOSInstallPage } from './components/IOSInstallPage';
 import { StickerSpendDialog } from './components/StickerSpendDialog';
 import { vipPasswordForTrack } from '../shared/stickers';
-import { baseSpeakerRank } from './utils/ranks';
+import { baseSpeakerRank, effectiveMemberRank } from './utils/ranks';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -1566,7 +1566,7 @@ export default function App() {
       ? '管理員'
       : currentUser?.isContributor
       ? '貢獻者'
-      : currentUser?.rank || '訪客稱號';
+      : effectiveMemberRank(currentUser, '訪客稱號');
 
     const payload = {
       authorName: currentUser ? currentUser.name : visitor.fullName,

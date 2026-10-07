@@ -1,3 +1,4 @@
+import { effectiveMemberRank } from '../utils/ranks';
 import { ThemedSelect } from './ThemedSelect';
 import React, { useState, useMemo } from 'react';
 import {
@@ -369,7 +370,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                 ? '管理員'
                 : m.authorUser.isContributor
                 ? '貢獻者'
-                : m.authorUser.rank || m.comment.authorBadge
+                : effectiveMemberRank(m.authorUser, m.comment.authorBadge || '無')
               : m.comment.authorBadge;
 
             return (
