@@ -1,4 +1,4 @@
-import appWorker from './luckyStickerMultiplierPolicyRouter';
+import appWorker from './adminUserDeleteRouter';
 import iosGoogleRedirectWorker from './iosGoogleRedirectRouter';
 import type { Env } from './index';
 
