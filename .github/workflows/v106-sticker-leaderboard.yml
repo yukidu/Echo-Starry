@@ -25,6 +25,8 @@ jobs:
         run: python scripts/v106_sticker_leaderboard_patch.py
       - name: Align release integrity
         run: python scripts/v106_fix_release_test.py
+      - name: Align changelog type
+        run: python scripts/v106_fix_changelog_type.py
       - name: Full test suite
         run: npm test
       - name: TypeScript diagnostic
@@ -35,7 +37,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm -f scripts/v106_sticker_leaderboard_patch.py scripts/v106_fix_release_test.py .github/workflows/v106-sticker-leaderboard.yml
+          git rm -f scripts/v106_sticker_leaderboard_patch.py scripts/v106_fix_release_test.py scripts/v106_fix_changelog_type.py .github/workflows/v106-sticker-leaderboard.yml
           git add worker/stickerRouter.ts src/components/StatisticsView.tsx src/components/StickerLeaderboardTab.tsx tests/stickerTransactions.test.ts tests/v106StickerLeaderboard.test.ts tests/releaseIntegrity.test.ts src/changelogReleaseNotes.ts public/sw.js
           git commit -m "v106: add sticker leaderboard and profile search"
           git push origin HEAD:safe/v106-sticker-leaderboard
