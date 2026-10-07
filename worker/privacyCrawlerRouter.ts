@@ -1,4 +1,5 @@
 import appWorker from './adminUserDeleteRouter';
+import iosGoogleRedirectWorker from './iosGoogleRedirectRouter';
 import type { Env } from './index';
 
 const X_ROBOTS_TAG = 'noindex, nofollow, noarchive, nosnippet, noimageindex';
@@ -135,6 +136,14 @@ export default {
           'X-Robots-Tag': X_ROBOTS_TAG
         }
       });
+    }
+
+    // Keep the long-standing application wrapper chain untouched. Only the
+    // Google Identity Services redirect POST at the origin root is routed
+    // through the iOS redirect handler; every other request follows the exact
+    // same admin/category/organization/session/playback/auth chain as before.
+    if (request.method === 'POST' && url.pathname === '/') {
+      return withPrivacyHeaders(await iosGoogleRedirectWorker.fetch(request, env));
     }
 
     return withPrivacyHeaders(await appWorker.fetch(request, env));
