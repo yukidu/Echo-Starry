@@ -34,6 +34,7 @@ import {
   CENTER_OPTIONS
 } from '../types';
 import { calculateNumerology } from '../utils/numerology';
+import { StickerLeaderboardTab } from './StickerLeaderboardTab';
 
 interface StatisticsViewProps {
   tracks: Track[];
@@ -51,7 +52,7 @@ interface LeaderboardData {
   topFinished: Array<{ user: UserProfile; count: number }>;
 }
 
-export type LeaderboardSubTab = 'model' | 'hot-tracks' | 'members' | 'hot-keywords';
+export type LeaderboardSubTab = 'model' | 'hot-tracks' | 'members' | 'stickers' | 'hot-keywords';
 
 const ZODIAC_LIST = [
   '牡羊座', '金牛座', '雙子座', '巨蟹座',
@@ -633,7 +634,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
       </div>
 
       {/* Requirement 2 & 4 (v2.5): 4 個子分頁導覽按鈕（新增「熱門關鍵字」分頁） */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1.5 bg-slate-100/90 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 p-1.5 bg-slate-100/90 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80">
         <button
           type="button"
           onClick={() => setActiveTab('model')}
@@ -671,6 +672,19 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
         >
           <Users className="w-3.5 h-3.5" />
           <span>會員排行榜</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('stickers')}
+          className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            activeTab === 'stickers'
+              ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+          }`}
+        >
+          <Trophy className="w-3.5 h-3.5" />
+          <span>貼紙排位賽</span>
         </button>
 
         <button
@@ -1072,7 +1086,12 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
         </div>
       )}
 
-      {/* SUB-TAB 4: 熱門關鍵字統計 - Requirement 4 (v2.5) */}
+      {/* SUB-TAB 4: 貼紙排位賽 */}
+      {activeTab === 'stickers' && (
+        <StickerLeaderboardTab users={users} onViewMember={onViewMember} />
+      )}
+
+      {/* SUB-TAB 5: 熱門關鍵字統計 - Requirement 4 (v2.5) */}
       {activeTab === 'hot-keywords' && (
         <div className="space-y-4">
           {/* Overview Stat Cards */}

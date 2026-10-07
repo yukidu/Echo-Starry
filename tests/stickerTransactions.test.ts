@@ -91,6 +91,33 @@ test('initial sticker reward uses the earning multiplier only when first credite
   assert.equal(db.sqlite.prepare("SELECT deltaUnits FROM sticker_transactions WHERE userId='platinum' AND type='initial'").get()?.deltaUnits,120);
 });
 
+
+test('sticker leaderboard sorts by current balance, totals earned/spent, and searches profile fields without leaking sensitive suggestions', async () => {
+  const db=database();
+  db.sqlite.exec("UPDATE users SET phone='0912345678', amwayId='A12345', birthday='1990-01-02', residence='苗栗' WHERE id='member'");
+  const member=await session(db,'member');
+  await balance(db,member);
+  db.sqlite.exec(`INSERT INTO sticker_transactions(id,userId,deltaUnits,balanceAfterUnits,type,description,uniqueKey,createdAt)
+    VALUES ('extra-in','member',100,160,'test_reward','測試收入','lb-in',1),
+           ('extra-out','member',-30,130,'test_spend','測試支出','lb-out',2);`);
+  const list=await call(db,'','/api/stickers/leaderboard');
+  assert.equal(list.status,200);
+  assert.ok(list.data.entries.length<=20);
+  assert.ok(list.data.entries[0].current>=list.data.entries.at(-1).current);
+  const byName=await call(db,member,'/api/stickers/leaderboard?q=%E4%B8%8B%E7%B7%9A');
+  assert.equal(byName.data.entries[0].user.id,'member');
+  assert.equal(byName.data.entries[0].current,13);
+  assert.equal(byName.data.entries[0].earned,16);
+  assert.equal(byName.data.entries[0].spent,3);
+  const privateSearch=await call(db,member,'/api/stickers/leaderboard?q=0912345678');
+  assert.equal(privateSearch.data.entries[0].user.id,'member');
+  assert.ok(!privateSearch.data.suggestions.includes('0912345678'));
+  const publicPrivateSearch=await call(db,'','/api/stickers/leaderboard?q=0912345678');
+  assert.equal(publicPrivateSearch.data.entries.length,0);
+  const publicSafeSearch=await call(db,'','/api/stickers/leaderboard?q=%E8%8B%97%E6%A0%97');
+  assert.equal(publicSafeSearch.data.entries[0].user.id,'member');
+});
+
 test('parallel unlock is permanent, charges once and cannot bypass rank or VIP', async () => {
   const db = database(); const token = await session(db, 'member');
   db.sqlite.exec("UPDATE tracks SET stickerUnlockCost = 2, requiredRank = '白金' WHERE id = 'track'");

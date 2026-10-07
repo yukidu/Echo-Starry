@@ -741,6 +741,60 @@ async function handleTrackWrite(request: Request, env: Env, actor: any) {
   return response;
 }
 
+
+async function stickerLeaderboard(db: any, actor: any, rawQuery: string) {
+  const query = String(rawQuery || '').trim().slice(0, 120);
+  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 5);
+  const publicSearchFields = [
+    'u.name','u.center','u.rank','u.approvedRank','u.role','u.joinReason','u.stayReason',
+    'u.sponsor','u.platinumUpline','u.diamondUpline','u.residence','u.zodiac',
+    'u.talentNumber','u.lifeNumber','u.registerDate'
+  ];
+  const memberOnlySearchFields = [
+    'u.email','u.amwayId','u.phone','u.birthday','u.birthDate','u.notes',
+    'u.rankUpdatedAt','u.auditedBy','u.auditedAt'
+  ];
+  const searchFields = actor ? [...publicSearchFields, ...memberOnlySearchFields] : publicSearchFields;
+  const clauses = tokens.map(() => `(${searchFields.map(field => `LOWER(COALESCE(CAST(${field} AS TEXT), '')) LIKE ?`).join(' OR ')})`);
+  const params = tokens.flatMap(token => searchFields.map(() => `%${token}%`));
+  const whereSearch = clauses.length ? ` AND ${clauses.join(' AND ')}` : '';
+  const sql = `SELECT
+      u.id,u.name,u.avatar,u.center,u.residence,u.joinReason,u.stayReason,u.sponsor,u.platinumUpline,u.diamondUpline,u.zodiac,
+      CASE WHEN COALESCE(u.rankApproved,0)=1 THEN COALESCE(NULLIF(u.approvedRank,''),u.rank,'無') ELSE COALESCE(u.rank,'無') END AS effectiveRank,
+      COALESCE(SUM(t.deltaUnits),0) AS balanceUnits,
+      COALESCE(SUM(CASE WHEN t.deltaUnits > 0 THEN t.deltaUnits ELSE 0 END),0) AS earnedUnits,
+      COALESCE(SUM(CASE WHEN t.deltaUnits < 0 THEN -t.deltaUnits ELSE 0 END),0) AS spentUnits
+    FROM users u
+    LEFT JOIN sticker_transactions t ON t.userId=u.id
+    WHERE COALESCE(u.isBlocked,0)=0
+      AND u.email IS NOT NULL AND TRIM(u.email)<>'' AND LOWER(u.email)<>'guest'
+      AND u.id NOT LIKE 'guest-%' AND u.name NOT LIKE '訪客%'
+      ${whereSearch}
+    GROUP BY u.id,u.name,u.avatar,u.center,u.residence,u.joinReason,u.stayReason,u.sponsor,u.platinumUpline,u.diamondUpline,u.zodiac,u.rank,u.approvedRank,u.rankApproved
+    ORDER BY balanceUnits DESC, earnedUnits DESC, u.name ASC
+    LIMIT 20`;
+  const prepared = db.prepare(sql);
+  const result = params.length ? await prepared.bind(...params).all() : await prepared.all();
+  const rows = result.results || [];
+  const entries = rows.map((row: any) => ({
+    user: { id: row.id, name: row.name, rank: row.effectiveRank || '無', avatar: row.avatar || '', center: row.center || '' },
+    current: unitsToStickers(Number(row.balanceUnits || 0)),
+    spent: unitsToStickers(Number(row.spentUnits || 0)),
+    earned: unitsToStickers(Number(row.earnedUnits || 0))
+  }));
+  const cleanQuery = query.toLowerCase();
+  const suggestionValues = rows.flatMap((row: any) => [
+    row.name,row.effectiveRank,row.center,row.residence,row.joinReason,row.stayReason,
+    row.sponsor,row.platinumUpline,row.diamondUpline,row.zodiac
+  ]).map((value: any) => String(value || '').trim()).filter(Boolean);
+  const matching = cleanQuery
+    ? suggestionValues.filter((value: string) => value.toLowerCase().includes(cleanQuery))
+    : [];
+  const fallbackNames = cleanQuery && matching.length === 0 ? rows.map((row: any) => String(row.name || '').trim()).filter(Boolean) : [];
+  const suggestions = [...new Set([...matching, ...fallbackNames])].slice(0, 8);
+  return json({ entries, suggestions, searchScope: actor ? 'member' : 'public' });
+}
+
 async function handleStickerApi(request: Request, env: Env, actor: any): Promise<Response | null> {
   const db = env.DB;
   const url = new URL(request.url);
@@ -748,6 +802,7 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
   const method = request.method.toUpperCase();
   if (!path.startsWith('/api/stickers')) return null;
   if (path === '/api/stickers/public-settings' && method === 'GET') return json({settings:settingsForClient(await settingMap(db))});
+  if (path === '/api/stickers/leaderboard' && method === 'GET') return stickerLeaderboard(db, actor, url.searchParams.get('q') || '');
   if (!actor) return json({ error: '貼紙為會員專屬，請先登入' }, 401);
   if (path === '/api/stickers/guide' && method === 'GET') {
     const values = await settingMap(db);
