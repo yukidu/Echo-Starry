@@ -37,7 +37,7 @@ test('Google sign-in keeps the large animated loading message and hides redundan
 });
 
 test('mobile hamburger owns logout and profile modal logout stays hidden from the rendered UI', () => {
-  assert.match(navbar, /<LogOut className="w-4 h-4" \/>/);
+  assert.match(navbar, /<LogOut className="w-4 h-4(?: [^"]*)?" \/>/);
   assert.match(navbar, /<span>登出<\/span>/);
   assert.match(navbar, /const handleLogout = \(\) =>/);
   assert.match(bridge, /button\[title="登出目前帳號"\]/);
