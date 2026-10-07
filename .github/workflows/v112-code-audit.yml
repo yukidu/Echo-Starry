@@ -1,0 +1,26 @@
+name: v112 final rank source audit
+
+on:
+  push:
+    branches:
+      - audit/v112-production-integrity-20261007
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: List remaining member rank references on exact main
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "MAIN=$(git rev-parse HEAD)"
+          echo '=== member-facing raw/effective rank references ==='
+          git grep -nE 'rankApproved|approvedRank|\.rank' -- src/components src/App.tsx src/utils | head -n 1000 || true
+          echo '=== effectiveMemberRank consumers ==='
+          git grep -n 'effectiveMemberRank' -- src/components src/App.tsx src/utils || true
