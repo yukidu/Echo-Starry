@@ -12,7 +12,6 @@ import {
   Check,
   X,
   LogIn,
-  LogOut,
   Shield,
   Clock,
   Sparkles,
@@ -60,7 +59,6 @@ interface ProfileModalProps {
   comments: Comment[];
   identityKeys?: string[];
   onLoginWithGoogle: (email?: string, name?: string, avatarUrl?: string) => void | Promise<void>;
-  onLogout: () => void;
   onUpdateProfile: (updatedData: Partial<UserProfile>) => void | Promise<void>;
   onSelectTrack: (track: Track) => void;
   onSelectCategory?: (category: CategoryType) => void;
@@ -95,7 +93,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   comments,
   identityKeys = [],
   onLoginWithGoogle,
-  onLogout,
   onUpdateProfile,
   onSelectTrack,
   onSelectCategory,
@@ -457,17 +454,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
           <div className="flex items-center gap-2">
             {currentUser && (isEditing ? <><button disabled={isSaving} onClick={handleSaveProfile} className="px-2 py-2 rounded-lg bg-white/20 text-xs">儲存</button><button disabled={isSaving} onClick={()=>setIsEditing(false)} className="px-2 py-2 text-xs">取消</button></> : <button onClick={handleStartEdit} disabled={currentProfileEditCount>=5} className="px-2 py-2 rounded-lg bg-white/20 text-xs">修改</button>)}
-            {currentUser && (
-              <button
-                type="button"
-                onClick={onLogout}
-                className="px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer border border-white/25 active:scale-95"
-                title="登出目前帳號"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>登出</span>
-              </button>
-            )}
             <button
               onClick={onClose}
               className="p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/20"

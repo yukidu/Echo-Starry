@@ -10,7 +10,6 @@ import {
   Edit2,
   Lock,
   Unlock,
-  AlertTriangle,
   Server,
   X,
   Check,
@@ -72,7 +71,6 @@ interface AdminModalProps {
     updates: Partial<Track>,
     options?: { persist?: boolean }
   ) => Promise<void> | void;
-  onSwitchToAdmin: () => void;
   onUplinesChanged?: () => void;
   onCategoriesUpdated?: (categories?: string[], change?: { oldName: string; newName?: string }) => void;
 }
@@ -94,7 +92,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   onDeleteTrack,
   onEditTrack,
   onUpdateTrack,
-  onSwitchToAdmin,
   onCategoriesUpdated,
   onUplinesChanged
 }) => {
@@ -138,10 +135,18 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const isDiamondOnly = isDiamondOrAbove && !isEffectiveAdmin;
   const isContributorOnly = currentUser?.isContributor === true && !isEffectiveAdmin && !isDiamondOrAbove;
 
-  // Requirement 1, 2, 4 & 6: Tabs: 數據中心, 會員, 音檔, 分類標籤, 網友關鍵字, 私秘VIP, 權限
-  const [activeTab, setActiveTab] = useState<'data-center' | 'users' | 'tracks' | 'categories' | 'keywords' | 'vip' | 'permissions' | 'uplines'>(
-    isContributorOnly ? 'tracks' : 'data-center'
-  );
+  // Restricted management tabs are super-admin only. Other roles land on the first feature they may use.
+  type AdminTab = 'data-center' | 'users' | 'tracks' | 'categories' | 'keywords' | 'vip' | 'permissions' | 'uplines';
+  const defaultAllowedTab: AdminTab = isEffectiveAdmin
+    ? 'data-center'
+    : isPlatinumOrAbove
+      ? 'data-center'
+      : currentUser?.isContributor === true
+        ? 'vip'
+        : currentUser?.isAdminUser || currentUser?.role === '管理員'
+          ? 'uplines'
+          : 'permissions';
+  const [activeTab, setActiveTab] = useState<AdminTab>(defaultAllowedTab);
 
   // Quick preview member modal state (Requirement 2)
   const [previewUser, setPreviewUser] = useState<UserProfile | null>(null);
@@ -694,21 +699,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           </button>
         </div>
 
-        {!isEffectiveAdmin && (
-          <div className="p-3 bg-amber-50 dark:bg-amber-950/60 border-b border-amber-200 dark:border-amber-900 flex items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
-              <span>尚未登入超級管理員帳號 (yukidu@gmail.com)</span>
-            </div>
-            <button
-              onClick={onSwitchToAdmin}
-              className="px-3 py-1 rounded-xl bg-amber-600 text-white font-bold shrink-0 hover:bg-amber-700"
-            >
-              使用 Google 登入
-            </button>
-          </div>
-        )}
-
         {/* Navigation Tabs - Requirement 7: 後台管理中心的分頁標籤，左右文字排列要更緊密；Requirement 3: 左右二側增加 < > 符號 */}
         <div className="flex items-center border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 px-1 pt-1.5 gap-1">
           <button
@@ -739,8 +729,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
               </button>
             )}
 
-            {/* 2. 會員 */}
-            {!isContributorOnly && (
+            {/* 2. 會員：僅超級管理員 */}
+            {isEffectiveAdmin && (
               <button
                 onClick={() => setActiveTab('users')}
                 className={`pb-1.5 px-1.5 sm:px-2 font-bold border-b-2 flex items-center gap-0.5 transition-colors shrink-0 ${
@@ -754,8 +744,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
               </button>
             )}
 
-            {/* 3. 音檔 */}
-            {!isDiamondOnly && (
+            {/* 3. 音檔：僅超級管理員 */}
+            {isEffectiveAdmin && (
               <button
                 onClick={() => setActiveTab('tracks')}
                 className={`pb-1.5 px-1.5 sm:px-2 font-bold border-b-2 flex items-center gap-0.5 transition-colors shrink-0 ${
@@ -784,8 +774,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
               </button>
             )}
 
-            {/* 5. 分類標籤 */}
-            {!isContributorOnly && (
+            {/* 5. 分類標籤：僅超級管理員 */}
+            {isEffectiveAdmin && (
               <button
                 onClick={() => setActiveTab('categories')}
                 className={`pb-1.5 px-1.5 sm:px-2 font-bold border-b-2 flex items-center gap-0.5 transition-colors shrink-0 ${
@@ -799,8 +789,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
               </button>
             )}
 
-            {/* 6. 網友關鍵字 */}
-            {!isDiamondOnly && (
+            {/* 6. 網友關鍵字：僅超級管理員 */}
+            {isEffectiveAdmin && (
               <button
                 onClick={() => setActiveTab('keywords')}
                 className={`pb-1.5 px-1.5 sm:px-2 font-bold border-b-2 flex items-center gap-0.5 transition-colors shrink-0 ${
@@ -848,7 +838,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           )}
 
           {/* TAB 1: Member List, Search (Requirement 5), Filters & Export (Requirement 6) */}
-          {activeTab === 'users' && (
+          {activeTab === 'users' && isEffectiveAdmin && (
             <div className="space-y-3">
               {/* Requirement 5: 新增「搜尋」功能，此功能「鑽石」權限也可以使用 */}
               <div className="relative">
@@ -1474,7 +1464,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           )}
 
           {/* TAB 2: Tracks Management (Requirement 5: 貢獻者只能修改刪除自己上傳的錄音檔；管理員無限制) */}
-          {activeTab === 'tracks' && (
+          {activeTab === 'tracks' && isEffectiveAdmin && (
             <div className="space-y-2.5">
               {tracks
                 .filter(t => (isContributorOnly ? t.uploaderEmail === currentUser?.email : true))
@@ -1573,7 +1563,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           )}
 
           {/* TAB: Categories Management */}
-          {activeTab === 'categories' && (
+          {activeTab === 'categories' && isEffectiveAdmin && (
             <div className="space-y-4">
               <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700 space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-700">
@@ -1730,7 +1720,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
             </div>
           )}
           {/* TAB: 網友關鍵字 (Requirement 2) */}
-          {activeTab === 'keywords' && (
+          {activeTab === 'keywords' && isEffectiveAdmin && (
             <KeywordsTab userEmail={currentUser?.email}
               tracks={tracks}
               onUpdateTrack={onUpdateTrack}

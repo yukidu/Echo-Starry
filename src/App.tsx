@@ -2431,7 +2431,6 @@ export default function App() {
         onDeleteTrack={handleDeleteTrack}
         onEditTrack={track => { setTrackToEdit(track); setIsUploadOpen(true); }}
         onUpdateTrack={handleUpdateTrack}
-        onSwitchToAdmin={() => { setIsAdminOpen(false); setIsProfileOpen(true); }}
         onCategoriesUpdated={fetchCategories}
       />
       </Suspense>) : isProfileOpen ? (<Suspense fallback={<div role="status" className="py-12 text-center text-slate-500">載入功能中…</div>}>
@@ -2443,7 +2442,6 @@ export default function App() {
         comments={allComments}
         identityKeys={identityKeys(currentUser, visitor.deviceId)}
         onLoginWithGoogle={handleLoginWithGoogle}
-        onLogout={handleLogout}
         onUpdateProfile={handleUpdateProfile}
         onSelectTrack={openTrackDetail}
         onSelectCategory={cat => {
