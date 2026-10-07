@@ -1,0 +1,75 @@
+name: v113 apply 2
+
+on:
+  push:
+    branches:
+      - safe/v113-rank-display-last-mile
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor == 'yukidu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch remaining member-facing raw rank displays
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/App.tsx')
+          s=p.read_text()
+          old="import { baseSpeakerRank } from './utils/ranks';"
+          new="import { baseSpeakerRank, effectiveMemberRank } from './utils/ranks';"
+          assert old in s
+          s=s.replace(old,new,1)
+          old=": currentUser?.rank || '訪客稱號';"
+          new=": effectiveMemberRank(currentUser, '訪客稱號');"
+          assert old in s
+          p.write_text(s.replace(old,new,1))
+
+          p=Path('src/components/NotificationsView.tsx')
+          s=p.read_text()
+          imp="import { effectiveMemberRank } from '../utils/ranks';\n"
+          if imp not in s:
+              s=imp+s
+          old=": m.authorUser.rank || m.comment.authorBadge"
+          new=": effectiveMemberRank(m.authorUser, m.comment.authorBadge || '無')"
+          assert old in s
+          p.write_text(s.replace(old,new,1))
+
+          Path('tests/v113RemainingRankDisplays.test.ts').write_text("""import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+test('new comments and mention notifications use official effective member rank', () => {
+  const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  const notifications = readFileSync(new URL('../src/components/NotificationsView.tsx', import.meta.url), 'utf8');
+  assert.match(app, /effectiveMemberRank\\(currentUser, '訪客稱號'\\)/);
+  assert.doesNotMatch(app, /: currentUser\\?\\.rank \\|\\| '訪客稱號'/);
+  assert.match(notifications, /effectiveMemberRank\\(m\\.authorUser, m\\.comment\\.authorBadge \\|\\| '無'\\)/);
+  assert.doesNotMatch(notifications, /m\\.authorUser\\.rank \\|\\| m\\.comment\\.authorBadge/);
+});
+""")
+          PY
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Test
+        run: npm test
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
+      - name: Commit verified source
+        shell: bash
+        run: |
+          rm -f .github/workflows/v113-apply.yml .github/workflows/v113-apply2.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "v113：補齊會員正式獎銜顯示一致性"
+          git push origin HEAD:safe/v113-rank-display-last-mile
