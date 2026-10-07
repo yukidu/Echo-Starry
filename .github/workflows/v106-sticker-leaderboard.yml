@@ -1,0 +1,39 @@
+name: v106 sticker leaderboard
+
+on:
+  push:
+    branches:
+      - safe/v106-sticker-leaderboard
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: safe/v106-sticker-leaderboard
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Apply v106 integration
+        run: python scripts/v106_sticker_leaderboard_patch.py
+      - name: Full test suite
+        run: npm test
+      - name: TypeScript diagnostic
+        run: npx tsc --noEmit
+      - name: Production build
+        run: npm run build
+      - name: Commit verified v106
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f scripts/v106_sticker_leaderboard_patch.py .github/workflows/v106-sticker-leaderboard.yml
+          git add worker/stickerRouter.ts src/components/StatisticsView.tsx src/components/StickerLeaderboardTab.tsx tests/stickerTransactions.test.ts tests/v106StickerLeaderboard.test.ts src/changelogReleaseNotes.ts public/sw.js
+          git commit -m "v106: add sticker leaderboard and profile search"
+          git push origin HEAD:safe/v106-sticker-leaderboard
