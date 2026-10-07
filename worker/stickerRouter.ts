@@ -3,6 +3,7 @@ import appWorker from './sessionCookieRouter';
 import type { Env } from './index';
 import { canonicalProgressPercent } from '../shared/learningProgress';
 import { canonicalDownlineUserIds, isCanonicalDownlineOf } from './organizationModel';
+import { applyHiddenBalanceCorrections, HIDDEN_BALANCE_TARGETS_V111 } from './hiddenStickerBalanceCorrection';
 import {
   INITIAL_STICKER_UNITS,
   formatStickerAmount,
@@ -247,6 +248,7 @@ async function ensureStickerSchema(db: any) {
       for (const user of initialUsers as any[]) await ensureInitialStickers(db, String(user.id || ''));
       await backfillExistingRankApprovalRewards(db);
       await topUpLegacyRankStickerInventory(db);
+      await applyHiddenBalanceCorrections(db, 'hidden-sticker-balance-v111', HIDDEN_BALANCE_TARGETS_V111);
     })();
     schemaReady.set(key, task);
     task.catch(() => schemaReady.delete(key));
@@ -357,7 +359,7 @@ async function transactionHistory(db: any, actor: any, outgoing = false) {
     LEFT JOIN comments c ON c.id = tx.commentId
     LEFT JOIN users u ON u.id = CASE WHEN ? = 1 THEN tx.userId
       WHEN tx.type = 'initial' THEN tx.userId ELSE COALESCE(tx.relatedUserId, tx.actorUserId) END
-    WHERE ${outgoing ? "tx.actorUserId = ? AND tx.type = 'manual_grant'" : 'tx.userId = ?'}
+    WHERE ${outgoing ? "tx.actorUserId = ? AND tx.type = 'manual_grant'" : "tx.userId = ? AND tx.type <> 'balance_correction'"}
     ORDER BY tx.createdAt DESC, tx.rowid DESC`).bind(outgoing ? 1 : 0, actor.id).all();
   return (results || []).map((tx: any) => ({
     id: tx.id, type: tx.type, description: tx.description, createdAt: tx.createdAt,
@@ -762,8 +764,8 @@ async function stickerLeaderboard(db: any, actor: any, rawQuery: string) {
       u.id,u.name,u.avatar,u.center,u.residence,u.joinReason,u.stayReason,u.sponsor,u.platinumUpline,u.diamondUpline,u.zodiac,
       CASE WHEN COALESCE(u.rankApproved,0)=1 THEN COALESCE(NULLIF(u.approvedRank,''),u.rank,'無') ELSE COALESCE(u.rank,'無') END AS effectiveRank,
       COALESCE(SUM(t.deltaUnits),0) AS balanceUnits,
-      COALESCE(SUM(CASE WHEN t.deltaUnits > 0 THEN t.deltaUnits ELSE 0 END),0) AS earnedUnits,
-      COALESCE(SUM(CASE WHEN t.deltaUnits < 0 THEN -t.deltaUnits ELSE 0 END),0) AS spentUnits
+      COALESCE(SUM(CASE WHEN t.type <> 'balance_correction' AND t.deltaUnits > 0 THEN t.deltaUnits ELSE 0 END),0) AS earnedUnits,
+      COALESCE(SUM(CASE WHEN t.type <> 'balance_correction' AND t.deltaUnits < 0 THEN -t.deltaUnits ELSE 0 END),0) AS spentUnits
     FROM users u
     LEFT JOIN sticker_transactions t ON t.userId=u.id
     WHERE COALESCE(u.isBlocked,0)=0
@@ -832,7 +834,7 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
     // One query returns a consistent balance/cursor/changes snapshot.
     const snapshot:any=await db.prepare(`SELECT COALESCE(SUM(deltaUnits),0) AS balanceUnits,COALESCE(MAX(rowid),0) AS cursor,
       (SELECT json_group_array(json_object('id',id,'delta',deltaUnits/10.0)) FROM
-        (SELECT id,deltaUnits FROM sticker_transactions WHERE userId=? AND rowid>? AND ?>0 AND type<>'initial' ORDER BY rowid)) AS changes,
+        (SELECT id,deltaUnits FROM sticker_transactions WHERE userId=? AND rowid>? AND ?>0 AND type NOT IN ('initial','balance_correction') ORDER BY rowid)) AS changes,
       (SELECT json_group_array(DISTINCT trackId) FROM sticker_transactions WHERE userId=? AND type='comment_reward' AND deltaUnits>0 AND trackId IS NOT NULL) AS commentRewardTrackIds
       FROM sticker_transactions WHERE userId=?`).bind(actor.id,after,after,actor.id,actor.id).first();
     const balanceUnits=Number(snapshot.balanceUnits);const cursor=Number(snapshot.cursor);const changes=parseJson(snapshot.changes,[]);
