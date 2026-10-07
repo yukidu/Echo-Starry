@@ -8,12 +8,17 @@ export type HiddenBalanceTarget = {
 };
 
 // Only irreversible hashes are stored in the public repository. The member-facing
-// application never receives these mappings and correction transactions stay hidden.
+// application never receives the name mappings.
 export const HIDDEN_BALANCE_TARGETS_V111: HiddenBalanceTarget[] = [
   { memberNameHash: 'e5ac816c42dcc65366df37f14662523ae508418cc5b771c7f69074e5558eb821', targetUnits: 3060 },
-  { memberNameHash: '4ef0f2491370e12d02e983194a63cd99f813e42c57a15b093335619058b20993', targetUnits: -1000 },
+  { memberNameHash: '4ef0f2491370e12d02e983194a63cd99f813e42c57a15b093335619058b20993', targetUnits: 2061 },
   { memberNameHash: '486d6d2f11d2e3ddfa57c3950bfdff0b89ce50436af46773abb64f6a7f5a5a90', targetUnits: 3160 }
 ];
+
+// v111 briefly shipped an incorrect negative target for one member. Production may
+// already have recorded that migration, so v112 deliberately uses a new migration
+// name while keeping the same exact final balances. This makes the repair idempotent.
+export const HIDDEN_BALANCE_TARGETS_V112: HiddenBalanceTarget[] = HIDDEN_BALANCE_TARGETS_V111.map(target => ({ ...target }));
 
 export async function hashNormalizedMemberName(value: unknown): Promise<string> {
   const normalized = normalizeMemberName(value);
@@ -21,11 +26,17 @@ export async function hashNormalizedMemberName(value: unknown): Promise<string> 
   return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export async function applyHiddenBalanceCorrections(
+async function applyCorrectionSet(
   db: any,
   migrationName: string,
   targets: HiddenBalanceTarget[]
 ): Promise<{ applied: boolean; pending: boolean; corrected: number }> {
+  // A negative final sticker balance is never a valid production calibration.
+  // Fail closed so a typo cannot silently make a member's usable balance negative.
+  if (targets.some(target => !Number.isInteger(target.targetUnits) || target.targetUnits < 0)) {
+    throw new Error(`Invalid sticker balance correction target: ${migrationName}`);
+  }
+
   await db.prepare('CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY)').run();
   if (await db.prepare('SELECT name FROM app_migrations WHERE name = ? LIMIT 1').bind(migrationName).first()) {
     return { applied: false, pending: false, corrected: 0 };
@@ -62,10 +73,29 @@ export async function applyHiddenBalanceCorrections(
       (id,userId,deltaUnits,balanceAfterUnits,type,sourceId,description,actorUserId,uniqueKey,createdAt)
       VALUES (?,?,?,?,?,?,?,?,?,?)`)
       .bind(uniqueKey, user.id, deltaUnits, target.targetUnits, HIDDEN_BALANCE_CORRECTION_TYPE,
-        null, '管理員隱藏餘額校正', 'system', uniqueKey, now).run();
+        null, '系統錯誤修正', 'system', uniqueKey, now).run();
     if (Number(result?.meta?.changes || 0) > 0) corrected += 1;
   }
 
   await db.prepare('INSERT OR IGNORE INTO app_migrations(name) VALUES (?)').bind(migrationName).run();
   return { applied: true, pending: false, corrected };
+}
+
+export async function applyHiddenBalanceCorrections(
+  db: any,
+  migrationName: string,
+  targets: HiddenBalanceTarget[]
+): Promise<{ applied: boolean; pending: boolean; corrected: number }> {
+  const primary = await applyCorrectionSet(db, migrationName, targets);
+  if (migrationName !== 'hidden-sticker-balance-v111') return primary;
+
+  // Always try the v112 repair after the legacy migration check. On an existing
+  // production DB, v111 is already marked complete but v112 still corrects the
+  // one bad final balance. On a fresh DB, this second pass is a harmless no-op.
+  const repair = await applyCorrectionSet(db, 'hidden-sticker-balance-v112', HIDDEN_BALANCE_TARGETS_V112);
+  return {
+    applied: primary.applied || repair.applied,
+    pending: primary.pending || repair.pending,
+    corrected: primary.corrected + repair.corrected
+  };
 }
