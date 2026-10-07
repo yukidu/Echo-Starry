@@ -17,9 +17,11 @@ jobs:
         with:
           fetch-depth: 0
       - name: Apply requested changes
-        run: python3 scripts/v116_apply.py
+        run: |
+          python3 scripts/v116_apply.py
+          python3 scripts/v116_compat.py
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm install --no-audit --no-fund --package-lock=false
       - name: Run tests
         run: npm test
       - name: TypeScript diagnostic
@@ -28,7 +30,7 @@ jobs:
         run: npm run build
       - name: Commit verified source
         run: |
-          rm -f scripts/v116_apply.py .github/workflows/v116-apply.yml
+          rm -f scripts/v116_apply.py scripts/v116_compat.py .github/workflows/v116-apply.yml package-lock.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
