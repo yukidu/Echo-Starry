@@ -1,0 +1,47 @@
+name: v112 apply fix 2
+
+on:
+  push:
+    branches:
+      - safe/v112-sticker-rank-integrity
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply prepared v112 source changes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, textwrap
+          source=Path('.github/workflows/v112-apply.yml').read_text()
+          match=re.search(r"python - <<'PY'\n(.*?)\n\s{10}PY\n", source, re.S)
+          if not match:
+              raise SystemExit('prepared v112 Python block not found')
+          code=textwrap.dedent(match.group(1))
+          code=code.replace("'''.replace(/^          /gm,''))", "''')")
+          exec(compile(code,'v112-prepared.py','exec'),{})
+          PY
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Commit verified v112 source only
+        shell: bash
+        run: |
+          rm -f .github/workflows/v112-audit.yml .github/workflows/v112-audit2.yml .github/workflows/v112-apply.yml .github/workflows/v112-apply-fix.yml .github/workflows/v112-apply-fix2.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "v112：修正貼紙餘額、獎銜一致性與貼紙簿介面"
+          git push origin HEAD:safe/v112-sticker-rank-integrity
