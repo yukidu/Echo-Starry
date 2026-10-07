@@ -315,6 +315,13 @@ export default function App() {
     currentUser?.role === '管理員';
   const isAdmin = isSuperAdmin;
   const canUpload = isSuperAdmin || currentUser?.isContributor === true;
+  const notificationRank = effectiveMemberRank(currentUser, '');
+  const notificationRankIndex = (RANK_ORDER as readonly string[]).indexOf(notificationRank);
+  const notificationPlatinumIndex = (RANK_ORDER as readonly string[]).indexOf('白金');
+  const canSeePendingAuditNotifications =
+    isSuperAdmin ||
+    currentUser?.role === '獎銜審核員' ||
+    (notificationPlatinumIndex >= 0 && notificationRankIndex >= notificationPlatinumIndex);
 
   // Tracks, Comments, Users from Backend API
   const [tracks, setTracks] = useState<Track[]>(() => readHomeCache()?.tracks || []);
@@ -408,7 +415,9 @@ export default function App() {
   }, [refreshStickerSummary]);
 
   // Requirement 9, 10 & 12: 未審核通過名單總數 + 被 @ 標記提醒總數（用於通知鈴鐺徽章提醒）
-  const pendingAuditCount = allUsers.filter(u => u.rankAuditStatus === 'pending' || u.rankApproved === false).length;
+  const pendingAuditCount = canSeePendingAuditNotifications
+    ? allUsers.filter(u => u.rankAuditStatus === 'pending' || u.rankApproved === false).length
+    : 0;
   const [stickerSpend, setStickerSpend] = useState<{title:string;cost:number} | null>(null);
   const stickerSpendResolver = useRef<((value:boolean)=>void) | null>(null);
   const resolveStickerSpend = (value:boolean) => { const resolve=stickerSpendResolver.current; stickerSpendResolver.current=null; setStickerSpend(null); resolve?.(value); };
@@ -439,8 +448,8 @@ export default function App() {
           return (hasDirect || isReply) && !isSelf;
         }).length
       : 0;
-    return auditCount + mentionCount + Number(stickerSummary?.unreadNotifications || 0);
-  }, [allUsers, comments, allComments, currentUser, stickerSummary?.unreadNotifications]);
+    return (canSeePendingAuditNotifications ? auditCount : 0) + mentionCount;
+  }, [allUsers, comments, allComments, currentUser, canSeePendingAuditNotifications]);
 
   // Filter & Search & Sort states (Requirement 18 & 19)
   const [selectedCategory, setSelectedCategory] = useState<string>('全部');
