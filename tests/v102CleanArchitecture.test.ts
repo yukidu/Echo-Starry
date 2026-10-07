@@ -7,8 +7,8 @@ const admin = readFileSync(new URL('../src/components/AdminModal.tsx', import.me
 const cardCss = readFileSync(new URL('../src/components/AudioCard.css', import.meta.url), 'utf8');
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
-test('cover progress and permission overlays restore only the v100 7px/8px font size', () => {
-  assert.match(cardCss, /button\[title\^="點擊照片"\][\s\S]*font-size:\s*7px\s*!important/);
+test('cover progress and permission overlays use 10px on mobile and keep 8px on larger screens', () => {
+  assert.match(cardCss, /button\[title\^="點擊照片"\][\s\S]*font-size:\s*10px\s*!important/);
   assert.match(cardCss, /@media \(min-width: 640px\)[\s\S]*button\[title\^="點擊照片"\][\s\S]*font-size:\s*8px\s*!important/);
 });
 
