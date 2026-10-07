@@ -30,7 +30,10 @@ test('desktop and Android keep popup with One Tap fallback', () => {
 });
 
 test('redirect endpoint verifies Google double-submit CSRF before exchanging credential', () => {
-  assert.equal(privacyRouter.includes("import appWorker from './iosGoogleRedirectRouter';"), true);
+  assert.equal(privacyRouter.includes("import appWorker from './adminUserDeleteRouter';"), true);
+  assert.equal(privacyRouter.includes("import iosGoogleRedirectWorker from './iosGoogleRedirectRouter';"), true);
+  assert.equal(privacyRouter.includes("request.method === 'POST' && url.pathname === '/'"), true);
+  assert.equal(privacyRouter.includes('iosGoogleRedirectWorker.fetch(request, env)'), true);
   assert.equal(redirectRouter.includes("form.get('g_csrf_token')"), true);
   assert.equal(redirectRouter.includes("cookieValue(request, 'g_csrf_token')"), true);
   assert.equal(redirectRouter.includes('csrfBody !== csrfCookie'), true);
@@ -41,6 +44,6 @@ test('iOS redirect restores app location and does not force profile completion i
   assert.equal(platformUx.includes('echostars_auth_return_v1'), true);
   assert.equal(platformUx.includes('echostars_auth_restore_v1'), true);
   assert.equal(platformUx.includes('echostars_skip_forced_profile_once'), true);
-  assert.equal(redirectRouter.includes("sessionStorage.setItem("), true);
-  assert.equal(redirectRouter.includes("window.location.replace(target)"), true);
+  assert.equal(redirectRouter.includes('sessionStorage.setItem('), true);
+  assert.equal(redirectRouter.includes('window.location.replace(target)'), true);
 });
