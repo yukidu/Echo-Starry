@@ -29,6 +29,12 @@
   font-size: 13px !important;
 }
 
+/* v109：封面上方已聽進度／貼紙獎勵列，不論是否已聽，一律使用當前調色盤主色且完全不透明。 */
+.audio-card button[title^="點擊照片"] > div.absolute.top-0 {
+  background-color: var(--color-primary, #c06c84) !important;
+  opacity: 1 !important;
+}
+
 /* 按讚數文字直接繼承回饋列顏色，淺色/深色模式都與左側心得數一致；Heart SVG 不受影響。 */
 .audio-card .reaction-button[aria-pressed] span {
   color: inherit !important;
