@@ -86,6 +86,11 @@ body[data-main-tab="upload"] .upload-modal-overlay form {
   overflow: visible !important;
 }
 
+/* 上傳完成／取消後，舊元件會先關閉；此時先讓首頁內容恢復，不留下空白頁。 */
+body[data-main-tab="upload"]:not(:has(.upload-modal-overlay)) main {
+  display: block;
+}
+
 @media (min-width: 768px) {
   .mobile-menu-shell {
     display: none;
