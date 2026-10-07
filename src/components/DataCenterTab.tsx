@@ -1,3 +1,4 @@
+import { effectiveMemberRank } from '../utils/ranks';
 import { ThemedSelect } from './ThemedSelect';
 import React, { useState, useMemo } from 'react';
 import {
@@ -187,7 +188,7 @@ export const DataCenterTab: React.FC<DataCenterTabProps> = ({ users }) => {
     reversedRanks.forEach(r => { map[r] = 0; });
 
     filteredUsers.forEach(u => {
-      const r = u.rank || '無';
+      const r = effectiveMemberRank(u);
       map[r] = (map[r] || 0) + 1;
     });
 

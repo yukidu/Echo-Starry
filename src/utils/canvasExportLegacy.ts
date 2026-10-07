@@ -1,3 +1,4 @@
+import { effectiveMemberRank } from './ranks';
 import { Track, Comment, UserProfile, UserListeningRecord } from '../types';
 import { calculateNumerology } from './numerology';
 
@@ -60,7 +61,7 @@ export async function exportMemberProfileAndListeningImage(
 
   ctx.font = 'bold 14px "PingFang TC", "Microsoft JhengHei", sans-serif';
   ctx.fillStyle = '#000000';
-  ctx.fillText(`姓名：${user.name}  |  獎銜：${user.rank || '無'}  |  編號：${user.amwayId || '-'}  |  中心：${user.center || '無'}`, padding + 12, profileBoxY + 26);
+  ctx.fillText(`姓名：${user.name}  |  獎銜：${effectiveMemberRank(user)}  |  編號：${user.amwayId || '-'}  |  中心：${user.center || '無'}`, padding + 12, profileBoxY + 26);
 
   ctx.font = '12px "PingFang TC", "Microsoft JhengHei", sans-serif';
   ctx.fillStyle = '#222222';
@@ -804,7 +805,7 @@ export async function exportPersonalProfileCard(user: UserProfile): Promise<Blob
   ctx.font = 'bold 15px "PingFang TC", "Microsoft JhengHei", sans-serif';
   ctx.fillStyle = '#000000';
   ctx.fillText(`學員姓名：${user.name || '-'}`, col1, py);
-  ctx.fillText(`最高獎銜：${user.rank || '無'}`, col2, py);
+  ctx.fillText(`最高獎銜：${effectiveMemberRank(user)}`, col2, py);
 
   // Horizontal divider
   py += 10;

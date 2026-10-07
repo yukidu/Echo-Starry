@@ -1,3 +1,4 @@
+import { effectiveMemberRank } from '../utils/ranks';
 import { vipPasswordForTrack } from '../../shared/stickers';
 import { keywordRanking } from '../utils/keywords';
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
@@ -406,7 +407,7 @@ export const DetailView: React.FC<DetailViewProps> = ({
     if (isExportingCard) return;
     setIsExportingCard(true);
     try {
-      const blob = await exportTrackFullCardImage(track, comments.map(c => { const author = allUsers.find(u=>u.email?.toLowerCase().trim()===c.authorEmail?.toLowerCase().trim()); return author ? {...c,authorName:author.name,authorAvatar:author.avatar,authorRank:author.rank} : c; }));
+      const blob = await exportTrackFullCardImage(track, comments.map(c => { const author = allUsers.find(u=>u.email?.toLowerCase().trim()===c.authorEmail?.toLowerCase().trim()); return author ? {...c,authorName:author.name,authorAvatar:author.avatar,authorRank:effectiveMemberRank(author)} : c; }));
       const filename = `繁星回聲_${track.title}_完整資訊圖卡.jpg`;
       await shareOrDownloadImage(blob, filename, `《${track.title}》演講完整資訊圖卡`);
     } catch (err) {

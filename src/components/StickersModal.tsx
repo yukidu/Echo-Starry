@@ -1,3 +1,4 @@
+import { effectiveMemberRank } from '../utils/ranks';
 import { setFeedbackRules } from './StickerFeedback';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Trophy, X, History, SlidersHorizontal, ListChecks, PlusCircle, Search, ArrowUpRight, Copy, Share2 } from 'lucide-react';
@@ -20,7 +21,7 @@ interface StickersModalProps {
 const historyCache = new Map<string, StickerTransaction[]>();
 const field = 'w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100';
 const primary = { backgroundColor: 'var(--color-primary,#c06c84)' };
-const actions: Record<string,string> = {profile_reward:'完善個人資料',rank_approval_reward:'獎銜審核獎勵',lucky_complete_reward:'好手氣完聽獎勵',initial:'會員初始貼紙',rating_reward:'評價錄音',like_reward:'按讚錄音',keyword_reward:'新增網友關鍵字',comment_reward:'聽完後分享心得',reply_reward:'回覆他人心得',comment_like_reward:'按讚他人心得',comment_reward_reversal:'刪除心得扣回',track_unlock_cost:'解鎖錄音',vip_upload_cost:'建立私秘VIP',lucky_cost:'好手氣',manual_grant:'人工加貼紙',manual_grant_debit:'加發貼紙給下線'};
+const actions: Record<string,string> = {profile_reward:'完善個人資料',rank_approval_reward:'獎銜審核獎勵',lucky_complete_reward:'好手氣完聽獎勵',initial:'會員初始貼紙',rating_reward:'評價錄音',like_reward:'按讚錄音',keyword_reward:'新增網友關鍵字',comment_reward:'聽完後分享心得',reply_reward:'回覆他人心得',comment_like_reward:'按讚他人心得',comment_reward_reversal:'刪除心得扣回',track_unlock_cost:'解鎖錄音',vip_upload_cost:'建立私秘VIP',lucky_cost:'好手氣',manual_grant:'人工加貼紙',manual_grant_debit:'加發貼紙給下線',balance_correction:'系統錯誤修正'};
 async function requestJson(url: string, options?: RequestInit) {
   const response = await fetch(url, options); const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || '操作失敗，請稍後再試');
@@ -154,7 +155,7 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
             </section>}
             {!superAdmin && <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 px-3 py-2 text-xs leading-relaxed">加發給下線的貼紙會從你自己的餘額扣除。目前可用：<strong>{formatStickerAmount(summary?.balance || 0)} 張</strong>。</div>}
             <input aria-label="搜尋下線名字" value={targetSearch} onChange={e=>setTargetSearch(e.target.value)} placeholder={superAdmin?'搜尋會員名字':'搜尋下線名字'} className={field}/>
-            <ThemedSelect aria-label="選擇下線" value={targetUserId} onChange={e=>setTargetUserId(e.target.value)} className={field}><option value="">{superAdmin?'選擇會員':'選擇下線'}</option>{filteredTargets.map(target=><option key={target.id} value={target.id}>{target.name}（{target.approvedRank || target.rank || '會員'}）</option>)}</ThemedSelect>
+            <ThemedSelect aria-label="選擇下線" value={targetUserId} onChange={e=>setTargetUserId(e.target.value)} className={field}><option value="">{superAdmin?'選擇會員':'選擇下線'}</option>{filteredTargets.map(target=><option key={target.id} value={target.id}>{target.name}（{effectiveMemberRank(target,'會員')}）</option>)}</ThemedSelect>
             <label className="block font-bold">加貼紙張數<div className="mt-1 flex items-center gap-2"><input aria-label="加貼紙張數" type="number" inputMode="decimal" min="0.1" max="1000" step="0.1" value={grantAmount} onChange={e=>setGrantAmount(e.target.value)} className={field}/><span className="shrink-0 text-sm">張</span></div><p className="mt-1 text-[11px] font-normal text-slate-500">可自行輸入 0.1～1000 張，人工加貼紙不套用白金級以上倍數。</p></label>
             <textarea aria-label="加貼紙原因" value={grantReason} onChange={e=>setGrantReason(e.target.value)} placeholder="加貼紙原因（必填）" rows={4} maxLength={500} className={`${field} resize-y min-h-28`}/>
             <button type="button" disabled={busy||loading} onClick={grant} className="w-full py-2.5 rounded-xl text-white font-bold disabled:opacity-50" style={primary}>確認加貼紙</button>

@@ -1,3 +1,4 @@
+import { effectiveMemberRank } from '../utils/ranks';
 import { UplineManagement } from './UplineManagement';
 import { ThemedSelect } from './ThemedSelect';
 import React, { useState, useEffect, useRef } from 'react';
@@ -117,7 +118,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   // Only the single verified super-admin email may even see the control.
   const isSuperAdminAccount = cleanEmail === 'yukidu@gmail.com';
 
-  const userRank = currentUser?.rank || '';
+  const userRank = currentUser ? effectiveMemberRank(currentUser, '') : '';
   const isDiamondOrAbove = userRank.includes('鑽石') || userRank.includes('皇冠') || userRank.includes('大使');
   // Requirement 2: 「白金」含白金以上可以使用「數據中心」
   const isPlatinumOrAbove = isEffectiveAdmin || isDiamondOrAbove || (() => {
@@ -515,7 +516,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       }
     }
     if (filterCenter !== '全部' && (u.center || '無') !== filterCenter) return false;
-    if (filterRank !== '全部' && u.rank !== filterRank) return false;
+    if (filterRank !== '全部' && effectiveMemberRank(u) !== filterRank) return false;
     if (filterDiamondUpline !== '全部' && (u.diamondUpline || '無') !== filterDiamondUpline) return false;
     if (filterContributor === '是' && !u.isContributor) return false;
     if (filterContributor === '否' && u.isContributor) return false;
@@ -1316,7 +1317,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                                 {u.name}
                               </span>
                               <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-white/25 text-white font-semibold">
-                                {u.rank || '無'}
+                                {effectiveMemberRank(u)}
                               </span>
                               {u.isContributor && (
                                 <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-amber-400 text-slate-900 font-extrabold">

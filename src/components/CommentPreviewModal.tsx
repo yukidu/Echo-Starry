@@ -1,3 +1,4 @@
+import { effectiveMemberRank } from '../utils/ranks';
 import { commentThreads } from '../utils/comments';
 import { apiJson, identityKeys } from '../utils/api';
 import React, { useEffect, useState, useRef, useMemo } from 'react';
@@ -148,7 +149,7 @@ export const CommentPreviewModal: React.FC<CommentPreviewModalProps> = ({
           u.name.toLowerCase().includes(q) ||
           (u.center && u.center.toLowerCase().includes(q)) ||
           (u.email && u.email.toLowerCase().includes(q)) ||
-          (u.rank && u.rank.toLowerCase().includes(q))
+          effectiveMemberRank(u, '').toLowerCase().includes(q)
         );
       })
       .slice(0, 6)
@@ -156,7 +157,7 @@ export const CommentPreviewModal: React.FC<CommentPreviewModalProps> = ({
         type: 'member' as const,
         id: `u-${u.id}`,
         label: u.name,
-        badge: [u.center, u.rank || '會員'].filter(Boolean).join(' ') || '會員',
+        badge: [u.center, effectiveMemberRank(u, '會員')].filter(Boolean).join(' ') || '會員',
         avatar: u.avatar
       }));
 
@@ -221,7 +222,7 @@ export const CommentPreviewModal: React.FC<CommentPreviewModalProps> = ({
     const payload = {
       authorName: currentUser?.name || visitor?.fullName || '訪客',
       authorAvatar: currentUser?.avatar || visitor?.emoji || '💬',
-      authorBadge: currentUser?.role === '超級管理員' ? '超級管理員' : currentUser?.isContributor ? '貢獻者' : (currentUser?.rank || '訪客'),
+      authorBadge: currentUser?.role === '超級管理員' ? '超級管理員' : currentUser?.isContributor ? '貢獻者' : (effectiveMemberRank(currentUser, '訪客')),
       authorEmail: currentUser?.email,
       deviceId: visitor?.deviceId,
       isAdmin: !!isAdmin,
@@ -321,7 +322,7 @@ export const CommentPreviewModal: React.FC<CommentPreviewModalProps> = ({
               const isClickable = Boolean(registeredAuthor);
               const displayAuthorName = registeredAuthor?.name || c.authorName;
               const displayAuthorAvatar = registeredAuthor?.avatar || c.authorAvatar;
-              const displayAuthorBadge = registeredAuthor ? (registeredAuthor.rank || '無') : null;
+              const displayAuthorBadge = registeredAuthor ? effectiveMemberRank(registeredAuthor) : null;
               const isRainbow = c.isAdmin || displayAuthorBadge === '貢獻者';
               const showBadge = !!displayAuthorBadge && displayAuthorBadge !== '訪客稱號' && displayAuthorBadge !== '無';
               const userLiked = likeStats[c.id] !== undefined ? likeStats[c.id].hasLiked : (c.likedBy || []).some(k => myKeys.includes(k));

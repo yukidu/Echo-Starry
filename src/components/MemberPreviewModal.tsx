@@ -1,3 +1,4 @@
+import { effectiveMemberRank } from '../utils/ranks';
 import React, { useState, useEffect } from 'react';
 import {
   X,
@@ -189,7 +190,7 @@ export const MemberPreviewModal: React.FC<MemberPreviewModalProps> = ({
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="font-bold text-sm sm:text-base truncate">{liveUser.name}</span>
                 <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-white/20 text-white font-bold">
-                  {liveUser.rank || '無'}
+                  {effectiveMemberRank(liveUser)}
                 </span>
                 {liveUser.isContributor && (
                   <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-amber-400 text-slate-900 font-extrabold">
