@@ -1,4 +1,4 @@
-/* v114：手機主選單改為真正浮層；透明外殼不再遮住整片頁面內容。 */
+/* v114：主選單使用真正浮層；透明外殼不遮住整片頁面內容。 */
 .mobile-menu-shell {
   position: absolute;
   top: 100%;
@@ -21,6 +21,8 @@
   display: inline-flex;
   width: max-content;
   max-width: calc(100vw - 1.5rem);
+  max-height: calc(100dvh - 5.5rem);
+  overflow-y: auto;
   flex-direction: column;
   align-items: stretch;
   gap: 0.25rem;
@@ -31,6 +33,7 @@
   box-shadow: 0 18px 45px rgb(15 23 42 / 0.24);
   backdrop-filter: blur(14px);
   pointer-events: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* v114：深色選單比深色頁面提高一階亮度，並加強邊框與陰影，避免融在背景裡。 */
@@ -139,8 +142,4 @@ body[data-main-tab="upload"]:not(:has(.upload-modal-overlay)) main {
   min-width: max-content;
 }
 
-@media (min-width: 768px) {
-  .mobile-menu-shell {
-    display: none;
-  }
-}
+/* v118：漢堡選單不再只限手機；桌機、平板、直式與橫式都使用同一選單。 */
