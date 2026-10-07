@@ -1,13 +1,20 @@
-/* v110：手機主選單貼合最長文字寬度，不再鋪滿整個畫面。 */
+/* v114：手機主選單改為真正浮層；透明外殼不再遮住整片頁面內容。 */
 .mobile-menu-shell {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 50;
   display: flex;
   justify-content: flex-end;
   padding: 0.75rem;
   border-top: 1px solid rgb(226 232 240 / 0.8);
+  background: transparent;
+  pointer-events: none;
 }
 
 .dark .mobile-menu-shell {
-  border-top-color: rgb(30 41 59);
+  border-top-color: rgb(51 65 85 / 0.65);
 }
 
 .mobile-menu-panel {
@@ -18,16 +25,21 @@
   align-items: stretch;
   gap: 0.25rem;
   padding: 0.5rem;
-  border: 1px solid rgb(226 232 240 / 0.85);
+  border: 1px solid rgb(226 232 240 / 0.9);
   border-radius: 1rem;
-  background: rgb(255 255 255 / 0.97);
-  box-shadow: 0 18px 45px rgb(15 23 42 / 0.2);
+  background: rgb(255 255 255 / 0.985);
+  box-shadow: 0 18px 45px rgb(15 23 42 / 0.24);
   backdrop-filter: blur(14px);
+  pointer-events: auto;
 }
 
+/* v114：深色選單比深色頁面提高一階亮度，並加強邊框與陰影，避免融在背景裡。 */
 .dark .mobile-menu-panel {
-  border-color: rgb(51 65 85 / 0.9);
-  background: rgb(15 23 42 / 0.97);
+  border-color: rgb(100 116 139 / 0.95);
+  background: rgb(30 41 59 / 0.99);
+  box-shadow:
+    0 22px 58px rgb(0 0 0 / 0.65),
+    0 0 0 1px rgb(148 163 184 / 0.14);
 }
 
 .mobile-menu-panel > button,
@@ -47,13 +59,22 @@
 }
 
 .dark .mobile-menu-panel button {
-  color: rgb(226 232 240) !important;
+  color: rgb(241 245 249) !important;
 }
 
 /* 只有通知數與貼紙數保留目前調色盤主色。 */
 .mobile-menu-panel .mobile-menu-accent-number,
 .mobile-menu-panel .sticker-menu-amount {
   color: var(--color-primary, #c06c84) !important;
+}
+
+/* v114：安裝狀態直接跟在「安裝到桌面」後方，與選單同字級、同字重、靠左排列。 */
+.mobile-menu-panel .install-app-status {
+  margin-left: 0 !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  line-height: inherit !important;
+  color: inherit !important;
 }
 
 /* v110：上傳音檔由全螢幕遮罩改為真正的內容頁。 */
@@ -89,19 +110,6 @@ body[data-main-tab="upload"] .upload-modal-overlay form {
 /* 上傳完成／取消後，舊元件會先關閉；此時先讓首頁內容恢復，不留下空白頁。 */
 body[data-main-tab="upload"]:not(:has(.upload-modal-overlay)) main {
   display: block;
-}
-
-/* v112：尚未安裝時，主選單固定明確顯示「未安裝」，並跟隨目前調色盤主色。 */
-button[aria-label="安裝到桌面"] > span:last-child {
-  color: var(--color-primary, #c06c84) !important;
-  font-size: 0 !important;
-}
-
-button[aria-label="安裝到桌面"] > span:last-child::after {
-  content: "未安裝";
-  font-size: 0.625rem;
-  font-weight: 700;
-  line-height: 1;
 }
 
 /* v112：我的貼紙簿分頁固定單排橫向；手機空間不足時左右滑動，不改成 2×2。 */
