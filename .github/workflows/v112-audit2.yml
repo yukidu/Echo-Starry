@@ -1,0 +1,40 @@
+name: v112 audit 2
+
+on:
+  push:
+    branches:
+      - safe/v112-sticker-rank-integrity
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Specific live member checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, urllib.parse, urllib.request
+          base='https://echostars.yukidu.workers.dev/api/stickers/leaderboard?q='
+          for name in ['Ming Yao','hank Lai','曾采婕','陳泰榮']:
+              with urllib.request.urlopen(base+urllib.parse.quote(name), timeout=30) as r:
+                  data=json.load(r)
+              print('QUERY',name)
+              for e in data.get('entries',[]):
+                  u=e.get('user',{})
+                  print({'name':u.get('name'),'rank':u.get('rank'),'current':e.get('current'),'earned':e.get('earned'),'spent':e.get('spent')})
+          PY
+      - name: Rank source audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== API routes mentioning users ==='
+          grep -RInE "api/(users|members)|users.*GET|GET.*users" worker src | head -n 200 || true
+          echo '=== raw rank references in member-facing code ==='
+          grep -RInE "rankApproved|approvedRank|\.rank" src/components src/utils src/App.tsx | head -n 600 || true
+          echo '=== correction references ==='
+          grep -RInE "balance_correction|HIDDEN_BALANCE_TARGETS|hidden-sticker-balance" worker tests src/components | head -n 300 || true
