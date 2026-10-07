@@ -23,10 +23,10 @@
   font-weight: 900 !important;
 }
 
-/* v107：手機版照片上下的進度／權限／貼紙文字放大為 10px；較大螢幕維持原尺寸。 */
+/* v108：手機版照片上下的進度／權限／貼紙文字放大為 13px；較大螢幕維持原尺寸。 */
 .audio-card button[title^="點擊照片"] > div.absolute.top-0,
 .audio-card button[title^="點擊照片"] > div.absolute.bottom-0 {
-  font-size: 10px !important;
+  font-size: 13px !important;
 }
 
 /* 按讚數文字直接繼承回饋列顏色，淺色/深色模式都與左側心得數一致；Heart SVG 不受影響。 */
