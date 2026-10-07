@@ -68,13 +68,21 @@
   color: var(--color-primary, #c06c84) !important;
 }
 
-/* v114：安裝狀態直接跟在「安裝到桌面」後方，與選單同字級、同字重、靠左排列。 */
-.mobile-menu-panel .install-app-status {
+/* v114：未安裝狀態和選單文字同尺寸，緊接在標題後方並以括弧顯示。 */
+.mobile-menu-panel button[aria-label="安裝到桌面"] > span:last-child {
   margin-left: 0 !important;
-  font-size: inherit !important;
+  font-size: 0 !important;
   font-weight: inherit !important;
   line-height: inherit !important;
   color: inherit !important;
+}
+
+.mobile-menu-panel button[aria-label="安裝到桌面"] > span:last-child::after {
+  content: "（未安裝）";
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  color: inherit;
 }
 
 /* v110：上傳音檔由全螢幕遮罩改為真正的內容頁。 */
