@@ -16,22 +16,17 @@ jobs:
       - name: Specific live member checks
         shell: bash
         run: |
-          set -euo pipefail
-          python - <<'PY'
-          import json, urllib.parse, urllib.request
-          base='https://echostars.yukidu.workers.dev/api/stickers/leaderboard?q='
-          for name in ['Ming Yao','hank Lai','曾采婕','陳泰榮']:
-              with urllib.request.urlopen(base+urllib.parse.quote(name), timeout=30) as r:
-                  data=json.load(r)
-              print('QUERY',name)
-              for e in data.get('entries',[]):
-                  u=e.get('user',{})
-                  print({'name':u.get('name'),'rank':u.get('rank'),'current':e.get('current'),'earned':e.get('earned'),'spent':e.get('spent')})
-          PY
+          set -u
+          for name in 'Ming Yao' 'hank Lai' '曾采婕' '陳泰榮'; do
+            echo "QUERY $name"
+            curl -A 'Mozilla/5.0' -sS --retry 2 --get --data-urlencode "q=$name" https://echostars.yukidu.workers.dev/api/stickers/leaderboard \
+              | python -c "import json,sys; d=json.load(sys.stdin); [print({'name':e.get('user',{}).get('name'),'rank':e.get('user',{}).get('rank'),'current':e.get('current'),'earned':e.get('earned'),'spent':e.get('spent')}) for e in d.get('entries',[])]" \
+              || true
+          done
       - name: Rank source audit
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
           echo '=== API routes mentioning users ==='
           grep -RInE "api/(users|members)|users.*GET|GET.*users" worker src | head -n 200 || true
           echo '=== raw rank references in member-facing code ==='
