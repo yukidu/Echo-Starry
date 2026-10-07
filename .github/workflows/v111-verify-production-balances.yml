@@ -1,0 +1,70 @@
+name: v111 verify production balances
+
+on:
+  push:
+    branches: [safe/v111-hidden-balance-correction]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: safe/v111-hidden-balance-correction
+      - name: Verify three corrected current balances without logging member names
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, urllib.parse, urllib.request
+
+          base = 'https://echostars.yukidu.workers.dev'
+          targets = {
+              'e5ac816c42dcc65366df37f14662523ae508418cc5b771c7f69074e5558eb821': 306.0,
+              '4ef0f2491370e12d02e983194a63cd99f813e42c57a15b093335619058b20993': -100.0,
+              '486d6d2f11d2e3ddfa57c3950bfdff0b89ce50436af46773abb64f6a7f5a5a90': 316.0,
+          }
+
+          def get_json(url):
+              req = urllib.request.Request(url, headers={'User-Agent': 'echostars-v111-verifier'})
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  if response.status != 200:
+                      raise RuntimeError(f'HTTP {response.status}')
+                  return json.load(response)
+
+          users = get_json(base + '/api/users')
+          matches = {}
+          for user in users:
+              normalized = ''.join(str(user.get('name') or '').split()).lower()
+              digest = hashlib.sha256(normalized.encode('utf-8')).hexdigest()
+              if digest in targets:
+                  matches.setdefault(digest, []).append(user)
+
+          if set(matches) != set(targets) or any(len(items) != 1 for items in matches.values()):
+              raise RuntimeError('Target member hash resolution is missing or ambiguous')
+
+          verified = 0
+          for digest, items in matches.items():
+              user = items[0]
+              query = urllib.parse.quote(str(user.get('name') or ''))
+              board = get_json(base + '/api/stickers/leaderboard?q=' + query)
+              entry = next((item for item in board.get('entries', []) if str(item.get('user', {}).get('id')) == str(user.get('id'))), None)
+              if entry is None:
+                  raise RuntimeError('Corrected member is missing from leaderboard search')
+              current = float(entry.get('current'))
+              if abs(current - targets[digest]) > 1e-9:
+                  raise RuntimeError('Corrected current balance does not match the requested target')
+              verified += 1
+
+          print(f'Production hidden balances verified: {verified}/3')
+          PY
+      - name: Remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "yukidu"
+          git config user.email "yukidu@gmail.com"
+          git rm .github/workflows/v111-verify-production-balances.yml
+          git commit -m "chore：移除 v111 正式餘額驗證工具"
+          git push origin HEAD:safe/v111-hidden-balance-correction
