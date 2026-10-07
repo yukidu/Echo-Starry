@@ -1,3 +1,4 @@
+import { effectiveMemberRank } from '../utils/ranks';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Trophy,
@@ -343,7 +344,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
     const reversedRanks = [...RANK_ORDER].reverse();
     const map: Record<string, number> = {};
     users.forEach(u => {
-      const r = u.rank || '無';
+      const r = effectiveMemberRank(u);
       map[r] = (map[r] || 0) + 1;
     });
     return reversedRanks
@@ -497,7 +498,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
 
               {/* 獎銜 */}
               <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium shrink-0">
-                {user.rank || '無'}
+                {effectiveMemberRank(user)}
               </span>
             </div>
           </div>

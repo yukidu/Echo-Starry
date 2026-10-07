@@ -1,3 +1,4 @@
+import { effectiveMemberRank } from './ranks';
 import { Track, UserProfile, UserListeningRecord } from '../types';
 import { calculateNumerology } from './numerology';
 import { JPEG_EXPORT_QUALITY, JPEG_EXPORT_WIDTH } from '../jpegExportPolicy';
@@ -308,7 +309,8 @@ export async function exportMemberLearningCard(user: UserProfile, items: Item[])
   ctx.fillStyle = '#000';
   ctx.fillRect(26, 26, W - 52, 4);
 
-  const titleRank = resolved.rank && resolved.rank !== '無' ? ` ${resolved.rank}` : '';
+  const resolvedRank = effectiveMemberRank(resolved);
+  const titleRank = resolvedRank !== '無' ? ` ${resolvedRank}` : '';
   ctx.font = `bold 28px ${font}`;
   ctx.fillStyle = '#000';
   ctx.fillText(`${resolved.name}${titleRank} 個人學習卡`, pad, 61);

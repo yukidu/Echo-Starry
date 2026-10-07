@@ -359,10 +359,10 @@ async function transactionHistory(db: any, actor: any, outgoing = false) {
     LEFT JOIN comments c ON c.id = tx.commentId
     LEFT JOIN users u ON u.id = CASE WHEN ? = 1 THEN tx.userId
       WHEN tx.type = 'initial' THEN tx.userId ELSE COALESCE(tx.relatedUserId, tx.actorUserId) END
-    WHERE ${outgoing ? "tx.actorUserId = ? AND tx.type = 'manual_grant'" : "tx.userId = ? AND tx.type <> 'balance_correction'"}
+    WHERE ${outgoing ? "tx.actorUserId = ? AND tx.type = 'manual_grant'" : "tx.userId = ? AND NOT (tx.type = 'balance_correction' AND tx.uniqueKey LIKE 'hidden-sticker-balance-v111:%' AND tx.balanceAfterUnits < 0)"}
     ORDER BY tx.createdAt DESC, tx.rowid DESC`).bind(outgoing ? 1 : 0, actor.id).all();
   return (results || []).map((tx: any) => ({
-    id: tx.id, type: tx.type, description: tx.description, createdAt: tx.createdAt,
+    id: tx.id, type: tx.type, description: tx.type === 'balance_correction' ? '系統錯誤修正' : tx.description, createdAt: tx.createdAt,
     delta: unitsToStickers(tx.deltaUnits), balanceAfter: unitsToStickers(tx.balanceAfterUnits),
     source: tx.trackId ? {
       kind: 'track', trackId: tx.trackId, commentId: tx.liveCommentId || undefined,

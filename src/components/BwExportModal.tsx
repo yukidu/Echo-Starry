@@ -1,3 +1,4 @@
+import { effectiveMemberRank } from '../utils/ranks';
 import React, { useState, useEffect } from 'react';
 import { Image as ImageIcon, Share2, X, Loader2, AlertCircle } from 'lucide-react';
 import { Track, Comment, UserProfile } from '../types';
@@ -61,7 +62,7 @@ export const BwExportModal: React.FC<BwExportModalProps> = ({
           blob = await exportRatedTracksImage(
             ratedTracks,
             currentUser.name,
-            currentUser.rank
+            effectiveMemberRank(currentUser)
           );
         }
 

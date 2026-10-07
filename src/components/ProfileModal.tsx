@@ -1,3 +1,4 @@
+import { effectiveMemberRank } from '../utils/ranks';
 import { getFeedbackRules, showStickerNotice } from './StickerFeedback';
 import { ThemedSelect } from './ThemedSelect';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -234,7 +235,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const platinumSuggestions = useMemo(() => {
     const set = new Set<string>();
     allUsers.forEach(u => {
-      if (u.rank && (u.rank.includes('白金') || u.rank.includes('翡翠') || u.rank.includes('鑽石') || u.rank.includes('皇冠') || u.rank.includes('大使'))) {
+      const rank = effectiveMemberRank(u, '');
+      if (rank && (rank.includes('白金') || rank.includes('翡翠') || rank.includes('鑽石') || rank.includes('皇冠') || rank.includes('大使'))) {
         set.add(u.name);
       }
       if (u.platinumUpline) set.add(u.platinumUpline);
@@ -246,7 +248,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const diamondSuggestions = useMemo(() => {
     const set = new Set<string>();
     allUsers.forEach(u => {
-      if (u.rank && (u.rank.includes('鑽石') || u.rank.includes('皇冠') || u.rank.includes('大使'))) {
+      const rank = effectiveMemberRank(u, '');
+      if (rank && (rank.includes('鑽石') || rank.includes('皇冠') || rank.includes('大使'))) {
         set.add(u.name);
       }
       if (u.diamondUpline) set.add(u.diamondUpline);
@@ -641,7 +644,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                 {organizationDisplayName || currentUser.name}
                               </h3>
                               <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300">
-                                {currentUser.rank}
+                                {effectiveMemberRank(currentUser)}
                               </span>
                               {currentUser.isContributor && (
                                 <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">

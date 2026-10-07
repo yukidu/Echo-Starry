@@ -1,3 +1,4 @@
+import { effectiveMemberRank } from '../utils/ranks';
 import React, { useState, useEffect } from 'react';
 import {
   X,
@@ -140,7 +141,7 @@ export const MemberDetailPreviewModal: React.FC<MemberDetailPreviewModalProps> =
 
       ctx.font = 'bold 18px "PingFang TC", sans-serif';
       ctx.fillStyle = '#000000';
-      ctx.fillText(`姓名：${user.name}  [${user.rank || '一般會員'}]`, padding, 145);
+      ctx.fillText(`姓名：${user.name}  [${effectiveMemberRank(user, '一般會員')}]`, padding, 145);
 
       ctx.font = '14px sans-serif';
       ctx.fillStyle = '#222222';
@@ -267,7 +268,7 @@ export const MemberDetailPreviewModal: React.FC<MemberDetailPreviewModalProps> =
                   {user.name}
                 </h3>
                 <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 font-bold">
-                  {user.rank || '一般會員'}
+                  {effectiveMemberRank(user, '一般會員')}
                 </span>
                 {user.isContributor && (
                   <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-bold">
@@ -372,7 +373,7 @@ export const MemberDetailPreviewModal: React.FC<MemberDetailPreviewModalProps> =
               </div>
               <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60">
                 <span className="text-[10px] text-slate-400 block">最高獎銜</span>
-                <span className="font-bold text-slate-800 dark:text-slate-100">{user.rank || '-'}</span>
+                <span className="font-bold text-slate-800 dark:text-slate-100">{effectiveMemberRank(user, '-')}</span>
               </div>
               <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60">
                 <span className="text-[10px] text-slate-400 block">初次如何認識安麗？</span>

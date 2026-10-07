@@ -91,6 +91,38 @@ body[data-main-tab="upload"]:not(:has(.upload-modal-overlay)) main {
   display: block;
 }
 
+/* v112：尚未安裝時，主選單固定明確顯示「未安裝」，並跟隨目前調色盤主色。 */
+button[aria-label="安裝到桌面"] > span:last-child {
+  color: var(--color-primary, #c06c84) !important;
+  font-size: 0 !important;
+}
+
+button[aria-label="安裝到桌面"] > span:last-child::after {
+  content: "未安裝";
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* v112：我的貼紙簿分頁固定單排橫向；手機空間不足時左右滑動，不改成 2×2。 */
+[role="tablist"][aria-label="貼紙簿分頁"] {
+  display: flex !important;
+  grid-template-columns: none !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+[role="tablist"][aria-label="貼紙簿分頁"]::-webkit-scrollbar {
+  display: none;
+}
+
+[role="tablist"][aria-label="貼紙簿分頁"] > button {
+  flex: 0 0 auto !important;
+  min-width: max-content;
+}
+
 @media (min-width: 768px) {
   .mobile-menu-shell {
     display: none;

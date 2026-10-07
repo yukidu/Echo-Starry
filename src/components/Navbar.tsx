@@ -1,3 +1,4 @@
+import { effectiveMemberRank } from '../utils/ranks';
 import React, { useEffect, useState } from 'react';
 import { Trophy, Home, BarChart3, Bell, User, UploadCloud, Settings, Palette, Moon, Sun, Mic, Menu, X, LogOut } from 'lucide-react';
 import { UserProfile, RANK_ORDER } from '../types';
@@ -74,13 +75,13 @@ export const Navbar: React.FC<NavbarProps> = ({
     ? '管理員'
     : currentUser.isContributor
     ? '貢獻者'
-    : (currentUser.rank || '會員');
+    : effectiveMemberRank(currentUser, '會員');
 
   const nameLen = Array.from(displayName).length;
   const nameFontSize = nameLen <= 4 ? 12 : Math.max(8.5, Math.round((4 / nameLen) * 12 * 10) / 10);
   const mobileNameFontSize = nameLen <= 4 ? 11 : Math.max(8, Math.round((4 / nameLen) * 11 * 10) / 10);
 
-  const userRank = currentUser?.rank || '';
+  const userRank = currentUser ? effectiveMemberRank(currentUser, '') : '';
   const isDiamondOrAbove = isAdministrator || isSuperAdmin || userRank.includes('鑽石') || userRank.includes('皇冠') || userRank.includes('大使');
   const isPlatinumOrAbove = isDiamondOrAbove || (() => {
     if (!userRank) return false;

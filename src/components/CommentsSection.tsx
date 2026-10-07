@@ -1,3 +1,4 @@
+import { effectiveMemberRank } from '../utils/ranks';
 import { vipPasswordForTrack } from '../../shared/stickers';
 import { commentThreads } from '../utils/comments';
 import { apiJson, identityKeys } from '../utils/api';
@@ -173,14 +174,14 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
         return u.name.toLowerCase().includes(q) ||
           (u.center && u.center.toLowerCase().includes(q)) ||
           (u.email && u.email.toLowerCase().includes(q)) ||
-          (u.rank && u.rank.toLowerCase().includes(q));
+          effectiveMemberRank(u, '').toLowerCase().includes(q);
       })
       .slice(0, 6)
       .map(u => ({
         type: 'member' as const,
         id: `u-${u.id}`,
         label: u.name,
-        badge: [u.center, u.rank || '會員'].filter(Boolean).join(' ') || '會員',
+        badge: [u.center, effectiveMemberRank(u, '會員')].filter(Boolean).join(' ') || '會員',
         avatar: u.avatar
       }));
 
@@ -343,7 +344,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             const isVisitor = !registeredAuthor;
             const displayAuthorName = registeredAuthor?.name || c.authorName;
             const displayAuthorAvatar = registeredAuthor?.avatar || c.authorAvatar;
-            const displayAuthorBadge = registeredAuthor ? (registeredAuthor.rank || '無') : null;
+            const displayAuthorBadge = registeredAuthor ? effectiveMemberRank(registeredAuthor) : null;
             const showBadge = !!registeredAuthor;
             const userLiked = likeStats[c.id] !== undefined ? likeStats[c.id].hasLiked : (c.likedBy || []).some(k => myKeys.includes(k));
             const userLikesCount = likeStats[c.id] !== undefined ? likeStats[c.id].likes : (c.likes || 0);
