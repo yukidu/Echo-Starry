@@ -137,8 +137,9 @@ export const ORGANIZATION_RELEASE_NOTES: ChangelogEntry = {
 };
 
 export const STICKER_LEADERBOARD_RELEASE_NOTES: ChangelogEntry = {
-  version: 'v4.4',
+  version: 'v4.5',
   date: '2026/10/07',
+  isLatest: true,
   summary: '排行榜新增貼紙排位賽與會員基本資料關鍵字搜尋，快速比較貼紙現況並找到會員。',
   added: [
     '排行榜新增「貼紙排位賽」，列出現有貼紙、累積已消費與累積已獲得總數前 20 名，依現有貼紙排序。',
@@ -151,7 +152,7 @@ export const STICKER_LEADERBOARD_RELEASE_NOTES: ChangelogEntry = {
 };
 
 export const PLATINUM_MULTIPLIER_RELEASE_NOTES: ChangelogEntry = {
-  version: 'v4.4', date: '2026/10/07', isLatest: true,
+  version: 'v4.4', date: '2026/10/07',
   summary: '修正白金級以上獲取貼紙倍數，讓倍數真正套用到所有一般貼紙收入，並與固定獎銜審核獎勵分開。',
   added: [
     '「如何獲得貼紙？」規則表會依登入會員身分直接顯示目前適用的白金級以上獲取貼紙倍數，以及乘完後的實際獎勵張數。'
@@ -181,7 +182,7 @@ export const STICKER_GUIDE_RELEASE_NOTES: ChangelogEntry = {
   removed: []
 };
 
-const RELEASE_NOTES = [PLATINUM_MULTIPLIER_RELEASE_NOTES, STICKER_GUIDE_RELEASE_NOTES, ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
+const RELEASE_NOTES = [STICKER_LEADERBOARD_RELEASE_NOTES, PLATINUM_MULTIPLIER_RELEASE_NOTES, STICKER_GUIDE_RELEASE_NOTES, ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
 
 const runtime = window as Window &
   typeof globalThis & {
