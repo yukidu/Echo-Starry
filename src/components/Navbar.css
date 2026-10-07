@@ -1,0 +1,93 @@
+/* v110：手機主選單貼合最長文字寬度，不再鋪滿整個畫面。 */
+.mobile-menu-shell {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.75rem;
+  border-top: 1px solid rgb(226 232 240 / 0.8);
+}
+
+.dark .mobile-menu-shell {
+  border-top-color: rgb(30 41 59);
+}
+
+.mobile-menu-panel {
+  display: inline-flex;
+  width: max-content;
+  max-width: calc(100vw - 1.5rem);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border: 1px solid rgb(226 232 240 / 0.85);
+  border-radius: 1rem;
+  background: rgb(255 255 255 / 0.97);
+  box-shadow: 0 18px 45px rgb(15 23 42 / 0.2);
+  backdrop-filter: blur(14px);
+}
+
+.dark .mobile-menu-panel {
+  border-color: rgb(51 65 85 / 0.9);
+  background: rgb(15 23 42 / 0.97);
+}
+
+.mobile-menu-panel > button,
+.mobile-menu-panel > div,
+.mobile-menu-panel .mobile-menu-row {
+  width: auto !important;
+  min-width: 100%;
+}
+
+/* 選單的標題、圖示與狀態文字統一使用同一前景色。 */
+.mobile-menu-panel button {
+  color: rgb(51 65 85) !important;
+}
+
+.mobile-menu-panel button * {
+  color: inherit !important;
+}
+
+.dark .mobile-menu-panel button {
+  color: rgb(226 232 240) !important;
+}
+
+/* 只有通知數與貼紙數保留目前調色盤主色。 */
+.mobile-menu-panel .mobile-menu-accent-number,
+.mobile-menu-panel .sticker-menu-amount {
+  color: var(--color-primary, #c06c84) !important;
+}
+
+/* v110：上傳音檔由全螢幕遮罩改為真正的內容頁。 */
+body[data-main-tab="upload"] main {
+  display: none;
+}
+
+body[data-main-tab="upload"] .upload-modal-overlay {
+  position: relative !important;
+  inset: auto !important;
+  z-index: auto !important;
+  display: block !important;
+  width: min(calc(100% - 2rem), 48rem) !important;
+  margin: 1.25rem auto 7rem !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+}
+
+body[data-main-tab="upload"] .upload-modal-overlay > div {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+}
+
+body[data-main-tab="upload"] .upload-modal-overlay form {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+@media (min-width: 768px) {
+  .mobile-menu-shell {
+    display: none;
+  }
+}
