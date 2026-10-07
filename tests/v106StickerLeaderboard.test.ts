@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const stats=readFileSync(new URL('../src/components/StatisticsView.tsx',import.meta.url),'utf8');
 const tab=readFileSync(new URL('../src/components/StickerLeaderboardTab.tsx',import.meta.url),'utf8');
 const worker=readFileSync(new URL('../worker/stickerRouter.ts',import.meta.url),'utf8');
+const changelog=readFileSync(new URL('../src/changelogReleaseNotes.ts',import.meta.url),'utf8');
 
 test('leaderboard adds the sticker ranking tab with top-20 ledger metrics and member card action',()=>{
   assert.match(stats,/貼紙排位賽/);
@@ -25,4 +26,11 @@ test('sticker ranking search has autocomplete while sensitive profile values sta
   assert.match(worker,/u\.birthday/);
   assert.match(worker,/searchScope: actor \? 'member' : 'public'/);
   assert.doesNotMatch(tab,/0912345678|amwayId|birthday/);
+});
+
+test('sticker leaderboard is published as the latest v4.5 release note',()=>{
+  assert.match(changelog,/STICKER_LEADERBOARD_RELEASE_NOTES/);
+  assert.match(changelog,/version:\s*'v4\.5'/);
+  assert.match(changelog,/isLatest:\s*true/);
+  assert.match(changelog,/貼紙排位賽與會員基本資料關鍵字搜尋/);
 });
