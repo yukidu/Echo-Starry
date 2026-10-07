@@ -28,7 +28,7 @@ test('sticker correction is visible as system error fix but excluded from earned
 test('requested UI styling is locked in', () => {
   const css=readFileSync(new URL('../src/components/Navbar.css', import.meta.url),'utf8');
   const guide=readFileSync(new URL('../src/components/StickerGuideTable.tsx', import.meta.url),'utf8');
-  assert.match(css,/content: "未安裝"/);
+  assert.match(css,/content: "（未安裝）"/);
   assert.match(css,/aria-label="貼紙簿分頁"/);
   assert.match(css,/overflow-x: auto/);
   assert.match(guide,/border-amber-200/);
