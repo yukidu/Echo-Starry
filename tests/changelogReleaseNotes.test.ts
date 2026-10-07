@@ -24,8 +24,11 @@ test('v3.8 cumulative changelog remains available for recent user-facing release
   assert.match(notes, /全站主選單改為固定置頂/);
 });
 
-test('changelog release patch merges both maintained releases and only intercepts GET changelog requests', () => {
-  assert.match(notes, /RELEASE_NOTES = \[PLATINUM_MULTIPLIER_RELEASE_NOTES, STICKER_GUIDE_RELEASE_NOTES, ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES\]/);
+test('changelog release patch includes v4.5 sticker leaderboard and only intercepts GET changelog requests', () => {
+  assert.match(notes, /STICKER_LEADERBOARD_RELEASE_NOTES/);
+  assert.match(notes, /version:\s*'v4\.5'/);
+  assert.match(notes, /貼紙排位賽與會員基本資料關鍵字搜尋/);
+  assert.match(notes, /RELEASE_NOTES = \[STICKER_LEADERBOARD_RELEASE_NOTES, PLATINUM_MULTIPLIER_RELEASE_NOTES, STICKER_GUIDE_RELEASE_NOTES, ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES\]/);
   assert.match(notes, /method !== 'GET'/);
   assert.match(notes, /url\.pathname === '\/api\/changelog'/);
   assert.match(notes, /return nativeFetch\(\.\.\.args\)/);
