@@ -1,4 +1,4 @@
-import appWorker from './adminUserDeleteRouter';
+import appWorker from './iosGoogleRedirectRouter';
 import type { Env } from './index';
 
 const X_ROBOTS_TAG = 'noindex, nofollow, noarchive, nosnippet, noimageindex';
