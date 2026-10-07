@@ -23,10 +23,10 @@
   font-weight: 900 !important;
 }
 
-/* v102：只把照片上下的進度／權限文字恢復到 v100 尺寸，其餘 v101 文案與貼紙邏輯完全不動。 */
+/* v107：手機版照片上下的進度／權限／貼紙文字放大為 10px；較大螢幕維持原尺寸。 */
 .audio-card button[title^="點擊照片"] > div.absolute.top-0,
 .audio-card button[title^="點擊照片"] > div.absolute.bottom-0 {
-  font-size: 7px !important;
+  font-size: 10px !important;
 }
 
 /* 按讚數文字直接繼承回饋列顏色，淺色/深色模式都與左側心得數一致；Heart SVG 不受影響。 */
