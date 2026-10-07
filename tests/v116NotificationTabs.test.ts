@@ -14,6 +14,8 @@ test('notification tabs match the personal-center underline navigation and stick
   assert.equal(notifications.includes('ChevronLeft'), true);
   assert.equal(notifications.includes('ChevronRight'), true);
   assert.equal(notifications.includes('border-b-2'), true);
+  assert.equal(notifications.includes('return isDirectMention;'), true);
+  assert.equal(notifications.includes("return comment.content.includes('@') || comment.content.includes('＠');"), false);
 });
 
 test('pending review tab is visible only to reviewers, platinum-and-above, or super admin', () => {

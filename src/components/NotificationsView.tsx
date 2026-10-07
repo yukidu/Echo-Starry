@@ -129,7 +129,11 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
           (comment.authorEmail && currentUser?.email && comment.authorEmail.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
           (comment.authorName && currentUser?.name && comment.authorName.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
         if (isSelf) return false;
-        return comment.content.includes('@') || comment.content.includes('＠');
+        const lower = comment.content.toLowerCase();
+        const isDirectMention = myName
+          ? lower.includes(`@${myName}`) || lower.includes(`＠${myName}`) || comment.replyToAuthor?.toLowerCase().trim() === myName
+          : false;
+        return isDirectMention;
       })
       .map(comment => {
         const track = tracks.find(trackItem => trackItem.id === comment.trackId);
