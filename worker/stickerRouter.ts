@@ -317,7 +317,7 @@ async function addStickerTransaction(db: any, input: {
   if (existing) return { inserted: false, balanceUnits: await stickerBalanceUnits(db, input.userId), transaction: existing };
   const track: any = await db.prepare('SELECT id,title,speaker,speakerRank FROM tracks WHERE id = ?').bind(input.trackId || input.sourceId || '').first();
   const id = `st-${crypto.randomUUID()}`;
-  const shouldMultiply = input.deltaUnits > 0 && !input.skipEarningMultiplier && !['rank_approval_reward','manual_grant'].includes(input.type);
+  const shouldMultiply = input.deltaUnits > 0 && !input.skipEarningMultiplier && !['rank_approval_reward','manual_grant','lucky_complete_reward'].includes(input.type);
   const multiplierTenths = shouldMultiply
     ? (input.earningMultiplierTenths ?? await earningMultiplierTenthsForUser(db, input.userId))
     : 10;
@@ -700,7 +700,7 @@ async function handleTrackWrite(request: Request, env: Env, actor: any) {
     // The balance trigger and unique key abort the entire D1 batch if a concurrent
     // spend or retry conflicts. A failed track save never commits this charge.
     statements.push(db.prepare(`INSERT INTO sticker_transactions
-      (id, userId, deltaUnits, balanceAfterUnits, type, sourceId, description, actorUserId, uniqueKey, createdAt)
+      (id, userId, deltaUnits, balanceAfterUnits, type, sourceId,description, actorUserId, uniqueKey, createdAt)
       SELECT ?, ?, ?, COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = ?), 0) + ?,
         'vip_upload_cost', ?, ?, ?, ?, ?`)
       .bind(`st-${crypto.randomUUID()}`, actor.id, -vipCostUnits, actor.id, -vipCostUnits,
