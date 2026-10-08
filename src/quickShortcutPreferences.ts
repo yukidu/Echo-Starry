@@ -50,7 +50,7 @@ export async function fetchCloudQuickPreferences() {
     credentials: 'same-origin',
     cache: 'no-store'
   });
-  if (response.status === 401) return null;
+  if (response.status === 401) return undefined;
   if (!response.ok) throw new Error(`偏好讀取失敗：${response.status}`);
   const data = await response.json().catch(() => ({}));
   const raw = data?.preferences;
@@ -72,7 +72,7 @@ export async function saveCloudQuickPreferences(quickActionIds: QuickActionId[],
       quickLabelMode: normalizeQuickLabelMode(quickLabelMode)
     })
   });
-  if (response.status === 401) return null;
+  if (response.status === 401) return undefined;
   if (!response.ok) throw new Error(`偏好儲存失敗：${response.status}`);
   const data = await response.json().catch(() => ({}));
   return data?.preferences || null;
