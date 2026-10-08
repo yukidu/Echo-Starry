@@ -18,5 +18,5 @@ export function isVisibleOnGuestHome(track: VisitorTrack): boolean {
 }
 
 export function canGuestPlayPublicShare(track: VisitorTrack, isGuest: boolean, isSharedDetail: boolean): boolean {
-  return isGuest && isSharedDetail && isPublicRecording(track) && !track.isPrivateVip && isFreeForGuest(track);
+  return isGuest && isSharedDetail && isPublicRecording(track) && !track.isPrivateVip;
 }
