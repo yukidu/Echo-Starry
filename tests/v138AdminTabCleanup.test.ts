@@ -12,12 +12,13 @@ test('admin cleanup climbs ancestors so page and modal presentations are both su
   assert.match(cleanup, /buttonTexts\.includes\('數據中心'\)/);
 });
 
-test('moved audio tab and retired display tab cannot remain visible or keyboard reachable', () => {
-  assert.match(cleanup, /text === '音檔' \|\| text === '顯示'/);
-  assert.match(cleanup, /v138RetiredAdminTab/);
+test('only the moved audio tab is hidden and made keyboard unreachable', () => {
+  assert.match(cleanup, /cleanAdminText\(button\.textContent\) === '音檔'/);
+  assert.match(cleanup, /v139MovedAudioTab/);
   assert.match(cleanup, /aria-hidden/);
   assert.match(cleanup, /tabIndex = -1/);
   assert.match(cleanup, /display: none !important/);
+  assert.doesNotMatch(cleanup, /顯示/);
 });
 
 test('admin cleanup loads after the v138 upload management integration', () => {
