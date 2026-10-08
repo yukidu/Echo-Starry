@@ -64,6 +64,31 @@ const findVisibleTarget = (selector: string) => {
   }) || null;
 };
 
+const boundsForTarget = (key: string, element: HTMLElement): SpotlightRect => {
+  if (key !== 'logo') return element.getBoundingClientRect();
+
+  // The navbar brand button intentionally grows to fill free header space. For the
+  // tutorial we only spotlight the microphone logo plus the four brand characters,
+  // not that invisible flex area or the decorative sound bars.
+  const logo = element.firstElementChild as HTMLElement | null;
+  const brandName = Array.from(element.querySelectorAll<HTMLElement>('span'))
+    .find(span => span.textContent?.trim() === '繁星回聲') || null;
+  if (!logo || !brandName) return element.getBoundingClientRect();
+
+  const logoRect = logo.getBoundingClientRect();
+  const textRect = brandName.getBoundingClientRect();
+  return {
+    top: Math.min(logoRect.top, textRect.top),
+    left: Math.min(logoRect.left, textRect.left),
+    right: Math.max(logoRect.right, textRect.right),
+    bottom: Math.max(logoRect.bottom, textRect.bottom)
+  };
+};
+
+const tutorialCopy = (target: TutorialTargetSpec) => target.key === 'visitor'
+  ? target.text.replace('累積星幣點數', '蒐集貼紙').replace('累積星幣', '蒐集貼紙')
+  : target.text;
+
 export const TutorialSpotlight: React.FC<TutorialSpotlightProps> = ({
   active,
   targets,
@@ -95,7 +120,7 @@ export const TutorialSpotlight: React.FC<TutorialSpotlightProps> = ({
           const element = findVisibleTarget(target.selector);
           if (!element) return;
 
-          const bounds = element.getBoundingClientRect();
+          const bounds = boundsForTarget(target.key, element);
           const padding = 6;
           next[target.key] = {
             top: Math.max(0, bounds.top - padding),
@@ -192,6 +217,34 @@ export const TutorialSpotlight: React.FC<TutorialSpotlightProps> = ({
       } as CalloutPlacement
     };
   });
+
+  // Narrow phones can put the logo and visitor callouts on the same row. Keep every
+  // tutorial card separated instead of allowing one orange box to cover another.
+  for (let currentIndex = 0; currentIndex < positions.length; currentIndex += 1) {
+    const current = positions[currentIndex];
+    for (let previousIndex = 0; previousIndex < currentIndex; previousIndex += 1) {
+      const previous = positions[previousIndex];
+      const currentBox = {
+        left: current.position.left,
+        top: current.position.top,
+        right: current.position.left + current.position.width,
+        bottom: current.position.top + current.position.height
+      };
+      const previousBox = {
+        left: previous.position.left,
+        top: previous.position.top,
+        right: previous.position.left + previous.position.width,
+        bottom: previous.position.top + previous.position.height
+      };
+      if (!overlaps(currentBox, previousBox, 8)) continue;
+
+      const below = previousBox.bottom + 10;
+      const above = previousBox.top - current.position.height - 10;
+      current.position.top = below + current.position.height <= viewport.height - edge
+        ? below
+        : clamp(above, edge, viewport.height - current.position.height - edge);
+    }
+  }
 
   const controlWidth = Math.min(isPhone ? 306 : 318, viewport.width - 24);
   const controlHeight = isPhone ? 134 : 124;
@@ -363,7 +416,7 @@ export const TutorialSpotlight: React.FC<TutorialSpotlightProps> = ({
               overflowWrap: 'break-word'
             }}
           >
-            {target.text}
+            {tutorialCopy(target)}
           </p>
         </div>
       ))}

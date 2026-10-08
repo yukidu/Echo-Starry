@@ -1,0 +1,47 @@
+/* v136: compact hamburger rows without changing the pinned top toolbar size. */
+.mobile-menu-panel[data-react-menu] {
+  gap: 0.125rem;
+  padding-block: 0.4rem;
+}
+
+.mobile-menu-panel[data-react-menu] .mobile-menu-row {
+  padding-top: 0.25rem !important;
+  padding-bottom: 0.25rem !important;
+}
+
+.mobile-menu-panel[data-react-menu] .mobile-menu-row > button:not(.navbar-inline-pin) {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.mobile-menu-panel[data-react-menu] > .my-1.h-px {
+  margin-top: 0.125rem !important;
+  margin-bottom: 0.125rem !important;
+}
+
+/* Only the hamburger-menu theme row changes wording; the top sun/moon icon stays icon-only. */
+.mobile-menu-panel[data-react-menu] .mobile-menu-row:has(.lucide-moon, .lucide-sun) > button:last-child > span {
+  font-size: 0 !important;
+}
+
+.mobile-menu-panel[data-react-menu] .mobile-menu-row:has(.lucide-moon, .lucide-sun) > button:last-child > span::after {
+  content: "開燈/關燈";
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+/* Guest role text is a site setting. Members keep their real role/rank untouched. */
+.navbar-menu-identity[aria-label="登入繁星回聲"] .navbar-menu-identity-role {
+  font-size: 0 !important;
+}
+
+.navbar-menu-identity[aria-label="登入繁星回聲"] .navbar-menu-identity-role::after {
+  content: var(--echostars-visitor-role-text, "訪客");
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: clamp(0.48rem, 2.4vw, 0.75rem);
+  line-height: 1.05;
+}
