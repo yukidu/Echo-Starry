@@ -1,31 +1,26 @@
 import { effectiveMemberRank } from '../utils/ranks';
-import React, { useEffect, useState } from 'react';
-import { Trophy, Home, BarChart3, Bell, User, UploadCloud, Settings, Palette, Moon, Sun, Mic, Menu, LogOut, Pin } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Trophy, Home, BarChart3, Bell, User, UploadCloud, Settings, Palette, Moon, Sun, Mic, Menu, LogOut, Pin, GripVertical } from 'lucide-react';
 import { UserProfile, RANK_ORDER } from '../types';
 import { VisitorIdentity } from '../utils/visitor';
 import { TwinklingStars } from './TwinklingStars';
 import { InstallAppButton } from './InstallAppButton';
+import {
+  MAX_QUICK_ACTIONS,
+  QuickActionId,
+  QuickLabelMode,
+  fetchCloudQuickPreferences,
+  normalizeQuickActionIds,
+  normalizeQuickLabelMode,
+  readLocalQuickPreferences,
+  saveCloudQuickPreferences,
+  writeLocalQuickPreferences
+} from '../quickShortcutPreferences';
 import './Navbar.css';
 
 export type NavTab = 'home' | 'stats' | 'notifications' | 'profile' | 'upload' | 'admin' | 'stickers' | 'install';
 
-type QuickActionId = 'home' | 'stats' | 'notifications' | 'stickers' | 'upload' | 'profile' | 'admin' | 'palette';
-
-const QUICK_ACTIONS_STORAGE_KEY = 'echostars_quick_header_actions_v1';
 const USER_FONT_ZOOM_KEY = 'echostars_user_font_zoom_v1';
-const MAX_QUICK_ACTIONS = 3;
-
-function readStoredQuickActions(): QuickActionId[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const parsed = JSON.parse(localStorage.getItem(QUICK_ACTIONS_STORAGE_KEY) || '[]');
-    if (!Array.isArray(parsed)) return [];
-    const allowed = new Set<QuickActionId>(['home', 'stats', 'notifications', 'stickers', 'upload', 'profile', 'admin', 'palette']);
-    return parsed.filter((id): id is QuickActionId => allowed.has(id)).slice(0, MAX_QUICK_ACTIONS);
-  } catch {
-    return [];
-  }
-}
 
 function readStoredFontZoom() {
   if (typeof window === 'undefined') return 1;
@@ -70,8 +65,13 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isQuickCustomizeOpen, setIsQuickCustomizeOpen] = useState(false);
-  const [quickActionIds, setQuickActionIds] = useState<QuickActionId[]>(readStoredQuickActions);
+  const [quickActionIds, setQuickActionIds] = useState<QuickActionId[]>(() => readLocalQuickPreferences().quickActionIds);
+  const [quickLabelMode, setQuickLabelMode] = useState<QuickLabelMode>(() => readLocalQuickPreferences().quickLabelMode);
   const [fontZoom, setFontZoom] = useState(readStoredFontZoom);
+  const [draggedQuickId, setDraggedQuickId] = useState<QuickActionId | null>(null);
+  const [quickSyncStatus, setQuickSyncStatus] = useState('');
+  const draggedQuickIdRef = useRef<QuickActionId | null>(null);
+  const cloudSaveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -80,6 +80,51 @@ export const Navbar: React.FC<NavbarProps> = ({
       if (document.body.dataset.mainTab === currentTab) delete document.body.dataset.mainTab;
     };
   }, [currentTab]);
+
+  useEffect(() => {
+    return () => {
+      if (cloudSaveTimerRef.current !== null) window.clearTimeout(cloudSaveTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser?.id || typeof window === 'undefined') {
+      setQuickSyncStatus(currentUser ? '' : '訪客設定只儲存在此裝置');
+      return;
+    }
+    const sessionKey = `echostars_ui_prefs_loaded_v1:${currentUser.id}`;
+    if (sessionStorage.getItem(sessionKey) === '1') {
+      setQuickSyncStatus('會員快捷設定已啟用跨裝置同步');
+      return;
+    }
+    let cancelled = false;
+    void fetchCloudQuickPreferences()
+      .then(async cloud => {
+        if (cancelled || cloud === undefined) return;
+        sessionStorage.setItem(sessionKey, '1');
+        if (cloud) {
+          const ids = normalizeQuickActionIds(cloud.quickActionIds);
+          const mode = normalizeQuickLabelMode(cloud.quickLabelMode);
+          setQuickActionIds(ids);
+          setQuickLabelMode(mode);
+          writeLocalQuickPreferences(ids, mode);
+          setQuickSyncStatus('已載入跨裝置快捷設定');
+          return;
+        }
+        const local = readLocalQuickPreferences();
+        if (local.quickActionIds.length > 0 || local.quickLabelMode !== 'icons') {
+          await saveCloudQuickPreferences(local.quickActionIds, local.quickLabelMode);
+          if (!cancelled) setQuickSyncStatus('已將此裝置設定同步到會員帳號');
+        } else if (!cancelled) {
+          setQuickSyncStatus('會員快捷設定已啟用跨裝置同步');
+        }
+      })
+      .catch(error => {
+        console.warn('Failed to hydrate quick shortcut preferences:', error);
+        if (!cancelled) setQuickSyncStatus('目前使用本機設定');
+      });
+    return () => { cancelled = true; };
+  }, [currentUser?.id]);
 
   const cleanEmail = currentUser?.email?.toLowerCase().trim();
   const isSuperAdmin = isAdmin || cleanEmail === 'yukidu@gmail.com' || currentUser?.role === '超級管理員';
@@ -171,7 +216,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     try {
       localStorage.setItem(USER_FONT_ZOOM_KEY, String(next));
     } catch {}
-    // homeDensityPolicy owns the global font-size calculation; resize is its existing re-apply signal.
     window.dispatchEvent(new Event('resize'));
   };
 
@@ -209,22 +253,69 @@ export const Navbar: React.FC<NavbarProps> = ({
     .map(id => availableQuickActions.find(option => option.id === id))
     .filter((option): option is NonNullable<typeof option> => Boolean(option));
 
-  const persistQuickActions = (next: QuickActionId[]) => {
-    const normalized = next.slice(0, MAX_QUICK_ACTIONS);
-    setQuickActionIds(normalized);
-    try {
-      localStorage.setItem(QUICK_ACTIONS_STORAGE_KEY, JSON.stringify(normalized));
-    } catch {}
+  const queueCloudSave = (ids: QuickActionId[], mode: QuickLabelMode) => {
+    if (!currentUser?.id) return;
+    if (cloudSaveTimerRef.current !== null) window.clearTimeout(cloudSaveTimerRef.current);
+    setQuickSyncStatus('跨裝置同步中…');
+    cloudSaveTimerRef.current = window.setTimeout(() => {
+      void saveCloudQuickPreferences(ids, mode)
+        .then(saved => {
+          if (saved !== undefined) setQuickSyncStatus('已跨裝置同步');
+        })
+        .catch(error => {
+          console.warn('Failed to save quick shortcut preferences:', error);
+          setQuickSyncStatus('本機已儲存，雲端同步稍後再試');
+        });
+    }, 900);
+  };
+
+  const persistQuickPreferences = (ids: QuickActionId[], mode: QuickLabelMode, sync = true) => {
+    const normalizedIds = normalizeQuickActionIds(ids);
+    const normalizedMode = normalizeQuickLabelMode(mode);
+    setQuickActionIds(normalizedIds);
+    setQuickLabelMode(normalizedMode);
+    writeLocalQuickPreferences(normalizedIds, normalizedMode);
+    if (sync) queueCloudSave(normalizedIds, normalizedMode);
   };
 
   const toggleQuickAction = (id: QuickActionId) => {
     const selected = visibleQuickActionIds;
     if (selected.includes(id)) {
-      persistQuickActions(selected.filter(item => item !== id));
+      persistQuickPreferences(selected.filter(item => item !== id), quickLabelMode);
       return;
     }
     if (selected.length >= MAX_QUICK_ACTIONS) return;
-    persistQuickActions([...selected, id]);
+    persistQuickPreferences([...selected, id], quickLabelMode);
+  };
+
+  const reorderQuickAction = (source: QuickActionId, target: QuickActionId) => {
+    if (source === target) return;
+    const selected = [...visibleQuickActionIds];
+    const from = selected.indexOf(source);
+    const to = selected.indexOf(target);
+    if (from < 0 || to < 0) return;
+    selected.splice(from, 1);
+    selected.splice(to, 0, source);
+    persistQuickPreferences(selected, quickLabelMode);
+  };
+
+  const beginPointerDrag = (id: QuickActionId, event: React.PointerEvent<HTMLButtonElement>) => {
+    draggedQuickIdRef.current = id;
+    setDraggedQuickId(id);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const movePointerDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const source = draggedQuickIdRef.current;
+    if (!source) return;
+    const targetElement = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-quick-sort-id]');
+    const target = targetElement?.dataset.quickSortId as QuickActionId | undefined;
+    if (target && target !== source) reorderQuickAction(source, target);
+  };
+
+  const endPointerDrag = () => {
+    draggedQuickIdRef.current = null;
+    setDraggedQuickId(null);
   };
 
   const quickActionIsActive = (id: QuickActionId) => id !== 'palette' && currentTab === id;
@@ -329,12 +420,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             key={action.id}
             type="button"
-            className={topButtonClass(quickActionIsActive(action.id))}
+            className={`${topButtonClass(quickActionIsActive(action.id))} navbar-top-quick-action ${quickLabelMode === 'labels' ? 'navbar-top-action-with-label' : ''}`}
             onClick={action.onClick}
             title={action.label}
             aria-label={action.label}
           >
             {action.icon}
+            {quickLabelMode === 'labels' && <span className="navbar-top-action-label">{action.label}</span>}
           </button>
         ))}
       </div>
@@ -342,7 +434,6 @@ export const Navbar: React.FC<NavbarProps> = ({
       {isMobileMenuOpen && (
         <div className="mobile-menu-shell">
           <div className="mobile-menu-panel animate-in slide-in-from-top-2">
-            {/* v120 compatibility marker: prevents the v119 DOM font control from being injected into this menu. */}
             <span data-echostars-font-control="moved-to-toolbar" hidden aria-hidden="true" />
 
             <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 mb-1">
@@ -419,34 +510,104 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {isQuickCustomizeOpen && (
               <div className="navbar-quick-customizer px-2 py-2 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700">
-                <p className="px-1 pb-2 text-[11px] font-bold text-slate-500 dark:text-slate-400 whitespace-normal">
-                  選擇最多三個。字體大小與深淺色已固定顯示，不計入三個名額。
-                </p>
+                <div className="navbar-drag-tip mb-2 rounded-lg px-2 py-2 text-[11px] font-black whitespace-normal" role="note">
+                  <span aria-hidden="true">☝️</span> 已選功能可按住左側 <GripVertical className="inline w-3.5 h-3.5 align-[-2px]" /> 拖曳排序，手機、平板、電腦都可以。
+                </div>
+
+                <div className="mb-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/70 p-2">
+                  <div className="mb-1.5 text-[11px] font-black text-slate-600 dark:text-slate-300">置頂顯示方式</div>
+                  <div className="grid grid-cols-2 gap-1" role="group" aria-label="置頂快捷顯示方式">
+                    <button
+                      type="button"
+                      onClick={() => persistQuickPreferences(visibleQuickActionIds, 'icons')}
+                      className={`rounded-lg px-2 py-1.5 text-xs font-bold border ${quickLabelMode === 'icons' ? 'border-[var(--color-primary,#c06c84)] bg-[var(--color-light-pill,#fae8ed)] dark:bg-slate-700' : 'border-slate-200 dark:border-slate-700'}`}
+                      aria-pressed={quickLabelMode === 'icons'}
+                    >
+                      只有圖示
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => persistQuickPreferences(visibleQuickActionIds, 'labels')}
+                      className={`rounded-lg px-2 py-1.5 text-xs font-bold border ${quickLabelMode === 'labels' ? 'border-[var(--color-primary,#c06c84)] bg-[var(--color-light-pill,#fae8ed)] dark:bg-slate-700' : 'border-slate-200 dark:border-slate-700'}`}
+                      aria-pressed={quickLabelMode === 'labels'}
+                    >
+                      圖示＋文字
+                    </button>
+                  </div>
+                </div>
+
+                {visibleQuickActionIds.length > 0 && (
+                  <div className="mb-2 space-y-1" aria-label="已置頂功能排序">
+                    <div className="px-1 text-[11px] font-black text-slate-500 dark:text-slate-400">已置頂（拖曳調整順序）</div>
+                    {visibleQuickActionIds.map(id => {
+                      const action = availableQuickActions.find(option => option.id === id);
+                      if (!action) return null;
+                      return (
+                        <div
+                          key={id}
+                          data-quick-sort-id={id}
+                          draggable
+                          onDragStart={() => { draggedQuickIdRef.current = id; setDraggedQuickId(id); }}
+                          onDragOver={event => {
+                            event.preventDefault();
+                            const source = draggedQuickIdRef.current;
+                            if (source) reorderQuickAction(source, id);
+                          }}
+                          onDragEnd={endPointerDrag}
+                          className={`navbar-quick-sort-row flex items-center gap-2 rounded-lg border px-1.5 py-1.5 bg-white dark:bg-slate-800 ${draggedQuickId === id ? 'is-dragging' : ''}`}
+                        >
+                          <button
+                            type="button"
+                            className="navbar-drag-handle shrink-0 rounded-md p-1.5"
+                            aria-label={`按住拖曳排序：${action.label}`}
+                            title="按住拖曳排序"
+                            onPointerDown={event => beginPointerDrag(id, event)}
+                            onPointerMove={movePointerDrag}
+                            onPointerUp={endPointerDrag}
+                            onPointerCancel={endPointerDrag}
+                          >
+                            <GripVertical className="w-4 h-4" />
+                          </button>
+                          <span className="shrink-0">{action.icon}</span>
+                          <span className="min-w-0 flex-1 truncate text-xs font-bold">{action.label}</span>
+                          <button
+                            type="button"
+                            className="shrink-0 rounded-md px-2 py-1 text-xs font-black"
+                            onClick={() => toggleQuickAction(id)}
+                            aria-label={`取消置頂：${action.label}`}
+                            title="取消置頂"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-1.5">
-                  {availableQuickActions.map(action => {
-                    const selected = visibleQuickActionIds.includes(action.id);
-                    const disabled = !selected && visibleQuickActionIds.length >= MAX_QUICK_ACTIONS;
+                  {availableQuickActions.filter(action => !visibleQuickActionIds.includes(action.id)).map(action => {
+                    const disabled = visibleQuickActionIds.length >= MAX_QUICK_ACTIONS;
                     return (
                       <button
                         key={action.id}
                         type="button"
                         onClick={() => toggleQuickAction(action.id)}
                         disabled={disabled}
-                        className={`flex min-w-0 items-center gap-2 rounded-lg border px-2 py-2 text-xs font-bold transition-colors ${
-                          selected
-                            ? 'border-[var(--color-primary,#c06c84)] bg-[var(--color-light-pill,#fae8ed)] dark:bg-slate-800'
-                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/70'
-                        } disabled:opacity-40`}
-                        aria-pressed={selected}
-                        title={selected ? `取消置頂：${action.label}` : `置頂：${action.label}`}
+                        className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/70 px-2 py-2 text-xs font-bold transition-colors disabled:opacity-40"
+                        title={disabled ? '已選滿三個，請先取消一個' : `置頂：${action.label}`}
                       >
                         <span className="shrink-0">{action.icon}</span>
                         <span className="truncate">{action.label}</span>
-                        <span className="ml-auto shrink-0" aria-hidden="true">{selected ? '✓' : '○'}</span>
+                        <span className="ml-auto shrink-0" aria-hidden="true">＋</span>
                       </button>
                     );
                   })}
                 </div>
+
+                <p className="px-1 pt-2 text-[10px] font-bold text-slate-500 dark:text-slate-400 whitespace-normal">
+                  {quickSyncStatus || (currentUser ? '會員快捷設定會跨裝置同步' : '訪客設定只儲存在此裝置')}
+                </p>
               </div>
             )}
 

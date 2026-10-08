@@ -137,6 +137,69 @@
   min-width: min(21rem, calc(100vw - 3rem)) !important;
 }
 
+/* v121：使用者可選擇只有圖示或圖示＋文字。窄螢幕仍使用既有橫向捲動，不擠壞標題。 */
+.navbar-top-action.navbar-top-action-with-label {
+  width: auto;
+  min-width: 2.25rem;
+  max-width: 10.5rem;
+  flex: 0 0 auto;
+  gap: 0.35rem;
+  padding: 0 0.6rem;
+}
+
+.navbar-top-action-label {
+  max-width: 7.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* v121：把「可以拖曳」直接做成可見提示與握把，不靠使用者猜。 */
+.navbar-drag-tip {
+  color: rgb(71 85 105);
+  background: rgb(241 245 249 / 0.96);
+  border: 1px dashed rgb(148 163 184 / 0.8);
+}
+
+.dark .navbar-drag-tip {
+  color: rgb(226 232 240);
+  background: rgb(15 23 42 / 0.7);
+  border-color: rgb(100 116 139 / 0.9);
+}
+
+.navbar-quick-sort-row {
+  border-color: rgb(226 232 240);
+  transition: opacity 120ms ease, transform 120ms ease, border-color 120ms ease;
+}
+
+.dark .navbar-quick-sort-row {
+  border-color: rgb(71 85 105);
+}
+
+.navbar-quick-sort-row.is-dragging {
+  opacity: 0.62;
+  transform: scale(0.985);
+  border-color: var(--color-primary, #c06c84);
+}
+
+.navbar-drag-handle {
+  cursor: grab;
+  touch-action: none;
+  color: var(--color-primary, #c06c84) !important;
+  background: rgb(241 245 249 / 0.95);
+}
+
+.dark .navbar-drag-handle {
+  background: rgb(51 65 85 / 0.95);
+}
+
+.navbar-drag-handle:active {
+  cursor: grabbing;
+}
+
 /* v110：上傳音檔由全螢幕遮罩改為真正的內容頁。 */
 body[data-main-tab="upload"] main {
   display: none;

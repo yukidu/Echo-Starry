@@ -1,4 +1,4 @@
-import appWorker from './playbackOwnerRouter';
+import appWorker from './uiPreferencesRouter';
 import type { Env } from './index';
 
 const SESSION_COOKIE = 'echostars_session';
