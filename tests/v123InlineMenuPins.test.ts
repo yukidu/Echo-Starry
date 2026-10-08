@@ -7,7 +7,7 @@ const prefs = readFileSync(new URL('../src/quickShortcutPreferences.ts', import.
 const css = readFileSync(new URL('../src/components/Navbar.css', import.meta.url), 'utf8');
 
 test('font and theme controls stay at the top of the hamburger function list', () => {
-  const font = navbar.indexOf("renderPinControl('font', '文字大小')");
+  const font = navbar.indexOf("renderPinControl('font', '字體')");
   const theme = navbar.indexOf("renderPinControl('theme', '淺色／暗色切換')");
   const stats = navbar.indexOf("renderPinControl('stats', '排行榜')");
   assert.ok(font >= 0 && theme >= 0 && stats >= 0);
@@ -15,16 +15,15 @@ test('font and theme controls stay at the top of the hamburger function list', (
   assert.ok(theme < stats);
 });
 
-test('all eligible signed-in hamburger actions expose inline pin controls while home and logout do not', () => {
+test('eligible signed-in hamburger actions expose inline pin controls while fixed header actions do not', () => {
   for (const [id, label] of [
-    ['font', '文字大小'],
+    ['font', '字體'],
     ['theme', '淺色／暗色切換'],
     ['stats', '排行榜'],
     ['notifications', '通知'],
     ['stickers', '我的貼紙'],
     ['upload', '上傳音檔'],
     ['profile', '個人中心'],
-    ['install', '安裝到桌面'],
     ['admin', '後台管理'],
     ['palette', '切換配色']
   ]) {
@@ -32,6 +31,7 @@ test('all eligible signed-in hamburger actions expose inline pin controls while 
   }
   assert.doesNotMatch(navbar, /renderPinControl\('home'/);
   assert.doesNotMatch(navbar, /renderPinControl\('logout'/);
+  assert.doesNotMatch(navbar, /renderPinControl\('install'/);
   assert.doesNotMatch(navbar, /自訂置頂功能/);
 });
 
