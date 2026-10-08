@@ -62,14 +62,23 @@ function installV139Styles() {
 }
 
 function syncGuestMode() {
-  document.documentElement.classList.toggle('echostars-v139-guest', isGuestMode());
+  const guest = isGuestMode();
+  document.documentElement.classList.toggle('echostars-v139-guest', guest);
 
-  if (!isGuestMode()) return;
-  document.querySelectorAll<HTMLElement>('.audio-card span').forEach(span => {
-    if ((span.textContent || '').replace(/\s+/g, '') === '[已聽0%]') {
-      const badge = span.parentElement;
-      if (badge) badge.style.setProperty('display', 'none', 'important');
+  document.querySelectorAll<HTMLElement>('[data-v139-hidden-zero-progress="1"]').forEach(badge => {
+    if (!guest) {
+      badge.style.removeProperty('display');
+      delete badge.dataset.v139HiddenZeroProgress;
     }
+  });
+  if (!guest) return;
+
+  document.querySelectorAll<HTMLElement>('.audio-card span').forEach(span => {
+    if ((span.textContent || '').replace(/\s+/g, '') !== '[已聽0%]') return;
+    const badge = span.parentElement;
+    if (!badge || badge.dataset.v139HiddenZeroProgress === '1') return;
+    badge.dataset.v139HiddenZeroProgress = '1';
+    badge.style.setProperty('display', 'none', 'important');
   });
 }
 
@@ -85,7 +94,9 @@ function syncLuckyButton() {
   if (!button) return;
   const label = button.querySelector<HTMLElement>('span');
   if (label && label.textContent !== '招喚繁星') label.textContent = '招喚繁星';
-  button.title = '從目前條件下可播放的音檔中招喚繁星';
+  if (button.title !== '從目前條件下可播放的音檔中招喚繁星') {
+    button.title = '從目前條件下可播放的音檔中招喚繁星';
+  }
 }
 
 function findCategoryTrigger() {
@@ -97,9 +108,10 @@ function applyCategoryLabel() {
   if (!trigger) return;
   const label = trigger.querySelector<HTMLElement>('span');
   const active = selectedCategoryLabel !== '全部';
-  if (label) label.textContent = active ? selectedCategoryLabel : '分類';
-  if (active) trigger.dataset.v139CategoryActive = '1';
-  else delete trigger.dataset.v139CategoryActive;
+  const desiredText = active ? selectedCategoryLabel : '分類';
+  if (label && label.textContent !== desiredText) label.textContent = desiredText;
+  if (active && trigger.dataset.v139CategoryActive !== '1') trigger.dataset.v139CategoryActive = '1';
+  if (!active && trigger.dataset.v139CategoryActive) delete trigger.dataset.v139CategoryActive;
 }
 
 function cleanOptionLabel(value: string) {
@@ -107,17 +119,18 @@ function cleanOptionLabel(value: string) {
 }
 
 function setUploadTab(page: HTMLElement, tab: 'upload' | 'manage') {
-  page.dataset.v139UploadTab = tab;
+  if (page.dataset.v139UploadTab !== tab) page.dataset.v139UploadTab = tab;
   page.querySelectorAll<HTMLButtonElement>('.v139-upload-tab').forEach(button => {
-    const active = button.dataset.tab === tab;
-    button.setAttribute('aria-selected', active ? 'true' : 'false');
+    const desired = button.dataset.tab === tab ? 'true' : 'false';
+    if (button.getAttribute('aria-selected') !== desired) button.setAttribute('aria-selected', desired);
   });
 
-  const header = page.querySelector<HTMLElement>(':scope > div > div:first-child');
+  const header = page.querySelector<HTMLElement>(':scope > div > div:not(.v139-upload-tabs):first-of-type');
   const heading = header?.querySelector<HTMLElement>('h2');
-  if (heading) heading.textContent = tab === 'manage' ? '管理音檔' : '上傳音檔';
+  const desiredHeading = tab === 'manage' ? '管理音檔' : '上傳音檔';
+  if (heading && heading.textContent !== desiredHeading) heading.textContent = desiredHeading;
   const actionGroup = header?.querySelector<HTMLElement>('div.flex.items-center.gap-2');
-  if (actionGroup) actionGroup.dataset.v139UploadActions = '1';
+  if (actionGroup && actionGroup.dataset.v139UploadActions !== '1') actionGroup.dataset.v139UploadActions = '1';
 }
 
 function syncUploadTabs() {
@@ -150,8 +163,7 @@ function syncUploadTabs() {
       page.firstElementChild?.prepend(tabs);
     }
 
-    const current = page.dataset.v139UploadTab === 'manage' ? 'manage' : 'upload';
-    setUploadTab(page, current);
+    setUploadTab(page, page.dataset.v139UploadTab === 'manage' ? 'manage' : 'upload');
   });
 }
 
@@ -185,7 +197,6 @@ document.addEventListener('click', event => {
   const clickedButton = target.closest<HTMLButtonElement>('button');
   const trigger = findCategoryTrigger();
   if (!clickedButton || !trigger || clickedButton === trigger) return;
-
   const container = trigger.parentElement;
   if (!container?.contains(clickedButton)) return;
 
