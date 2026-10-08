@@ -5,21 +5,25 @@ import { readFileSync } from 'node:fs';
 const navbar = readFileSync(new URL('../src/components/Navbar.tsx', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../src/components/Navbar.v124.css', import.meta.url), 'utf8');
 
-test('visitor login, install and home are grouped at the hamburger upper right', () => {
-  assert.match(navbar, /navbar-menu-header-actions[\s\S]*navbar-menu-install-shortcut[\s\S]*!currentUser[\s\S]*navbar-menu-login-shortcut[\s\S]*登入[\s\S]*navbar-menu-home-shortcut/);
-  assert.match(navbar, /onClick=\{\(\) => handleMobileNav\('profile'\)\}[\s\S]*className="navbar-menu-login-shortcut"/);
-  assert.match(css, /\.navbar-menu-install-shortcut[\s\S]*flex-direction:\s*column/);
+test('identity opens login/profile while the header only contains mood and home actions', () => {
+  const head = navbar.slice(navbar.indexOf('<div className="navbar-menu-profile-head'), navbar.indexOf('<div className={`${menuRowClass(false)} navbar-menu-font-row`}>'));
+  assert.match(head, /navbar-menu-identity[\s\S]*登入繁星回聲/);
+  assert.match(head, /onClick=\{\(\) => handleMobileNav\('profile'\)\}/);
+  assert.match(head, /navbar-menu-header-actions[\s\S]*navbar-menu-palette-shortcut[\s\S]*navbar-menu-home-shortcut/);
+  assert.doesNotMatch(head, /InstallAppButton|navbar-menu-login-shortcut/);
+  assert.match(css, /\.navbar-menu-home-shortcut,[\s\S]*flex-direction:\s*column/);
+  assert.doesNotMatch(css, /navbar-menu-home-shortcut span[\s\S]*display:\s*none/);
 });
 
-test('install is a fixed hamburger header action and no longer a pin-able list row', () => {
+test('installation remains available as a list entry outside the header without a pin', () => {
   assert.match(navbar, /install:\s*false/);
+  assert.match(navbar, /<InstallAppButton onOpenIOSGuide=\{handleInstallGuide\} className=\{menuActionClass\}/);
   assert.doesNotMatch(navbar, /renderPinControl\('install'/);
-  assert.doesNotMatch(navbar, /echostars-install-menu-action/);
 });
 
 test('hamburger font label is 字體 and theme row omits current light-dark status text', () => {
   assert.match(navbar, /renderPinControl\('font', '字體'\)/);
-  assert.match(navbar, /<span className="min-w-0 flex-1">字體<\/span>/);
+  assert.match(navbar, /<span className="navbar-menu-font-label">字體<\/span>/);
   assert.doesNotMatch(navbar, /目前\{isDark \? '暗色' : '淺色'\}/);
 });
 

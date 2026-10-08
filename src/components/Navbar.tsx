@@ -151,7 +151,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const stickerBalanceText = stickerBalance === undefined
     ? '…'
     : (Number.isInteger(stickerBalance) ? String(stickerBalance) : stickerBalance.toFixed(1));
-  const stickerMenuTitle = currentUser ? `我的貼紙 ${stickerBalanceText} 張` : '我的貼紙(會員專屬)';
+  const stickerMenuTitle = currentUser ? `我的貼紙 ${stickerBalanceText} 張` : '我的貼紙';
 
   const displayName = currentUser?.name || visitor?.fullName || '勇敢的獅子';
   const displayRole = !currentUser
@@ -163,6 +163,11 @@ export const Navbar: React.FC<NavbarProps> = ({
     : currentUser.isContributor
     ? '貢獻者'
     : effectiveMemberRank(currentUser, '會員');
+
+  const identityAvatar = currentUser?.avatar?.trim() || (!currentUser ? visitor?.emoji || '🦁' : '👤');
+  const identityAvatarIsImage = /^(?:https?:|data:|blob:|\/)/i.test(identityAvatar);
+  const identityNameSize = Math.max(0.45, Math.min(1, 3 / Array.from(displayName).length));
+  const identityRoleSize = Math.max(0.45, Math.min(0.75, 3 / Array.from(displayRole).length));
 
   const userRank = currentUser ? effectiveMemberRank(currentUser, '') : '';
   const isDiamondOrAbove = isAdministrator || isSuperAdmin || userRank.includes('鑽石') || userRank.includes('皇冠') || userRank.includes('大使');
@@ -517,19 +522,22 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {isMobileMenuOpen && (
         <div className="mobile-menu-shell">
-          <div className="mobile-menu-panel animate-in slide-in-from-top-2" style={{ zoom: 1 / fontZoom } as React.CSSProperties}>
+          <div className="mobile-menu-panel animate-in slide-in-from-top-2" data-react-menu="true" style={{ '--navbar-font-zoom': fontZoom, zoom: 1 / fontZoom } as React.CSSProperties}>
             <div className="navbar-menu-profile-head px-3 py-2 border-b border-slate-200 dark:border-slate-700 mb-1">
-              <div className="min-w-0">
-                <div className="font-black text-sm text-slate-800 dark:text-slate-100 truncate max-w-[18rem]">{displayName}</div>
-                <div className="text-xs font-bold" style={{ color: 'var(--color-primary,#c06c84)' }}>{displayRole}</div>
-              </div>
+              <button type="button" onClick={() => handleMobileNav('profile')} className="navbar-menu-identity" aria-label={currentUser ? '開啟個人中心' : '登入繁星回聲'}>
+                <span className="navbar-menu-identity-icon" aria-hidden="true">
+                  {identityAvatarIsImage ? <img src={identityAvatar} alt="" /> : identityAvatar}
+                </span>
+                <span className="navbar-menu-identity-text">
+                  <span className="navbar-menu-identity-name" style={{ fontSize: `${identityNameSize}rem` }} title={displayName}>{displayName}</span>
+                  <span className="navbar-menu-identity-role" style={{ fontSize: `${identityRoleSize}rem` }}>{displayRole}</span>
+                </span>
+              </button>
               <div className="navbar-menu-header-actions">
-                <InstallAppButton onOpenIOSGuide={handleInstallGuide} className="navbar-menu-install-shortcut" />
-                {!currentUser && (
-                  <button type="button" onClick={() => handleMobileNav('profile')} className="navbar-menu-login-shortcut" title="登入" aria-label="登入">
-                    登入
-                  </button>
-                )}
+                <button type="button" onClick={handleRandomPalette} className="navbar-menu-palette-shortcut" title="好心情" aria-label="好心情">
+                  <Palette className="w-5 h-5 shrink-0" />
+                  <span>好心情</span>
+                </button>
                 <button type="button" onClick={handleMenuHomeRefresh} className="navbar-menu-home-shortcut" title="回首頁並重新整理" aria-label="回首頁">
                   <Home className="w-4 h-4 shrink-0" />
                   <span>回首頁</span>
@@ -608,11 +616,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             )}
 
+            {currentUser && (
+              <div className={menuRowClass(false)}>
+                {renderPinControl('palette', '好心情')}
+                <button type="button" onClick={handleRandomPalette} className={menuActionClass}>
+                  <Palette className="w-4 h-4 shrink-0" /><span>好心情</span>
+                </button>
+              </div>
+            )}
+
             <div className={menuRowClass(false)}>
-              {renderPinControl('palette', '切換配色')}
-              <button type="button" onClick={handleRandomPalette} className={menuActionClass}>
-                <Palette className="w-4 h-4 shrink-0" /><span>切換配色</span>
-              </button>
+              <InstallAppButton onOpenIOSGuide={handleInstallGuide} className={menuActionClass} />
             </div>
 
             {currentUser && (

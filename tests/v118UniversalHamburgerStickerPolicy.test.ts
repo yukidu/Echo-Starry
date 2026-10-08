@@ -25,7 +25,7 @@ test('logout lives in hamburger menu only, not ProfileModal', () => {
 });
 
 test('palette and theme controls remain available after collapsing header actions', () => {
-  assert.equal(navbar.includes('<span>切換配色</span>'), true);
+  assert.equal(navbar.includes('<span>好心情</span>'), true);
   assert.equal(navbar.includes("{isDark ? '切換淺色模式' : '切換深色模式'}"), true);
 });
 

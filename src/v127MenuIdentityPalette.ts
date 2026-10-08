@@ -143,6 +143,7 @@ function ensureIdentityIcon(info: HTMLElement, name: HTMLElement, isVisitor: boo
 }
 
 function syncIdentityHeader(panel: HTMLElement) {
+  if (panel.dataset.reactMenu === 'true') return;
   const head = panel.querySelector<HTMLElement>('.navbar-menu-profile-head');
   const info = head?.firstElementChild as HTMLElement | null;
   if (!head || !info || info.classList.contains('navbar-menu-header-actions')) return;

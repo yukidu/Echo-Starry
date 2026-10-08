@@ -17,7 +17,7 @@ test('pinned actions keep the saved order and support long-press horizontal reor
 });
 
 test('hamburger header removes sync/count text and keeps home playback list in the upper right action group', () => {
-  assert.match(navbar, /navbar-menu-profile-head[\s\S]*navbar-menu-header-actions[\s\S]*navbar-menu-home-shortcut[\s\S]*首頁播放清單/);
+  assert.match(navbar, /navbar-menu-profile-head[\s\S]*navbar-menu-header-actions[\s\S]*navbar-menu-home-shortcut[\s\S]*回首頁/);
   assert.doesNotMatch(navbar, /手機置頂|平板置頂|桌機置頂/);
   assert.doesNotMatch(navbar, /已跨裝置同步|已載入跨裝置設定|同步中…|本機已儲存，稍後再同步/);
   assert.equal((navbar.match(/onClick=\{handleLogoClick\} className=\{menuRowClass/g) || []).length, 0);

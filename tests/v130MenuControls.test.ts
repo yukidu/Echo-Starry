@@ -21,7 +21,7 @@ test('home shortcut displays 回首頁 and refreshes or navigates home', () => {
 });
 
 test('hamburger menu stays independent from content font zoom and keeps controls left aligned', () => {
-  assert.match(navbar, /style=\{\{ zoom: 1 \/ fontZoom \} as React\.CSSProperties\}/);
+  assert.match(navbar, /style=\{\{ '--navbar-font-zoom': fontZoom, zoom: 1 \/ fontZoom \} as React\.CSSProperties\}/);
   assert.match(navbar, /navbar-menu-font-controls/);
   assert.match(navbarCss, /\.navbar-menu-font-controls \{[\s\S]*justify-content: flex-start/);
 });

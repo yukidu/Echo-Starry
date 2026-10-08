@@ -252,6 +252,7 @@ function syncMenuPolish() {
   syncFontMinusButtons();
   document.querySelectorAll<HTMLElement>('.mobile-menu-panel').forEach(panel => {
     removeLegacyFontControl(panel);
+    if (panel.dataset.reactMenu === 'true') return;
     addVisitorAnimal(panel);
     simplifyVisitorStickerLabel(panel);
     syncInstalledHeaderAction(panel);

@@ -7,7 +7,7 @@
   z-index: 50;
   display: flex;
   justify-content: flex-end;
-  padding: 0.75rem;
+  padding: 12px;
   border-top: 1px solid rgb(226 232 240 / 0.8);
   background: transparent;
   pointer-events: none;
@@ -20,9 +20,9 @@
 .mobile-menu-panel {
   display: inline-flex;
   box-sizing: border-box;
-  width: min(22.5rem, calc(100vw - 1.5rem));
-  max-width: min(22.5rem, calc(100vw - 1.5rem));
-  max-height: calc(100dvh - 5rem);
+  width: max-content;
+  max-width: min(22.5rem, calc((100vw - 24px) * var(--navbar-font-zoom, 1)));
+  max-height: calc((100dvh - 80px) * var(--navbar-font-zoom, 1));
   overflow-y: auto;
   flex-direction: column;
   align-items: stretch;
@@ -371,9 +371,39 @@ body[data-main-tab="upload"]:not(:has(.upload-modal-overlay)) main {
     left: 8.7rem;
     right: 4rem;
   }
+}
 
-  .mobile-menu-panel {
-    width: calc(100vw - 1rem);
-    max-width: calc(100vw - 1rem);
-  }
+/* Keep the header frame fixed while content font sizes change. */
+.navbar-main-row {
+  height: 56px;
+  padding-inline: 12px;
+  gap: 12px;
+}
+.navbar-main-row > [data-main-menu="hamburger"] {
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+}
+.navbar-main-row > [data-main-menu="hamburger"] > svg {
+  width: 24px;
+  height: 24px;
+}
+@media (min-width: 640px) {
+  .navbar-main-row { height: 64px; padding-inline: 24px; }
+}
+@media (min-width: 1024px) {
+  .navbar-main-row { padding-inline: 32px; }
+}
+.mobile-menu-panel[data-react-menu] .navbar-menu-palette-shortcut > svg {
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+}
+
+.mobile-menu-panel .sticker-menu-amount {
+  font-size: 2rem !important;
+  line-height: 1;
+  vertical-align: middle;
+}
+.mobile-menu-panel[data-react-menu] .navbar-menu-palette-shortcut > span {
+  font-size: 0.72rem !important;
 }

@@ -24,14 +24,55 @@
   pointer-events: none;
 }
 
-/* v124/v125：漢堡選單個人資料列右上角固定放安裝、登入（訪客）與首頁。 */
+/* React owns the identity and the two header actions. Rem units cancel page zoom. */
 .navbar-menu-profile-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
-
+.navbar-menu-identity {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: left;
+}
+.navbar-menu-identity-icon {
+  display: inline-flex;
+  flex: 0 0 3rem;
+  width: 3rem;
+  height: 3rem;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  font-size: 2rem;
+}
+.navbar-menu-identity-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.navbar-menu-identity-text {
+  display: flex;
+  flex-direction: column;
+  width: 3rem;
+  flex: 0 0 3rem;
+  text-align: left;
+}
+.navbar-menu-identity-name,
+.navbar-menu-identity-role {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+}
+.navbar-menu-identity-role {
+  color: var(--color-primary, #c06c84) !important;
+}
 .navbar-menu-header-actions {
   display: inline-flex;
   flex: 0 0 auto;
@@ -39,112 +80,27 @@
   justify-content: flex-end;
   gap: 0.35rem;
 }
-
 .navbar-menu-home-shortcut,
-.navbar-menu-login-shortcut,
-.navbar-menu-install-shortcut {
+.navbar-menu-palette-shortcut {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-width: 3.3rem;
+  min-height: 3rem;
+  padding: 0.4rem 0.5rem;
   border-radius: 0.65rem;
   background: rgb(241 245 249);
   color: rgb(51 65 85);
-}
-
-.dark .navbar-menu-home-shortcut,
-.dark .navbar-menu-login-shortcut,
-.dark .navbar-menu-install-shortcut {
-  background: rgb(51 65 85);
-  color: rgb(241 245 249);
-}
-
-.navbar-menu-home-shortcut {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  min-height: 2.75rem;
-  padding: 0.35rem 0.6rem;
   font-size: 0.72rem;
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
 }
-
-.navbar-menu-login-shortcut {
-  display: inline-flex;
-  min-width: 2.7rem;
-  min-height: 2.75rem;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  padding: 0.35rem 0.5rem;
-  font-size: 0.72rem;
-  font-weight: 900;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-/* 安裝入口改成圖案在上、文字在下的兩行排列。 */
-.navbar-menu-install-shortcut {
-  display: inline-flex !important;
-  width: 3.45rem;
-  min-height: 2.75rem;
-  flex: 0 0 3.45rem;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.12rem;
-  padding: 0.3rem 0.22rem;
-  font-size: 0.58rem;
-  font-weight: 850;
-  line-height: 1.05;
-  white-space: nowrap;
-}
-
-.navbar-menu-install-shortcut > svg {
-  width: 1rem;
-  height: 1rem;
-  flex: 0 0 auto;
-}
-
-.navbar-menu-install-shortcut > span {
-  margin: 0 !important;
-  font-size: 0.58rem !important;
-  font-weight: 850 !important;
-  line-height: 1.05 !important;
-  color: inherit !important;
-}
-
-/* InstallAppButton 原本的狀態小字不在選單頂部重複顯示。 */
-.navbar-menu-install-shortcut > span:last-child {
-  display: none !important;
-}
-
-@media (max-width: 420px) {
-  .navbar-menu-profile-head {
-    gap: 0.45rem;
-  }
-
-  .navbar-menu-header-actions {
-    gap: 0.25rem;
-  }
-
-  .navbar-menu-home-shortcut span {
-    display: none;
-  }
-
-  .navbar-menu-home-shortcut {
-    width: 2.5rem;
-    min-height: 2.75rem;
-    padding-inline: 0;
-  }
-
-  .navbar-menu-login-shortcut {
-    min-width: 2.45rem;
-    padding-inline: 0.35rem;
-  }
-
-  .navbar-menu-install-shortcut {
-    width: 3.15rem;
-    flex-basis: 3.15rem;
-  }
+.dark .navbar-menu-home-shortcut,
+.dark .navbar-menu-palette-shortcut {
+  background: rgb(51 65 85);
+  color: rgb(241 245 249);
 }

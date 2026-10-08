@@ -30,7 +30,7 @@ test('font zoom starts at 100 percent and does not scale the hamburger menu', ()
   assert.match(navbar, /Math\.max\(1, value\)/);
   assert.match(navbar, /Math\.max\(1, fontZoom \+ delta\)/);
   assert.match(navbar, /disabled=\{fontZoom <= 1\}/);
-  assert.match(navbar, /style=\{\{ zoom: 1 \/ fontZoom \} as React\.CSSProperties\}/);
+  assert.match(navbar, /style=\{\{ '--navbar-font-zoom': fontZoom, zoom: 1 \/ fontZoom \} as React\.CSSProperties\}/);
   assert.match(navbar, /navbar-menu-font-controls/);
   assert.match(navbarCss, /\.navbar-menu-font-controls \{[\s\S]*justify-content: flex-start/);
 });
@@ -51,7 +51,7 @@ test('logout and reset menu are rendered on the same persistent footer row', () 
 });
 
 test('menu width is compact while preserving right-aligned trailing controls', () => {
-  assert.match(navbarCss, /width: min\(22\.5rem, calc\(100vw - 1\.5rem\)\)/);
+  assert.match(navbarCss, /max-width: min\(22\.5rem, calc\(\(100vw - 24px\) \* var\(--navbar-font-zoom, 1\)\)\)/);
   assert.match(navbarCss, /\.mobile-menu-row \.navbar-menu-trailing \{[\s\S]*margin-left: auto/);
 });
 
