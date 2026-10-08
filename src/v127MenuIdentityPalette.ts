@@ -110,11 +110,12 @@ function ensureIdentityIcon(info: HTMLElement, name: HTMLElement, isVisitor: boo
   let icon = name.querySelector<HTMLElement>('.v127-identity-icon, .v126-visitor-animal');
   if (!icon) {
     icon = document.createElement('span');
-    icon.className = 'v127-identity-icon';
+    icon.className = isVisitor ? 'v126-visitor-animal v127-identity-icon' : 'v127-identity-icon';
     icon.setAttribute('aria-hidden', 'true');
     name.prepend(icon);
   }
   icon.classList.add('v127-identity-icon');
+  if (isVisitor) icon.classList.add('v126-visitor-animal');
 
   const avatar = isVisitor ? readVisitorEmoji() : readMemberAvatar();
   const identityKey = `${isVisitor ? 'visitor' : 'member'}:${avatar || 'default'}`;
