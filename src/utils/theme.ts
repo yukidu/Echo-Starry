@@ -61,34 +61,18 @@ export const DARK_THEME: ThemePalette = {
   borderSubtle: '#23293b'
 };
 
-// v128: keep one local visual history slot. This is deliberately in-memory only:
-// no Worker / D1 / KV / R2 request is needed for a purely visual undo action.
-let displayedLightPalette: ThemePalette | null = null;
-let previousDisplayedLightPalette: ThemePalette | null = null;
-let lastRequestedPaletteId: string | null = null;
-let overrideRequestedPaletteId: string | null = null;
-
 export function getRandomLightPalette(excludeId?: string): ThemePalette {
-  const excludedIds = new Set<string>();
-  if (excludeId) excludedIds.add(excludeId);
-
-  // When the user has stepped back visually, App still holds its last requested
-  // palette until the next random choice. Exclude both so "random" always changes
-  // the visible color instead of accidentally picking the same palette again.
-  if (displayedLightPalette?.id) excludedIds.add(displayedLightPalette.id);
-
-  const filtered = LIGHT_PALETTES.filter(p => !excludedIds.has(p.id));
+  const filtered = excludeId ? LIGHT_PALETTES.filter(p => p.id !== excludeId) : LIGHT_PALETTES;
   const pool = filtered.length > 0 ? filtered : LIGHT_PALETTES;
-  const index = Math.floor(Math.random() * pool.length);
-  return pool[index];
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function paintThemeToDom(palette: ThemePalette, isDark: boolean) {
+/**
+ * Requirement 20: 淺色系切換、深色系切換，主視覺色會維持同一個顏色。
+ */
+export function applyThemeToDom(palette: ThemePalette, isDark: boolean) {
   const root = document.documentElement;
 
-  // Keep the browser chrome and installed PWA top bar in sync with the exact
-  // palette primary color. Chromium uses the live theme-color meta value for
-  // both normal tabs and standalone PWA window chrome.
   let themeColorMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
   if (!themeColorMeta) {
     themeColorMeta = document.createElement('meta');
@@ -97,8 +81,6 @@ function paintThemeToDom(palette: ThemePalette, isDark: boolean) {
   }
   themeColorMeta.content = palette.primary;
 
-  // Primary color and accents ALWAYS stay identical across dark and light modes!
-  // 置頂麥克風 logo 填色即為 var(--color-primary)
   root.style.setProperty('--color-primary', palette.primary);
   root.style.setProperty('--color-primary-hover', palette.primaryHover);
   root.style.setProperty('--color-accent-scrubber', palette.primary);
@@ -115,7 +97,6 @@ function paintThemeToDom(palette: ThemePalette, isDark: boolean) {
   } else {
     root.classList.remove('dark');
     root.style.setProperty('--color-light-pill', palette.lightPill);
-    // Requirement 7: 恢復漂亮淺色系框框底色
     root.style.setProperty('--theme-box-bg', '#ffffff');
     root.style.setProperty('--color-primary-50', `${palette.primary}15`);
     root.style.setProperty('--theme-gradient-bg', palette.gradientBg);
@@ -124,54 +105,4 @@ function paintThemeToDom(palette: ThemePalette, isDark: boolean) {
     root.style.setProperty('--theme-text-secondary', palette.textSecondary);
     root.style.setProperty('--theme-border-subtle', palette.borderSubtle);
   }
-}
-
-export function canRestorePreviousLightPalette() {
-  return previousDisplayedLightPalette !== null;
-}
-
-export function restorePreviousLightPalette(isDark: boolean) {
-  if (!displayedLightPalette || !previousDisplayedLightPalette) return false;
-
-  const current = displayedLightPalette;
-  displayedLightPalette = previousDisplayedLightPalette;
-  previousDisplayedLightPalette = current;
-
-  // App still owns the requested palette state. While the displayed palette is
-  // stepped back, remember that requested id so a light/dark toggle keeps the
-  // restored color. A genuinely new random palette clears this override below.
-  overrideRequestedPaletteId =
-    lastRequestedPaletteId && displayedLightPalette.id !== lastRequestedPaletteId
-      ? lastRequestedPaletteId
-      : null;
-
-  paintThemeToDom(displayedLightPalette, isDark);
-  return true;
-}
-
-/**
- * Requirement 20: 淺色系切換、深色系切換，主視覺色會維持同一個顏色。
- */
-export function applyThemeToDom(palette: ThemePalette, isDark: boolean) {
-  lastRequestedPaletteId = palette.id;
-
-  // A mode-only change from App can re-submit its current palette. If the user
-  // has just chosen「上一色」, keep the restored palette while still applying the
-  // requested light/dark mode. A new palette id means a true random-color change.
-  if (
-    overrideRequestedPaletteId &&
-    palette.id === overrideRequestedPaletteId &&
-    displayedLightPalette
-  ) {
-    paintThemeToDom(displayedLightPalette, isDark);
-    return;
-  }
-
-  overrideRequestedPaletteId = null;
-  if (!displayedLightPalette || displayedLightPalette.id !== palette.id) {
-    previousDisplayedLightPalette = displayedLightPalette;
-    displayedLightPalette = palette;
-  }
-
-  paintThemeToDom(displayedLightPalette, isDark);
 }
