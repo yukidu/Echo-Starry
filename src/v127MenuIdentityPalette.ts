@@ -75,53 +75,6 @@ function installStyles() {
       border-radius: inherit;
       object-fit: cover;
     }
-    .v129-refresh-control,
-    .v129-refresh-shortcut {
-      border: 0;
-      cursor: pointer;
-      color: rgb(51 65 85);
-      background: rgb(241 245 249);
-      font-weight: 850;
-      white-space: nowrap;
-      transition: transform 120ms ease, background-color 120ms ease;
-    }
-    .dark .v129-refresh-control,
-    .dark .v129-refresh-shortcut {
-      color: rgb(241 245 249);
-      background: rgb(51 65 85);
-    }
-    .v129-refresh-control:hover,
-    .v129-refresh-shortcut:hover {
-      transform: translateY(-1px);
-      background: color-mix(in srgb, var(--color-light-pill,#fae8ed) 68%, rgb(241 245 249));
-    }
-    .v129-refresh-control {
-      flex: 0 0 auto;
-      min-width: 4.65rem;
-      min-height: 2rem;
-      padding: 0.25rem 0.45rem;
-      border-radius: 0.62rem;
-      font-size: 0.68rem;
-      line-height: 1;
-    }
-    .v129-refresh-shortcut {
-      display: inline-flex;
-      width: 3.15rem;
-      min-height: 2.75rem;
-      flex: 0 0 3.15rem;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 0.1rem;
-      padding: 0.28rem 0.16rem;
-      border-radius: 0.65rem;
-      font-size: 0.54rem;
-      line-height: 1;
-    }
-    .v129-refresh-shortcut > strong {
-      font-size: 1rem;
-      line-height: 0.9;
-    }
   `;
   document.head.appendChild(style);
 }
@@ -213,50 +166,6 @@ function syncIdentityHeader(panel: HTMLElement) {
   fitThreeCharacterWidth(role, visibleText(role), 12, 8.5);
 }
 
-function findPaletteAction(panel: HTMLElement) {
-  return Array.from(panel.querySelectorAll<HTMLButtonElement>('.mobile-menu-row > button'))
-    .find(button => (button.textContent || '').includes('切換配色')) || null;
-}
-
-function createRefreshButton(className: string) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = className;
-  button.title = '重新整理頁面';
-  button.setAttribute('aria-label', '重新整理頁面');
-  if (className.includes('shortcut')) {
-    const icon = document.createElement('strong');
-    icon.setAttribute('aria-hidden', 'true');
-    icon.textContent = '↻';
-    const text = document.createElement('span');
-    text.textContent = '重新整理';
-    button.append(icon, text);
-  } else {
-    button.textContent = '↻ 重新整理';
-  }
-  button.addEventListener('click', event => {
-    event.preventDefault();
-    event.stopPropagation();
-    window.location.reload();
-  });
-  return button;
-}
-
-function syncRefreshControls(panel: HTMLElement) {
-  const paletteButton = findPaletteAction(panel);
-  const paletteRow = paletteButton?.closest<HTMLElement>('.mobile-menu-row') || null;
-
-  if (paletteRow && !paletteRow.querySelector('.v129-refresh-control')) {
-    paletteRow.appendChild(createRefreshButton('v129-refresh-control'));
-  }
-
-  const headerPalette = panel.querySelector<HTMLElement>('.navbar-menu-palette-shortcut');
-  const headerActions = headerPalette?.parentElement;
-  if (headerPalette && headerActions && !headerActions.querySelector('.v129-refresh-shortcut')) {
-    headerPalette.insertAdjacentElement('afterend', createRefreshButton('v129-refresh-shortcut'));
-  }
-}
-
 function syncTopToolbarAlignment() {
   const toolbar = document.querySelector<HTMLElement>('[data-echostars-top-toolbar="true"]');
   const title = document.querySelector<HTMLElement>('.brand-logo-glow .echo-wave-text');
@@ -276,10 +185,7 @@ function syncTopToolbarAlignment() {
 function syncMenuUi() {
   installStyles();
   syncTopToolbarAlignment();
-  document.querySelectorAll<HTMLElement>('.mobile-menu-panel').forEach(panel => {
-    syncIdentityHeader(panel);
-    syncRefreshControls(panel);
-  });
+  document.querySelectorAll<HTMLElement>('.mobile-menu-panel').forEach(syncIdentityHeader);
 }
 
 function scheduleMenuSync() {
@@ -287,33 +193,6 @@ function scheduleMenuSync() {
   window.requestAnimationFrame(() => {
     syncMenuUi();
     window.requestAnimationFrame(syncMenuUi);
-  });
-}
-
-function isPaletteClickInsideMenu(target: Element) {
-  const panel = target.closest('.mobile-menu-panel');
-  if (!panel) return false;
-  if (target.closest('.navbar-menu-palette-shortcut')) return true;
-  const button = target.closest<HTMLButtonElement>('.mobile-menu-row > button');
-  return Boolean(button && (button.textContent || '').includes('切換配色'));
-}
-
-let paletteReopenScheduled = false;
-function keepMenuOpenAfterPalette() {
-  if (paletteReopenScheduled) return;
-  paletteReopenScheduled = true;
-
-  const ensureOpen = () => {
-    if (!document.querySelector('.mobile-menu-panel')) {
-      document.querySelector<HTMLButtonElement>('button[data-main-menu="hamburger"]')?.click();
-    }
-    scheduleMenuSync();
-  };
-
-  window.setTimeout(ensureOpen, 0);
-  window.requestAnimationFrame(() => {
-    ensureOpen();
-    paletteReopenScheduled = false;
   });
 }
 
@@ -343,11 +222,6 @@ document.addEventListener('click', event => {
     event.preventDefault();
     event.stopPropagation();
     activateIdentity(identity);
-    return;
-  }
-
-  if (isPaletteClickInsideMenu(target)) {
-    keepMenuOpenAfterPalette();
     return;
   }
 
