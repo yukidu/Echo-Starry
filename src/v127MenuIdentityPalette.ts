@@ -1,8 +1,3 @@
-import {
-  canRestorePreviousLightPalette,
-  restorePreviousLightPalette
-} from './utils/theme';
-
 const VISITOR_KEY = 'sq_visitor_identity_v1';
 const USER_KEY = 'sq_current_user_v1';
 const STYLE_ID = 'echostars-v127-menu-identity-palette';
@@ -80,45 +75,40 @@ function installStyles() {
       border-radius: inherit;
       object-fit: cover;
     }
-    .v128-palette-back-control,
-    .v128-palette-back-shortcut {
+    .v129-refresh-control,
+    .v129-refresh-shortcut {
       border: 0;
       cursor: pointer;
       color: rgb(51 65 85);
       background: rgb(241 245 249);
       font-weight: 850;
       white-space: nowrap;
-      transition: opacity 120ms ease, transform 120ms ease, background-color 120ms ease;
+      transition: transform 120ms ease, background-color 120ms ease;
     }
-    .dark .v128-palette-back-control,
-    .dark .v128-palette-back-shortcut {
+    .dark .v129-refresh-control,
+    .dark .v129-refresh-shortcut {
       color: rgb(241 245 249);
       background: rgb(51 65 85);
     }
-    .v128-palette-back-control:hover:not(:disabled),
-    .v128-palette-back-shortcut:hover:not(:disabled) {
+    .v129-refresh-control:hover,
+    .v129-refresh-shortcut:hover {
       transform: translateY(-1px);
       background: color-mix(in srgb, var(--color-light-pill,#fae8ed) 68%, rgb(241 245 249));
     }
-    .v128-palette-back-control:disabled,
-    .v128-palette-back-shortcut:disabled {
-      cursor: default;
-      opacity: 0.34;
-    }
-    .v128-palette-back-control {
+    .v129-refresh-control {
       flex: 0 0 auto;
-      min-width: 3.7rem;
+      min-width: 4.65rem;
       min-height: 2rem;
       padding: 0.25rem 0.45rem;
       border-radius: 0.62rem;
       font-size: 0.68rem;
       line-height: 1;
     }
-    .v128-palette-back-shortcut {
+    .v129-refresh-shortcut {
       display: inline-flex;
-      width: 2.55rem;
+      width: 3.15rem;
       min-height: 2.75rem;
-      flex: 0 0 2.55rem;
+      flex: 0 0 3.15rem;
       flex-direction: column;
       align-items: center;
       justify-content: center;
@@ -128,7 +118,7 @@ function installStyles() {
       font-size: 0.54rem;
       line-height: 1;
     }
-    .v128-palette-back-shortcut > strong {
+    .v129-refresh-shortcut > strong {
       font-size: 1rem;
       line-height: 0.9;
     }
@@ -196,7 +186,6 @@ function ensureIdentityIcon(info: HTMLElement, name: HTMLElement, isVisitor: boo
     icon.textContent = avatar || (isVisitor ? '🦁' : '👤');
   }
 
-  // Keep the absolute icon anchored to the whole two-line identity block.
   if (getComputedStyle(info).position === 'static') info.style.position = 'relative';
 }
 
@@ -229,57 +218,67 @@ function findPaletteAction(panel: HTMLElement) {
     .find(button => (button.textContent || '').includes('切換配色')) || null;
 }
 
-function createPaletteBackButton(className: string) {
+function createRefreshButton(className: string) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = className;
-  button.title = '回到上一個配色';
-  button.setAttribute('aria-label', '上一個配色');
+  button.title = '重新整理頁面';
+  button.setAttribute('aria-label', '重新整理頁面');
   if (className.includes('shortcut')) {
     const icon = document.createElement('strong');
     icon.setAttribute('aria-hidden', 'true');
-    icon.textContent = '↶';
+    icon.textContent = '↻';
     const text = document.createElement('span');
-    text.textContent = '上一色';
+    text.textContent = '重新整理';
     button.append(icon, text);
   } else {
-    button.textContent = '↶ 上一色';
+    button.textContent = '↻ 重新整理';
   }
   button.addEventListener('click', event => {
     event.preventDefault();
     event.stopPropagation();
-    const isDark = document.documentElement.classList.contains('dark');
-    restorePreviousLightPalette(isDark);
-    syncMenuUi();
+    window.location.reload();
   });
   return button;
 }
 
-function syncPaletteBackControls(panel: HTMLElement) {
-  const canGoBack = canRestorePreviousLightPalette();
+function syncRefreshControls(panel: HTMLElement) {
   const paletteButton = findPaletteAction(panel);
   const paletteRow = paletteButton?.closest<HTMLElement>('.mobile-menu-row') || null;
 
-  if (paletteRow && !paletteRow.querySelector('.v128-palette-back-control')) {
-    paletteRow.appendChild(createPaletteBackButton('v128-palette-back-control'));
+  if (paletteRow && !paletteRow.querySelector('.v129-refresh-control')) {
+    paletteRow.appendChild(createRefreshButton('v129-refresh-control'));
   }
-  paletteRow?.querySelectorAll<HTMLButtonElement>('.v128-palette-back-control')
-    .forEach(button => { button.disabled = !canGoBack; });
 
   const headerPalette = panel.querySelector<HTMLElement>('.navbar-menu-palette-shortcut');
   const headerActions = headerPalette?.parentElement;
-  if (headerPalette && headerActions && !headerActions.querySelector('.v128-palette-back-shortcut')) {
-    headerPalette.insertAdjacentElement('afterend', createPaletteBackButton('v128-palette-back-shortcut'));
+  if (headerPalette && headerActions && !headerActions.querySelector('.v129-refresh-shortcut')) {
+    headerPalette.insertAdjacentElement('afterend', createRefreshButton('v129-refresh-shortcut'));
   }
-  headerActions?.querySelectorAll<HTMLButtonElement>('.v128-palette-back-shortcut')
-    .forEach(button => { button.disabled = !canGoBack; });
+}
+
+function syncTopToolbarAlignment() {
+  const toolbar = document.querySelector<HTMLElement>('[data-echostars-top-toolbar="true"]');
+  const title = document.querySelector<HTMLElement>('.brand-logo-glow .echo-wave-text');
+  const hamburger = document.querySelector<HTMLElement>('button[data-main-menu="hamburger"]');
+  if (!toolbar || !title || !hamburger) return;
+
+  const titleRect = title.getBoundingClientRect();
+  const hamburgerRect = hamburger.getBoundingClientRect();
+  const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+  const left = Math.ceil(titleRect.right + 8);
+  const right = Math.ceil(Math.max(0, viewportWidth - hamburgerRect.left + 8));
+
+  toolbar.style.left = `${left}px`;
+  toolbar.style.right = `${right}px`;
 }
 
 function syncMenuUi() {
   installStyles();
+  syncTopToolbarAlignment();
   document.querySelectorAll<HTMLElement>('.mobile-menu-panel').forEach(panel => {
     syncIdentityHeader(panel);
-    syncPaletteBackControls(panel);
+    syncRefreshControls(panel);
   });
 }
 
@@ -353,6 +352,7 @@ document.addEventListener('click', event => {
   }
 
   if (target.closest('button[data-main-menu="hamburger"]')) scheduleMenuSync();
+  if (target.closest('button[aria-label="縮小字體"], button[aria-label="放大字體"]')) scheduleMenuSync();
 }, true);
 
 document.addEventListener('keydown', event => {
@@ -365,6 +365,8 @@ document.addEventListener('keydown', event => {
   activateIdentity(target);
 });
 
+window.addEventListener('resize', scheduleMenuSync);
+window.addEventListener('orientationchange', scheduleMenuSync);
 window.addEventListener('pageshow', scheduleMenuSync);
 window.addEventListener('storage', event => {
   if (event.key === USER_KEY || event.key === VISITOR_KEY) scheduleMenuSync();
