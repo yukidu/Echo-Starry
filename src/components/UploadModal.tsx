@@ -1396,7 +1396,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               </div>
 
               <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                勾選「私秘VIP」後，只有擁有專屬 VIP 連結者方可瀏覽與聆聽該音檔（訪客未登入持有連結亦可直接收聽）。此音檔同時也會顯示在首頁清單。
+                私秘 VIP 音檔需先登入，再透過專屬授權連結及音檔權限、貼紙條件播放。訪客首頁是否顯示由「訪客可見」設定決定。
               </p>
 
               {isPrivateVip && (
