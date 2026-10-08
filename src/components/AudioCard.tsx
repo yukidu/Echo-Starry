@@ -51,6 +51,14 @@ export const AudioCard: React.FC<AudioCardProps> = ({
     ? track.categories.map(cat => String(cat || '').trim()).filter(Boolean)
     : [];
 
+  // Visitors do not own or spend stickers. Read the same local member cache used by App
+  // so guest cards never advertise sticker rewards/costs while member cards stay unchanged.
+  const isGuest = (() => {
+    if (typeof window === 'undefined') return false;
+    try { return !window.localStorage.getItem('sq_current_user_v1'); }
+    catch { return true; }
+  })();
+
   // Requirement 10 & 14: Progress badges calculation & accurate duration/time
   const safeDuration = (liveDuration && liveDuration > 0)
     ? liveDuration
@@ -62,7 +70,6 @@ export const AudioCard: React.FC<AudioCardProps> = ({
     : (progressMemory?.currentTime || 0);
   const progressRatio = safeDuration > 0 ? currentTime / safeDuration : 0;
   const isCompleted = progressMemory?.completed || progressRatio >= 0.95;
-  const hasListened2Min = currentTime >= 120 && !isCompleted;
 
   // Requirement 11 (v2.7): 私秘VIP音檔一律顯示鎖頭+「私秘VIP」
   const displayRequiredRank = track.isPrivateVip
@@ -83,6 +90,7 @@ export const AudioCard: React.FC<AudioCardProps> = ({
     ? `${displayRequiredRank}│-${stickerUnlockCost}張貼紙`
     : displayRequiredRank;
   const hasReadAccess = canAccess && isVipUnlocked;
+  const guestProgressPercent = isCompleted ? 100 : Math.max(0, Math.min(100, Math.round(progressRatio * 100)));
 
   const handlePlayClick = (e: React.MouseEvent<HTMLElement>) => {
     e.stopPropagation();
@@ -116,7 +124,14 @@ export const AudioCard: React.FC<AudioCardProps> = ({
               loading="lazy"
             />
 
-            {isCompleted ? (
+            {isGuest ? (
+              <div
+                className="absolute top-0 inset-x-0 text-white text-[6px] sm:text-[7px] font-bold text-center px-0.5 py-1 whitespace-nowrap flex items-center justify-center z-30 shadow-2xs leading-none tracking-[-0.03em]"
+                style={{ backgroundColor: progressRatio > 0 || isCompleted ? 'var(--color-primary, #c06c84)' : 'rgb(0 0 0 / 0.5)' }}
+              >
+                <span className="whitespace-nowrap">[已聽{guestProgressPercent}%]</span>
+              </div>
+            ) : isCompleted ? (
               <div
                 className="absolute top-0 inset-x-0 text-white text-[6px] sm:text-[7px] font-bold text-center px-0.5 py-1 whitespace-nowrap flex items-center justify-center z-30 shadow-2xs leading-none tracking-[-0.03em]"
                 style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
@@ -134,10 +149,10 @@ export const AudioCard: React.FC<AudioCardProps> = ({
 
             <div
               className="absolute bottom-0 inset-x-0 z-30 flex items-center justify-center gap-0.5 bg-black/35 px-0.5 py-[2px] sm:py-0.5 text-[6px] sm:text-[7px] leading-none font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)] whitespace-nowrap tracking-[-0.03em]"
-              title={`收聽權限：${permissionStickerLabel}`}
+              title={`收聽權限：${isGuest ? displayRequiredRank : permissionStickerLabel}`}
             >
               {displayRequiredRank !== '公開' && <Lock className="w-2.5 h-2.5 shrink-0" />}
-              <span className="whitespace-nowrap">{displayRequiredRank}{stickerUnlockCost>0 && <>│<span className="text-emerald-400">-{stickerUnlockCost}</span><span className="text-white">張貼紙</span></>}</span>
+              <span className="whitespace-nowrap">{displayRequiredRank}{!isGuest && stickerUnlockCost>0 && <>│<span className="text-emerald-400">-{stickerUnlockCost}</span><span className="text-white">張貼紙</span></>}</span>
             </div>
           </button>
 

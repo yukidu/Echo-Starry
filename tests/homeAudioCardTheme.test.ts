@@ -11,8 +11,9 @@ test('listening progress badges use the current palette primary color', () => {
   assert.doesNotMatch(audioCard, /bg-blue-600\/95/);
 });
 
-test('portrait access label text is always white', () => {
-  assert.match(audioCard, /收聽權限：\$\{permissionStickerLabel\}/);
+test('portrait access label text is always white and guests do not see sticker costs', () => {
+  assert.match(audioCard, /收聽權限：\$\{isGuest \? displayRequiredRank : permissionStickerLabel\}/);
+  assert.match(audioCard, /\{!isGuest && stickerUnlockCost>0/);
   assert.match(audioCard, /font-black text-white/);
   assert.doesNotMatch(audioCard, /text-amber-300/);
 });
