@@ -21,7 +21,7 @@
   display: inline-flex;
   width: max-content;
   max-width: calc(100vw - 1.5rem);
-  max-height: calc(100dvh - 5.5rem);
+  max-height: calc(100dvh - 7.25rem);
   overflow-y: auto;
   flex-direction: column;
   align-items: stretch;
@@ -86,6 +86,55 @@
   font-weight: 600;
   line-height: 1.25rem;
   color: inherit;
+}
+
+/* v120：置頂主選單固定保留字體縮放與深淺色切換，另可放最多三個自訂快捷功能。 */
+.navbar-top-toolbar {
+  min-height: 2.6rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.navbar-top-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.navbar-top-action {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  transition: background-color 150ms ease, color 150ms ease, opacity 150ms ease, transform 150ms ease;
+}
+
+.navbar-top-action:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.navbar-top-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.navbar-top-toolbar-divider {
+  width: 1px;
+  height: 1.5rem;
+  flex: 0 0 1px;
+  margin: 0 0.15rem;
+  background: rgb(203 213 225 / 0.95);
+}
+
+.dark .navbar-top-toolbar-divider {
+  background: rgb(71 85 105 / 0.95);
+}
+
+.navbar-quick-customizer {
+  width: min(21rem, calc(100vw - 3rem)) !important;
+  min-width: min(21rem, calc(100vw - 3rem)) !important;
 }
 
 /* v110：上傳音檔由全螢幕遮罩改為真正的內容頁。 */
