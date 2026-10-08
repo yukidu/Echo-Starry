@@ -6,13 +6,13 @@ const navbar = readFileSync(new URL('../src/components/Navbar.tsx', import.meta.
 const prefs = readFileSync(new URL('../src/quickShortcutPreferences.ts', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../src/components/Navbar.css', import.meta.url), 'utf8');
 
-test('font and theme controls appear before home in the hamburger menu', () => {
+test('font and theme controls stay at the top of the hamburger function list', () => {
   const font = navbar.indexOf("renderPinControl('font', '文字大小')");
   const theme = navbar.indexOf("renderPinControl('theme', '淺色／暗色切換')");
-  const home = navbar.indexOf('<span>首頁播放清單</span>');
-  assert.ok(font >= 0 && theme >= 0 && home >= 0);
-  assert.ok(font < home);
-  assert.ok(theme < home);
+  const stats = navbar.indexOf("renderPinControl('stats', '排行榜')");
+  assert.ok(font >= 0 && theme >= 0 && stats >= 0);
+  assert.ok(font < stats);
+  assert.ok(theme < stats);
 });
 
 test('all eligible signed-in hamburger actions expose inline pin controls while home and logout do not', () => {
