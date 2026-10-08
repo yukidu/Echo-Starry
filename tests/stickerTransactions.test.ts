@@ -581,3 +581,21 @@ test('outgoing grants are paginated independently and recovery reports whether r
  assert.equal((await call(db,member,'/api/stickers/grant-history')).status,403);
  assert.equal((await call(db,member,'/api/stickers/reconcile','POST',{})).data.changed,false);
 });
+
+
+test('guest visibility migrates old data, persists through partial edits and cannot be changed anonymously',async()=>{
+ const db=database();db.sqlite.exec('ALTER TABLE tracks DROP COLUMN guestVisible');
+ const member=await session(db,'member');
+ const created=await call(db,member,'/api/tracks','POST',{title:'訪客測試',speaker:'講者',audioUrl:'/visible.mp3',requiredRank:'白金',guestVisible:true,stickerUnlockCost:5});
+ assert.equal(created.status,200);const id=created.data.id || created.data.track?.id;
+ assert.equal(db.sqlite.prepare('SELECT guestVisible,requiredRank,stickerUnlockCost FROM tracks WHERE id=?').get(id)?.guestVisible,1);
+ assert.equal((await call(db,member,'/api/tracks/'+id,'PUT',{description:'只改簡介'})).status,200);
+ assert.equal(db.sqlite.prepare('SELECT guestVisible FROM tracks WHERE id=?').get(id)?.guestVisible,1);
+ assert.equal((await call(db,'','/api/tracks/'+id,'PUT',{guestVisible:false})).status,401);
+ assert.equal((await call(db,member,'/api/tracks/'+id,'PUT',{guestVisible:'false'})).status,400);
+ assert.equal((await call(db,member,'/api/tracks/'+id,'PUT',{guestVisible:false})).status,200);
+ assert.equal(db.sqlite.prepare('SELECT guestVisible,requiredRank,stickerUnlockCost FROM tracks WHERE id=?').get(id)?.guestVisible,0);
+ const row=db.sqlite.prepare('SELECT requiredRank,stickerUnlockCost FROM tracks WHERE id=?').get(id);
+ assert.equal(row?.requiredRank,'白金');assert.equal(row?.stickerUnlockCost,5);
+ const list=await call(db,'','/api/tracks');assert.equal(list.data.find((t:any)=>t.id===id).guestVisible,false);
+});

@@ -171,6 +171,7 @@ export interface Track {
   durationSeconds: number;
   series: string;
   speechDate: string;
+  guestVisible?: boolean; // Only adds this recording to the guest home list; never grants playback permission.
   requiredRank: AmwayRank; // Rank = reading permission
   permission?: string; // fallback string
   seriesOrder: string;

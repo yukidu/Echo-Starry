@@ -492,6 +492,7 @@ export default {
                   externalFiles: t.externalFiles ? JSON.parse(t.externalFiles) : [],
                   likedBy: t.likedBy ? JSON.parse(t.likedBy) : [],
                   ratings: t.ratings ? JSON.parse(t.ratings) : {},
+                  guestVisible: Boolean(t.guestVisible),
                   isPrivateVip: Boolean(t.isPrivateVip)
                 }));
                 return jsonResponse(parsed);
@@ -508,6 +509,7 @@ export default {
           if (!env.DB) return errorResponse('資料庫尚未連線，音檔資訊尚未儲存', 503);
           const body: any = await request.json().catch(() => ({}));
           if (!String(body.title || '').trim() || !String(body.audioUrl || '').trim()) return errorResponse('標題與音檔為必填項目', 400);
+          if (body.guestVisible !== undefined && typeof body.guestVisible !== 'boolean') return errorResponse('訪客可見格式錯誤', 400);
           const vipDays = Number(body.vipDurationDays ?? 0);
           if (!Number.isSafeInteger(vipDays) || vipDays < 0 || vipDays > 36500) return errorResponse('VIP 有效天數格式錯誤', 400);
           const id = body.id || `t-${Date.now()}`;
@@ -535,6 +537,7 @@ export default {
 
           const newTrack = {
             ...body,
+            guestVisible: body.guestVisible === true,
             id,
             vipDurationDays: body.isPrivateVip ? vipDays : 0,
             vipToken: body.isPrivateVip ? `vip_${crypto.randomUUID()}` : null,
@@ -565,8 +568,8 @@ export default {
                   rating, ratingCount, commentsCount, likes, duration, durationSeconds,
                   audioUrl, series, speechDate, requiredRank, seriesOrder, uploadDate,
                   description, uploaderId, uploaderEmail, playCount, isPrivateVip,
-                  externalVideos, externalPpts, externalFiles, likedBy, ratings, vipToken, vipExpiresAt, vipDurationDays, keywordMeta
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  externalVideos, externalPpts, externalFiles, likedBy, ratings, vipToken, vipExpiresAt, vipDurationDays, keywordMeta, guestVisible
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
               `).bind(
                 id, newTrack.title || '無標題', newTrack.speaker || '未知講者', newTrack.speakerRank || '無',
                 newTrack.speakerAvatar || '', JSON.stringify(newTrack.categories), JSON.stringify(newTrack.keywords),
@@ -576,7 +579,7 @@ export default {
                 newTrack.uploadDate, newTrack.description || '', newTrack.uploaderId || '', newTrack.uploaderEmail || '',
                 newTrack.playCount, newTrack.isPrivateVip ? 1 : 0, JSON.stringify(newTrack.externalVideos),
                 JSON.stringify(newTrack.externalPpts), JSON.stringify(newTrack.externalFiles),
-                JSON.stringify(newTrack.likedBy), JSON.stringify(newTrack.ratings), newTrack.vipToken, newTrack.vipExpiresAt, newTrack.vipDurationDays, JSON.stringify(newTrack.keywordMeta)
+                JSON.stringify(newTrack.likedBy), JSON.stringify(newTrack.ratings), newTrack.vipToken, newTrack.vipExpiresAt, newTrack.vipDurationDays, JSON.stringify(newTrack.keywordMeta), newTrack.guestVisible ? 1 : 0
               );
               await env.DB.batch([insert, ...(env.stickerTrackWriteStatements || []), ...newTrack.keywords.map((name: string) => env.DB.prepare('INSERT OR IGNORE INTO keyword_catalog(name,createdAt) VALUES (?,?)').bind(name,newTrack.keywordMeta[name]?.createdAt || Date.now()))]);
             } catch (e) {
@@ -656,6 +659,10 @@ export default {
             }
             if (has('series')) add('series', String(body.series || ''));
             if (has('speechDate')) add('speechDate', String(body.speechDate || ''));
+            if (has('guestVisible')) {
+              if (typeof body.guestVisible !== 'boolean') return errorResponse('訪客可見格式錯誤', 400);
+              add('guestVisible', body.guestVisible ? 1 : 0);
+            }
             if (has('requiredRank')) add('requiredRank', String(body.requiredRank || '無'));
             if (has('seriesOrder')) add('seriesOrder', String(body.seriesOrder || ''));
             if (has('description')) add('description', String(body.description || ''));

@@ -125,6 +125,7 @@ function normalizeTrackRow(row: any) {
   for (const key of ['categories', 'keywords', 'externalVideos', 'externalPpts', 'externalFiles', 'likedBy']) {
     track[key] = parseJson(row[key], []);
   }
+  track.guestVisible = Boolean(row.guestVisible);
   track.ratings = parseJson(row.ratings, {});
   track.keywordMeta = parseJson(row.keywordMeta, {});
   track.stickerUnlockCost = Math.max(0, Number(row.stickerUnlockCost || 0));
@@ -141,7 +142,8 @@ async function ensureStickerSchema(db: any) {
       const trackColumns = new Set((trackInfo.results || []).map((row: any) => row.name));
       for (const [name, type] of Object.entries({
         stickerUnlockCost: 'INTEGER DEFAULT 0',
-        commentStickerReward: 'INTEGER DEFAULT 0'
+        commentStickerReward: 'INTEGER DEFAULT 0',
+        guestVisible: 'INTEGER DEFAULT 0'
       })) {
         if (!trackColumns.has(name)) {
           try { await db.prepare(`ALTER TABLE tracks ADD COLUMN ${name} ${type}`).run(); }

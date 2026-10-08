@@ -75,7 +75,7 @@ function normalizeUser(row: any) {
   return user;
 }
 function normalizeTrack(row: any) {
-  const track = { ...row, isPrivateVip: Boolean(row.isPrivateVip) };
+  const track = { ...row, isPrivateVip: Boolean(row.isPrivateVip), guestVisible: Boolean(row.guestVisible) };
   ['categories', 'keywords', 'externalVideos', 'externalPpts', 'externalFiles', 'likedBy'].forEach(k => track[k] = parse(row[k], []));
   track.ratings = parse(row.ratings, {});
   track.keywordMeta = parse(row.keywordMeta, {});

@@ -197,6 +197,14 @@ export const REACT_MENU_RELEASE_NOTES: ChangelogEntry = {
   removed: ['移除獨立重新整理快捷與舊 v130 選單 DOM 補丁；新身份與快捷不再受舊補丁覆寫。']
 };
 
+export const VISITOR_UPLOAD_RELEASE_NOTES: ChangelogEntry = {
+  version:'v4.9',date:'2026/10/08',isLatest:true,
+  summary:'上傳音檔改為可完整捲動的頁面，訪客首頁與分享播放規則更清楚。',
+  added:['上傳與編輯可設定「訪客可見」，只影響首頁清單，不授予播放權限。'],
+  modified:['訪客首頁預設顯示公開音檔，另列出勾選訪客可見的音檔。','分享連結先開啟詳細頁；公開音檔訪客可直接播放，受限音檔提示登入。','上傳頁移除彈窗框架與高度限制，下方提供儲存按鈕。'],
+  removed:['訪客選單隱藏我的貼紙、個人中心與重設選單，保留登入入口。']
+};
+
 export const GOOGLE_LOGIN_RECOVERY_RELEASE_NOTES: ChangelogEntry = {
   version: 'v4.8',
   date: '2026-10-08',
@@ -214,7 +222,7 @@ export const STICKER_USAGE_RELEASE_NOTES: ChangelogEntry = {
   removed:['移除無關操作造成的貼紙查詢，以及開啟貼紙簿時重複載入整份紀錄。']
 };
 
-const RELEASE_NOTES = [GOOGLE_LOGIN_RECOVERY_RELEASE_NOTES, STICKER_USAGE_RELEASE_NOTES, REACT_MENU_RELEASE_NOTES, STICKER_LEADERBOARD_RELEASE_NOTES, PLATINUM_MULTIPLIER_RELEASE_NOTES, STICKER_GUIDE_RELEASE_NOTES, ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
+const RELEASE_NOTES = [VISITOR_UPLOAD_RELEASE_NOTES, GOOGLE_LOGIN_RECOVERY_RELEASE_NOTES, STICKER_USAGE_RELEASE_NOTES, REACT_MENU_RELEASE_NOTES, STICKER_LEADERBOARD_RELEASE_NOTES, PLATINUM_MULTIPLIER_RELEASE_NOTES, STICKER_GUIDE_RELEASE_NOTES, ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
 
 const runtime = window as Window &
   typeof globalThis & {

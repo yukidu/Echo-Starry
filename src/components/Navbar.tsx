@@ -260,9 +260,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     theme: true,
     stats: true,
     notifications: Boolean(currentUser),
-    stickers: true,
+    stickers: Boolean(currentUser),
     upload: canUpload,
-    profile: true,
+    profile: Boolean(currentUser),
     install: false,
     admin: canAccessSettings,
     palette: true
@@ -587,6 +587,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             )}
 
+            {currentUser && (
             <div className={menuRowClass(currentTab === 'stickers')}>
               {renderPinControl('stickers', '我的貼紙')}
               <button type="button" onClick={handleOpenStickers} className={menuActionClass}>
@@ -594,6 +595,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span>{currentUser ? <>我的貼紙 <span className="mobile-menu-accent-number sticker-menu-amount">{stickerBalanceText}</span> 張</> : stickerMenuTitle}</span>
               </button>
             </div>
+
+            )}
 
             {canUpload && (
               <div className={menuRowClass(currentTab === 'upload')}>
@@ -604,12 +607,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             )}
 
+            {currentUser && (
             <div className={menuRowClass(currentTab === 'profile')}>
               {renderPinControl('profile', '個人中心')}
               <button onClick={() => handleMobileNav('profile')} className={menuActionClass}>
                 <User className="w-4 h-4 shrink-0" /><span>個人中心</span>
               </button>
             </div>
+
+            )}
 
             {canAccessSettings && (
               <div className={menuRowClass(currentTab === 'admin')}>
@@ -633,9 +639,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <User className="w-4 h-4 shrink-0" /><span>登入</span>
                     </button>
                   )}
+                  {currentUser && (
                   <button type="button" onClick={resetCurrentDeviceMenu} className="navbar-menu-footer-button navbar-menu-reset-button" title="恢復此裝置的預設置頂選單">
                     <RotateCcw className="w-4 h-4 shrink-0" /><span>重設選單</span>
                   </button>
+                  )}
                 </div>
               </>
             }
