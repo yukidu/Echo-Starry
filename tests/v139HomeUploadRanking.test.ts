@@ -6,6 +6,7 @@ const polish = readFileSync(new URL('../src/v139HomeUploadPolish.ts', import.met
 const density = readFileSync(new URL('../src/homeDensityPolicy.ts', import.meta.url), 'utf8');
 const adminCleanup = readFileSync(new URL('../src/v138AdminTabCleanup.ts', import.meta.url), 'utf8');
 const leaderboard = readFileSync(new URL('../src/components/StickerLeaderboardTab.tsx', import.meta.url), 'utf8');
+const privacyRouter = readFileSync(new URL('../worker/privacyCrawlerRouter.ts', import.meta.url), 'utf8');
 const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 test('guest zero progress and lucky response are hidden while summon label is shortened', () => {
@@ -32,7 +33,9 @@ test('retired display settings feature no longer injects a tab or calls its API'
   assert.doesNotMatch(adminCleanup, /顯示/);
 });
 
-test('sticker leaderboard ranks by spent stickers descending before rendering ranks', () => {
+test('sticker leaderboard ranks by spent stickers descending on server and client', () => {
+  assert.match(privacyRouter, /ORDER BY spentUnits DESC, earnedUnits DESC, u\.name ASC/);
+  assert.match(privacyRouter, /url\.pathname === '\/api\/stickers\/leaderboard'/);
   assert.match(leaderboard, /rankedEntries/);
   assert.match(leaderboard, /Number\(b\.spent \|\| 0\) - Number\(a\.spent \|\| 0\)/);
   assert.match(leaderboard, /累積已消費貼紙數由高至低排序/);
