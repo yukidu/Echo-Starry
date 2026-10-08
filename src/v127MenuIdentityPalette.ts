@@ -1,3 +1,8 @@
+import {
+  canRestorePreviousLightPalette,
+  restorePreviousLightPalette
+} from './utils/theme';
+
 const VISITOR_KEY = 'sq_visitor_identity_v1';
 const USER_KEY = 'sq_current_user_v1';
 const STYLE_ID = 'echostars-v127-menu-identity-palette';
@@ -23,6 +28,13 @@ function installStyles() {
       justify-content: center;
       align-items: flex-start;
       text-align: left;
+      cursor: pointer;
+      border-radius: 0.7rem;
+      outline: none;
+    }
+    .navbar-menu-profile-head > .v127-identity-info:hover,
+    .navbar-menu-profile-head > .v127-identity-info:focus-visible {
+      background: color-mix(in srgb, var(--color-light-pill,#fae8ed) 62%, transparent);
     }
     .v127-identity-name,
     .v127-identity-role {
@@ -67,6 +79,58 @@ function installStyles() {
       height: 100%;
       border-radius: inherit;
       object-fit: cover;
+    }
+    .v128-palette-back-control,
+    .v128-palette-back-shortcut {
+      border: 0;
+      cursor: pointer;
+      color: rgb(51 65 85);
+      background: rgb(241 245 249);
+      font-weight: 850;
+      white-space: nowrap;
+      transition: opacity 120ms ease, transform 120ms ease, background-color 120ms ease;
+    }
+    .dark .v128-palette-back-control,
+    .dark .v128-palette-back-shortcut {
+      color: rgb(241 245 249);
+      background: rgb(51 65 85);
+    }
+    .v128-palette-back-control:hover:not(:disabled),
+    .v128-palette-back-shortcut:hover:not(:disabled) {
+      transform: translateY(-1px);
+      background: color-mix(in srgb, var(--color-light-pill,#fae8ed) 68%, rgb(241 245 249));
+    }
+    .v128-palette-back-control:disabled,
+    .v128-palette-back-shortcut:disabled {
+      cursor: default;
+      opacity: 0.34;
+    }
+    .v128-palette-back-control {
+      flex: 0 0 auto;
+      min-width: 3.7rem;
+      min-height: 2rem;
+      padding: 0.25rem 0.45rem;
+      border-radius: 0.62rem;
+      font-size: 0.68rem;
+      line-height: 1;
+    }
+    .v128-palette-back-shortcut {
+      display: inline-flex;
+      width: 2.55rem;
+      min-height: 2.75rem;
+      flex: 0 0 2.55rem;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.1rem;
+      padding: 0.28rem 0.16rem;
+      border-radius: 0.65rem;
+      font-size: 0.54rem;
+      line-height: 1;
+    }
+    .v128-palette-back-shortcut > strong {
+      font-size: 1rem;
+      line-height: 0.9;
     }
   `;
   document.head.appendChild(style);
@@ -136,11 +200,10 @@ function ensureIdentityIcon(info: HTMLElement, name: HTMLElement, isVisitor: boo
   if (getComputedStyle(info).position === 'static') info.style.position = 'relative';
 }
 
-function syncIdentityHeader() {
-  const panel = document.querySelector<HTMLElement>('.mobile-menu-panel');
-  const head = panel?.querySelector<HTMLElement>('.navbar-menu-profile-head');
+function syncIdentityHeader(panel: HTMLElement) {
+  const head = panel.querySelector<HTMLElement>('.navbar-menu-profile-head');
   const info = head?.firstElementChild as HTMLElement | null;
-  if (!panel || !head || !info || info.classList.contains('navbar-menu-header-actions')) return;
+  if (!head || !info || info.classList.contains('navbar-menu-header-actions')) return;
 
   const name = info.firstElementChild as HTMLElement | null;
   const role = info.children.item(1) as HTMLElement | null;
@@ -148,6 +211,11 @@ function syncIdentityHeader() {
 
   const isVisitor = role.textContent?.trim() === '訪客';
   info.classList.add('v127-identity-info');
+  info.dataset.v128IdentityAction = isVisitor ? 'login' : 'profile';
+  info.setAttribute('role', 'button');
+  info.setAttribute('tabindex', '0');
+  info.setAttribute('aria-label', isVisitor ? '登入繁星回聲' : '開啟個人中心');
+  info.setAttribute('title', isVisitor ? '登入繁星回聲' : '開啟個人中心');
   name.classList.add('v127-identity-name');
   role.classList.add('v127-identity-role');
   ensureIdentityIcon(info, name, isVisitor);
@@ -156,11 +224,70 @@ function syncIdentityHeader() {
   fitThreeCharacterWidth(role, visibleText(role), 12, 8.5);
 }
 
-function scheduleIdentitySync() {
-  window.setTimeout(syncIdentityHeader, 0);
+function findPaletteAction(panel: HTMLElement) {
+  return Array.from(panel.querySelectorAll<HTMLButtonElement>('.mobile-menu-row > button'))
+    .find(button => (button.textContent || '').includes('切換配色')) || null;
+}
+
+function createPaletteBackButton(className: string) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = className;
+  button.title = '回到上一個配色';
+  button.setAttribute('aria-label', '上一個配色');
+  if (className.includes('shortcut')) {
+    const icon = document.createElement('strong');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '↶';
+    const text = document.createElement('span');
+    text.textContent = '上一色';
+    button.append(icon, text);
+  } else {
+    button.textContent = '↶ 上一色';
+  }
+  button.addEventListener('click', event => {
+    event.preventDefault();
+    event.stopPropagation();
+    const isDark = document.documentElement.classList.contains('dark');
+    restorePreviousLightPalette(isDark);
+    syncMenuUi();
+  });
+  return button;
+}
+
+function syncPaletteBackControls(panel: HTMLElement) {
+  const canGoBack = canRestorePreviousLightPalette();
+  const paletteButton = findPaletteAction(panel);
+  const paletteRow = paletteButton?.closest<HTMLElement>('.mobile-menu-row') || null;
+
+  if (paletteRow && !paletteRow.querySelector('.v128-palette-back-control')) {
+    paletteRow.appendChild(createPaletteBackButton('v128-palette-back-control'));
+  }
+  paletteRow?.querySelectorAll<HTMLButtonElement>('.v128-palette-back-control')
+    .forEach(button => { button.disabled = !canGoBack; });
+
+  const headerPalette = panel.querySelector<HTMLElement>('.navbar-menu-palette-shortcut');
+  const headerActions = headerPalette?.parentElement;
+  if (headerPalette && headerActions && !headerActions.querySelector('.v128-palette-back-shortcut')) {
+    headerPalette.insertAdjacentElement('afterend', createPaletteBackButton('v128-palette-back-shortcut'));
+  }
+  headerActions?.querySelectorAll<HTMLButtonElement>('.v128-palette-back-shortcut')
+    .forEach(button => { button.disabled = !canGoBack; });
+}
+
+function syncMenuUi() {
+  installStyles();
+  document.querySelectorAll<HTMLElement>('.mobile-menu-panel').forEach(panel => {
+    syncIdentityHeader(panel);
+    syncPaletteBackControls(panel);
+  });
+}
+
+function scheduleMenuSync() {
+  window.setTimeout(syncMenuUi, 0);
   window.requestAnimationFrame(() => {
-    syncIdentityHeader();
-    window.requestAnimationFrame(syncIdentityHeader);
+    syncMenuUi();
+    window.requestAnimationFrame(syncMenuUi);
   });
 }
 
@@ -181,7 +308,7 @@ function keepMenuOpenAfterPalette() {
     if (!document.querySelector('.mobile-menu-panel')) {
       document.querySelector<HTMLButtonElement>('button[data-main-menu="hamburger"]')?.click();
     }
-    scheduleIdentitySync();
+    scheduleMenuSync();
   };
 
   window.setTimeout(ensureOpen, 0);
@@ -191,21 +318,56 @@ function keepMenuOpenAfterPalette() {
   });
 }
 
+function activateIdentity(info: HTMLElement) {
+  const panel = info.closest<HTMLElement>('.mobile-menu-panel');
+  if (!panel) return;
+  const action = info.dataset.v128IdentityAction;
+
+  if (action === 'login') {
+    panel.querySelector<HTMLButtonElement>('.navbar-menu-login-shortcut')?.click();
+    return;
+  }
+
+  const profileButton = Array.from(panel.querySelectorAll<HTMLButtonElement>('.mobile-menu-row > button'))
+    .find(button => (button.textContent || '').includes('個人中心'));
+  profileButton?.click();
+}
+
 installStyles();
 
 document.addEventListener('click', event => {
   const target = event.target instanceof Element ? event.target : null;
   if (!target) return;
 
+  const identity = target.closest<HTMLElement>('.v127-identity-info');
+  if (identity) {
+    event.preventDefault();
+    event.stopPropagation();
+    activateIdentity(identity);
+    return;
+  }
+
   if (isPaletteClickInsideMenu(target)) {
     keepMenuOpenAfterPalette();
     return;
   }
 
-  if (target.closest('button[data-main-menu="hamburger"]')) scheduleIdentitySync();
+  if (target.closest('button[data-main-menu="hamburger"]')) scheduleMenuSync();
 }, true);
 
-window.addEventListener('pageshow', scheduleIdentitySync);
-window.addEventListener('storage', event => {
-  if (event.key === USER_KEY || event.key === VISITOR_KEY) scheduleIdentitySync();
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const target = event.target instanceof Element
+    ? event.target.closest<HTMLElement>('.v127-identity-info')
+    : null;
+  if (!target) return;
+  event.preventDefault();
+  activateIdentity(target);
 });
+
+window.addEventListener('pageshow', scheduleMenuSync);
+window.addEventListener('storage', event => {
+  if (event.key === USER_KEY || event.key === VISITOR_KEY) scheduleMenuSync();
+});
+
+syncMenuUi();
