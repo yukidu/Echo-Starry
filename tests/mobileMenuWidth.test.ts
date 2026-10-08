@@ -17,7 +17,7 @@ test('hamburger drawer remains the React menu controlled by the navbar on every 
 test('hamburger drawer hugs the longest label and stays on the right', () => {
   assert.match(navbarCss, /\.mobile-menu-shell\s*\{[\s\S]*justify-content:\s*flex-end;/);
   assert.match(navbarCss, /\.mobile-menu-panel\s*\{[\s\S]*width:\s*max-content;/);
-  assert.match(navbarCss, /max-width:\s*calc\(100vw - 1\.5rem\);/);
+  assert.match(navbarCss, /max-width:\s*min\(22\.5rem, calc\(\(100vw - 24px\) \* var\(--navbar-font-zoom, 1\)\)\);/);
 });
 
 test('v119 defaults tablet landscape and desktop home playlists to three columns', () => {

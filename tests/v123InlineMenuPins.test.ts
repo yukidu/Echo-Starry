@@ -25,7 +25,7 @@ test('eligible signed-in hamburger actions expose inline pin controls while fixe
     ['upload', '上傳音檔'],
     ['profile', '個人中心'],
     ['admin', '後台管理'],
-    ['palette', '切換配色']
+    ['palette', '好心情']
   ]) {
     assert.match(navbar, new RegExp(`renderPinControl\\('${id}', '${label}'\\)`));
   }

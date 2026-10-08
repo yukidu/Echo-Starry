@@ -5,13 +5,14 @@ import { readFileSync } from 'node:fs';
 const policy = readFileSync(new URL('../src/v127MenuIdentityPalette.ts', import.meta.url), 'utf8');
 const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
-test('v127 random palette keeps the hamburger menu open without changing other navigation actions', () => {
-  assert.match(policy, /function isPaletteClickInsideMenu\(target: Element\)/);
-  assert.match(policy, /target\.closest\('\.navbar-menu-palette-shortcut'\)/);
-  assert.match(policy, /includes\('切換配色'\)/);
-  assert.match(policy, /function keepMenuOpenAfterPalette\(\)/);
-  assert.match(policy, /button\[data-main-menu="hamburger"\]/);
-  assert.match(policy, /if \(isPaletteClickInsideMenu\(target\)\) \{[\s\S]*keepMenuOpenAfterPalette\(\);[\s\S]*return;/);
+test('React palette keeps the menu open while navigation still closes it', () => {
+  const navbar = readFileSync(new URL('../src/components/Navbar.tsx', import.meta.url), 'utf8');
+  const palette = navbar.slice(navbar.indexOf('const handleRandomPalette ='), navbar.indexOf('const changeFontZoom ='));
+  const navigation = navbar.slice(navbar.indexOf('const handleMobileNav ='), navbar.indexOf('const handleLogoClick ='));
+  assert.match(palette, /onRandomPalette\(\)/);
+  assert.doesNotMatch(palette, /setIsMobileMenuOpen/);
+  assert.match(navigation, /setIsMobileMenuOpen\(false\)/);
+  assert.match(policy, /if \(panel.dataset.reactMenu === 'true'\) return/);
 });
 
 test('v127 identity block has a larger fixed icon and a three-character text column', () => {

@@ -139,7 +139,6 @@ export const ORGANIZATION_RELEASE_NOTES: ChangelogEntry = {
 export const STICKER_LEADERBOARD_RELEASE_NOTES: ChangelogEntry = {
   version: 'v4.5',
   date: '2026/10/07',
-  isLatest: true,
   summary: '排行榜新增貼紙排位賽與會員基本資料關鍵字搜尋，快速比較貼紙現況並找到會員。',
   added: [
     '排行榜新增「貼紙排位賽」，列出現有貼紙、累積已消費與累積已獲得總數前 20 名，依現有貼紙排序。',
@@ -182,7 +181,23 @@ export const STICKER_GUIDE_RELEASE_NOTES: ChangelogEntry = {
   removed: []
 };
 
-const RELEASE_NOTES = [STICKER_LEADERBOARD_RELEASE_NOTES, PLATINUM_MULTIPLIER_RELEASE_NOTES, STICKER_GUIDE_RELEASE_NOTES, ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
+export const REACT_MENU_RELEASE_NOTES: ChangelogEntry = {
+  version: 'v4.6', date: '2026/10/08', isLatest: true,
+  summary: '漢堡選單由 React 正式管理，統一身份、快捷與字體配置，保留自訂置頂及跨裝置偏好。',
+  added: [
+    '選單上方固定提供「好心情」與「回首頁」；好心情可以連續換色，回首頁同時重新整理。',
+    '選單底部同排顯示登出與重設選單；重設只恢復此裝置的置頂功能與順序。'
+  ],
+  modified: [
+    '訪客動物與會員頭像更加清楚；姓名、身份靠左，長姓名自動縮小，點身份直接登入或開啟個人中心。',
+    '選單縮窄並靠右，字體控制靠近標題；個人字體可調整 100%～140%，選單、Logo 與網站標題維持固定大小。',
+    '保留置頂勾選、手機最多 3 個、平板最多 5 個、桌機不限及長按左右排序；頂部快捷維持一行並可橫向捲動。',
+    '安裝入口保留於選單清單；訪客貼紙項目簡化為「我的貼紙」，一般裝飾箭頭移除，真正下拉控制維持靠右。'
+  ],
+  removed: ['移除獨立重新整理快捷與舊 v130 選單 DOM 補丁；新身份與快捷不再受舊補丁覆寫。']
+};
+
+const RELEASE_NOTES = [REACT_MENU_RELEASE_NOTES, STICKER_LEADERBOARD_RELEASE_NOTES, PLATINUM_MULTIPLIER_RELEASE_NOTES, STICKER_GUIDE_RELEASE_NOTES, ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
 
 const runtime = window as Window &
   typeof globalThis & {

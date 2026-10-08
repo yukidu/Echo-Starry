@@ -28,7 +28,7 @@ test('changelog release patch includes v4.5 sticker leaderboard and only interce
   assert.match(notes, /STICKER_LEADERBOARD_RELEASE_NOTES/);
   assert.match(notes, /version:\s*'v4\.5'/);
   assert.match(notes, /貼紙排位賽與會員基本資料關鍵字搜尋/);
-  assert.match(notes, /RELEASE_NOTES = \[STICKER_LEADERBOARD_RELEASE_NOTES, PLATINUM_MULTIPLIER_RELEASE_NOTES, STICKER_GUIDE_RELEASE_NOTES, ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES\]/);
+  assert.match(notes, /RELEASE_NOTES = \[REACT_MENU_RELEASE_NOTES, STICKER_LEADERBOARD_RELEASE_NOTES, PLATINUM_MULTIPLIER_RELEASE_NOTES, STICKER_GUIDE_RELEASE_NOTES, ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES\]/);
   assert.match(notes, /method !== 'GET'/);
   assert.match(notes, /url\.pathname === '\/api\/changelog'/);
   assert.match(notes, /return nativeFetch\(\.\.\.args\)/);

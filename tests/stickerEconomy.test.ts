@@ -57,7 +57,7 @@ test('錄音解鎖貼紙欄位支援 0 到 50 且 0 保留免貼紙語意', () =
 test('主選單與貼紙專區保留訪客會員界線及超管分頁', () => {
   const navbar = read('src/components/Navbar.tsx');
   const modal = read('src/components/StickersModal.tsx');
-  assert.match(navbar, /我的貼紙\(會員專屬\)/);
+  assert.match(navbar, /stickerMenuTitle = currentUser[\s\S]*: '我的貼紙'/);
   assert.match(navbar, /我的貼紙/);
   assert.match(modal, /批次修改/);
   assert.match(modal, /其他規則/);

@@ -228,12 +228,12 @@ function syncInstalledHeaderAction(panel: HTMLElement) {
   const shortcut = document.createElement('button');
   shortcut.type = 'button';
   shortcut.className = 'navbar-menu-palette-shortcut';
-  shortcut.title = '隨機配色';
-  shortcut.setAttribute('aria-label', '隨機配色');
+  shortcut.title = '好心情';
+  shortcut.setAttribute('aria-label', '好心情');
   const icon = paletteButton.querySelector('svg')?.cloneNode(true);
   if (icon) shortcut.appendChild(icon);
   const text = document.createElement('span');
-  text.textContent = '隨機配色';
+  text.textContent = '好心情';
   shortcut.appendChild(text);
   shortcut.addEventListener('click', () => paletteButton.click());
   headerActions.prepend(shortcut);
@@ -252,6 +252,7 @@ function syncMenuPolish() {
   syncFontMinusButtons();
   document.querySelectorAll<HTMLElement>('.mobile-menu-panel').forEach(panel => {
     removeLegacyFontControl(panel);
+    if (panel.dataset.reactMenu === 'true') return;
     addVisitorAnimal(panel);
     simplifyVisitorStickerLabel(panel);
     syncInstalledHeaderAction(panel);

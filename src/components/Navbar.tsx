@@ -1,6 +1,6 @@
 import { effectiveMemberRank } from '../utils/ranks';
 import React, { useEffect, useRef, useState } from 'react';
-import { Trophy, Home, BarChart3, Bell, User, UploadCloud, Settings, Palette, Moon, Sun, Mic, Menu, LogOut, Check, Download } from 'lucide-react';
+import { Trophy, Home, BarChart3, Bell, User, UploadCloud, Settings, Palette, Moon, Sun, Mic, Menu, LogOut, Check, Download, RotateCcw } from 'lucide-react';
 import { UserProfile, RANK_ORDER } from '../types';
 import { VisitorIdentity } from '../utils/visitor';
 import { TwinklingStars } from './TwinklingStars';
@@ -32,7 +32,7 @@ const QUICK_DRAG_CANCEL_DISTANCE = 10;
 function readStoredFontZoom() {
   if (typeof window === 'undefined') return 1;
   const value = Number(localStorage.getItem(USER_FONT_ZOOM_KEY));
-  return Number.isFinite(value) ? Math.min(1.4, Math.max(0.8, value)) : 1;
+  return Number.isFinite(value) ? Math.min(1.4, Math.max(1, value)) : 1;
 }
 
 interface NavbarProps {
@@ -151,7 +151,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const stickerBalanceText = stickerBalance === undefined
     ? '…'
     : (Number.isInteger(stickerBalance) ? String(stickerBalance) : stickerBalance.toFixed(1));
-  const stickerMenuTitle = currentUser ? `我的貼紙 ${stickerBalanceText} 張` : '我的貼紙(會員專屬)';
+  const stickerMenuTitle = currentUser ? `我的貼紙 ${stickerBalanceText} 張` : '我的貼紙';
 
   const displayName = currentUser?.name || visitor?.fullName || '勇敢的獅子';
   const displayRole = !currentUser
@@ -163,6 +163,11 @@ export const Navbar: React.FC<NavbarProps> = ({
     : currentUser.isContributor
     ? '貢獻者'
     : effectiveMemberRank(currentUser, '會員');
+
+  const identityAvatar = currentUser?.avatar?.trim() || (!currentUser ? visitor?.emoji || '🦁' : '👤');
+  const identityAvatarIsImage = /^(?:https?:|data:|blob:|\/)/i.test(identityAvatar);
+  const identityNameSize = Math.max(0.45, Math.min(1, 3 / Array.from(displayName).length));
+  const identityRoleSize = Math.max(0.45, Math.min(0.75, 3 / Array.from(displayRole).length));
 
   const userRank = currentUser ? effectiveMemberRank(currentUser, '') : '';
   const isDiamondOrAbove = isAdministrator || isSuperAdmin || userRank.includes('鑽石') || userRank.includes('皇冠') || userRank.includes('大使');
@@ -208,6 +213,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const handleLogoClick = () => handleMobileNav('home');
 
+  const handleMenuHomeRefresh = () => {
+    setIsMobileMenuOpen(false);
+    const onHomeUrl = window.location.pathname === '/' && !window.location.search && !window.location.hash;
+    if (onHomeUrl) {
+      window.location.reload();
+      return;
+    }
+    window.location.assign('/');
+  };
+
   const handleOpenStickers = () => {
     if (currentTab !== 'home') onSelectTab('home');
     onOpenStickers?.();
@@ -222,11 +237,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const handleRandomPalette = () => {
     onRandomPalette();
-    setIsMobileMenuOpen(false);
   };
 
   const changeFontZoom = (delta: number) => {
-    const next = Math.round(Math.min(1.4, Math.max(0.8, fontZoom + delta)) * 10) / 10;
+    const next = Math.round(Math.min(1.4, Math.max(1, fontZoom + delta)) * 10) / 10;
     setFontZoom(next);
     try { localStorage.setItem(USER_FONT_ZOOM_KEY, String(next)); } catch {}
     window.dispatchEvent(new Event('resize'));
@@ -277,6 +291,11 @@ export const Navbar: React.FC<NavbarProps> = ({
     setQuickPreferences(normalized);
     writeLocalQuickPreferences(normalized);
     queueCloudSave(normalized);
+  };
+
+  const resetCurrentDeviceMenu = () => {
+    if (!currentUser) return;
+    persistQuickPreferences({ ...quickPreferences, [deviceKind]: ['font', 'theme'] });
   };
 
   const toggleQuickAction = (id: QuickActionId) => {
@@ -343,7 +362,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     if (id === 'font') {
       return (
         <div className="navbar-top-font-group" aria-label="字體">
-          <button type="button" className={topButtonClass(false)} onClick={() => changeFontZoom(-0.1)} disabled={fontZoom <= 0.8} aria-label="縮小字體" title={`縮小字體（目前 ${Math.round(fontZoom * 100)}%）`}>
+          <button type="button" className={topButtonClass(false)} onClick={() => changeFontZoom(-0.1)} disabled={fontZoom <= 1} aria-label="縮小字體" title={`縮小字體（目前 ${Math.round(fontZoom * 100)}%）`}>
             <span className="font-black text-xs">A−</span>
           </button>
           <button type="button" className={topButtonClass(false)} onClick={() => changeFontZoom(0.1)} disabled={fontZoom >= 1.4} aria-label="放大字體" title={`放大字體（目前 ${Math.round(fontZoom * 100)}%）`}>
@@ -368,7 +387,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       profile: { label: '個人中心', icon: <User className="w-4 h-4" />, onClick: () => handleMobileNav('profile') },
       install: { label: '安裝到桌面', icon: <Download className="w-4 h-4" />, onClick: handlePinnedInstall },
       admin: { label: '後台管理', icon: <Settings className="w-4 h-4" />, onClick: () => handleMobileNav('admin') },
-      palette: { label: '切換配色', icon: <Palette className="w-4 h-4" />, onClick: handleRandomPalette }
+      palette: { label: '好心情', icon: <Palette className="w-4 h-4" />, onClick: handleRandomPalette }
     };
     const action = meta[id as Exclude<QuickActionId, 'font' | 'theme'>];
     return (
@@ -503,33 +522,38 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {isMobileMenuOpen && (
         <div className="mobile-menu-shell">
-          <div className="mobile-menu-panel animate-in slide-in-from-top-2">
+          <div className="mobile-menu-panel animate-in slide-in-from-top-2" data-react-menu="true" style={{ '--navbar-font-zoom': fontZoom, zoom: 1 / fontZoom } as React.CSSProperties}>
             <div className="navbar-menu-profile-head px-3 py-2 border-b border-slate-200 dark:border-slate-700 mb-1">
-              <div className="min-w-0">
-                <div className="font-black text-sm text-slate-800 dark:text-slate-100 truncate max-w-[18rem]">{displayName}</div>
-                <div className="text-xs font-bold" style={{ color: 'var(--color-primary,#c06c84)' }}>{displayRole}</div>
-              </div>
+              <button type="button" onClick={() => handleMobileNav('profile')} className="navbar-menu-identity" aria-label={currentUser ? '開啟個人中心' : '登入繁星回聲'}>
+                <span className="navbar-menu-identity-icon" aria-hidden="true">
+                  {identityAvatarIsImage ? <img src={identityAvatar} alt="" /> : identityAvatar}
+                </span>
+                <span className="navbar-menu-identity-text">
+                  <span className="navbar-menu-identity-name" style={{ fontSize: `${identityNameSize}rem` }} title={displayName}>{displayName}</span>
+                  <span className="navbar-menu-identity-role" style={{ fontSize: `${identityRoleSize}rem` }}>{displayRole}</span>
+                </span>
+              </button>
               <div className="navbar-menu-header-actions">
-                <InstallAppButton onOpenIOSGuide={handleInstallGuide} className="navbar-menu-install-shortcut" />
-                {!currentUser && (
-                  <button type="button" onClick={() => handleMobileNav('profile')} className="navbar-menu-login-shortcut" title="登入" aria-label="登入">
-                    登入
-                  </button>
-                )}
-                <button type="button" onClick={handleLogoClick} className="navbar-menu-home-shortcut" title="首頁播放清單" aria-label="首頁播放清單">
+                <button type="button" onClick={handleRandomPalette} className="navbar-menu-palette-shortcut" title="好心情" aria-label="好心情">
+                  <Palette className="w-5 h-5 shrink-0" />
+                  <span>好心情</span>
+                </button>
+                <button type="button" onClick={handleMenuHomeRefresh} className="navbar-menu-home-shortcut" title="回首頁並重新整理" aria-label="回首頁">
                   <Home className="w-4 h-4 shrink-0" />
-                  <span>首頁播放清單</span>
+                  <span>回首頁</span>
                 </button>
               </div>
             </div>
 
-            <div className={menuRowClass(false)}>
+            <div className={`${menuRowClass(false)} navbar-menu-font-row`}>
               {renderPinControl('font', '字體')}
               <span className="w-4 shrink-0 text-center text-xs font-black">A</span>
-              <span className="min-w-0 flex-1">字體</span>
-              <button type="button" onClick={() => changeFontZoom(-0.1)} disabled={fontZoom <= 0.8} className="navbar-menu-mini-control" aria-label="縮小字體">A−</button>
-              <span className="text-[10px] font-bold text-slate-400">{Math.round(fontZoom * 100)}%</span>
-              <button type="button" onClick={() => changeFontZoom(0.1)} disabled={fontZoom >= 1.4} className="navbar-menu-mini-control" aria-label="放大字體">A＋</button>
+              <span className="navbar-menu-font-label">字體</span>
+              <div className="navbar-menu-font-controls">
+                <button type="button" onClick={() => changeFontZoom(-0.1)} disabled={fontZoom <= 1} className="navbar-menu-mini-control" aria-label="縮小字體">A−</button>
+                <span className="navbar-menu-font-value">{Math.round(fontZoom * 100)}%</span>
+                <button type="button" onClick={() => changeFontZoom(0.1)} disabled={fontZoom >= 1.4} className="navbar-menu-mini-control" aria-label="放大字體">A＋</button>
+              </div>
             </div>
 
             <div className={menuRowClass(false)}>
@@ -592,19 +616,30 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             )}
 
+            {currentUser && (
+              <div className={menuRowClass(false)}>
+                {renderPinControl('palette', '好心情')}
+                <button type="button" onClick={handleRandomPalette} className={menuActionClass}>
+                  <Palette className="w-4 h-4 shrink-0" /><span>好心情</span>
+                </button>
+              </div>
+            )}
+
             <div className={menuRowClass(false)}>
-              {renderPinControl('palette', '切換配色')}
-              <button type="button" onClick={handleRandomPalette} className={menuActionClass}>
-                <Palette className="w-4 h-4 shrink-0" /><span>切換配色</span>
-              </button>
+              <InstallAppButton onOpenIOSGuide={handleInstallGuide} className={menuActionClass} />
             </div>
 
             {currentUser && (
               <>
                 <div className="my-1 h-px bg-slate-200 dark:bg-slate-800" />
-                <button type="button" onClick={handleLogout} className={menuRowClass(false)} title="登出目前帳號">
-                  <LogOut className="w-4 h-4 shrink-0" /><span>登出</span>
-                </button>
+                <div className="navbar-menu-footer-actions">
+                  <button type="button" onClick={handleLogout} className="navbar-menu-footer-button" title="登出目前帳號">
+                    <LogOut className="w-4 h-4 shrink-0" /><span>登出</span>
+                  </button>
+                  <button type="button" onClick={resetCurrentDeviceMenu} className="navbar-menu-footer-button navbar-menu-reset-button" title="恢復此裝置的預設置頂選單">
+                    <RotateCcw className="w-4 h-4 shrink-0" /><span>重設選單</span>
+                  </button>
+                </div>
               </>
             )}
           </div>
