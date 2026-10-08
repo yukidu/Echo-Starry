@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS tracks (
   series TEXT,
   speechDate TEXT,
   requiredRank TEXT DEFAULT '無',
+  guestVisible INTEGER DEFAULT 0,
   seriesOrder TEXT,
   uploadDate TEXT,
   description TEXT,

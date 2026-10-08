@@ -17,7 +17,10 @@ test('mobile menu hugs its content and keeps only counts in the palette primary 
   assert.match(css, /\.mobile-menu-accent-number,[\s\S]*color:\s*var\(--color-primary,\s*#c06c84\)\s*!important;/);
 });
 
-test('upload audio is presented as page content instead of a fixed overlay', () => {
-  assert.match(css, /body\[data-main-tab="upload"\] \.upload-modal-overlay\s*\{[\s\S]*position:\s*relative\s*!important;[\s\S]*background:\s*transparent\s*!important;/);
-  assert.match(css, /body\[data-main-tab="upload"\] \.upload-modal-overlay form\s*\{[\s\S]*max-height:\s*none\s*!important;[\s\S]*overflow:\s*visible\s*!important;/);
+test('upload audio is document-flow content without the shared modal height cap', () => {
+  const upload = readFileSync(new URL('../src/components/UploadModal.tsx', import.meta.url), 'utf8');
+  assert.match(upload, /className="upload-modal-overlay upload-page"/);
+  assert.doesNotMatch(upload, /className="app-modal-overlay upload-modal-overlay/);
+  assert.doesNotMatch(upload, /max-h-\[75vh\]/);
+  assert.match(css, /\.upload-page > div \{ max-height: none/);
 });

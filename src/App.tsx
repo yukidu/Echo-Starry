@@ -1,3 +1,4 @@
+import { isVisibleOnGuestHome, canGuestPlayPublicShare } from './visitorTrackPolicy';
 import { createStickerSummaryClient, STICKER_POLL_MS } from './stickerSummaryClient';
 import { sortStickerTracks } from './homePlaylistPolicy';
 import { StickerFeedback, showStickerDelta, showStickerNotice, setFeedbackRules, getFeedbackRules } from './components/StickerFeedback';
@@ -691,6 +692,7 @@ export default function App() {
   const [previewMember, setPreviewMember] = useState<UserProfile | null>(null);
 
   // Modals
+  const visitorShareTrackId = useRef<string | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -1026,7 +1028,11 @@ export default function App() {
 
             if (requestedTrackId) {
               const found = tData.find((t: Track) => t.id === requestedTrackId);
-              if (found) handlePlayTrack(found, 'expanded');
+              if (found) {
+                visitorShareTrackId.current = found.id;
+                openTrackDetail(found);
+                void handlePlayTrack(found, 'expanded', null, true);
+              }
             }
           }
         }
@@ -1201,7 +1207,11 @@ export default function App() {
   };
 
   // 2. Play / Select Track with Memory Resume & Fullscreen Loading
-  const handlePlayTrack = async (track: Track, targetMode?: PlayerDisplayMode, permissionAnchor?: HTMLElement | null) => {
+  const handlePlayTrack = async (track: Track, targetMode?: PlayerDisplayMode, permissionAnchor?: HTMLElement | null, sharedDetail = false) => {
+    if (!currentUser && !canGuestPlayPublicShare(track, true, true) && sharedDetail) {
+      showPermissionAlert('請先登入會員，再依音檔權限與貼紙條件播放。', permissionAnchor);
+      return;
+    }
     // Requirement 11 (v2.7): 私秘VIP音檔播放守護
     if (track.isPrivateVip && !isTrackVipUnlocked(track)) {
       showPermissionAlert('此錄音檔為【私密VIP】專屬內容，請向上傳者取得專屬授權連結後再播放。', permissionAnchor);
@@ -1216,7 +1226,7 @@ export default function App() {
       return;
     }
 
-    if (!await ensureStickerUnlock(track, permissionAnchor)) return;
+    if (!canGuestPlayPublicShare(track, !currentUser, sharedDetail) && !await ensureStickerUnlock(track, permissionAnchor)) return;
 
     // Preserve user preferred player mode (Requirement 14)
     const effectiveMode = targetMode || (playerMode === 'expanded' ? savedPreferredMode : playerMode);
@@ -2017,6 +2027,7 @@ export default function App() {
   const filteredTracks = useMemo(() => {
     const trackList = Array.isArray(tracks) ? tracks : [];
     const filtered = trackList.filter(t => {
+      if (!currentUser && !isVisibleOnGuestHome(t)) return false;
       if (!trackMatchesHomeBaseFilters(t, selectedCategory, selectedSpeakerRank, searchQuery)) return false;
       if (selectedKeywords.length > 0 && !selectedKeywords.every(keyword => trackMatchesHomeKeyword(t, keyword))) return false;
       return true;
@@ -2446,7 +2457,7 @@ export default function App() {
       )}
 
       {/* Main Container */}
-      <main className={`flex-1 w-full mx-auto px-4 sm:px-6 py-5 pb-28 ${isAdminOpen ? 'max-w-6xl' : 'max-w-3xl'}`}>
+      <main hidden={isUploadOpen} className={`flex-1 w-full mx-auto px-4 sm:px-6 py-5 pb-28 ${isAdminOpen ? 'max-w-6xl' : 'max-w-3xl'}`}>
         {/* Requirement 16 & 9: 優先切換排行榜與公開通知分頁 */}
         {isAdminOpen ? (<Suspense fallback={<div role="status" className="py-12 text-center text-slate-500">載入功能中…</div>}>
       <AdminModal
@@ -2580,7 +2591,7 @@ export default function App() {
                   if (currentTrack?.id === activeTrack.id) {
                     handleTogglePlay();
                   } else {
-                    handlePlayTrack(activeTrack, savedPreferredMode, anchor);
+                    handlePlayTrack(activeTrack, savedPreferredMode, anchor, visitorShareTrackId.current === activeTrack.id);
                   }
                 }}
                 onSeek={(sec) => {
@@ -3084,6 +3095,7 @@ export default function App() {
         onClose={() => {
           setIsUploadOpen(false);
           setTrackToEdit(null);
+          if (currentTab === 'upload') setCurrentTab('home');
         }}
         currentUser={currentUser}
         isAdmin={isAdmin}

@@ -278,39 +278,10 @@
   background: color-mix(in srgb, var(--color-primary,#c06c84) 28%, rgb(30 41 59));
 }
 
-/* v110：上傳音檔由全螢幕遮罩改為真正的內容頁。 */
-body[data-main-tab="upload"] main {
-  display: none;
-}
+/* Upload is in document flow; no modal height cap or nested scroll area. */
+.upload-page { width: min(calc(100% - 2rem), 72rem); margin: 1.25rem auto 7rem; }
+.upload-page > div { max-height: none; }
 
-body[data-main-tab="upload"] .upload-modal-overlay {
-  position: relative !important;
-  inset: auto !important;
-  z-index: auto !important;
-  display: block !important;
-  width: min(calc(100% - 2rem), 48rem) !important;
-  margin: 1.25rem auto 7rem !important;
-  padding: 0 !important;
-  overflow: visible !important;
-  background: transparent !important;
-  backdrop-filter: none !important;
-}
-
-body[data-main-tab="upload"] .upload-modal-overlay > div {
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 !important;
-  box-shadow: none !important;
-}
-
-body[data-main-tab="upload"] .upload-modal-overlay form {
-  max-height: none !important;
-  overflow: visible !important;
-}
-
-body[data-main-tab="upload"]:not(:has(.upload-modal-overlay)) main {
-  display: block;
-}
 
 /* v112：我的貼紙簿分頁固定單排橫向；手機空間不足時左右滑動，不改成 2×2。 */
 [role="tablist"][aria-label="貼紙簿分頁"] {
@@ -409,3 +380,6 @@ body[data-main-tab="upload"]:not(:has(.upload-modal-overlay)) main {
 }
 
 .navbar-menu-install-row:empty { display: none; }
+
+#track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility] { grid-column: 1 / -1 !important; }
+.navbar-menu-footer-actions:has(> button:only-child) { grid-template-columns: minmax(0, 1fr); }

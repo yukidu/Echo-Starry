@@ -113,6 +113,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const [series, setSeries] = useState('');
   const [speechDate, setSpeechDate] = useState(new Date().toISOString().split('T')[0].replace(/-/g, '/'));
   const [seriesOrder, setSeriesOrder] = useState('第 1 集');
+  const [guestVisible, setGuestVisible] = useState(false);
   const [requiredRank, setRequiredRank] = useState<AmwayRank>('無');
   const [stickerUnlockCost, setStickerUnlockCost] = useState(0);
   const [commentStickerReward, setCommentStickerReward] = useState(0);
@@ -387,6 +388,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setSpeechDate(trackToEdit.speechDate || '');
       setSeriesOrder(trackToEdit.seriesOrder ?? '');
       setRequiredRank(trackToEdit.requiredRank || '無');
+      setGuestVisible(Boolean(trackToEdit.guestVisible));
       setStickerUnlockCost(Math.max(0, Number(trackToEdit.stickerUnlockCost || 0)));
       setCommentStickerReward(Math.max(0, Number(trackToEdit.commentStickerReward || 0)));
       setDescription(trackToEdit.description || '');
@@ -411,6 +413,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setSpeechDate(new Date().toISOString().split('T')[0].replace(/-/g, '/'));
       setSeriesOrder('第 1 集');
       setRequiredRank('無');
+      setGuestVisible(false);
       setStickerUnlockCost(0);
       setCommentStickerReward(0);
       setDescription('');
@@ -691,6 +694,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         series: series.trim(),
         speechDate: speechDate.trim(),
         requiredRank,
+        guestVisible,
         stickerUnlockCost,
         commentStickerReward,
         stickerOperationId: crypto.randomUUID(),
@@ -756,8 +760,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   return (
-    <div className="app-modal-overlay upload-modal-overlay fixed inset-0 z-[160] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl border border-rose-100/60 dark:border-slate-800 my-6">
+    <div className="upload-modal-overlay upload-page">
+      <div className="w-full bg-white dark:bg-slate-900">
         {/* Header - Requirement 20: 統一底色與麥克風相同色 */}
         <div
           className="p-4 sm:p-5 flex items-center justify-between text-white"
@@ -783,7 +787,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form id="track-upload-form" onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+        <form id="track-upload-form" onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 text-xs">
           {errorMessage && (
             <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -1329,6 +1333,13 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             </div>
 
             {/* 新需求: 獎銜＝閱讀瀏覽權限 */}
+            <div data-upload-guest-visibility="true">
+              <label className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300">
+                <input type="checkbox" checked={guestVisible} onChange={event => setGuestVisible(event.target.checked)} />
+                訪客可見
+              </label>
+              <p className="mt-1 text-xs text-slate-500">讓訪客在首頁看到此音檔；播放仍依權限與貼紙設定判斷。公開音檔預設可見，分享連結可開啟詳細頁。</p>
+            </div>
             <div>
               <label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">
                 瀏覽權限最低門檻獎銜（含該獎銜以上皆可收聽）
@@ -1542,6 +1553,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             />
           </div>
 
+          <div className="flex justify-end gap-3 pb-6">
+            <button type="button" onClick={onClose} disabled={isUploading} className="px-4 py-3">取消</button>
+            <button type="submit" disabled={isUploading} className="rounded-xl px-5 py-3 text-white" style={{backgroundColor:'var(--color-primary,#c06c84)'}}>{isUploading ? '儲存中…' : '儲存音檔'}</button>
+          </div>
         </form>
       </div>
     </div>
