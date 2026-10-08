@@ -255,3 +255,28 @@ body[data-main-tab="upload"]:not(:has(.upload-modal-overlay)) main {
 }
 
 /* v118：漢堡選單不再只限手機；桌機、平板、直式與橫式都使用同一選單。 */
+
+/* v122：頂部導覽只能維持單行。快捷工具列覆蓋在 Logo 與漢堡之間，不再佔第二列；空間不足時只在工具列內橫向滑動。 */
+.navbar-top-toolbar {
+  position: absolute !important;
+  top: 50%;
+  left: max(9.5rem, calc((100vw - 56rem) / 2 + 9.5rem));
+  right: max(4.25rem, calc((100vw - 56rem) / 2 + 4.25rem));
+  z-index: 20;
+  min-width: 0;
+  min-height: 2.25rem;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: translateY(-50%);
+  flex-wrap: nowrap !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+}
+
+@media (max-width: 380px) {
+  .navbar-top-toolbar {
+    left: 8.7rem;
+    right: 4rem;
+  }
+}
