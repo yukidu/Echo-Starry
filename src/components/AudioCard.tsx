@@ -264,7 +264,7 @@ export const AudioCard: React.FC<AudioCardProps> = ({
                 className="absolute top-0 inset-x-0 text-white text-[7px] sm:text-[8px] font-black text-center px-1 py-1 whitespace-nowrap flex items-center justify-center z-30 shadow-2xs leading-none"
                 style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
               >
-                <span className="whitespace-nowrap">已聽100%｜{commentRewardClaimed ? '已發' : '寫心得'}<span className="text-amber-200"> +{track.commentStickerReward || 0}</span> 張貼紙</span>
+                <span className="whitespace-nowrap">[已聽100%]{commentRewardClaimed ? '已發' : '寫心得'}<span className="text-amber-200"> +{track.commentStickerReward || 0}</span> 張貼紙</span>
               </div>
             ) : progressRatio > 0 ? (
               <div
@@ -292,7 +292,7 @@ export const AudioCard: React.FC<AudioCardProps> = ({
 
         <div className="flex-1 min-w-0 flex flex-col self-stretch pr-7 sm:pr-8">
           <div>
-            <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100 leading-tight truncate group-hover:text-[var(--color-primary,#c06c84)] transition-colors" title={track.title}>
+            <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100 leading-[1.02] truncate group-hover:text-[var(--color-primary,#c06c84)] transition-colors" title={track.title}>
               {track.title}
             </h3>
 
