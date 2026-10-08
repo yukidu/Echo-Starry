@@ -23,7 +23,6 @@
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <script>
       // v126: personal font zoom starts at 100% and can only grow from there.
-      // Normalize old 80% / 90% values before React or display policies read them.
       try {
         var echostarsFontZoomKey = 'echostars_user_font_zoom_v1';
         var echostarsFontZoomValue = Number(localStorage.getItem(echostarsFontZoomKey));
@@ -33,8 +32,6 @@
       } catch (_) {}
     </script>
     <script>
-      // Capture Chromium's native install event before the React bundle loads.
-      // The component consumes this exact browser event later from the user's click.
       window.__ECHOSTARS_INSTALL_PROMPT__ = null;
       window.addEventListener('beforeinstallprompt', function (event) {
         event.preventDefault();
@@ -65,5 +62,6 @@
     <script type="module" src="/src/v127MenuIdentityPalette.ts"></script>
     <script type="module" src="/src/v138UploadAdminRework.tsx"></script>
     <script type="module" src="/src/v138AdminTabCleanup.ts"></script>
+    <script type="module" src="/src/v139HomeUploadPolish.ts"></script>
   </body>
 </html>

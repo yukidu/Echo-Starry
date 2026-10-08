@@ -1,6 +1,7 @@
 import appWorker from './adminUserDeleteRouter';
 import iosGoogleRedirectWorker from './iosGoogleRedirectRouter';
 import type { Env } from './index';
+import { unitsToStickers } from '../shared/stickers';
 
 const X_ROBOTS_TAG = 'noindex, nofollow, noarchive, nosnippet, noimageindex';
 
@@ -110,6 +111,44 @@ function withPrivacyHeaders(response: Response): Response {
   });
 }
 
+async function spentStickerLeaderboard(env: Env): Promise<Response | null> {
+  if (!env.DB) return null;
+  try {
+    const result = await env.DB.prepare(`SELECT
+        u.id,u.name,u.avatar,u.center,
+        CASE WHEN COALESCE(u.rankApproved,0)=1 THEN COALESCE(NULLIF(u.approvedRank,''),u.rank,'無') ELSE COALESCE(u.rank,'無') END AS effectiveRank,
+        COALESCE(SUM(t.deltaUnits),0) AS balanceUnits,
+        COALESCE(SUM(CASE WHEN t.type <> 'balance_correction' AND t.deltaUnits > 0 THEN t.deltaUnits ELSE 0 END),0) AS earnedUnits,
+        COALESCE(SUM(CASE WHEN t.type <> 'balance_correction' AND t.deltaUnits < 0 THEN -t.deltaUnits ELSE 0 END),0) AS spentUnits
+      FROM users u
+      LEFT JOIN sticker_transactions t ON t.userId=u.id
+      WHERE COALESCE(u.isBlocked,0)=0
+        AND u.email IS NOT NULL AND TRIM(u.email)<>'' AND LOWER(u.email)<>'guest'
+        AND u.id NOT LIKE 'guest-%' AND u.name NOT LIKE '訪客%'
+      GROUP BY u.id,u.name,u.avatar,u.center,u.rank,u.approvedRank,u.rankApproved
+      ORDER BY spentUnits DESC, earnedUnits DESC, u.name ASC
+      LIMIT 20`).all();
+    const entries = (result.results || []).map((row: any) => ({
+      user: {
+        id: row.id,
+        name: row.name,
+        rank: row.effectiveRank || '無',
+        avatar: row.avatar || '',
+        center: row.center || ''
+      },
+      current: unitsToStickers(Number(row.balanceUnits || 0)),
+      spent: unitsToStickers(Number(row.spentUnits || 0)),
+      earned: unitsToStickers(Number(row.earnedUnits || 0))
+    }));
+    return new Response(JSON.stringify({ entries, suggestions: [], searchScope: 'public' }), {
+      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
+    });
+  } catch (error) {
+    console.warn('Spent sticker leaderboard fallback:', error);
+    return null;
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -136,6 +175,18 @@ export default {
           'X-Robots-Tag': X_ROBOTS_TAG
         }
       });
+    }
+
+    // The default sticker league is server-ranked by cumulative spent stickers.
+    // Searches continue through the existing authenticated sticker router so its
+    // member-only search fields and permissions stay unchanged.
+    if (
+      request.method === 'GET' &&
+      url.pathname === '/api/stickers/leaderboard' &&
+      !url.searchParams.get('q')
+    ) {
+      const ranked = await spentStickerLeaderboard(env);
+      if (ranked) return withPrivacyHeaders(ranked);
     }
 
     // Keep the long-standing application wrapper chain untouched. Only the

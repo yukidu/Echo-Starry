@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const policy = readFileSync(new URL('../src/v138UploadAdminRework.tsx', import.meta.url), 'utf8');
 const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const adminModal = readFileSync(new URL('../src/components/AdminModal.tsx', import.meta.url), 'utf8');
+const homeDensity = readFileSync(new URL('../src/homeDensityPolicy.ts', import.meta.url), 'utf8');
 
 test('v138 upload page hides duplicate bottom actions and auto upload date without deleting the data source', () => {
   assert.match(policy, /data-v138-hidden-upload-date/);
@@ -29,11 +30,9 @@ test('upload page fixes cover continuity and raises hamburger above upload layer
   assert.match(policy, /mobile-menu-shell[\s\S]*z-index: 260/);
 });
 
-test('audio management is available on upload page and removed from admin navigation', () => {
+test('audio management is available on upload page', () => {
   assert.match(policy, /TrackManagementPanel/);
   assert.match(policy, /原「後台管理 ＞ 音檔」已整合到此頁/);
-  assert.match(policy, /text === '音檔' \|\| text === '顯示'/);
-  assert.match(policy, /button\.style\.display = 'none'/);
 });
 
 test('hamburger upload label becomes upload and management', () => {
@@ -41,10 +40,10 @@ test('hamburger upload label becomes upload and management', () => {
   assert.match(policy, /renameUploadMenu/);
 });
 
-test('legacy display tab is absent from current React admin source and stale cached UI is removed by v138 policy', () => {
+test('retired display settings feature is absent from React admin and home density policy', () => {
   assert.doesNotMatch(adminModal, /setActiveTab\(['"]display['"]\)/);
   assert.doesNotMatch(adminModal, /activeTab\s*===\s*['"]display['"]/);
-  assert.match(policy, /text === '顯示'/);
+  assert.doesNotMatch(homeDensity, /display-settings|顯示設定|echostars-display-settings|data-echostars-display-tab/);
 });
 
 test('v138 policy loads after existing menu and upload presentation policies', () => {

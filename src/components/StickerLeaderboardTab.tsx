@@ -69,6 +69,14 @@ export const StickerLeaderboardTab: React.FC<StickerLeaderboardTabProps> = ({ us
     };
   }, [query]);
 
+  const rankedEntries = useMemo(() => [...entries].sort((a, b) => {
+    const spentDiff = Number(b.spent || 0) - Number(a.spent || 0);
+    if (spentDiff !== 0) return spentDiff;
+    const earnedDiff = Number(b.earned || 0) - Number(a.earned || 0);
+    if (earnedDiff !== 0) return earnedDiff;
+    return (a.user.name || '').localeCompare(b.user.name || '', 'zh-Hant');
+  }), [entries]);
+
   const usersById = useMemo(() => new Map(users.map(user => [user.id, user])), [users]);
   const openMember = (entry: StickerLeaderboardEntry) => {
     if (!onViewMember) return;
@@ -84,7 +92,7 @@ export const StickerLeaderboardTab: React.FC<StickerLeaderboardTabProps> = ({ us
             <Sparkles className="w-4 h-4 text-amber-500" />
             <span>貼紙排位賽</span>
           </h3>
-          <p className="text-[11px] text-slate-400 mt-0.5">依現有貼紙數排序，最多顯示 20 名</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">依累積已消費貼紙數由高至低排序，最多顯示 20 名</p>
         </div>
 
         <div className="relative">
@@ -125,11 +133,11 @@ export const StickerLeaderboardTab: React.FC<StickerLeaderboardTabProps> = ({ us
           <div className="py-12 text-center text-sm text-slate-400">讀取貼紙排位中…</div>
         ) : error ? (
           <div className="py-12 text-center text-sm text-rose-500">{error}</div>
-        ) : entries.length === 0 ? (
+        ) : rankedEntries.length === 0 ? (
           <div className="py-12 text-center text-sm text-slate-400">找不到符合條件的會員</div>
         ) : (
           <div className="space-y-2 pt-2">
-            {entries.map((entry, index) => (
+            {rankedEntries.map((entry, index) => (
               <div key={entry.user.id} className="grid grid-cols-1 sm:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(92px,0.7fr))] gap-2 sm:items-center p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60">
                 <div className="flex items-center gap-2.5 min-w-0">
                   {rankBadge(index)}
