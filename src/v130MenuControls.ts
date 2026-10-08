@@ -18,6 +18,7 @@ function installStyles() {
     /* v130: user font zoom must not enlarge the hamburger menu itself. */
     .mobile-menu-panel {
       transform-origin: top right;
+      position: relative;
     }
 
     .navbar-menu-home-shortcut {
@@ -55,22 +56,19 @@ function installStyles() {
       margin-right: 0 !important;
     }
 
-    .v130-menu-footer-actions {
-      display: flex;
-      width: 100%;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.5rem;
-    }
-    .v130-menu-footer-actions > button {
+    .v130-logout-row {
       width: auto !important;
-      min-width: 0 !important;
+      align-self: flex-start;
+      padding-right: 0.65rem !important;
     }
     .v130-reset-menu-button {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      margin-left: auto;
+      align-self: flex-end;
+      margin-top: -2.55rem;
+      margin-right: 0.15rem;
+      margin-bottom: 0.2rem;
       padding: 0.5rem 0.65rem;
       border-radius: 0.75rem;
       font-size: 0.78rem;
@@ -132,7 +130,7 @@ function syncFontRow(panel: HTMLElement) {
 
 function applyMenuZoomCompensation(panel: HTMLElement) {
   const zoom = readFontZoom();
-  panel.style.zoom = String(Math.round((1 / zoom) * 10000) / 10000);
+  panel.style.setProperty('zoom', String(Math.round((1 / zoom) * 10000) / 10000));
 }
 
 function pinButtons(panel: HTMLElement) {
@@ -166,18 +164,9 @@ function syncFooter(panel: HTMLElement) {
   const logout = Array.from(panel.querySelectorAll<HTMLButtonElement>('button'))
     .find(button => button.textContent?.trim() === '登出');
   if (!logout) return;
+  logout.classList.add('v130-logout-row');
 
-  let footer = logout.parentElement?.classList.contains('v130-menu-footer-actions')
-    ? logout.parentElement as HTMLElement
-    : null;
-  if (!footer) {
-    footer = document.createElement('div');
-    footer.className = 'v130-menu-footer-actions';
-    logout.replaceWith(footer);
-    footer.appendChild(logout);
-  }
-
-  if (footer.querySelector('.v130-reset-menu-button')) return;
+  if (panel.querySelector('.v130-reset-menu-button')) return;
   const reset = document.createElement('button');
   reset.type = 'button';
   reset.className = 'v130-reset-menu-button';
@@ -189,7 +178,7 @@ function syncFooter(panel: HTMLElement) {
     event.stopPropagation();
     resetCurrentDeviceMenu(panel);
   });
-  footer.appendChild(reset);
+  logout.insertAdjacentElement('afterend', reset);
 }
 
 function syncPanel(panel: HTMLElement) {
