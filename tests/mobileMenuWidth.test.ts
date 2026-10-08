@@ -20,26 +20,28 @@ test('hamburger drawer hugs the longest label and stays on the right', () => {
   assert.match(navbarCss, /max-width:\s*min\(22\.5rem, calc\(\(100vw - 24px\) \* var\(--navbar-font-zoom, 1\)\)\);/);
 });
 
-test('v119 defaults tablet landscape and desktop home playlists to three columns', () => {
-  assert.match(homeDensity, /tablet:\s*\{\s*portraitColumns:\s*1,\s*landscapeColumns:\s*3/);
-  assert.match(homeDensity, /desktop:\s*\{\s*columns:\s*3/);
+test('tablet landscape and desktop home playlists keep three columns without the retired display settings API', () => {
+  assert.match(homeDensity, /@media \(min-width:\s*640px\) and \(orientation:\s*landscape\)[\s\S]*--echostars-home-columns:\s*3/);
+  assert.match(homeDensity, /@media \(min-width:\s*1024px\)[\s\S]*--echostars-home-columns:\s*3/);
   assert.match(homeDensity, /grid-template-columns:\s*repeat\(var\(--echostars-home-columns/);
+  assert.doesNotMatch(homeDensity, /\/api\/display-settings|site_display_settings/);
 });
 
-test('v119 hamburger menu adds local font zoom without cloud writes', () => {
+test('hamburger menu keeps local font zoom after the display settings feature is retired', () => {
+  assert.match(navbar, /echostars_user_font_zoom_v1/);
+  assert.match(navbar, /A−/);
+  assert.match(navbar, /A＋/);
+  assert.match(navbar, /localStorage\.setItem\(USER_FONT_ZOOM_KEY/);
   assert.match(homeDensity, /echostars_user_font_zoom_v1/);
-  assert.match(homeDensity, /data-echostars-font-control/);
-  assert.match(homeDensity, /A−/);
-  assert.match(homeDensity, /A＋/);
-  assert.match(homeDensity, /localStorage\.setItem\(USER_FONT_ZOOM_KEY/);
+  assert.match(homeDensity, /document\.documentElement\.style\.fontSize/);
 });
 
-test('v119 super admin display page visualizes three device classes and persists global settings', () => {
-  assert.match(homeDensity, /data-echostars-display-tab/);
-  assert.match(homeDensity, /手機／平板／桌機視覺化配置/);
-  assert.match(homeDensity, /tablet-landscape-columns/);
-  assert.match(homeDensity, /fetch\('\/api\/display-settings'/);
-  assert.match(adminRouter, /url\.pathname === '\/api\/display-settings'/);
-  assert.match(adminRouter, /site_display_settings/);
-  assert.match(adminRouter, /只有超級管理員可修改全站顯示設定/);
+test('retired super-admin display settings UI and backend route stay removed', () => {
+  assert.doesNotMatch(homeDensity, /data-echostars-display-tab/);
+  assert.doesNotMatch(homeDensity, /手機／平板／桌機視覺化配置/);
+  assert.doesNotMatch(homeDensity, /tablet-landscape-columns/);
+  assert.doesNotMatch(homeDensity, /fetch\('\/api\/display-settings'/);
+  assert.doesNotMatch(adminRouter, /url\.pathname === '\/api\/display-settings'/);
+  assert.doesNotMatch(adminRouter, /site_display_settings/);
+  assert.doesNotMatch(adminRouter, /只有超級管理員可修改全站顯示設定/);
 });
