@@ -407,3 +407,5 @@ body[data-main-tab="upload"]:not(:has(.upload-modal-overlay)) main {
 .mobile-menu-panel[data-react-menu] .navbar-menu-palette-shortcut > span {
   font-size: 0.72rem !important;
 }
+
+.navbar-menu-install-row:empty { display: none; }

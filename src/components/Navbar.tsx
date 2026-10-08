@@ -545,6 +545,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </div>
 
+            <div className={`${menuRowClass(false)} navbar-menu-install-row`}>
+              <InstallAppButton onOpenIOSGuide={handleInstallGuide} className={menuActionClass} hideWhenInstalled />
+            </div>
+
             <div className={`${menuRowClass(false)} navbar-menu-font-row`}>
               {renderPinControl('font', '字體')}
               <span className="w-4 shrink-0 text-center text-xs font-black">A</span>
@@ -616,32 +620,25 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             )}
 
-            {currentUser && (
-              <div className={menuRowClass(false)}>
-                {renderPinControl('palette', '好心情')}
-                <button type="button" onClick={handleRandomPalette} className={menuActionClass}>
-                  <Palette className="w-4 h-4 shrink-0" /><span>好心情</span>
-                </button>
-              </div>
-            )}
-
-            <div className={menuRowClass(false)}>
-              <InstallAppButton onOpenIOSGuide={handleInstallGuide} className={menuActionClass} />
-            </div>
-
-            {currentUser && (
+            {
               <>
                 <div className="my-1 h-px bg-slate-200 dark:bg-slate-800" />
                 <div className="navbar-menu-footer-actions">
-                  <button type="button" onClick={handleLogout} className="navbar-menu-footer-button" title="登出目前帳號">
-                    <LogOut className="w-4 h-4 shrink-0" /><span>登出</span>
-                  </button>
+                  {currentUser ? (
+                    <button type="button" onClick={handleLogout} className="navbar-menu-footer-button" title="登出目前帳號">
+                      <LogOut className="w-4 h-4 shrink-0" /><span>登出</span>
+                    </button>
+                  ) : (
+                    <button type="button" onClick={() => handleMobileNav('profile')} className="navbar-menu-footer-button" title="登入 Google 帳號">
+                      <User className="w-4 h-4 shrink-0" /><span>登入</span>
+                    </button>
+                  )}
                   <button type="button" onClick={resetCurrentDeviceMenu} className="navbar-menu-footer-button navbar-menu-reset-button" title="恢復此裝置的預設置頂選單">
                     <RotateCcw className="w-4 h-4 shrink-0" /><span>重設選單</span>
                   </button>
                 </div>
               </>
-            )}
+            }
           </div>
         </div>
       )}

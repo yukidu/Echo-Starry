@@ -133,10 +133,12 @@ if (typeof window !== 'undefined') {
 
 export function InstallAppButton({
   onOpenIOSGuide,
-  className = ''
+  className = '',
+  hideWhenInstalled = false
 }: {
   onOpenIOSGuide?: () => void;
   compact?: boolean;
+  hideWhenInstalled?: boolean;
   className?: string;
 }) {
   useSyncExternalStore(
@@ -306,6 +308,8 @@ export function InstallAppButton({
     setShowInstaller(true);
     void prepareInstall();
   };
+
+  if (hideWhenInstalled && installed) return null;
 
   return (
     <>

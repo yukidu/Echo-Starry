@@ -1,3 +1,4 @@
+import { withGoogleLoginDeadline } from './googleLoginDeadline';
 import { GOOGLE_CLIENT_ID } from './config/auth';
 
 declare global {
@@ -214,6 +215,7 @@ async function validateCachedSession() {
 }
 
 let initialized = false;
+let loginInFlight = false;
 let activeStatus: HTMLElement | null = null;
 let incompleteProfilePromptedThisLoad = false;
 let incompleteProfileEditStartedThisLoad = false;
@@ -267,15 +269,21 @@ async function handleGoogleCredential(response: any) {
     return;
   }
 
+  if (loginInFlight) return;
+  loginInFlight = true;
   setStatus('登入中請稍後');
   try {
-    const result = await originalFetch('/api/users/google-sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ credential }),
-      cache: 'no-store'
+    const { result, data } = await withGoogleLoginDeadline(async signal => {
+      const result = await originalFetch('/api/users/google-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential }),
+        signal,
+        cache: 'no-store'
+      });
+      const data = await result.json().catch(() => ({}));
+      return { result, data };
     });
-    const data = await result.json().catch(() => ({}));
     if (!result.ok || !data?.user || !data?.authToken) {
       throw new Error(data?.error || 'Google 登入失敗，請稍後重試。');
     }
@@ -288,11 +296,14 @@ async function handleGoogleCredential(response: any) {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
     sessionStorage.setItem(SESSION_CHECK_KEY, String(Date.now()));
     setStatus(profileNeedsCompletion(user) ? '登入成功，正在開啟個人資料…' : '登入成功，正在同步學習紀錄…');
-    await claimLocalPlayback(user);
+    // The next page validates the session and retries playback import.
+    // A slow optional import must never hold a verified login on this screen.
     window.location.reload();
   } catch (error) {
     console.error('Secure Google sign-in failed:', error);
     setStatus(error instanceof Error ? error.message : 'Google 登入失敗，請稍後重試。', true);
+  } finally {
+    loginInFlight = false;
   }
 }
 
@@ -371,9 +382,14 @@ function renderOfficialButton(legacyButton: HTMLButtonElement) {
   activeStatus = status;
   simplifyLoginPanel(legacyButton);
 
+  const sdkStartedAt = Date.now();
   const render = () => {
     if (!wrapper.isConnected) return;
     if (!ensureGoogleInitialized()) {
+      if (Date.now() - sdkStartedAt >= 15000) {
+        setStatus('Google 登入元件載入逾時，請重新整理後再試。', true);
+        return;
+      }
       setTimeout(render, 250);
       return;
     }
