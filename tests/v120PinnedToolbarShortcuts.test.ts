@@ -6,37 +6,41 @@ const navbar = readFileSync(new URL('../src/components/Navbar.tsx', import.meta.
 const navbarCss = readFileSync(new URL('../src/components/Navbar.css', import.meta.url), 'utf8');
 const quickPrefs = readFileSync(new URL('../src/quickShortcutPreferences.ts', import.meta.url), 'utf8');
 
-test('font minus, font plus and theme are permanently rendered in the sticky top toolbar', () => {
+test('v123 keeps font and theme available in both toolbar rendering and hamburger menu', () => {
   assert.match(navbar, /data-echostars-top-toolbar="true"/);
+  assert.match(navbar, /renderPinControl\('font', '文字大小'\)/);
+  assert.match(navbar, /renderPinControl\('theme', '淺色／暗色切換'\)/);
   assert.match(navbar, /aria-label="縮小字體"/);
   assert.match(navbar, /aria-label="放大字體"/);
-  assert.match(navbar, /aria-label=\{isDark \? '切換淺色模式' : '切換深色模式'\}/);
-  assert.doesNotMatch(navbar, /onClick=\{handleToggleTheme\} className=\{mobileRowClass\(false\)\}/);
+  assert.match(navbar, /淺色／暗色切換/);
 });
 
-test('legacy v119 menu font injector is explicitly suppressed after controls move to the toolbar', () => {
-  assert.match(navbar, /data-echostars-font-control="moved-to-toolbar"/);
+test('v123 removes the old separate shortcut customizer and keeps font zoom local', () => {
+  assert.doesNotMatch(navbar, /自訂置頂功能/);
+  assert.doesNotMatch(navbar, /GripVertical/);
   assert.match(navbar, /echostars_user_font_zoom_v1/);
   assert.match(navbar, /window\.dispatchEvent\(new Event\('resize'\)\)/);
 });
 
-test('users can pin at most three eligible hamburger actions with a local cache', () => {
-  assert.match(quickPrefs, /MAX_QUICK_ACTIONS = 3/);
-  assert.match(quickPrefs, /echostars_quick_header_actions_v1/);
-  assert.match(navbar, /自訂置頂功能/);
-  assert.match(navbar, /visibleQuickActionIds\.length >= MAX_QUICK_ACTIONS/);
+test('v123 uses device-specific limits and local cache', () => {
+  assert.match(quickPrefs, /mobile:\s*3/);
+  assert.match(quickPrefs, /tablet:\s*5/);
+  assert.match(quickPrefs, /desktop:\s*Number\.MAX_SAFE_INTEGER/);
+  assert.match(quickPrefs, /echostars_quick_header_actions_v2/);
   assert.match(quickPrefs, /localStorage\.setItem\(QUICK_ACTIONS_STORAGE_KEY/);
+  assert.match(navbar, /selectedQuickActionIds\.length < deviceLimit/);
 });
 
 test('permission-sensitive shortcuts remain gated by the same navbar permissions', () => {
-  assert.match(navbar, /id: 'notifications'.*available: Boolean\(currentUser\)/s);
-  assert.match(navbar, /id: 'upload'.*available: canUpload/s);
-  assert.match(navbar, /id: 'admin'.*available: canAccessSettings/s);
+  assert.match(navbar, /notifications:\s*Boolean\(currentUser\)/);
+  assert.match(navbar, /upload:\s*canUpload/);
+  assert.match(navbar, /admin:\s*canAccessSettings/);
 });
 
-test('toolbar stays compact and horizontally safe on narrow phones', () => {
-  assert.match(navbarCss, /\.navbar-top-toolbar\s*\{[\s\S]*overflow-x:\s*auto;/);
-  assert.match(navbarCss, /\.navbar-top-action\s*\{[\s\S]*width:\s*2\.25rem;/);
-  assert.match(navbarCss, /flex:\s*0 0 2\.25rem;/);
-  assert.match(navbarCss, /max-height:\s*calc\(100dvh - 7\.25rem\);/);
+test('toolbar stays compact and horizontally safe while desktop width remains fluid', () => {
+  assert.match(navbarCss, /\.navbar-top-toolbar\s*\{[\s\S]*overflow-x:\s*auto/);
+  assert.match(navbarCss, /\.navbar-top-action\s*\{[\s\S]*width:\s*2\.25rem/);
+  assert.match(navbarCss, /\.navbar-main-row\s*\{[\s\S]*max-width:\s*none\s*!important/);
+  assert.match(navbarCss, /left:\s*9\.5rem/);
+  assert.doesNotMatch(navbarCss, /100vw - 56rem/);
 });
