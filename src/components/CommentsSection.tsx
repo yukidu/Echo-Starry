@@ -295,7 +295,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             </div>
           )}
 
-          <textarea ref={textareaRef} value={inputText} onChange={handleTextareaChange} maxLength={2000} rows={3} placeholder={replyingTo ? '寫下回覆內容...' : `按這裡寫下您的心得收穫，可獲得+${commentStickerReward}張貼紙（必須100%聽完錄音）`} className="w-full bg-transparent resize-none outline-hidden text-sm sm:text-base text-slate-800 dark:text-slate-100 placeholder:text-slate-400" />
+          <textarea ref={textareaRef} value={inputText} onChange={handleTextareaChange} maxLength={2000} rows={3} placeholder={replyingTo ? '寫下回覆內容...' : currentUser ? `按這裡寫下您的心得收穫，可獲得+${commentStickerReward}張貼紙（必須100%聽完錄音）` : '按這裡寫下您的心得收穫...'} className="w-full bg-transparent resize-none outline-hidden text-sm sm:text-base text-slate-800 dark:text-slate-100 placeholder:text-slate-400" />
 
           {isMentionOpen && (
             <div className="absolute left-2 top-full mt-1 z-40 w-64 max-w-[calc(100vw-32px)] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95">
