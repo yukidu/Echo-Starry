@@ -8,6 +8,7 @@ const USER_KEY = 'sq_current_user_v1';
 const AUTH_RETURN_KEY = 'echostars_auth_return_v1';
 const AUTH_RESTORE_KEY = 'echostars_auth_restore_v1';
 const SKIP_FORCED_PROFILE_KEY = 'echostars_skip_forced_profile_once';
+const PROFILE_AUTO_OPEN_DISABLED_KEY = 'echostars_profile_auto_open_disabled_v1';
 const PROD_HOST = 'echostars.yukidu.workers.dev';
 
 let patched = false;
@@ -31,6 +32,15 @@ function readCachedUser() {
   }
 }
 
+function enableProgressiveProfileCompletion() {
+  try {
+    localStorage.setItem(PROFILE_AUTO_OPEN_DISABLED_KEY, '1');
+    sessionStorage.setItem(SKIP_FORCED_PROFILE_KEY, '1');
+  } catch {
+    // Login and browsing must keep working if browser storage is unavailable.
+  }
+}
+
 function captureReturnContext() {
   try {
     const context = {
@@ -51,6 +61,7 @@ function restoreAfterRedirect() {
     raw = sessionStorage.getItem(AUTH_RESTORE_KEY) || '';
     if (!raw) return;
     sessionStorage.removeItem(AUTH_RESTORE_KEY);
+    enableProgressiveProfileCompletion();
     const context = JSON.parse(raw);
     const scrollY = Math.max(0, Number(context?.scrollY) || 0);
     const historyState = context?.historyState;
@@ -67,7 +78,10 @@ function restoreAfterRedirect() {
 
 function blockLegacyForcedProfileOpenOnce(event: MouseEvent) {
   try {
-    if (sessionStorage.getItem(SKIP_FORCED_PROFILE_KEY) !== '1') return;
+    const shouldBlock =
+      sessionStorage.getItem(SKIP_FORCED_PROFILE_KEY) === '1' ||
+      localStorage.getItem(PROFILE_AUTO_OPEN_DISABLED_KEY) === '1';
+    if (!shouldBlock) return;
     if (event.isTrusted) return;
     const target = event.target instanceof Element
       ? event.target.closest('[data-tutorial-target="visitor-profile"]')
@@ -83,6 +97,55 @@ function blockLegacyForcedProfileOpenOnce(event: MouseEvent) {
 
 document.addEventListener('click', blockLegacyForcedProfileOpenOnce, true);
 restoreAfterRedirect();
+
+// v131: incomplete profile data is now progressive rather than a blocking step.
+// Existing members immediately get the same behavior without needing to sign in again.
+if (readCachedUser()) enableProgressiveProfileCompletion();
+
+function addLoginIntro(buttonHost: HTMLElement) {
+  const wrapper = buttonHost.parentElement;
+  if (!wrapper || wrapper.querySelector('[data-echostars-login-intro="1"]')) return;
+
+  const intro = document.createElement('div');
+  intro.dataset.echostarsLoginIntro = '1';
+  Object.assign(intro.style, {
+    width: '100%',
+    boxSizing: 'border-box',
+    textAlign: 'center',
+    padding: '2px 8px 4px'
+  });
+
+  const title = document.createElement('div');
+  title.textContent = '登入繁星回聲';
+  Object.assign(title.style, {
+    fontSize: '20px',
+    lineHeight: '1.3',
+    fontWeight: '900',
+    color: 'var(--color-primary, #0f8b83)'
+  });
+
+  const description = document.createElement('div');
+  description.textContent = '登入後可跨裝置保存學習進度與個人紀錄';
+  Object.assign(description.style, {
+    marginTop: '7px',
+    fontSize: '13px',
+    lineHeight: '1.55',
+    color: '#475569',
+    fontWeight: '700'
+  });
+
+  const helper = document.createElement('div');
+  helper.textContent = '個人資料可稍後補齊，不會中斷目前瀏覽';
+  Object.assign(helper.style, {
+    marginTop: '4px',
+    fontSize: '12px',
+    lineHeight: '1.5',
+    color: '#64748b'
+  });
+
+  intro.append(title, description, helper);
+  wrapper.insertBefore(intro, buttonHost);
+}
 
 function addIosRedirectNote(buttonHost: HTMLElement) {
   const wrapper = buttonHost.parentElement;
@@ -103,6 +166,19 @@ function addIosRedirectNote(buttonHost: HTMLElement) {
   wrapper.appendChild(note);
 }
 
+function normalizeProgressiveLoginStatus() {
+  const statuses = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-echostars-google-identity="1"] [role="status"]')
+  );
+  statuses.forEach(status => {
+    const spans = Array.from(status.querySelectorAll('span'));
+    const text = spans[spans.length - 1];
+    if (text?.textContent?.includes('登入成功，正在開啟個人資料')) {
+      text.textContent = '登入成功！正在同步學習紀錄，個人資料可稍後補齊。';
+    }
+  });
+}
+
 function patchGoogleIdentity() {
   if (patched) return true;
   const id = window.google?.accounts?.id;
@@ -119,6 +195,15 @@ function patchGoogleIdentity() {
       ...config,
       itp_support: true
     };
+    const callback = typeof config.callback === 'function'
+      ? config.callback as (response: unknown) => unknown
+      : null;
+    if (callback) {
+      next.callback = (response: unknown) => {
+        enableProgressiveProfileCompletion();
+        return callback(response);
+      };
+    }
     if (useRedirect) {
       // Google documents redirect mode as required on iOS because of ITP.
       // The credential is POSTed to the production origin root and handled by
@@ -141,6 +226,7 @@ function patchGoogleIdentity() {
       locale: 'zh_TW'
     });
 
+    addLoginIntro(parent);
     if (useRedirect) {
       addIosRedirectNote(parent);
     } else if (!oneTapPrompted && !readCachedUser() && originalPrompt) {
@@ -161,6 +247,9 @@ function patchGoogleIdentity() {
   patched = true;
   return true;
 }
+
+const statusObserver = new MutationObserver(normalizeProgressiveLoginStatus);
+statusObserver.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
 
 function startPatching() {
   if (patchGoogleIdentity()) return;
