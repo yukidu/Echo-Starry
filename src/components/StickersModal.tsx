@@ -10,7 +10,7 @@ import { StickerGuideTable } from './StickerGuideTable';
 export type StickerSource = { kind: 'track' | 'member' | 'feature'; trackId?: string; commentId?: string; userId?: string; label: string; available: boolean };
 type StickerTransaction = { id: string; delta: number; description: string; type: string; createdAt: number; source?: StickerSource | null };
 type StickerSettings = { ratingReward: number; likeReward: number; keywordReward: number; keywordRewardLimit: number; commentThreadLimit: number; replyReward: number; luckyCost: number; vipUploadCost: number; profileReward:number; luckyCompleteReward:number; luckyDailyLimit:number; toastSeconds:number; profileHintSeconds:number; profileHintText:string; luckyHintText:string; platinumRankReward?:number; platinumEarningMultiplier?:number; emeraldRankReward?:number; diamondRankReward?:number };
-type StickerSummary = { balance: number; transactions?: StickerTransaction[]; canGrant: boolean; isSuperAdmin: boolean };
+type StickerSummary = { cursor?: number; balance: number; transactions?: StickerTransaction[]; canGrant: boolean; isSuperAdmin: boolean };
 interface StickersModalProps {
   isOpen: boolean; onClose: () => void; currentUser: UserProfile | null; tracks: Track[];
   initialSummary?: StickerSummary | null;
@@ -18,7 +18,15 @@ interface StickersModalProps {
   onOpenSource?: (source: StickerSource) => void;
   onRequireProfileEdit?: () => void;
 }
-const historyCache = new Map<string, StickerTransaction[]>();
+type HistoryPage = {transactions:StickerTransaction[];nextCursor:string|null;time:number;cursor?:number};
+const historyCache = new Map<string, HistoryPage>();
+const historyRequests = new Map<string,Promise<any>>();
+const recoveredAt = new Map<string, number>();
+const RECOVERY_TTL = 5 * 60_000;
+function cacheHistory(key:string,page:HistoryPage) {
+  if(historyCache.size>=8 && !historyCache.has(key))historyCache.delete(historyCache.keys().next().value!);
+  historyCache.set(key,page);
+}
 const field = 'w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100';
 const primary = { backgroundColor: 'var(--color-primary,#c06c84)' };
 const actions: Record<string,string> = {profile_reward:'完善個人資料',rank_approval_reward:'獎銜審核獎勵',lucky_complete_reward:'好手氣完聽獎勵',initial:'會員初始貼紙',rating_reward:'評價錄音',like_reward:'按讚錄音',keyword_reward:'新增網友關鍵字',comment_reward:'聽完後分享心得',reply_reward:'回覆他人心得',comment_like_reward:'按讚他人心得',comment_reward_reversal:'刪除心得扣回',track_unlock_cost:'解鎖錄音',vip_upload_cost:'建立私秘VIP',lucky_cost:'好手氣',manual_grant:'人工加貼紙',manual_grant_debit:'加發貼紙給下線',balance_correction:'系統錯誤修正'};
@@ -45,30 +53,94 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
   const [inviteInfo,setInviteInfo] = useState<{url:string;dealerId:string;displayName:string;kind:'platinum'|'diamond'} | null>(null);
   const [inviteBusy,setInviteBusy] = useState(false);
   const [inviteNotice,setInviteNotice] = useState('');
+  const [historyNext,setHistoryNext]=useState<string|null>(null);
+  const [grantNext,setGrantNext]=useState<string|null>(null);
+  const latestSummary=useRef(initialSummary);latestSummary.current=initialSummary;
   const requestSequence = useRef(0); const mutationPending = useRef(false);
   const grantOperation = useRef<{signature:string;id:string} | null>(null);
-  const notifyChanged = () => { onStickerChanged?.(); window.dispatchEvent(new CustomEvent('echostars:sticker-changed')); };
-  const load = async () => {
-    if (!currentUser) { setLoading(false); return; }
-    const sequence = ++requestSequence.current;
+  const notifyChanged = () => {
+    window.dispatchEvent(new CustomEvent('echostars:sticker-changed'));
+    onStickerChanged?.();
+  };
+  const loadHistory = async (outgoing=false,append=false,force=false) => {
+    if(!currentUser)return;
+    const key=currentUser.id+(outgoing?':grant':':history');
+    const cached=historyCache.get(key);
+    const apply=(page:HistoryPage)=>{
+      if(outgoing){setGrantHistory(page.transactions);setGrantNext(page.nextCursor);}
+      else {setSummary(prev=>({...prev!,transactions:page.transactions}));setHistoryNext(page.nextCursor);}
+    };
+    if(!append && !force && cached && Date.now()-cached.time<30_000 && (outgoing || cached.cursor===latestSummary.current?.cursor)) {
+      apply(cached);setLoading(false);return;
+    }
+    const sequence=++requestSequence.current;
     setLoading(true);
     try {
-      // Paint the ledger independently; management requests never block the first page.
-      const historyTask=requestJson('/api/stickers/history').then(data=>{if(sequence===requestSequence.current){historyCache.set(currentUser.id,data.transactions);setSummary(prev=>({...prev!,transactions:data.transactions}));}});
-      const summaryTask=requestJson('/api/stickers/summary').then(data=>{if(sequence===requestSequence.current)setSummary(prev=>({...data,transactions:prev?.transactions}));});
-      const grantsTask=canGrant?requestJson('/api/stickers/grant-targets').then(data=>{if(sequence===requestSequence.current)setTargets(data.targets || []);}):Promise.resolve();
-      const rulesTask=canManageRules?requestJson('/api/stickers/settings').then(data=>{if(sequence===requestSequence.current)setSettings(data.settings);}):Promise.resolve();
-      const outgoingTask=canGrant?requestJson('/api/stickers/grant-history').then(data=>{if(sequence===requestSequence.current)setGrantHistory(data.transactions || []);}):Promise.resolve();
-      await Promise.all([historyTask.then(()=>{if(sequence===requestSequence.current)setLoading(false);}),summaryTask,grantsTask,rulesTask,outgoingTask]);
-      // Recovery runs after the history is visible, then refreshes it without blanking it.
-      await requestJson('/api/stickers/reconcile',{method:'POST'});
-      const fresh=await requestJson('/api/stickers/history');
-      if(sequence===requestSequence.current){historyCache.set(currentUser.id,fresh.transactions);setSummary(prev=>({...prev!,transactions:fresh.transactions}));}
-      notifyChanged();
-    } catch (reason) { if (sequence === requestSequence.current) setError(reason instanceof Error ? reason.message : '無法讀取貼紙資料'); }
-    finally { if (sequence === requestSequence.current) setLoading(false); }
+      const before=append?(outgoing?grantNext:historyNext):null;
+      const url='/api/stickers/'+(outgoing?'grant-history':'history')+(before?'?before='+encodeURIComponent(before):'');
+      const ledgerCursor=latestSummary.current?.cursor;
+      const requestKey=key+':'+url+':'+ledgerCursor;
+      let pending=historyRequests.get(requestKey);
+      if(!pending){
+        pending=requestJson(url);historyRequests.set(requestKey,pending);
+        void pending.finally(()=>historyRequests.delete(requestKey)).catch(()=>{});
+      }
+      const data=await pending;
+      const rows=append?[...(cached?.transactions || []),...data.transactions]:data.transactions;
+      const page={transactions:rows,nextCursor:data.nextCursor || null,time:Date.now(),cursor:ledgerCursor};
+      if(sequence===requestSequence.current){cacheHistory(key,page);apply(page);}
+    } catch(reason) {if(sequence===requestSequence.current)setError(reason instanceof Error?reason.message:'無法讀取貼紙紀錄');}
+    finally {if(sequence===requestSequence.current)setLoading(false);}
   };
-  useEffect(() => { if (isOpen) { setTab('history'); setError(''); setSummary({...initialSummary!,transactions:historyCache.get(currentUser?.id || '')}); void load(); } return () => {requestSequence.current += 1;}; }, [isOpen,currentUser?.id]);
+  useEffect(()=>{
+    if(!isOpen||!currentUser){setLoading(false);return;}
+    setTab('history');setError('');
+    setSummary({...initialSummary!,transactions:historyCache.get(currentUser.id+':history')?.transactions});
+    onStickerChanged?.();
+    // Recover missed rewards occasionally, after paint; normal playback still awards immediately.
+    const userId=currentUser.id;
+    let active=true;
+    if(Date.now()-(recoveredAt.get(userId)||0)>=RECOVERY_TTL) {
+      void requestJson('/api/stickers/reconcile',{method:'POST'}).then(data=>{
+        if(recoveredAt.size>=8)recoveredAt.delete(recoveredAt.keys().next().value!);
+        recoveredAt.set(userId,Date.now());
+        if(data.changed) {
+          historyCache.delete(userId+':history');
+          if(active) {
+            void loadHistory(false,false,true);notifyChanged();
+          }
+        }
+      }).catch(()=>{}); // Retry on the next open; ledger reads remain usable if recovery is offline.
+    }
+    return()=>{active=false;requestSequence.current+=1;};
+  },[isOpen,currentUser?.id]);
+  useEffect(()=>{
+    if(!initialSummary)return;
+    setSummary(prev=>({...initialSummary,transactions:prev?.transactions}));
+    const cached=historyCache.get((currentUser?.id || '')+':history');
+    if(isOpen && tab==='history' && (!cached || cached.cursor!==initialSummary.cursor))void loadHistory(false,false,true);
+  },[initialSummary]);
+  useEffect(()=>{
+    if(!isOpen||!currentUser)return;
+    let active=true;
+    setError('');
+    if(tab==='history')void loadHistory();
+    else if(tab==='grant'&&canGrant) {
+      setLoading(true);
+      void Promise.all([
+        requestJson('/api/stickers/grant-targets').then(data=>{if(active)setTargets(data.targets || []);}),
+        loadHistory(true)
+      ]).catch(reason=>{if(active)setError(reason instanceof Error?reason.message:'無法讀取下線');})
+        .finally(()=>{if(active)setLoading(false);});
+    } else if(tab==='rules'&&canManageRules) {
+      if(settings){setLoading(false);return;}
+      setLoading(true);
+      void requestJson('/api/stickers/settings').then(data=>{if(active)setSettings(data.settings);})
+        .catch(reason=>{if(active)setError(reason instanceof Error?reason.message:'無法讀取規則');})
+        .finally(()=>{if(active)setLoading(false);});
+    } else setLoading(false);
+    return()=>{active=false;requestSequence.current+=1;};
+  },[isOpen,currentUser?.id,tab]);
   const filteredTracks = useMemo(() => tracks.filter(track => [track.title,track.speaker,track.series].some(value => String(value || '').toLocaleLowerCase('zh-Hant').includes(trackSearch.trim().toLocaleLowerCase('zh-Hant')))),[tracks,trackSearch]);
   const filteredTargets = useMemo(() => targets.filter(target => target.name.toLocaleLowerCase('zh-Hant').includes(targetSearch.trim().toLocaleLowerCase('zh-Hant'))),[targets,targetSearch]);
   if (!isOpen) return null;
@@ -83,7 +155,9 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
     const signature = JSON.stringify([targetUserId,grantAmount,grantReason.trim()]);
     if (grantOperation.current?.signature !== signature) grantOperation.current = {signature,id:crypto.randomUUID()};
     await requestJson('/api/stickers/grant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetUserId,amount:Number(grantAmount),reason:grantReason.trim(),operationId:grantOperation.current.id})});
-    grantOperation.current=null;setGrantReason('');setTargetUserId('');await load();notifyChanged();
+    grantOperation.current=null;setGrantReason('');setTargetUserId('');
+    historyCache.delete(currentUser!.id+':history');
+    await loadHistory(true,false,true);onStickerChanged?.();
   });
   const batch = () => mutate(async () => {
     if (!selectedTrackIds.length || (batchUnlockCost === '' && batchCommentReward === '')) throw new Error('請勾選錄音並選擇要修改的貼紙欄位');
@@ -92,7 +166,7 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
   });
   const saveRules = () => mutate(async () => {
     const data=await requestJson('/api/stickers/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(settings)});
-    setSettings(data.settings);setFeedbackRules(data.settings);notifyChanged();
+    setSettings(data.settings);setFeedbackRules(data.settings);
   });
   const copyText = async (text: string) => {
     if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return; }
@@ -145,7 +219,7 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
         </div>
         <div role="tabpanel" className="overflow-y-auto min-h-0 p-3 space-y-3 text-sm text-slate-800 dark:text-slate-100">
           {error && <div role="alert" className="p-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs">{error}</div>}
-          {tab==='history' && <><StickerGuideTable currentUser={currentUser} tracks={tracks}/><div className="rounded-2xl p-3 text-white text-center" style={primary}><p className="text-xs">目前可用貼紙</p><p className="text-4xl font-black mt-1">{summary?formatStickerAmount(summary.balance):'—'} 張</p></div><h3 className="font-black">來源與消耗紀錄</h3>{transactions(summary?.transactions || [])}</>}
+          {tab==='history' && <><StickerGuideTable currentUser={currentUser} tracks={tracks}/><div className="rounded-2xl p-3 text-white text-center" style={primary}><p className="text-xs">目前可用貼紙</p><p className="text-4xl font-black mt-1">{summary?formatStickerAmount(summary.balance):'—'} 張</p></div><h3 className="font-black">來源與消耗紀錄</h3>{transactions(summary?.transactions || [])}{historyNext && <button type="button" disabled={loading} onClick={()=>void loadHistory(false,true)} className="w-full py-2 rounded-xl border border-slate-200 dark:border-slate-700 disabled:opacity-50">載入更多紀錄</button>}</>}
           {tab==='grant' && canGrant && <div className="space-y-3">
             {canCreateDownlineInvite && <section aria-label="綁定成為我下線" className="rounded-2xl border border-slate-200 dark:border-slate-700 p-3 space-y-2 bg-slate-50 dark:bg-slate-800/60">
               <div><h3 className="font-black">綁定成為我下線</h3><p className="text-xs text-slate-500 dark:text-slate-400 mt-1">分享您的專屬網址。已登入會員點開後，系統會依您或夫妻共同事業體的最高已審核獎銜，自動綁定上手白金或上手鑽石。</p></div>
@@ -159,7 +233,7 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
             <label className="block font-bold">加貼紙張數<div className="mt-1 flex items-center gap-2"><input aria-label="加貼紙張數" type="number" inputMode="decimal" min="0.1" max="1000" step="0.1" value={grantAmount} onChange={e=>setGrantAmount(e.target.value)} className={field}/><span className="shrink-0 text-sm">張</span></div><p className="mt-1 text-[11px] font-normal text-slate-500">可自行輸入 0.1～1000 張，人工加貼紙不套用白金級以上倍數。</p></label>
             <textarea aria-label="加貼紙原因" value={grantReason} onChange={e=>setGrantReason(e.target.value)} placeholder="加貼紙原因（必填）" rows={4} maxLength={500} className={`${field} resize-y min-h-28`}/>
             <button type="button" disabled={busy||loading} onClick={grant} className="w-full py-2.5 rounded-xl text-white font-bold disabled:opacity-50" style={primary}>確認加貼紙</button>
-            <h3 className="font-black">所有加貼紙紀錄</h3>{transactions(grantHistory)}
+            <h3 className="font-black">所有加貼紙紀錄</h3>{transactions(grantHistory)}{grantNext && <button type="button" disabled={loading} onClick={()=>void loadHistory(true,true)} className="w-full py-2 rounded-xl border border-slate-200 dark:border-slate-700 disabled:opacity-50">載入更多加貼紙紀錄</button>}
           </div>}
           {tab==='batch' && superAdmin && <div className="space-y-3">
             <div className="relative"><Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input aria-label="搜尋錄音" value={trackSearch} onChange={e=>setTrackSearch(e.target.value)} placeholder="搜尋錄音標題、講者、系列" className={`${field} pl-9`}/></div>

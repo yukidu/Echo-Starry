@@ -1,4 +1,4 @@
-const CACHE_NAME = 'echostars-shell-v132';
+const CACHE_NAME = 'echostars-shell-v133';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-monochrome.svg', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', event => {
@@ -36,6 +36,12 @@ self.addEventListener('fetch', event => {
 
   event.respondWith((async () => {
     try {
+      // Vite filenames contain a content hash; identical files do not need a revalidation.
+      // HTML and API data still use the network so updates and private state stay fresh.
+      if (url.pathname.startsWith('/assets/') && /-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/i.test(url.pathname)) {
+        const cached = await (await caches.open(CACHE_NAME)).match(event.request);
+        if (cached) return cached;
+      }
       const response = await fetch(event.request);
       // Never store a personalized /share/* HTML response as the generic app
       // shell. Doing so can reopen the wrong recording on a later offline load.

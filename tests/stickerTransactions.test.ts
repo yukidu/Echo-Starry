@@ -526,3 +526,58 @@ test('authorized administrators can manage feedback rules and invalid limits can
   assert.equal((await call(db,token,'/api/stickers/settings','PUT',{...initial.data.settings,toastSeconds:2,luckyHintText:'你的答案\n聽完+{x}張貼紙'})).status,200);
   assert.equal((await call(db,member,'/api/stickers/public-settings')).data.settings.toastSeconds,2);
 });
+
+test('unchanged summaries avoid ledger aggregation while still checking notifications, permissions and live sessions',async()=>{
+ const db=database();const member=await session(db,'member');
+ const initial=(await call(db,member,'/api/stickers/summary')).data;
+ db.queries.length=0;
+ const same=(await call(db,member,'/api/stickers/summary?after='+initial.cursor)).data;
+ assert.equal(same.unchanged,true);assert.equal(same.balance,undefined);
+ assert.ok(!db.queries.some(sql=>/SUM\\(deltaUnits\\)|sticker_unlocks|json_group_array/.test(sql)));
+ assert.ok(db.queries.length<=4,'cheap summary SQL count='+db.queries.length);
+ db.sqlite.exec("INSERT INTO member_notifications(id,userId,type,title,message,createdAt) VALUES ('notice','member','test','title','message',1)");
+ assert.equal((await call(db,member,'/api/stickers/summary?after='+initial.cursor)).data.unreadNotifications,1);
+ db.sqlite.exec("UPDATE users SET rank='白金',approvedRank='白金' WHERE id='member'");
+ assert.equal((await call(db,member,'/api/stickers/summary?after='+initial.cursor)).data.canGrant,true);
+ const plan=db.sqlite.prepare("EXPLAIN QUERY PLAN SELECT rowid AS cursor FROM sticker_transactions INDEXED BY sticker_transactions_user_cursor WHERE userId=? ORDER BY rowid DESC LIMIT 1").all('member');
+ assert.ok(plan.some((x:any)=>x.detail.includes('COVERING INDEX sticker_transactions_user_cursor')));
+ assert.ok(!plan.some((x:any)=>x.detail.includes('TEMP B-TREE')));
+ db.sqlite.exec("UPDATE users SET isBlocked=1 WHERE id='member'");
+ assert.equal((await call(db,member,'/api/stickers/summary?after='+initial.cursor)).status,401);
+});
+test('ledger pages retain every source, handle equal timestamps and concurrent new entries, and never cross member boundaries',async()=>{
+ const db=database();const member=await session(db,'member');
+ await call(db,member,'/api/stickers/summary');
+ const add=db.sqlite.prepare("INSERT INTO sticker_transactions(id,userId,deltaUnits,balanceAfterUnits,type,description,uniqueKey,createdAt,trackId) VALUES (?,'member',1,61,'test_reward','reward',?,1000,'track')");
+ for(let i=0;i<125;i++)add.run('page-'+String(i).padStart(3,'0'),'page-'+i);
+ db.sqlite.exec("INSERT INTO sticker_transactions(id,userId,deltaUnits,balanceAfterUnits,type,description,uniqueKey,createdAt) VALUES ('secret','other',1,61,'test_reward','private','secret',1000)");
+ let page=(await call(db,member,'/api/stickers/history')).data;
+ assert.equal(page.transactions.length,50);assert.ok(page.nextCursor);
+ const ids=page.transactions.map((x:any)=>x.id);
+ db.sqlite.exec("INSERT INTO sticker_transactions(id,userId,deltaUnits,balanceAfterUnits,type,description,uniqueKey,createdAt) VALUES ('new','member',1,61,'test_reward','new','new',2000)");
+ while(page.nextCursor){
+  page=(await call(db,member,'/api/stickers/history?before='+encodeURIComponent(page.nextCursor))).data;
+  assert.ok(page.transactions.length<=50);
+  for(const tx of page.transactions){if(tx.id.startsWith('page-'))assert.equal(tx.source.label,'講者-錄音');ids.push(tx.id);}
+ }
+ assert.equal(new Set(ids).size,126);assert.equal(ids.length,126);
+ assert.ok(!ids.includes('secret'));assert.ok(!ids.includes('new'));
+ for(const cursor of ['oops','[-1,"x"]','[1,{}]','[1,""]']){
+  assert.equal((await call(db,member,'/api/stickers/history?before='+encodeURIComponent(cursor))).status,400);
+ }
+ const plan=db.sqlite.prepare('EXPLAIN QUERY PLAN SELECT id FROM sticker_transactions WHERE userId=? AND (createdAt,id)<(?,?) ORDER BY createdAt DESC,id DESC LIMIT 51').all('member',1000,'page-100');
+ assert.ok(plan.some((x:any)=>x.detail.includes('sticker_transactions_user_history')));
+ assert.ok(!plan.some((x:any)=>x.detail.includes('TEMP B-TREE')));
+});
+test('outgoing grants are paginated independently and recovery reports whether rewards changed',async()=>{
+ const db=database();const admin=await session(db,'admin');const member=await session(db,'member');
+ await call(db,member,'/api/stickers/summary');
+ const add=db.sqlite.prepare("INSERT INTO sticker_transactions(id,userId,deltaUnits,balanceAfterUnits,type,description,uniqueKey,createdAt,actorUserId,relatedUserId) VALUES (?,'member',1,61,'manual_grant','encourage',?,1000,'admin','member')");
+ for(let i=0;i<65;i++)add.run('grant-'+i,'history-grant-'+i);
+ const first=(await call(db,admin,'/api/stickers/grant-history')).data;
+ assert.equal(first.transactions.length,50);
+ const next=(await call(db,admin,'/api/stickers/grant-history?before='+encodeURIComponent(first.nextCursor))).data;
+ assert.equal(next.transactions.length,15);assert.equal(next.nextCursor,null);
+ assert.equal((await call(db,member,'/api/stickers/grant-history')).status,403);
+ assert.equal((await call(db,member,'/api/stickers/reconcile','POST',{})).data.changed,false);
+});

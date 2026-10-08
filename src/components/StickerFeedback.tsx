@@ -1,3 +1,4 @@
+import { canChangeStickerBalance } from '../stickerSummaryClient';
 import React, { useEffect, useState } from 'react';
 let lastPoint: {x:number;y:number}|null=null;
 let pointTime=0;
@@ -16,7 +17,7 @@ export function StickerFeedback(){
   const receive=(e:Event)=>{const item=(e as CustomEvent).detail;setItems(prev=>[...prev.slice(-3),item]);const timer=setTimeout(()=>{setItems(prev=>prev.filter(x=>x.id!==item.id));timers.delete(timer);},Math.max(100,Math.min(60000,item.seconds*1000)));timers.add(timer);};
   document.addEventListener('pointerdown',point,true);document.addEventListener('keydown',keyboard,true);window.addEventListener('echostars:feedback',receive);
   const original=window.fetch;
-  const observed:typeof fetch=async(input,init)=>{const response=await original(input,init);const url=typeof input==='string'?input:input instanceof URL?input.href:input.url;const method=String(init?.method||(input instanceof Request?input.method:'GET')).toUpperCase();if(response.ok && url.includes('/api/') && method!=='GET' && !url.includes('/stickers/reconcile')) window.dispatchEvent(new CustomEvent('echostars:sticker-changed'));return response;};
+  const observed:typeof fetch=async(input,init)=>{const response=await original(input,init);const url=typeof input==='string'?input:input instanceof URL?input.href:input.url;const method=String(init?.method||(input instanceof Request?input.method:'GET')).toUpperCase();const path=new URL(url,window.location.origin);if(response.ok && path.origin===window.location.origin && (canChangeStickerBalance(path.pathname,method) || response.headers.get('X-Echostars-Sticker-Changed')==='1')) window.dispatchEvent(new CustomEvent('echostars:sticker-changed'));return response;};
   window.fetch=observed;
   return()=>{if(window.fetch===observed)window.fetch=original;timers.forEach(clearTimeout);document.removeEventListener('pointerdown',point,true);document.removeEventListener('keydown',keyboard,true);window.removeEventListener('echostars:feedback',receive);};
  },[]);

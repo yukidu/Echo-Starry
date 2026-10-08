@@ -197,7 +197,15 @@ export const REACT_MENU_RELEASE_NOTES: ChangelogEntry = {
   removed: ['移除獨立重新整理快捷與舊 v130 選單 DOM 補丁；新身份與快捷不再受舊補丁覆寫。']
 };
 
-const RELEASE_NOTES = [REACT_MENU_RELEASE_NOTES, STICKER_LEADERBOARD_RELEASE_NOTES, PLATINUM_MULTIPLIER_RELEASE_NOTES, STICKER_GUIDE_RELEASE_NOTES, ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
+export const STICKER_USAGE_RELEASE_NOTES: ChangelogEntry = {
+  version:'v4.7',date:'2026/10/08',isLatest:true,
+  summary:'貼紙簿載入與更新效率提升，降低重複讀取。所有取得、消耗與補發紀錄完整保留。',
+  added:['貼紙紀錄與人工加貼紙紀錄每頁 50 筆，可按「載入更多」查看較早的明細。'],
+  modified:['貼紙餘額改為每分鐘核對，操作後與切回頁面仍即時更新。','貼紙沒有異動時使用輕量核對；管理資料在開啟對應分頁時才載入。','短時間重開貼紙簿重用紀錄，補發檢查不再每次重複執行。','已快取且內容未改變的網站程式檔由裝置直接讀取，加快再次開啟。'],
+  removed:['移除無關操作造成的貼紙查詢，以及開啟貼紙簿時重複載入整份紀錄。']
+};
+
+const RELEASE_NOTES = [STICKER_USAGE_RELEASE_NOTES, REACT_MENU_RELEASE_NOTES, STICKER_LEADERBOARD_RELEASE_NOTES, PLATINUM_MULTIPLIER_RELEASE_NOTES, STICKER_GUIDE_RELEASE_NOTES, ORGANIZATION_RELEASE_NOTES, RANK_STICKER_RELEASE_NOTES, STICKER_PAGES_RELEASE_NOTES, HEALTHCHECK_RELEASE_NOTES, CUMULATIVE_RELEASE_NOTES];
 
 const runtime = window as Window &
   typeof globalThis & {

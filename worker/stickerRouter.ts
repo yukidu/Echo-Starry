@@ -165,7 +165,11 @@ async function ensureStickerSchema(db: any) {
           uniqueKey TEXT NOT NULL UNIQUE,
           createdAt INTEGER NOT NULL
         )`),
-        db.prepare('CREATE INDEX IF NOT EXISTS sticker_transactions_user_created ON sticker_transactions(userId, createdAt DESC)'),
+        db.prepare('CREATE INDEX IF NOT EXISTS sticker_transactions_user_history ON sticker_transactions(userId, createdAt DESC, id DESC)'),
+        // The paged index covers the old prefix; keeping both would duplicate writes.
+        db.prepare('DROP INDEX IF EXISTS sticker_transactions_user_created'),
+        db.prepare('CREATE INDEX IF NOT EXISTS sticker_transactions_user_cursor ON sticker_transactions(userId)'),
+        db.prepare("CREATE INDEX IF NOT EXISTS sticker_transactions_grant_history ON sticker_transactions(actorUserId, createdAt DESC, id DESC) WHERE type = 'manual_grant'"),
         db.prepare('CREATE INDEX IF NOT EXISTS sticker_transactions_source ON sticker_transactions(sourceId, type)'),
         db.prepare(`CREATE TRIGGER IF NOT EXISTS sticker_spend_balance_guard
           BEFORE INSERT ON sticker_transactions
@@ -201,6 +205,7 @@ async function ensureStickerSchema(db: any) {
           readAt INTEGER,
           sourceId TEXT UNIQUE
         )`),
+        db.prepare('CREATE INDEX IF NOT EXISTS member_notifications_user_unread ON member_notifications(userId) WHERE readAt IS NULL'),
         db.prepare('CREATE INDEX IF NOT EXISTS member_notifications_user_created ON member_notifications(userId, createdAt DESC)')
       ]);
 
@@ -350,7 +355,15 @@ function trackLabel(track: any) {
   return `${track.speaker || ''}${track.speakerRank && track.speakerRank !== '無' ? track.speakerRank : ''}-${track.title || track.id}`;
 }
 
-async function transactionHistory(db: any, actor: any, outgoing = false) {
+function historyPage(url:URL) {
+  const raw=url.searchParams.get('before');
+  if(!raw)return null;
+  if(raw.length>300)throw new Error('invalid_history_cursor');
+  const value=JSON.parse(raw);
+  if(!Array.isArray(value)||value.length!==2||!Number.isSafeInteger(value[0])||value[0]<0||typeof value[1]!=='string'||!value[1]||value[1].length>200)throw new Error('invalid_history_cursor');
+  return value as [number,string];
+}
+async function transactionHistory(db: any, actor: any, outgoing = false, before: [number,string] | null = null) {
   const { results } = await db.prepare(`SELECT tx.*, t.id AS liveTrackId, t.title AS trackTitle,
     t.speaker AS trackSpeaker, t.speakerRank AS trackSpeakerRank, c.id AS liveCommentId,
     u.id AS liveUserId, u.name AS sourceUserName
@@ -360,8 +373,12 @@ async function transactionHistory(db: any, actor: any, outgoing = false) {
     LEFT JOIN users u ON u.id = CASE WHEN ? = 1 THEN tx.userId
       WHEN tx.type = 'initial' THEN tx.userId ELSE COALESCE(tx.relatedUserId, tx.actorUserId) END
     WHERE ${outgoing ? "tx.actorUserId = ? AND tx.type = 'manual_grant'" : "tx.userId = ? AND NOT (tx.type = 'balance_correction' AND tx.uniqueKey LIKE 'hidden-sticker-balance-v111:%' AND tx.balanceAfterUnits < 0)"}
-    ORDER BY tx.createdAt DESC, tx.rowid DESC`).bind(outgoing ? 1 : 0, actor.id).all();
-  return (results || []).map((tx: any) => ({
+    ${before ? 'AND (tx.createdAt, tx.id) < (?, ?)' : ''}
+    ORDER BY tx.createdAt DESC, tx.id DESC LIMIT 51`).bind(outgoing ? 1 : 0, actor.id, ...(before || [])).all();
+  const rows=results || [];
+  const page=rows.slice(0,50);
+  const last=page[page.length-1] as any;
+  return {nextCursor: rows.length>50 && last ? JSON.stringify([last.createdAt,last.id]) : null, transactions:page.map((tx: any) => ({
     id: tx.id, type: tx.type, description: tx.type === 'balance_correction' ? '系統錯誤修正' : tx.description, createdAt: tx.createdAt,
     delta: unitsToStickers(tx.deltaUnits), balanceAfter: unitsToStickers(tx.balanceAfterUnits),
     source: tx.trackId ? {
@@ -369,7 +386,7 @@ async function transactionHistory(db: any, actor: any, outgoing = false) {
       label: tx.liveTrackId ? trackLabel({id:tx.trackId,title:tx.trackTitle,speaker:tx.trackSpeaker,speakerRank:tx.trackSpeakerRank}) : tx.sourceLabel || tx.description,
       available: Boolean(tx.liveTrackId)
     } : tx.type === 'lucky_cost' ? {kind:'feature', label:'好手氣', available:true} : tx.liveUserId ? {kind:'member', userId:tx.liveUserId, label:tx.sourceUserName, available:true} : null
-  }));
+  }))};
 }
 
 async function settingMap(db: any) {
@@ -823,14 +840,24 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
   await ensureInitialStickers(db, actor.id);
 
   if (path === '/api/stickers/reconcile' && method === 'POST') {
+    const before:any=await db.prepare('SELECT rowid AS cursor FROM sticker_transactions INDEXED BY sticker_transactions_user_cursor WHERE userId=? ORDER BY rowid DESC LIMIT 1').bind(actor.id).first();
     await reconcileCommentRewards(db,actor); await reconcileLuckyRewards(db,actor);
-    return json({success:true});
+    const after:any=await db.prepare('SELECT rowid AS cursor FROM sticker_transactions INDEXED BY sticker_transactions_user_cursor WHERE userId=? ORDER BY rowid DESC LIMIT 1').bind(actor.id).first();
+    return json({success:true,changed:Number(before?.cursor || 0)!==Number(after?.cursor || 0)});
   }
 
   if ((path === '/api/stickers/me' || path === '/api/stickers/summary') && method === 'GET') {
     const quick = path.endsWith('/summary');
     if (!quick) { await reconcileCommentRewards(db, actor); await reconcileLuckyRewards(db,actor); }
     const after = Math.max(0, Number(url.searchParams.get('after')) || 0);
+    if(quick && Number.isSafeInteger(after) && after>0) {
+      const latest:any=await db.prepare('SELECT rowid AS cursor FROM sticker_transactions INDEXED BY sticker_transactions_user_cursor WHERE userId=? ORDER BY rowid DESC LIMIT 1').bind(actor.id).first();
+      if(Number(latest?.cursor || 0)===after) {
+        const unread:any=await db.prepare('SELECT COUNT(*) AS count FROM member_notifications WHERE userId=? AND readAt IS NULL').bind(actor.id).first();
+        return json({unchanged:true,cursor:after,changes:[],unreadNotifications:Number(unread?.count || 0),
+          canGrant:canGrantStickers(actor),isSuperAdmin:isSuperAdmin(actor),canManageRules:canManageRules(actor)});
+      }
+    }
     // One query returns a consistent balance/cursor/changes snapshot.
     const snapshot:any=await db.prepare(`SELECT COALESCE(SUM(deltaUnits),0) AS balanceUnits,COALESCE(MAX(rowid),0) AS cursor,
       (SELECT json_group_array(json_object('id',id,'delta',deltaUnits/10.0)) FROM
@@ -846,9 +873,14 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
     return json({balanceUnits,balance:unitsToStickers(balanceUnits),cursor,changes,
       unlockedTrackIds:(unlocks.results || []).map((row:any)=>row.trackId),commentRewardTrackIds,unreadNotifications:Number((unread as any)?.count || 0),
       canGrant:canGrantStickers(actor),isSuperAdmin:isSuperAdmin(actor),canManageRules:canManageRules(actor),
-      ...(quick ? {} : {transactions:await transactionHistory(db,actor)})});
+      ...(quick ? {} : await transactionHistory(db,actor))});
   }
-  if (path === '/api/stickers/history' && method === 'GET') return json({transactions:await transactionHistory(db,actor)});
+  if ((path === '/api/stickers/history' || path === '/api/stickers/grant-history') && method === 'GET') {
+    const outgoing=path.endsWith('/grant-history');
+    if(outgoing && !canGrantStickers(actor)) return json({error:'沒有人工加貼紙權限'},403);
+    try { return json(await transactionHistory(db,actor,outgoing,historyPage(url))); }
+    catch(error) { if(error instanceof Error && (error.message==='invalid_history_cursor'||error instanceof SyntaxError))return json({error:'紀錄分頁無效，請重新開啟'},400);throw error; }
+  }
 
   if (path === '/api/stickers/settings') {
     if (!canManageRules(actor)) return json({ error: '只有超級管理員可管理貼紙規則，或授權管理員可修改' }, 403);
@@ -980,10 +1012,6 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
     return json({ success: true, unlocked: true, charged: costStickers, balance: unitsToStickers(balanceUnits) });
   }
 
-  if (path === '/api/stickers/grant-history' && method === 'GET') {
-    if (!canGrantStickers(actor)) return json({ error: '目前獎銜沒有加貼紙權限' }, 403);
-    return json({ transactions: await transactionHistory(db, actor, true) });
-  }
 
   if (path === '/api/stickers/grant-targets' && method === 'GET') {
     if (!canGrantStickers(actor)) return json({ error: '目前獎銜沒有加貼紙權限' }, 403);
