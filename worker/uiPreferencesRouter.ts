@@ -2,10 +2,10 @@ import appWorker from './playbackOwnerRouter';
 import type { Env } from './index';
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{30,}$/;
-const MAX_QUICK_ACTIONS = 3;
 const ALLOWED_QUICK_ACTIONS = new Set([
-  'home', 'stats', 'notifications', 'stickers', 'upload', 'profile', 'admin', 'palette'
+  'font', 'theme', 'stats', 'notifications', 'stickers', 'upload', 'profile', 'install', 'admin', 'palette'
 ]);
+const DEVICE_LIMITS = { mobile: 3, tablet: 5, desktop: 100 } as const;
 const tableReady = new WeakMap<object, Promise<void>>();
 
 function json(data: unknown, status = 200) {
@@ -41,20 +41,34 @@ async function authenticatedUserId(request: Request, env: Env) {
   return String(row.userId || '');
 }
 
-function normalizeIds(value: unknown) {
+function normalizeIds(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [] as string[];
   const ids: string[] = [];
   for (const raw of value) {
     const id = String(raw || '');
     if (!ALLOWED_QUICK_ACTIONS.has(id) || ids.includes(id)) continue;
     ids.push(id);
-    if (ids.length >= MAX_QUICK_ACTIONS) break;
+    if (ids.length >= limit) break;
   }
   return ids;
 }
 
-function normalizeMode(value: unknown) {
-  return value === 'labels' ? 'labels' : 'icons';
+function normalizePreferences(value: unknown) {
+  if (Array.isArray(value)) {
+    const legacy = value.map(item => String(item || '')).filter(item => item !== 'home');
+    const merged = ['font', 'theme', ...legacy];
+    return {
+      mobile: normalizeIds(merged, DEVICE_LIMITS.mobile),
+      tablet: normalizeIds(merged, DEVICE_LIMITS.tablet),
+      desktop: normalizeIds(merged, DEVICE_LIMITS.desktop)
+    };
+  }
+  const raw = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  return {
+    mobile: normalizeIds(raw.mobile, DEVICE_LIMITS.mobile),
+    tablet: normalizeIds(raw.tablet, DEVICE_LIMITS.tablet),
+    desktop: normalizeIds(raw.desktop, DEVICE_LIMITS.desktop)
+  };
 }
 
 async function ensureTable(db: any) {
@@ -88,15 +102,14 @@ async function handleGet(request: Request, env: Env) {
   if (!userId) return json({ error: '尚未登入' }, 401);
   if (!(await tableExists(env.DB))) return json({ preferences: null });
   const row: any = await env.DB.prepare(
-    'SELECT quickActionIds, quickLabelMode, updatedAt FROM user_ui_preferences WHERE userId = ? LIMIT 1'
+    'SELECT quickActionIds, updatedAt FROM user_ui_preferences WHERE userId = ? LIMIT 1'
   ).bind(userId).first();
   if (!row) return json({ preferences: null });
   let parsed: unknown = [];
   try { parsed = JSON.parse(String(row.quickActionIds || '[]')); } catch {}
   return json({
     preferences: {
-      quickActionIds: normalizeIds(parsed),
-      quickLabelMode: normalizeMode(row.quickLabelMode),
+      quickActionIds: normalizePreferences(parsed),
       updatedAt: Number(row.updatedAt || 0)
     }
   });
@@ -106,19 +119,18 @@ async function handlePut(request: Request, env: Env) {
   const userId = await authenticatedUserId(request, env);
   if (!userId) return json({ error: '尚未登入' }, 401);
   const body: any = await request.clone().json().catch(() => ({}));
-  const quickActionIds = normalizeIds(body.quickActionIds);
-  const quickLabelMode = normalizeMode(body.quickLabelMode);
+  const quickActionIds = normalizePreferences(body.quickActionIds);
   const updatedAt = Date.now();
   await ensureTable(env.DB);
   await env.DB.prepare(`
     INSERT INTO user_ui_preferences (userId, quickActionIds, quickLabelMode, updatedAt)
-    VALUES (?, ?, ?, ?)
+    VALUES (?, ?, 'icons', ?)
     ON CONFLICT(userId) DO UPDATE SET
       quickActionIds = excluded.quickActionIds,
-      quickLabelMode = excluded.quickLabelMode,
+      quickLabelMode = 'icons',
       updatedAt = excluded.updatedAt
-  `).bind(userId, JSON.stringify(quickActionIds), quickLabelMode, updatedAt).run();
-  return json({ preferences: { quickActionIds, quickLabelMode, updatedAt } });
+  `).bind(userId, JSON.stringify(quickActionIds), updatedAt).run();
+  return json({ preferences: { quickActionIds, updatedAt } });
 }
 
 export default {
