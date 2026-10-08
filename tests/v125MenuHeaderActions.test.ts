@@ -6,7 +6,7 @@ const navbar = readFileSync(new URL('../src/components/Navbar.tsx', import.meta.
 const css = readFileSync(new URL('../src/components/Navbar.v124.css', import.meta.url), 'utf8');
 
 test('identity opens login/profile while the header only contains mood and home actions', () => {
-  const head = navbar.slice(navbar.indexOf('<div className="navbar-menu-profile-head'), navbar.indexOf('<div className={`${menuRowClass(false)} navbar-menu-font-row`}>'));
+  const head = navbar.slice(navbar.indexOf('<div className="navbar-menu-profile-head'), navbar.indexOf('<InstallAppButton'));
   assert.match(head, /navbar-menu-identity[\s\S]*登入繁星回聲/);
   assert.match(head, /onClick=\{\(\) => handleMobileNav\('profile'\)\}/);
   assert.match(head, /navbar-menu-header-actions[\s\S]*navbar-menu-palette-shortcut[\s\S]*navbar-menu-home-shortcut/);
