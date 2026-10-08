@@ -35,7 +35,7 @@ test('reset menu and logout remain separate controls on the same footer row', ()
   assert.match(navbar, /className="navbar-menu-footer-actions"/);
   assert.match(navbar, /<span>登出<\/span>/);
   assert.match(navbar, /<span>重設選單<\/span>/);
-  assert.match(navbar, /resetTopNavPreference/);
+  assert.match(navbar, /resetCurrentDeviceMenu/);
   assert.match(navbar, /\[deviceKind\]: \['font', 'theme'\]/);
   assert.match(navbarCss, /\.navbar-menu-footer-actions \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\)/);
 });
