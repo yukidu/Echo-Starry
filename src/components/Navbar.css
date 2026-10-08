@@ -21,7 +21,7 @@
   display: inline-flex;
   width: max-content;
   max-width: calc(100vw - 1.5rem);
-  max-height: calc(100dvh - 7.25rem);
+  max-height: calc(100dvh - 5rem);
   overflow-y: auto;
   flex-direction: column;
   align-items: stretch;
@@ -36,7 +36,6 @@
   -webkit-overflow-scrolling: touch;
 }
 
-/* v114：深色選單比深色頁面提高一階亮度，並加強邊框與陰影，避免融在背景裡。 */
 .dark .mobile-menu-panel {
   border-color: rgb(100 116 139 / 0.95);
   background: rgb(30 41 59 / 0.99);
@@ -52,7 +51,6 @@
   min-width: 100%;
 }
 
-/* 選單的標題、圖示與狀態文字統一使用同一前景色。 */
 .mobile-menu-panel button {
   color: rgb(51 65 85) !important;
 }
@@ -65,13 +63,12 @@
   color: rgb(241 245 249) !important;
 }
 
-/* 只有通知數與貼紙數保留目前調色盤主色。 */
 .mobile-menu-panel .mobile-menu-accent-number,
 .mobile-menu-panel .sticker-menu-amount {
   color: var(--color-primary, #c06c84) !important;
 }
 
-/* v114：未安裝狀態和選單文字同尺寸，緊接在標題後方並以括弧顯示。 */
+/* 安裝狀態在選單內維持精簡文字。 */
 .mobile-menu-panel button[aria-label="安裝到桌面"] > span:last-child {
   margin-left: 0 !important;
   font-size: 0 !important;
@@ -88,9 +85,8 @@
   color: inherit;
 }
 
-/* v120：置頂主選單固定保留字體縮放與深淺色切換，另可放最多三個自訂快捷功能。 */
 .navbar-top-toolbar {
-  min-height: 2.6rem;
+  min-height: 2.25rem;
   overflow-x: auto;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -101,6 +97,7 @@
 }
 
 .navbar-top-action {
+  position: relative;
   display: inline-flex;
   width: 2.25rem;
   height: 2.25rem;
@@ -120,84 +117,85 @@
   opacity: 0.38;
 }
 
-.navbar-top-toolbar-divider {
-  width: 1px;
-  height: 1.5rem;
-  flex: 0 0 1px;
-  margin: 0 0.15rem;
-  background: rgb(203 213 225 / 0.95);
-}
-
-.dark .navbar-top-toolbar-divider {
-  background: rgb(71 85 105 / 0.95);
-}
-
-.navbar-quick-customizer {
-  width: min(21rem, calc(100vw - 3rem)) !important;
-  min-width: min(21rem, calc(100vw - 3rem)) !important;
-}
-
-/* v121：使用者可選擇只有圖示或圖示＋文字。窄螢幕仍使用既有橫向捲動，不擠壞標題。 */
-.navbar-top-action.navbar-top-action-with-label {
-  width: auto;
-  min-width: 2.25rem;
-  max-width: 10.5rem;
+.navbar-top-font-group {
+  display: inline-flex;
   flex: 0 0 auto;
-  gap: 0.35rem;
-  padding: 0 0.6rem;
+  gap: 0.2rem;
 }
 
-.navbar-top-action-label {
-  max-width: 7.5rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.72rem;
-  font-weight: 800;
+.navbar-top-badge {
+  position: absolute;
+  top: -0.22rem;
+  right: -0.22rem;
+  display: inline-flex;
+  min-width: 0.9rem;
+  height: 0.9rem;
+  padding: 0 0.2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--color-primary, #c06c84);
+  color: white !important;
+  font-size: 0.55rem;
+  font-weight: 900;
   line-height: 1;
 }
 
-/* v121：把「可以拖曳」直接做成可見提示與握把，不靠使用者猜。 */
-.navbar-drag-tip {
-  color: rgb(71 85 105);
-  background: rgb(241 245 249 / 0.96);
-  border: 1px dashed rgb(148 163 184 / 0.8);
+/* v123：每個漢堡選單功能直接在左側勾選，不再使用額外「自訂置頂功能」面板。 */
+.navbar-inline-pin,
+.navbar-pin-placeholder {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: 0 0 1.35rem;
 }
 
-.dark .navbar-drag-tip {
-  color: rgb(226 232 240);
-  background: rgb(15 23 42 / 0.7);
-  border-color: rgb(100 116 139 / 0.9);
+.navbar-inline-pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1.5px solid rgb(148 163 184 / 0.9);
+  border-radius: 0.38rem;
+  background: transparent;
 }
 
-.navbar-quick-sort-row {
-  border-color: rgb(226 232 240);
-  transition: opacity 120ms ease, transform 120ms ease, border-color 120ms ease;
-}
-
-.dark .navbar-quick-sort-row {
-  border-color: rgb(71 85 105);
-}
-
-.navbar-quick-sort-row.is-dragging {
-  opacity: 0.62;
-  transform: scale(0.985);
+.navbar-inline-pin.is-selected {
   border-color: var(--color-primary, #c06c84);
+  background: var(--color-primary, #c06c84);
+  color: white !important;
 }
 
-.navbar-drag-handle {
-  cursor: grab;
-  touch-action: none;
-  color: var(--color-primary, #c06c84) !important;
-  background: rgb(241 245 249 / 0.95);
+.navbar-inline-pin.is-selected * {
+  color: white !important;
 }
 
-.dark .navbar-drag-handle {
-  background: rgb(51 65 85 / 0.95);
+.navbar-inline-pin-empty {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: rgb(203 213 225);
 }
 
-.navbar-drag-handle:active {
-  cursor: grabbing;
+.dark .navbar-inline-pin-empty {
+  background: rgb(100 116 139);
+}
+
+.navbar-menu-mini-control {
+  min-width: 2.15rem;
+  height: 1.8rem;
+  padding: 0 0.42rem;
+  border-radius: 0.55rem;
+  background: rgb(241 245 249);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.dark .navbar-menu-mini-control {
+  background: rgb(51 65 85);
+}
+
+.navbar-menu-mini-control:disabled {
+  opacity: 0.35;
 }
 
 /* v110：上傳音檔由全螢幕遮罩改為真正的內容頁。 */
@@ -230,7 +228,6 @@ body[data-main-tab="upload"] .upload-modal-overlay form {
   overflow: visible !important;
 }
 
-/* 上傳完成／取消後，舊元件會先關閉；此時先讓首頁內容恢復，不留下空白頁。 */
 body[data-main-tab="upload"]:not(:has(.upload-modal-overlay)) main {
   display: block;
 }
@@ -254,17 +251,18 @@ body[data-main-tab="upload"]:not(:has(.upload-modal-overlay)) main {
   min-width: max-content;
 }
 
-/* v118：漢堡選單不再只限手機；桌機、平板、直式與橫式都使用同一選單。 */
+/* v123：頂部導覽永遠一行；桌機不再依 56rem 固定容器計算，直接隨視窗寬度伸縮。 */
+.navbar-main-row {
+  max-width: none !important;
+}
 
-/* v122：頂部導覽只能維持單行。快捷工具列覆蓋在 Logo 與漢堡之間，不再佔第二列；空間不足時只在工具列內橫向滑動。 */
 .navbar-top-toolbar {
   position: absolute !important;
   top: 50%;
-  left: max(9.5rem, calc((100vw - 56rem) / 2 + 9.5rem));
-  right: max(4.25rem, calc((100vw - 56rem) / 2 + 4.25rem));
+  left: 9.5rem;
+  right: 4.25rem;
   z-index: 20;
   min-width: 0;
-  min-height: 2.25rem;
   margin: 0 !important;
   padding: 0 !important;
   transform: translateY(-50%);
@@ -272,6 +270,20 @@ body[data-main-tab="upload"]:not(:has(.upload-modal-overlay)) main {
   overflow-x: auto;
   overflow-y: hidden;
   white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .navbar-top-toolbar {
+    left: 12.5rem;
+    right: 5.25rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .navbar-top-toolbar {
+    left: 14rem;
+    right: 5.5rem;
+  }
 }
 
 @media (max-width: 380px) {
