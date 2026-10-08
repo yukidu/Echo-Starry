@@ -24,7 +24,7 @@ export type NavTab = 'home' | 'stats' | 'notifications' | 'profile' | 'upload' |
 
 const USER_FONT_ZOOM_KEY = 'echostars_user_font_zoom_v1';
 const QUICK_ACTION_ORDER: QuickActionId[] = [
-  'font', 'theme', 'stats', 'notifications', 'stickers', 'upload', 'profile', 'install', 'admin', 'palette'
+  'font', 'theme', 'stats', 'notifications', 'stickers', 'upload', 'profile', 'admin', 'palette'
 ];
 const QUICK_DRAG_HOLD_MS = 260;
 const QUICK_DRAG_CANCEL_DISTANCE = 10;
@@ -216,6 +216,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const handleInstallGuide = () => {
     if (currentTab !== 'home') onSelectTab('home');
+    setIsMobileMenuOpen(false);
     onInstallGuide?.();
   };
 
@@ -248,7 +249,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     stickers: true,
     upload: canUpload,
     profile: true,
-    install: true,
+    install: false,
     admin: canAccessSettings,
     palette: true
   };
@@ -333,7 +334,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     setIsMobileMenuOpen(true);
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
-        document.querySelector<HTMLButtonElement>('.echostars-install-menu-action')?.click();
+        document.querySelector<HTMLButtonElement>('.navbar-menu-install-shortcut')?.click();
       });
     });
   };
@@ -341,7 +342,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const renderPinnedAction = (id: QuickActionId) => {
     if (id === 'font') {
       return (
-        <div className="navbar-top-font-group" aria-label="文字大小">
+        <div className="navbar-top-font-group" aria-label="字體">
           <button type="button" className={topButtonClass(false)} onClick={() => changeFontZoom(-0.1)} disabled={fontZoom <= 0.8} aria-label="縮小字體" title={`縮小字體（目前 ${Math.round(fontZoom * 100)}%）`}>
             <span className="font-black text-xs">A−</span>
           </button>
@@ -508,16 +509,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className="font-black text-sm text-slate-800 dark:text-slate-100 truncate max-w-[18rem]">{displayName}</div>
                 <div className="text-xs font-bold" style={{ color: 'var(--color-primary,#c06c84)' }}>{displayRole}</div>
               </div>
-              <button type="button" onClick={handleLogoClick} className="navbar-menu-home-shortcut" title="首頁播放清單" aria-label="首頁播放清單">
-                <Home className="w-4 h-4 shrink-0" />
-                <span>首頁播放清單</span>
-              </button>
+              <div className="navbar-menu-header-actions">
+                <InstallAppButton onOpenIOSGuide={handleInstallGuide} className="navbar-menu-install-shortcut" />
+                {!currentUser && (
+                  <button type="button" onClick={() => handleMobileNav('profile')} className="navbar-menu-login-shortcut" title="登入" aria-label="登入">
+                    登入
+                  </button>
+                )}
+                <button type="button" onClick={handleLogoClick} className="navbar-menu-home-shortcut" title="首頁播放清單" aria-label="首頁播放清單">
+                  <Home className="w-4 h-4 shrink-0" />
+                  <span>首頁播放清單</span>
+                </button>
+              </div>
             </div>
 
             <div className={menuRowClass(false)}>
-              {renderPinControl('font', '文字大小')}
+              {renderPinControl('font', '字體')}
               <span className="w-4 shrink-0 text-center text-xs font-black">A</span>
-              <span className="min-w-0 flex-1">文字大小</span>
+              <span className="min-w-0 flex-1">字體</span>
               <button type="button" onClick={() => changeFontZoom(-0.1)} disabled={fontZoom <= 0.8} className="navbar-menu-mini-control" aria-label="縮小字體">A−</button>
               <span className="text-[10px] font-bold text-slate-400">{Math.round(fontZoom * 100)}%</span>
               <button type="button" onClick={() => changeFontZoom(0.1)} disabled={fontZoom >= 1.4} className="navbar-menu-mini-control" aria-label="放大字體">A＋</button>
@@ -528,7 +537,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button type="button" onClick={onToggleTheme} className={menuActionClass}>
                 {isDark ? <Sun className="w-4 h-4 shrink-0" /> : <Moon className="w-4 h-4 shrink-0" />}
                 <span className="min-w-0 flex-1">淺色／暗色切換</span>
-                <span className="text-[10px] font-bold text-slate-400">目前{isDark ? '暗色' : '淺色'}</span>
               </button>
             </div>
 
@@ -573,11 +581,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button onClick={() => handleMobileNav('profile')} className={menuActionClass}>
                 <User className="w-4 h-4 shrink-0" /><span>個人中心</span>
               </button>
-            </div>
-
-            <div className={menuRowClass(false)}>
-              {renderPinControl('install', '安裝到桌面')}
-              <InstallAppButton onOpenIOSGuide={handleInstallGuide} className="echostars-install-menu-action flex min-w-0 flex-1 items-center gap-3 text-sm font-semibold py-0.5" />
             </div>
 
             {canAccessSettings && (
