@@ -125,7 +125,7 @@ function setUploadTab(page: HTMLElement, tab: 'upload' | 'manage') {
     if (button.getAttribute('aria-selected') !== desired) button.setAttribute('aria-selected', desired);
   });
 
-  const header = page.querySelector<HTMLElement>(':scope > div > div:not(.v139-upload-tabs):first-of-type');
+  const header = page.querySelector<HTMLElement>(':scope > div > div:not(.v139-upload-tabs)');
   const heading = header?.querySelector<HTMLElement>('h2');
   const desiredHeading = tab === 'manage' ? '管理音檔' : '上傳音檔';
   if (heading && heading.textContent !== desiredHeading) heading.textContent = desiredHeading;
