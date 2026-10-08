@@ -5,13 +5,6 @@ import { deleteOrganizationStateForUser } from './organizationModel';
 const SUPER_ADMIN_EMAIL = 'yukidu@gmail.com';
 const SESSION_COOKIE = 'echostars_session';
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{30,}$/;
-const DISPLAY_SETTING_ID = 'global';
-
-const DEFAULT_DISPLAY_SETTINGS = {
-  mobile: { columns: 1, gap: 6, maxWidth: 760, fontScale: 1 },
-  tablet: { portraitColumns: 1, landscapeColumns: 3, gap: 8, maxWidth: 1180, fontScale: 1 },
-  desktop: { columns: 3, gap: 10, maxWidth: 1440, fontScale: 1 }
-};
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -21,49 +14,6 @@ function json(data: unknown, status = 200) {
       'Cache-Control': 'no-store'
     }
   });
-}
-
-function displayJson(data: unknown, status = 200, cache = false) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': cache ? 'public, max-age=300' : 'no-store'
-    }
-  });
-}
-
-function clampNumber(value: unknown, min: number, max: number, fallback: number) {
-  const number = Number(value);
-  return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
-}
-
-function clampInteger(value: unknown, min: number, max: number, fallback: number) {
-  return Math.round(clampNumber(value, min, max, fallback));
-}
-
-function normalizeDisplaySettings(input: any) {
-  return {
-    mobile: {
-      columns: clampInteger(input?.mobile?.columns, 1, 2, 1),
-      gap: clampInteger(input?.mobile?.gap, 2, 24, 6),
-      maxWidth: clampInteger(input?.mobile?.maxWidth, 320, 900, 760),
-      fontScale: clampNumber(input?.mobile?.fontScale, 0.8, 1.4, 1)
-    },
-    tablet: {
-      portraitColumns: clampInteger(input?.tablet?.portraitColumns, 1, 3, 1),
-      landscapeColumns: clampInteger(input?.tablet?.landscapeColumns, 1, 4, 3),
-      gap: clampInteger(input?.tablet?.gap, 2, 24, 8),
-      maxWidth: clampInteger(input?.tablet?.maxWidth, 700, 1600, 1180),
-      fontScale: clampNumber(input?.tablet?.fontScale, 0.8, 1.4, 1)
-    },
-    desktop: {
-      columns: clampInteger(input?.desktop?.columns, 1, 4, 3),
-      gap: clampInteger(input?.desktop?.gap, 2, 32, 10),
-      maxWidth: clampInteger(input?.desktop?.maxWidth, 960, 2000, 1440),
-      fontScale: clampNumber(input?.desktop?.fontScale, 0.8, 1.4, 1)
-    }
-  };
 }
 
 function normalizeEmail(value: unknown) {
@@ -110,41 +60,6 @@ async function verifiedActor(request: Request, env: Env) {
 
   if (!row || row.isBlocked || Number(row.expiresAt || 0) <= Date.now()) return null;
   return row;
-}
-
-async function readDisplaySettings(env: Env) {
-  if (!env.DB) return DEFAULT_DISPLAY_SETTINGS;
-  try {
-    const row: any = await env.DB.prepare('SELECT value FROM site_display_settings WHERE id = ? LIMIT 1')
-      .bind(DISPLAY_SETTING_ID).first();
-    if (!row?.value) return DEFAULT_DISPLAY_SETTINGS;
-    return normalizeDisplaySettings(JSON.parse(String(row.value)));
-  } catch {
-    // The table is created only when the super admin saves custom values.
-    // Until then GET stays read-only and returns code defaults, saving D1 writes.
-    return DEFAULT_DISPLAY_SETTINGS;
-  }
-}
-
-async function saveDisplaySettings(request: Request, env: Env) {
-  if (!env.DB) return displayJson({ error: '資料庫尚未連線' }, 503);
-  const actor = await verifiedActor(request, env);
-  if (!actor || normalizeEmail(actor.email) !== SUPER_ADMIN_EMAIL) {
-    return displayJson({ error: '只有超級管理員可修改全站顯示設定' }, 403);
-  }
-  const body: any = await request.json().catch(() => ({}));
-  const settings = normalizeDisplaySettings(body?.settings || body);
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS site_display_settings (
-    id TEXT PRIMARY KEY,
-    value TEXT NOT NULL,
-    updatedAt INTEGER NOT NULL,
-    updatedBy TEXT
-  )`).run();
-  await env.DB.prepare(`INSERT INTO site_display_settings(id,value,updatedAt,updatedBy)
-    VALUES (?,?,?,?)
-    ON CONFLICT(id) DO UPDATE SET value=excluded.value,updatedAt=excluded.updatedAt,updatedBy=excluded.updatedBy`)
-    .bind(DISPLAY_SETTING_ID, JSON.stringify(settings), Date.now(), actor.id).run();
-  return displayJson({ success: true, settings });
 }
 
 async function tableExists(db: any, name: string) {
@@ -236,15 +151,6 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const method = request.method.toUpperCase();
-
-    if (url.pathname === '/api/display-settings') {
-      if (method === 'GET') {
-        const settings = await readDisplaySettings(env);
-        return displayJson({ settings }, 200, true);
-      }
-      if (method === 'PUT') return saveDisplaySettings(request, env);
-      return displayJson({ error: 'Method not allowed' }, 405);
-    }
 
     const match = url.pathname.match(/^\/api\/admin\/users\/([^/]+)$/);
     if (match && method === 'DELETE') {
