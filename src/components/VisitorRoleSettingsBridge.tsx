@@ -7,6 +7,7 @@ import {
   readCachedVisitorRoleText,
   saveVisitorRoleText
 } from '../visitorRoleSettings';
+import '../v136GuestMenu.css';
 
 const HOST_ID = 'echostars-visitor-role-settings-host';
 
