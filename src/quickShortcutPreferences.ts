@@ -1,46 +1,98 @@
-export type QuickActionId = 'home' | 'stats' | 'notifications' | 'stickers' | 'upload' | 'profile' | 'admin' | 'palette';
-export type QuickLabelMode = 'icons' | 'labels';
+export type QuickActionId = 'font' | 'theme' | 'stats' | 'notifications' | 'stickers' | 'upload' | 'profile' | 'install' | 'admin' | 'palette';
+export type QuickDeviceKind = 'mobile' | 'tablet' | 'desktop';
+export type QuickActionPreferences = Record<QuickDeviceKind, QuickActionId[]>;
 
-export const MAX_QUICK_ACTIONS = 3;
-export const QUICK_ACTIONS_STORAGE_KEY = 'echostars_quick_header_actions_v1';
-export const QUICK_LABEL_MODE_STORAGE_KEY = 'echostars_quick_header_label_mode_v1';
+export const QUICK_ACTIONS_STORAGE_KEY = 'echostars_quick_header_actions_v2';
+const LEGACY_QUICK_ACTIONS_STORAGE_KEY = 'echostars_quick_header_actions_v1';
 
-const ALLOWED_QUICK_ACTIONS = new Set<QuickActionId>([
-  'home', 'stats', 'notifications', 'stickers', 'upload', 'profile', 'admin', 'palette'
-]);
+export const QUICK_ACTION_LIMITS: Record<QuickDeviceKind, number> = {
+  mobile: 3,
+  tablet: 5,
+  desktop: Number.MAX_SAFE_INTEGER
+};
 
-export function normalizeQuickActionIds(value: unknown): QuickActionId[] {
+const ALLOWED_QUICK_ACTIONS: QuickActionId[] = [
+  'font', 'theme', 'stats', 'notifications', 'stickers', 'upload', 'profile', 'install', 'admin', 'palette'
+];
+const ALLOWED_QUICK_ACTION_SET = new Set<QuickActionId>(ALLOWED_QUICK_ACTIONS);
+
+const DEFAULT_QUICK_ACTIONS: QuickActionPreferences = {
+  mobile: ['font', 'theme'],
+  tablet: ['font', 'theme'],
+  desktop: ['font', 'theme']
+};
+
+export function quickActionLimitForDevice(device: QuickDeviceKind) {
+  return QUICK_ACTION_LIMITS[device];
+}
+
+export function normalizeQuickActionIds(value: unknown, device: QuickDeviceKind = 'desktop'): QuickActionId[] {
   if (!Array.isArray(value)) return [];
   const unique: QuickActionId[] = [];
   for (const raw of value) {
-    if (!ALLOWED_QUICK_ACTIONS.has(raw as QuickActionId)) continue;
-    const id = raw as QuickActionId;
-    if (!unique.includes(id)) unique.push(id);
-    if (unique.length >= MAX_QUICK_ACTIONS) break;
+    const id = String(raw || '') as QuickActionId;
+    if (!ALLOWED_QUICK_ACTION_SET.has(id) || unique.includes(id)) continue;
+    unique.push(id);
+    if (unique.length >= quickActionLimitForDevice(device)) break;
   }
   return unique;
 }
 
-export function normalizeQuickLabelMode(value: unknown): QuickLabelMode {
-  return value === 'labels' ? 'labels' : 'icons';
+function migrateLegacyList(value: unknown): QuickActionPreferences {
+  const legacy = Array.isArray(value)
+    ? value.map(item => String(item || '')).filter(item => item !== 'home')
+    : [];
+  const merged = ['font', 'theme', ...legacy];
+  return {
+    mobile: normalizeQuickActionIds(merged, 'mobile'),
+    tablet: normalizeQuickActionIds(merged, 'tablet'),
+    desktop: normalizeQuickActionIds(merged, 'desktop')
+  };
 }
 
-export function readLocalQuickPreferences() {
-  if (typeof window === 'undefined') return { quickActionIds: [] as QuickActionId[], quickLabelMode: 'icons' as QuickLabelMode };
+export function normalizeQuickActionPreferences(value: unknown): QuickActionPreferences {
+  if (Array.isArray(value)) return migrateLegacyList(value);
+  if (!value || typeof value !== 'object') return { ...DEFAULT_QUICK_ACTIONS };
+  const raw = value as Partial<Record<QuickDeviceKind, unknown>>;
+  return {
+    mobile: normalizeQuickActionIds(raw.mobile, 'mobile'),
+    tablet: normalizeQuickActionIds(raw.tablet, 'tablet'),
+    desktop: normalizeQuickActionIds(raw.desktop, 'desktop')
+  };
+}
+
+export function getQuickDeviceKind(): QuickDeviceKind {
+  if (typeof navigator === 'undefined' || typeof window === 'undefined') return 'desktop';
+  const ua = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  const shortSide = Math.min(window.screen?.width || window.innerWidth, window.screen?.height || window.innerHeight);
+  const isIPad = /iPad/i.test(ua) || (platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isAndroidTablet = /Android/i.test(ua) && !/Mobile/i.test(ua);
+  const isTouchTablet = navigator.maxTouchPoints > 1 && shortSide >= 600 && !/iPhone|iPod|Mobile/i.test(ua);
+  if (isIPad || isAndroidTablet || isTouchTablet) return 'tablet';
+  if (/iPhone|iPod|Android.*Mobile|Mobi/i.test(ua) || shortSide < 600) return 'mobile';
+  return 'desktop';
+}
+
+export function readLocalQuickPreferences(): QuickActionPreferences {
+  if (typeof window === 'undefined') return { ...DEFAULT_QUICK_ACTIONS };
   try {
-    const quickActionIds = normalizeQuickActionIds(JSON.parse(localStorage.getItem(QUICK_ACTIONS_STORAGE_KEY) || '[]'));
-    const quickLabelMode = normalizeQuickLabelMode(localStorage.getItem(QUICK_LABEL_MODE_STORAGE_KEY));
-    return { quickActionIds, quickLabelMode };
-  } catch {
-    return { quickActionIds: [] as QuickActionId[], quickLabelMode: 'icons' as QuickLabelMode };
-  }
+    const raw = localStorage.getItem(QUICK_ACTIONS_STORAGE_KEY);
+    if (raw) return normalizeQuickActionPreferences(JSON.parse(raw));
+    const legacyRaw = localStorage.getItem(LEGACY_QUICK_ACTIONS_STORAGE_KEY);
+    if (legacyRaw) {
+      const migrated = migrateLegacyList(JSON.parse(legacyRaw));
+      writeLocalQuickPreferences(migrated);
+      return migrated;
+    }
+  } catch {}
+  return { ...DEFAULT_QUICK_ACTIONS };
 }
 
-export function writeLocalQuickPreferences(quickActionIds: QuickActionId[], quickLabelMode: QuickLabelMode) {
+export function writeLocalQuickPreferences(preferences: QuickActionPreferences) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(QUICK_ACTIONS_STORAGE_KEY, JSON.stringify(normalizeQuickActionIds(quickActionIds)));
-    localStorage.setItem(QUICK_LABEL_MODE_STORAGE_KEY, normalizeQuickLabelMode(quickLabelMode));
+    localStorage.setItem(QUICK_ACTIONS_STORAGE_KEY, JSON.stringify(normalizeQuickActionPreferences(preferences)));
   } catch {}
 }
 
@@ -56,21 +108,18 @@ export async function fetchCloudQuickPreferences() {
   const raw = data?.preferences;
   if (!raw) return null;
   return {
-    quickActionIds: normalizeQuickActionIds(raw.quickActionIds),
-    quickLabelMode: normalizeQuickLabelMode(raw.quickLabelMode),
+    quickActionIds: normalizeQuickActionPreferences(raw.quickActionIds),
     updatedAt: Number(raw.updatedAt || 0)
   };
 }
 
-export async function saveCloudQuickPreferences(quickActionIds: QuickActionId[], quickLabelMode: QuickLabelMode) {
+export async function saveCloudQuickPreferences(preferences: QuickActionPreferences) {
+  const normalized = normalizeQuickActionPreferences(preferences);
   const response = await fetch('/api/user-ui-preferences', {
     method: 'PUT',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      quickActionIds: normalizeQuickActionIds(quickActionIds),
-      quickLabelMode: normalizeQuickLabelMode(quickLabelMode)
-    })
+    body: JSON.stringify({ quickActionIds: normalized })
   });
   if (response.status === 401) return undefined;
   if (!response.ok) throw new Error(`偏好儲存失敗：${response.status}`);
