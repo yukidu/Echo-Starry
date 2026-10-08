@@ -19,8 +19,9 @@
 
 .mobile-menu-panel {
   display: inline-flex;
-  width: max-content;
-  max-width: calc(100vw - 1.5rem);
+  box-sizing: border-box;
+  width: min(22.5rem, calc(100vw - 1.5rem));
+  max-width: min(22.5rem, calc(100vw - 1.5rem));
   max-height: calc(100dvh - 5rem);
   overflow-y: auto;
   flex-direction: column;
@@ -198,6 +199,85 @@
   opacity: 0.35;
 }
 
+/* v131：字體控制緊貼「字體」文字，不再被 flex 撐到選單最右側。 */
+.navbar-menu-font-row {
+  justify-content: flex-start;
+}
+
+.navbar-menu-font-label {
+  flex: 0 0 auto;
+  margin-right: 0.15rem;
+}
+
+.navbar-menu-font-controls {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.28rem;
+  margin-left: 0.1rem;
+}
+
+.navbar-menu-font-value {
+  min-width: 2.65rem;
+  text-align: center;
+  color: rgb(148 163 184);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+/* 保留所有既有列左側的置頂勾選；任何尾端下拉控制都固定靠右。 */
+.mobile-menu-row .navbar-menu-trailing {
+  margin-left: auto;
+}
+
+/* v131：登出＋重設選單固定同一排；長選單時底部操作仍可見。 */
+.navbar-menu-footer-actions {
+  position: sticky;
+  bottom: -0.5rem;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.45rem;
+  padding: 0.5rem 0 0.15rem;
+  background: rgb(255 255 255 / 0.985);
+}
+
+.dark .navbar-menu-footer-actions {
+  background: rgb(30 41 59 / 0.99);
+}
+
+.navbar-menu-footer-button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 2.45rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid rgb(226 232 240 / 0.95);
+  border-radius: 0.8rem;
+  background: rgb(248 250 252);
+  font-size: 0.78rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.dark .navbar-menu-footer-button {
+  border-color: rgb(71 85 105);
+  background: rgb(51 65 85);
+}
+
+.navbar-menu-reset-button {
+  border-color: color-mix(in srgb, var(--color-primary,#c06c84) 50%, transparent);
+  background: color-mix(in srgb, var(--color-primary,#c06c84) 17%, white);
+  color: var(--color-primary,#c06c84) !important;
+}
+
+.dark .navbar-menu-reset-button {
+  background: color-mix(in srgb, var(--color-primary,#c06c84) 28%, rgb(30 41 59));
+}
+
 /* v110：上傳音檔由全螢幕遮罩改為真正的內容頁。 */
 body[data-main-tab="upload"] main {
   display: none;
@@ -290,5 +370,10 @@ body[data-main-tab="upload"]:not(:has(.upload-modal-overlay)) main {
   .navbar-top-toolbar {
     left: 8.7rem;
     right: 4rem;
+  }
+
+  .mobile-menu-panel {
+    width: calc(100vw - 1rem);
+    max-width: calc(100vw - 1rem);
   }
 }
