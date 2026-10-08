@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const authRouter = readFileSync(new URL('../worker/authRouter.ts', import.meta.url), 'utf8');
 const learningRouter = readFileSync(new URL('../worker/learningCardRouter.ts', import.meta.url), 'utf8');
 const playbackRouter = readFileSync(new URL('../worker/playbackOwnerRouter.ts', import.meta.url), 'utf8');
+const uiPreferencesRouter = readFileSync(new URL('../worker/uiPreferencesRouter.ts', import.meta.url), 'utf8');
 const sessionCookieRouter = readFileSync(new URL('../worker/sessionCookieRouter.ts', import.meta.url), 'utf8');
 const categoryRouter = readFileSync(new URL('../worker/categoryIntegrityRouter.ts', import.meta.url), 'utf8');
 const organizationRouter = readFileSync(new URL('../worker/organizationRouter.ts', import.meta.url), 'utf8');
@@ -87,7 +88,7 @@ test('sensitive write routes bind identity to the verified session', () => {
   assert.match(authRouter, /只有超級管理員可執行此操作/);
 });
 
-test('wrapper order preserves privacy, member deletion, categories, organizations, cookie continuity, playback and auth security', () => {
+test('wrapper order preserves privacy, member deletion, categories, organizations, cookie continuity, UI preferences, playback and auth security', () => {
   assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
   assert.match(privacyRouter, /import appWorker from '\.\/adminUserDeleteRouter'/);
   assert.match(adminUserDeleteRouter, /import appWorker from '\.\/categoryIntegrityRouter'/);
@@ -95,7 +96,8 @@ test('wrapper order preserves privacy, member deletion, categories, organization
   assert.match(organizationRouter, /import appWorker from '\.\/stickerRouter'/);
   const stickerRouter = readFileSync(new URL('../worker/stickerRouter.ts', import.meta.url), 'utf8');
   assert.match(stickerRouter, /import appWorker from '\.\/sessionCookieRouter'/);
-  assert.match(sessionCookieRouter, /import appWorker from '\.\/playbackOwnerRouter'/);
+  assert.match(sessionCookieRouter, /import appWorker from '\.\/uiPreferencesRouter'/);
+  assert.match(uiPreferencesRouter, /import appWorker from '\.\/playbackOwnerRouter'/);
   assert.match(playbackRouter, /import learningWorker from '\.\/learningCardRouter'/);
   assert.match(learningRouter, /import authWorker from '\.\/authRouter'/);
 
