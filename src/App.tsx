@@ -1,3 +1,4 @@
+import { createStickerSummaryClient, STICKER_POLL_MS } from './stickerSummaryClient';
 import { sortStickerTracks } from './homePlaylistPolicy';
 import { StickerFeedback, showStickerDelta, showStickerNotice, setFeedbackRules, getFeedbackRules } from './components/StickerFeedback';
 import { IOSInstallPage } from './components/IOSInstallPage';
@@ -333,7 +334,7 @@ export default function App() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [allComments, setAllComments] = useState<Comment[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
-  const [stickerSummary, setStickerSummary] = useState<{ balance: number; unlockedTrackIds: string[]; commentRewardTrackIds: string[]; unreadNotifications: number; canGrant: boolean; isSuperAdmin: boolean } | null>(null);
+  const [stickerSummary, setStickerSummary] = useState<{ cursor:number; balance: number; unlockedTrackIds: string[]; commentRewardTrackIds: string[]; unreadNotifications: number; canGrant: boolean; isSuperAdmin: boolean } | null>(null);
   const [isStickersOpen, setIsStickersOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(() => (readHomeCache()?.tracks || []).length === 0);
   const homeCacheValidatedAtRef = useRef(readHomeCache()?.savedAt || 0);
@@ -372,6 +373,7 @@ export default function App() {
     }
   };
 
+  const [stickerSummaryClient] = useState(()=>createStickerSummaryClient(apiJson));
   const stickerSummaryRequest = useRef(0);
   const stickerCursor = useRef<{userId:string;value:number}>({userId:'',value:0});
   const seenStickerChanges=useRef(new Set<string>());
@@ -383,11 +385,17 @@ export default function App() {
     }
     try {
       const after=stickerCursor.current.userId===currentUser.id?stickerCursor.current.value:0;
-      const data = await apiJson(`/api/stickers/summary?after=${after}`);
+      const data = await stickerSummaryClient.read(currentUser.id, after);
       if (requestId !== stickerSummaryRequest.current) return;
       for(const change of data.changes || []) if(!seenStickerChanges.current.has(change.id)){seenStickerChanges.current.add(change.id);showStickerDelta(change.delta);}
+      stickerSummaryClient.acknowledge(currentUser.id,Number(data.cursor));
       stickerCursor.current={userId:currentUser.id,value:data.cursor};
+      if (data.unchanged && data.balance === undefined) {
+        setStickerSummary(prev => prev ? {...prev,unreadNotifications:Number(data.unreadNotifications || 0),canGrant:Boolean(data.canGrant),isSuperAdmin:Boolean(data.isSuperAdmin)} : prev);
+        return;
+      }
       setStickerSummary({
+        cursor:Number(data.cursor || 0),
         balance: Number(data.balance || 0),
         unlockedTrackIds: Array.isArray(data.unlockedTrackIds) ? data.unlockedTrackIds : [],
         commentRewardTrackIds: Array.isArray(data.commentRewardTrackIds) ? data.commentRewardTrackIds : [],
@@ -401,15 +409,34 @@ export default function App() {
   }, [currentUser?.id]);
 
   useEffect(() => {
-    void refreshStickerSummary();
     void apiJson('/api/stickers/public-settings').then(data=>setFeedbackRules(data.settings)).catch(()=>{});
-    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refreshStickerSummary();},15000);
-    return()=>window.clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    stickerSummaryClient.reset();
+    seenStickerChanges.current.clear();
+    stickerCursor.current={userId:'',value:0};
+    setStickerSummary(null);
+    void refreshStickerSummary();
+    if (!currentUser) return;
+    const refreshVisible=()=>{if(document.visibilityState==='visible')void refreshStickerSummary();};
+    const timer=window.setInterval(refreshVisible,STICKER_POLL_MS);
+    document.addEventListener('visibilitychange',refreshVisible);
+    window.addEventListener('focus',refreshVisible);
+    return()=>{
+      stickerSummaryRequest.current += 1;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange',refreshVisible);
+      window.removeEventListener('focus',refreshVisible);
+    };
   }, [refreshStickerSummary]);
-
   useEffect(() => {
     let timer:number;
-    const refresh = () => { window.clearTimeout(timer);timer=window.setTimeout(()=>void refreshStickerSummary(),200); };
+    const refresh = () => {
+      if(!currentUser)return;
+      stickerSummaryClient.invalidate(currentUser.id);
+      window.clearTimeout(timer);
+      timer=window.setTimeout(()=>void refreshStickerSummary(),200);
+    };
     window.addEventListener('echostars:sticker-changed', refresh);
     return () => {window.clearTimeout(timer);window.removeEventListener('echostars:sticker-changed', refresh);};
   }, [refreshStickerSummary]);
