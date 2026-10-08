@@ -1,0 +1,64 @@
+/* v124：置頂快捷支援手機／桌機長按後左右排序。 */
+.navbar-top-action-slot {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.navbar-top-action-slot.is-dragging {
+  position: relative;
+  z-index: 5;
+  cursor: grabbing;
+  opacity: 0.76;
+  transform: scale(1.08);
+}
+
+.navbar-top-action-slot.is-dragging .navbar-top-action,
+.navbar-top-action-slot.is-dragging .navbar-top-font-group {
+  pointer-events: none;
+}
+
+/* v124：漢堡選單個人資料列右上角固定放首頁播放清單，移除同步與置頂數量文字。 */
+.navbar-menu-profile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.navbar-menu-home-shortcut {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.65rem;
+  background: rgb(241 245 249);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.dark .navbar-menu-home-shortcut {
+  background: rgb(51 65 85);
+}
+
+@media (max-width: 420px) {
+  .navbar-menu-home-shortcut span {
+    display: none;
+  }
+
+  .navbar-menu-home-shortcut {
+    width: 2rem;
+    padding-inline: 0;
+  }
+}

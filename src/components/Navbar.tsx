@@ -18,6 +18,7 @@ import {
   writeLocalQuickPreferences
 } from '../quickShortcutPreferences';
 import './Navbar.css';
+import './Navbar.v124.css';
 
 export type NavTab = 'home' | 'stats' | 'notifications' | 'profile' | 'upload' | 'admin' | 'stickers' | 'install';
 
@@ -25,6 +26,8 @@ const USER_FONT_ZOOM_KEY = 'echostars_user_font_zoom_v1';
 const QUICK_ACTION_ORDER: QuickActionId[] = [
   'font', 'theme', 'stats', 'notifications', 'stickers', 'upload', 'profile', 'install', 'admin', 'palette'
 ];
+const QUICK_DRAG_HOLD_MS = 260;
+const QUICK_DRAG_CANCEL_DISTANCE = 10;
 
 function readStoredFontZoom() {
   if (typeof window === 'undefined') return 1;
@@ -50,6 +53,15 @@ interface NavbarProps {
   visitor?: VisitorIdentity;
 }
 
+interface QuickDragState {
+  id: QuickActionId | null;
+  pointerId: number | null;
+  startX: number;
+  startY: number;
+  dragging: boolean;
+  element: HTMLElement | null;
+}
+
 export const Navbar: React.FC<NavbarProps> = ({
   currentTab,
   onSelectTab,
@@ -71,8 +83,18 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [quickPreferences, setQuickPreferences] = useState<QuickActionPreferences>(readLocalQuickPreferences);
   const [deviceKind, setDeviceKind] = useState<QuickDeviceKind>(getQuickDeviceKind);
   const [fontZoom, setFontZoom] = useState(readStoredFontZoom);
-  const [quickSyncStatus, setQuickSyncStatus] = useState('');
+  const [draggingQuickActionId, setDraggingQuickActionId] = useState<QuickActionId | null>(null);
   const cloudSaveTimerRef = useRef<number | null>(null);
+  const dragHoldTimerRef = useRef<number | null>(null);
+  const suppressQuickClickUntilRef = useRef(0);
+  const dragStateRef = useRef<QuickDragState>({
+    id: null,
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    dragging: false,
+    element: null
+  });
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -95,18 +117,13 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   useEffect(() => () => {
     if (cloudSaveTimerRef.current !== null) window.clearTimeout(cloudSaveTimerRef.current);
+    if (dragHoldTimerRef.current !== null) window.clearTimeout(dragHoldTimerRef.current);
   }, []);
 
   useEffect(() => {
-    if (!currentUser?.id || typeof window === 'undefined') {
-      setQuickSyncStatus('');
-      return;
-    }
+    if (!currentUser?.id || typeof window === 'undefined') return;
     const sessionKey = `echostars_ui_prefs_loaded_v2:${currentUser.id}`;
-    if (sessionStorage.getItem(sessionKey) === '1') {
-      setQuickSyncStatus('已啟用跨裝置同步');
-      return;
-    }
+    if (sessionStorage.getItem(sessionKey) === '1') return;
     let cancelled = false;
     void fetchCloudQuickPreferences()
       .then(async cloud => {
@@ -116,16 +133,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           const next = normalizeQuickActionPreferences(cloud.quickActionIds);
           setQuickPreferences(next);
           writeLocalQuickPreferences(next);
-          setQuickSyncStatus('已載入跨裝置設定');
           return;
         }
         const local = readLocalQuickPreferences();
         await saveCloudQuickPreferences(local);
-        if (!cancelled) setQuickSyncStatus('已同步此裝置設定');
       })
       .catch(error => {
         console.warn('Failed to hydrate quick shortcut preferences:', error);
-        if (!cancelled) setQuickSyncStatus('目前使用本機設定');
       });
     return () => { cancelled = true; };
   }, [currentUser?.id]);
@@ -244,22 +258,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   const selectedQuickActionIds = storedForDevice.filter(id => availableActionIds.includes(id));
   const deviceLimit = quickActionLimitForDevice(deviceKind);
   const pinnedQuickActionIds = currentUser
-    ? QUICK_ACTION_ORDER.filter(id => selectedQuickActionIds.includes(id) && actionAvailability[id])
+    ? selectedQuickActionIds.filter(id => actionAvailability[id])
     : (['font', 'theme'] as QuickActionId[]);
 
   const queueCloudSave = (next: QuickActionPreferences) => {
     if (!currentUser?.id) return;
     if (cloudSaveTimerRef.current !== null) window.clearTimeout(cloudSaveTimerRef.current);
-    setQuickSyncStatus('同步中…');
     cloudSaveTimerRef.current = window.setTimeout(() => {
-      void saveCloudQuickPreferences(next)
-        .then(saved => {
-          if (saved !== undefined) setQuickSyncStatus('已跨裝置同步');
-        })
-        .catch(error => {
-          console.warn('Failed to save quick shortcut preferences:', error);
-          setQuickSyncStatus('本機已儲存，稍後再同步');
-        });
+      void saveCloudQuickPreferences(next).catch(error => {
+        console.warn('Failed to save quick shortcut preferences:', error);
+      });
     }, 900);
   };
 
@@ -279,6 +287,17 @@ export const Navbar: React.FC<NavbarProps> = ({
       ? [...selected, id]
       : selected;
     persistQuickPreferences({ ...quickPreferences, [deviceKind]: nextSelected });
+  };
+
+  const reorderQuickAction = (fromId: QuickActionId, toId: QuickActionId) => {
+    if (!currentUser || fromId === toId) return;
+    const ordered = [...selectedQuickActionIds];
+    const fromIndex = ordered.indexOf(fromId);
+    const toIndex = ordered.indexOf(toId);
+    if (fromIndex < 0 || toIndex < 0) return;
+    ordered.splice(fromIndex, 1);
+    ordered.splice(toIndex, 0, fromId);
+    persistQuickPreferences({ ...quickPreferences, [deviceKind]: ordered });
   };
 
   const canShowPinControl = (id: QuickActionId) => {
@@ -322,7 +341,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const renderPinnedAction = (id: QuickActionId) => {
     if (id === 'font') {
       return (
-        <div key={id} className="navbar-top-font-group" aria-label="文字大小">
+        <div className="navbar-top-font-group" aria-label="文字大小">
           <button type="button" className={topButtonClass(false)} onClick={() => changeFontZoom(-0.1)} disabled={fontZoom <= 0.8} aria-label="縮小字體" title={`縮小字體（目前 ${Math.round(fontZoom * 100)}%）`}>
             <span className="font-black text-xs">A−</span>
           </button>
@@ -334,7 +353,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     }
     if (id === 'theme') {
       return (
-        <button key={id} type="button" className={topButtonClass(false)} onClick={onToggleTheme} title={isDark ? '切換淺色模式' : '切換深色模式'} aria-label={isDark ? '切換淺色模式' : '切換深色模式'} aria-pressed={isDark}>
+        <button type="button" className={topButtonClass(false)} onClick={onToggleTheme} title={isDark ? '切換淺色模式' : '切換深色模式'} aria-label={isDark ? '切換淺色模式' : '切換深色模式'} aria-pressed={isDark}>
           {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
       );
@@ -352,7 +371,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     };
     const action = meta[id as Exclude<QuickActionId, 'font' | 'theme'>];
     return (
-      <button key={id} type="button" className={topButtonClass(quickActionIsActive(id))} onClick={action.onClick} title={action.label} aria-label={action.label}>
+      <button type="button" className={topButtonClass(quickActionIsActive(id))} onClick={action.onClick} title={action.label} aria-label={action.label}>
         {action.icon}
         {id === 'notifications' && pendingNotificationsCount > 0 && (
           <span className="navbar-top-badge">{pendingNotificationsCount}</span>
@@ -361,8 +380,94 @@ export const Navbar: React.FC<NavbarProps> = ({
     );
   };
 
-  const deviceLabel = deviceKind === 'mobile' ? '手機' : deviceKind === 'tablet' ? '平板' : '桌機';
-  const limitLabel = deviceKind === 'desktop' ? '不限' : String(deviceLimit);
+  const clearDragHoldTimer = () => {
+    if (dragHoldTimerRef.current === null) return;
+    window.clearTimeout(dragHoldTimerRef.current);
+    dragHoldTimerRef.current = null;
+  };
+
+  const beginQuickActionDrag = (id: QuickActionId, event: React.PointerEvent<HTMLDivElement>) => {
+    if (!currentUser) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    clearDragHoldTimer();
+    const pointerId = event.pointerId;
+    const element = event.currentTarget;
+    dragStateRef.current = {
+      id,
+      pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      dragging: false,
+      element
+    };
+    dragHoldTimerRef.current = window.setTimeout(() => {
+      const state = dragStateRef.current;
+      if (state.id !== id || state.pointerId !== pointerId) return;
+      state.dragging = true;
+      setDraggingQuickActionId(id);
+      try { element.setPointerCapture(pointerId); } catch {}
+      try { navigator.vibrate?.(12); } catch {}
+    }, QUICK_DRAG_HOLD_MS);
+  };
+
+  const moveQuickActionDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const state = dragStateRef.current;
+    if (state.pointerId !== event.pointerId || !state.id) return;
+    if (!state.dragging) {
+      const distance = Math.hypot(event.clientX - state.startX, event.clientY - state.startY);
+      if (distance > QUICK_DRAG_CANCEL_DISTANCE) clearDragHoldTimer();
+      return;
+    }
+    event.preventDefault();
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-quick-action-id]');
+    const targetId = target?.dataset.quickActionId as QuickActionId | undefined;
+    if (targetId && targetId !== state.id) reorderQuickAction(state.id, targetId);
+  };
+
+  const endQuickActionDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const state = dragStateRef.current;
+    if (state.pointerId !== event.pointerId) return;
+    clearDragHoldTimer();
+    if (state.dragging) {
+      suppressQuickClickUntilRef.current = Date.now() + 500;
+      try { state.element?.releasePointerCapture(event.pointerId); } catch {}
+    }
+    dragStateRef.current = {
+      id: null,
+      pointerId: null,
+      startX: 0,
+      startY: 0,
+      dragging: false,
+      element: null
+    };
+    setDraggingQuickActionId(null);
+  };
+
+  const cancelQuickActionHold = (event: React.PointerEvent<HTMLDivElement>) => {
+    const state = dragStateRef.current;
+    if (state.pointerId === event.pointerId && !state.dragging) clearDragHoldTimer();
+  };
+
+  const renderPinnedActionSlot = (id: QuickActionId) => (
+    <div
+      key={id}
+      className={`navbar-top-action-slot ${draggingQuickActionId === id ? 'is-dragging' : ''}`}
+      data-quick-action-id={id}
+      onPointerDown={event => beginQuickActionDrag(id, event)}
+      onPointerMove={moveQuickActionDrag}
+      onPointerUp={endQuickActionDrag}
+      onPointerCancel={endQuickActionDrag}
+      onPointerLeave={cancelQuickActionHold}
+      onClickCapture={event => {
+        if (Date.now() < suppressQuickClickUntilRef.current) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }}
+    >
+      {renderPinnedAction(id)}
+    </div>
+  );
 
   return (
     <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/90 dark:bg-slate-900/90 border-b border-[var(--theme-border-subtle,#f1e7ea)] dark:border-slate-800 transition-colors shadow-xs relative">
@@ -392,19 +497,21 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       <div data-echostars-top-toolbar="true" className="navbar-top-toolbar relative z-10 flex items-center justify-end gap-1" aria-label="置頂快捷功能">
-        {pinnedQuickActionIds.map(renderPinnedAction)}
+        {pinnedQuickActionIds.map(renderPinnedActionSlot)}
       </div>
 
       {isMobileMenuOpen && (
         <div className="mobile-menu-shell">
           <div className="mobile-menu-panel animate-in slide-in-from-top-2">
-            <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 mb-1">
-              <div className="font-black text-sm text-slate-800 dark:text-slate-100 truncate max-w-[18rem]">{displayName}</div>
-              <div className="flex items-center justify-between gap-3 text-xs font-bold">
-                <span style={{ color: 'var(--color-primary,#c06c84)' }}>{displayRole}</span>
-                {currentUser && <span className="text-slate-400 dark:text-slate-500">{deviceLabel}置頂 {selectedQuickActionIds.length}/{limitLabel}</span>}
+            <div className="navbar-menu-profile-head px-3 py-2 border-b border-slate-200 dark:border-slate-700 mb-1">
+              <div className="min-w-0">
+                <div className="font-black text-sm text-slate-800 dark:text-slate-100 truncate max-w-[18rem]">{displayName}</div>
+                <div className="text-xs font-bold" style={{ color: 'var(--color-primary,#c06c84)' }}>{displayRole}</div>
               </div>
-              {currentUser && quickSyncStatus && <div className="mt-0.5 text-[10px] font-semibold text-slate-400 dark:text-slate-500">{quickSyncStatus}</div>}
+              <button type="button" onClick={handleLogoClick} className="navbar-menu-home-shortcut" title="首頁播放清單" aria-label="首頁播放清單">
+                <Home className="w-4 h-4 shrink-0" />
+                <span>首頁播放清單</span>
+              </button>
             </div>
 
             <div className={menuRowClass(false)}>
@@ -426,11 +533,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             <div className="my-1 h-px bg-slate-200 dark:bg-slate-800" />
-
-            <button onClick={handleLogoClick} className={menuRowClass(currentTab === 'home')}>
-              <Home className="w-4 h-4 shrink-0" />
-              <span>首頁播放清單</span>
-            </button>
 
             <div className={menuRowClass(currentTab === 'stats')}>
               {renderPinControl('stats', '排行榜')}
