@@ -1,5 +1,6 @@
 import { canChangeStickerBalance } from '../stickerSummaryClient';
 import React, { useEffect, useState } from 'react';
+import { VisitorRoleSettingsBridge } from './VisitorRoleSettingsBridge';
 let lastPoint: {x:number;y:number}|null=null;
 let pointTime=0;
 let serial=0;
@@ -21,5 +22,8 @@ export function StickerFeedback(){
   window.fetch=observed;
   return()=>{if(window.fetch===observed)window.fetch=original;timers.forEach(clearTimeout);document.removeEventListener('pointerdown',point,true);document.removeEventListener('keydown',keyboard,true);window.removeEventListener('echostars:feedback',receive);};
  },[]);
- return <div aria-live="polite" className="pointer-events-none fixed inset-0 z-[300]">{items.map((item,index)=><div key={item.id} role="status" className="absolute max-w-[min(320px,calc(100vw-24px))] w-max whitespace-pre-wrap rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 px-4 py-2 shadow-xl text-sm text-center" style={{left:Math.max(Math.min(172,window.innerWidth/2),Math.min(window.innerWidth-Math.min(172,window.innerWidth/2),item.point?.x ?? window.innerWidth/2)),top:Math.max(70,(item.point?.y ?? 140)-55-index*45),transform:'translateX(-50%)'}}>{item.text.split(/([+-]\d+(?:\.\d+)?(?:張貼紙)?)/g).map((part:number|string,i:number)=><span key={i} className={String(part).startsWith('+')?'text-red-500':String(part).startsWith('-')?'text-emerald-500':undefined}>{part}</span>)}</div>)}</div>;
+ return <>
+  <VisitorRoleSettingsBridge />
+  <div aria-live="polite" className="pointer-events-none fixed inset-0 z-[300]">{items.map((item,index)=><div key={item.id} role="status" className="absolute max-w-[min(320px,calc(100vw-24px))] w-max whitespace-pre-wrap rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 px-4 py-2 shadow-xl text-sm text-center" style={{left:Math.max(Math.min(172,window.innerWidth/2),Math.min(window.innerWidth-Math.min(172,window.innerWidth/2),item.point?.x ?? window.innerWidth/2)),top:Math.max(70,(item.point?.y ?? 140)-55-index*45),transform:'translateX(-50%)'}}>{item.text.split(/([+-]\d+(?:\.\d+)?(?:張貼紙)?)/g).map((part:number|string,i:number)=><span key={i} className={String(part).startsWith('+')?'text-red-500':String(part).startsWith('-')?'text-emerald-500':undefined}>{part}</span>)}</div>)}</div>
+ </>;
 }
