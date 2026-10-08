@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const navbar = readFileSync(new URL('../src/components/Navbar.tsx', import.meta.url), 'utf8');
 const navbarCss = readFileSync(new URL('../src/components/Navbar.css', import.meta.url), 'utf8');
+const quickPrefs = readFileSync(new URL('../src/quickShortcutPreferences.ts', import.meta.url), 'utf8');
 
 test('font minus, font plus and theme are permanently rendered in the sticky top toolbar', () => {
   assert.match(navbar, /data-echostars-top-toolbar="true"/);
@@ -19,13 +20,12 @@ test('legacy v119 menu font injector is explicitly suppressed after controls mov
   assert.match(navbar, /window\.dispatchEvent\(new Event\('resize'\)\)/);
 });
 
-test('users can pin at most three eligible hamburger actions using local device storage', () => {
-  assert.match(navbar, /MAX_QUICK_ACTIONS = 3/);
-  assert.match(navbar, /echostars_quick_header_actions_v1/);
+test('users can pin at most three eligible hamburger actions with a local cache', () => {
+  assert.match(quickPrefs, /MAX_QUICK_ACTIONS = 3/);
+  assert.match(quickPrefs, /echostars_quick_header_actions_v1/);
   assert.match(navbar, /自訂置頂功能/);
   assert.match(navbar, /visibleQuickActionIds\.length >= MAX_QUICK_ACTIONS/);
-  assert.match(navbar, /localStorage\.setItem\(QUICK_ACTIONS_STORAGE_KEY/);
-  assert.doesNotMatch(navbar, /fetch\([^\n]*quick_header_actions/);
+  assert.match(quickPrefs, /localStorage\.setItem\(QUICK_ACTIONS_STORAGE_KEY/);
 });
 
 test('permission-sensitive shortcuts remain gated by the same navbar permissions', () => {
