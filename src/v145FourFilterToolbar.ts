@@ -164,11 +164,12 @@ function installStyles() {
   document.head.appendChild(style);
 }
 
-function readCategories() {
+function readCategories(): string[] {
   try {
     const parsed = JSON.parse(localStorage.getItem(HOME_CACHE_KEY) || 'null');
-    const categories = Array.isArray(parsed?.categories) ? parsed.categories.map(String).filter(Boolean) : [];
-    const unique = Array.from(new Set(categories));
+    const rawCategories: unknown[] = Array.isArray(parsed?.categories) ? parsed.categories : [];
+    const categories: string[] = rawCategories.map((value: unknown) => String(value)).filter(Boolean);
+    const unique: string[] = Array.from(new Set<string>(categories));
     if (!unique.includes('全部')) unique.unshift('全部');
     return unique.length ? unique : ['全部'];
   } catch {
