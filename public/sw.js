@@ -1,6 +1,6 @@
-const CACHE_NAME = 'echostars-shell-v154';
+const CACHE_NAME = 'echostars-shell-v157';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-monochrome.svg', '/icon-192.png', '/icon-512.png'];
-const FORCE_STALE_CLIENT_REFRESH = CACHE_NAME === 'echostars-shell-v154';
+const FORCE_STALE_CLIENT_REFRESH = CACHE_NAME === 'echostars-shell-v157';
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));

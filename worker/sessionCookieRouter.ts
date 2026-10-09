@@ -1,4 +1,5 @@
 import appWorker from './uiPreferencesRouter';
+import authWorker from './authRouter';
 import type { Env } from './index';
 
 const SESSION_COOKIE = 'echostars_session';
@@ -161,10 +162,12 @@ async function sessionResponse(request: Request, env: Env) {
 
   const token = bearerToken(request) || cookieToken(request);
   const delegated = requestWithCookieSession(request);
-  const response = await appWorker.fetch(delegated, env);
+  const response = await authWorker.fetch(delegated, env);
 
   if (!response.ok || !token) {
-    return response.ok ? response : withSetCookie(response, clearedSessionCookie());
+    // A slow anonymous/expired session response must not erase a newer login cookie.
+    // Only explicit logout clears the cookie.
+    return response;
   }
 
   const data: any = await response.clone().json().catch(() => null);
@@ -184,13 +187,7 @@ async function sessionResponse(request: Request, env: Env) {
 }
 
 async function googleLoginResponse(request: Request, env: Env) {
-  try {
-    await ensurePersistentSessions(env.DB);
-  } catch (error) {
-    console.warn('Persistent session migration failed before login:', error);
-  }
-
-  const response = await appWorker.fetch(request, env);
+  const response = await authWorker.fetch(request, env);
   if (!response.ok) return response;
   const data: any = await response.clone().json().catch(() => null);
   const token = String(data?.authToken || '');

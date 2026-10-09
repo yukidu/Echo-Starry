@@ -1,4 +1,5 @@
 import appWorker from './adminUserDeleteRouter';
+import sessionWorker from './sessionCookieRouter';
 import type { Env } from './index';
 
 const LOGIN_PATH = '/';
@@ -127,17 +128,20 @@ async function handleGoogleRedirect(request: Request, env: Env) {
     body: JSON.stringify({ credential })
   });
 
-  const response = await appWorker.fetch(verifiedRequest, env);
+  const response = await sessionWorker.fetch(verifiedRequest, env);
   const data: any = await response.clone().json().catch(() => ({}));
   if (!response.ok || !data?.user || !data?.authToken) {
     return failurePage(data?.error || 'Google 登入驗證失敗，請重新選擇 Google 帳號。', response.status || 401);
   }
 
-  return successPage({
+  const success = successPage({
     ...data.user,
     _authToken: data.authToken,
     _sessionExpiresAt: data.sessionExpiresAt
   });
+  const cookie = response.headers.get('Set-Cookie');
+  if (cookie) success.headers.set('Set-Cookie', cookie);
+  return success;
 }
 
 export default {

@@ -138,6 +138,9 @@ async function ensureStickerSchema(db: any) {
   const key = db as object;
   if (!schemaReady.has(key)) {
     const task = (async () => {
+      // Persist the completed migration across cold Worker isolates.
+      await db.prepare('CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY)').run();
+      if (await db.prepare("SELECT name FROM app_migrations WHERE name = 'sticker-schema-v157'").first()) return;
       const trackInfo = await db.prepare('PRAGMA table_info(tracks)').all();
       const trackColumns = new Set((trackInfo.results || []).map((row: any) => row.name));
       for (const [name, type] of Object.entries({
@@ -256,6 +259,7 @@ async function ensureStickerSchema(db: any) {
       await backfillExistingRankApprovalRewards(db);
       await topUpLegacyRankStickerInventory(db);
       await applyHiddenBalanceCorrections(db, 'hidden-sticker-balance-v111', HIDDEN_BALANCE_TARGETS_V111);
+      await db.prepare("INSERT OR IGNORE INTO app_migrations(name) VALUES ('sticker-schema-v157')").run();
     })();
     schemaReady.set(key, task);
     task.catch(() => schemaReady.delete(key));

@@ -1,3 +1,5 @@
+import './sessionCache';
+import { exchangeGoogleCredential, loginRevision } from './googleCredentialExchange';
 import { GOOGLE_CLIENT_ID } from './config/auth';
 
 declare global {
@@ -74,6 +76,7 @@ function installLogoutBridge() {
 
 async function restoreFromFirstPartySession() {
   if (readCachedUser()) return true;
+  const startedRevision = loginRevision();
   try {
     if (sessionStorage.getItem(EXPLICIT_LOGOUT_KEY) === '1') {
       await originalFetch('/api/auth/logout', {
@@ -95,6 +98,8 @@ async function restoreFromFirstPartySession() {
     });
     if (!response.ok) return false;
     const data = await response.json().catch(() => ({}));
+    // A newer interactive login wins over an older cookie recovery response.
+    if (startedRevision !== loginRevision() || readCachedUser()) return true;
     if (!storeRecoveredSession(data)) return false;
     window.location.reload();
     return true;
@@ -110,15 +115,8 @@ async function acceptGoogleCredential(response: any) {
   const credential = String(response?.credential || '');
   if (!credential) return;
   try {
-    const result = await originalFetch('/api/users/google-sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      cache: 'no-store',
-      body: JSON.stringify({ credential })
-    });
-    const data = await result.json().catch(() => ({}));
-    if (!result.ok || !storeRecoveredSession(data)) return;
+    const data = await exchangeGoogleCredential(credential, originalFetch);
+    if (!storeRecoveredSession(data)) return;
     window.location.reload();
   } catch {
     // The compact fallback remains available when an embedded browser blocks GIS.

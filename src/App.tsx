@@ -1,3 +1,4 @@
+import { mergeMemberSession } from './authSessionPolicy';
 import { isVisibleOnGuestHome, canGuestPlayPublicShare } from './visitorTrackPolicy';
 import { createStickerSummaryClient, STICKER_POLL_MS } from './stickerSummaryClient';
 import { sortStickerTracks } from './homePlaylistPolicy';
@@ -360,6 +361,7 @@ export default function App() {
   };
 
   const fetchAllUsers = async (force = false) => {
+    if (!currentUser) return;
     if (hasFetchedAllUsersRef.current && !force) return;
     try {
       const res = await fetch('/api/users');
@@ -900,7 +902,7 @@ export default function App() {
     if(uplineInviteHandledRef.current===operationKey)return;
     uplineInviteHandledRef.current=operationKey;
     void apiJson('/api/organization/invite-accept',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dealerId})}).then(data=>{
-      if(data.user){const updated={...currentUser,...data.user};setCurrentUser(updated);localStorage.setItem('sq_current_user_v1',JSON.stringify(updated));setAllUsers(prev=>[...prev.filter(user=>user.id!==updated.id),updated]);}
+      if(data.user){const updated={...currentUser,...data.user};const retained = mergeMemberSession(currentUser, updated);setCurrentUser(retained);localStorage.setItem('sq_current_user_v1',JSON.stringify(retained));setAllUsers(prev=>[...prev.filter(user=>user.id!==updated.id),updated]);}
       showStickerNotice(data.message || `已完成下線綁定：${data.displayName || ''}`,2);
       setIsProfileOpen(false);setIsStickersOpen(false);setCurrentTab('home');
       window.history.replaceState({echostars:true,view:'home'},'',window.location.origin + '/');
@@ -1742,7 +1744,7 @@ export default function App() {
         body:JSON.stringify({actorEmail:currentUser?.email,isAdminUser:!user.isAdminUser,isContributor:!user.isContributor,isBlocked:!user.isBlocked})
       });
       setAllUsers(prev=>prev.map(u=>u.id===userId?updated:u));
-      if(currentUser?.id===userId){setCurrentUser(updated);localStorage.setItem('sq_current_user_v1',JSON.stringify(updated));}
+      if(currentUser?.id===userId){const retained = mergeMemberSession(currentUser, updated);setCurrentUser(retained);localStorage.setItem('sq_current_user_v1',JSON.stringify(retained));}
     } catch(error) { alert(error instanceof Error?error.message:'儲存失敗，請重試'); }
     finally {pendingMemberActions.current.delete(userId);}
   };
@@ -1770,8 +1772,9 @@ export default function App() {
         const updated = await res.json();
         setAllUsers(prev => prev.map(u => (u.id === userId ? updated : u)));
         if (currentUser?.id === userId) {
-          setCurrentUser(updated);
-          localStorage.setItem('sq_current_user_v1', JSON.stringify(updated));
+          const retained = mergeMemberSession(currentUser, updated);
+          setCurrentUser(retained);
+          localStorage.setItem('sq_current_user_v1', JSON.stringify(retained));
         }
       }
     } catch (e) {
@@ -1809,6 +1812,8 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    setAllUsers([]);
+    hasFetchedAllUsersRef.current = false;
     setCurrentUser(null);
     setStickerSummary(null);
     localStorage.removeItem('sq_current_user_v1');

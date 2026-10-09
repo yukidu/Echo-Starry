@@ -1,4 +1,5 @@
 import appWorker from './favoriteRouter';
+import sessionWorker from './sessionCookieRouter';
 import iosGoogleRedirectWorker from './iosGoogleRedirectRouter';
 import type { Env } from './index';
 import { unitsToStickers } from '../shared/stickers';
@@ -153,6 +154,17 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
+    // Browser cookie writes must originate here. Future external apps require
+    // their own scoped server credentials, not reuse of a member's site cookie.
+    const origin = request.headers.get('Origin');
+    if (url.pathname.startsWith('/api/') && !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
+        origin && origin !== url.origin &&
+        (url.pathname === '/api/users/google-sync' || (request.headers.has('Cookie') && !request.headers.has('Authorization')))) {
+      return new Response(JSON.stringify({ error: '不允許跨站修改會員資料' }), {
+        status: 403, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+      });
+    }
+
     // Always let crawlers read the explicit global exclusion policy.
     if (request.method === 'GET' && url.pathname === '/robots.txt') {
       return new Response(ROBOTS_TXT, {
@@ -187,6 +199,11 @@ export default {
     ) {
       const ranked = await spentStickerLeaderboard(env);
       if (ranked) return withPrivacyHeaders(ranked);
+    }
+
+    // Authentication must not wait for unrelated sticker/catalog migrations.
+    if (url.pathname === '/api/users/google-sync' || url.pathname.startsWith('/api/auth/')) {
+      return withPrivacyHeaders(await sessionWorker.fetch(request, env));
     }
 
     // Keep the long-standing application wrapper chain untouched. Only the
