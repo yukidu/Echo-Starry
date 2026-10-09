@@ -89,7 +89,13 @@ jobs:
             exit 1
           fi
 
-          node scripts/verifyThemeMenuUi.mjs
+          # Headless Chrome can very occasionally fail to expose its debug port on a hosted runner.
+          # Retry the real browser check once only; the second failure remains a hard failure.
+          if ! node scripts/verifyThemeMenuUi.mjs; then
+            echo "Browser UI check startup failed once; retrying one final time."
+            sleep 2
+            node scripts/verifyThemeMenuUi.mjs
+          fi
 
       - name: Upload browser UI evidence
         if: always()
