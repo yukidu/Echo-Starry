@@ -30,7 +30,7 @@ test('release verification runs tests, diagnostics, production build, and real b
   assert.match(workflow, /TypeScript diagnostic[\s\S]*if: always\(\)[\s\S]*run: npm run lint/);
   assert.match(workflow, /Production build[\s\S]*if: always\(\)[\s\S]*run: npm run build/);
   assert.match(workflow, /Browser UI check[\s\S]*node scripts\/verifyThemeMenuUi\.mjs/);
-  assert.match(workflow, /Upload browser UI screenshots[\s\S]*actions\/upload-artifact@v4/);
+  assert.match(workflow, /Upload browser UI evidence[\s\S]*actions\/upload-artifact@v4/);
   assert.match(wrangler, /\[build\][\s\S]*command = "npm run build"/);
   assert.doesNotMatch(wrangler, /command = "npm run verify"/);
 });
