@@ -1,4 +1,4 @@
-import appWorker from './adminUserDeleteRouter';
+import appWorker from './favoriteRouter';
 import iosGoogleRedirectWorker from './iosGoogleRedirectRouter';
 import type { Env } from './index';
 import { unitsToStickers } from '../shared/stickers';
@@ -192,7 +192,7 @@ export default {
     // Keep the long-standing application wrapper chain untouched. Only the
     // Google Identity Services redirect POST at the origin root is routed
     // through the iOS redirect handler; every other request follows the exact
-    // same admin/category/organization/session/playback/auth chain as before.
+    // same favorite/admin/category/organization/session/playback/auth chain as before.
     if (request.method === 'POST' && url.pathname === '/') {
       return withPrivacyHeaders(await iosGoogleRedirectWorker.fetch(request, env));
     }

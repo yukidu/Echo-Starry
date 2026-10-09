@@ -7,6 +7,7 @@ const navbarCss = readFileSync(new URL('../src/components/Navbar.css', import.me
 const profile = readFileSync(new URL('../src/components/ProfileModal.tsx', import.meta.url), 'utf8');
 const guide = readFileSync(new URL('../src/stickerGuidePolicy.ts', import.meta.url), 'utf8');
 const stickerRouter = readFileSync(new URL('../worker/stickerRouter.ts', import.meta.url), 'utf8');
+const favoriteRouter = readFileSync(new URL('../worker/favoriteRouter.ts', import.meta.url), 'utf8');
 const privacyRouter = readFileSync(new URL('../worker/privacyCrawlerRouter.ts', import.meta.url), 'utf8');
 
 test('all viewport sizes use one hamburger main menu and brand never wraps', () => {
@@ -34,6 +35,7 @@ test('Summon Stars completion reward is excluded from platinum earning multiplie
   assert.equal(guide.includes('召喚繁星完聽獎勵不套用白金級以上獲取倍數'), true);
   assert.equal(stickerRouter.includes("['rank_approval_reward','manual_grant','lucky_complete_reward']"), true);
   assert.equal(stickerRouter.includes("type:'lucky_complete_reward'"), true);
-  assert.equal(privacyRouter.includes("import appWorker from './adminUserDeleteRouter';"), true);
+  assert.equal(privacyRouter.includes("import appWorker from './favoriteRouter';"), true);
+  assert.equal(favoriteRouter.includes("import appWorker from './adminUserDeleteRouter';"), true);
   assert.equal(privacyRouter.includes('luckyStickerMultiplierPolicyRouter'), false);
 });

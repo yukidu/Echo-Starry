@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const router = readFileSync(new URL('../worker/categoryIntegrityRouter.ts', import.meta.url), 'utf8');
 const adminUserDeleteRouter = readFileSync(new URL('../worker/adminUserDeleteRouter.ts', import.meta.url), 'utf8');
+const favoriteRouter = readFileSync(new URL('../worker/favoriteRouter.ts', import.meta.url), 'utf8');
 const privacyRouter = readFileSync(new URL('../worker/privacyCrawlerRouter.ts', import.meta.url), 'utf8');
 const bootstrap = readFileSync(new URL('../src/categoryIntegrityBootstrap.ts', import.meta.url), 'utf8');
 const audioCard = readFileSync(new URL('../src/components/AudioCard.tsx', import.meta.url), 'utf8');
@@ -26,7 +27,8 @@ test('D1 categories is the only category authority, including an empty list', ()
   assert.match(router, /body\.categories = sanitizeCategories\(body\.categories, allowed\)/);
   assert.match(router, /repairCreatedTrackResponse/);
   assert.match(router, /reconcileAllTrackCategories/);
-  assert.match(privacyRouter, /import appWorker from '\.\/adminUserDeleteRouter'/);
+  assert.match(privacyRouter, /import appWorker from '\.\/favoriteRouter'/);
+  assert.match(favoriteRouter, /import appWorker from '\.\/adminUserDeleteRouter'/);
   assert.match(adminUserDeleteRouter, /import appWorker from '\.\/categoryIntegrityRouter'/);
   assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
 });
