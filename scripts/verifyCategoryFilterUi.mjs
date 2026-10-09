@@ -56,7 +56,7 @@ async function waitForJson(url, attempts = 60) {
 async function main() {
   const chromeBinary = resolveChromeBinary();
   const debugPort = await getFreePort();
-  const userDataDir = `/tmp/echostars-category-ui-${process.pid}`;
+  const userDataDir = `/tmp/echostars-chrome-category-ui-${process.pid}`;
   const chrome = spawn(chromeBinary, [
     '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--hide-scrollbars',
     '--window-size=412,915', '--remote-debugging-address=127.0.0.1',
@@ -104,7 +104,10 @@ async function main() {
 
     const evaluate = async expression => {
       const result = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
-      if (result.exceptionDetails) throw new Error(result.exceptionDetails.text || 'Runtime evaluation failed.');
+      if (result.exceptionDetails) {
+        const description = result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'Runtime evaluation failed.';
+        throw new Error(description);
+      }
       return result.result?.value;
     };
 
@@ -176,23 +179,44 @@ async function main() {
       menuVisible: (() => {
         const menu = document.querySelector('[data-v145-menu="category"]');
         return !!menu && !menu.hidden;
-      })()
+      })(),
+      categoryOptions: Array.from(document.querySelectorAll('[data-v145-menu="category"] button')).map(el => (el.textContent || '').trim()),
+      originalOptions: Array.from(document.querySelectorAll('.sort-toolbar button')).map(el => (el.textContent || '').replace(/\s+/g, ' ').trim())
     }))()`);
+
+    const states = [];
+    const persistState = async (phase, extra = {}) => {
+      const state = await readState();
+      states.push({ phase, ...state, ...extra });
+      await writeFile(DEBUG_JSON, JSON.stringify({ states }, null, 2), 'utf8');
+      console.log(`[category-ui] ${phase}: ${JSON.stringify(state)}`);
+      return state;
+    };
+
+    await persistState('initial');
 
     const chooseCategory = async (displayLabel, expectedLabel, expectedCards, shotIndex) => {
       await evaluate(`document.querySelector('[data-v145-button="category"]')?.click()`);
       await waitFor(`(() => { const m = document.querySelector('[data-v145-menu="category"]'); return !!m && !m.hidden; })()`, `category menu open for ${displayLabel}`);
-      await evaluate(`(() => {
-        const button = Array.from(document.querySelectorAll('[data-v145-menu="category"] button'))
-          .find(el => (el.textContent || '').trim() === ${JSON.stringify(displayLabel)});
-        if (!button) throw new Error('Missing category option: ${displayLabel}');
+      await capture(`/tmp/echostars-category-${shotIndex}-menu.png`);
+      const before = await persistState(`before-${expectedLabel}`);
+
+      const clickResult = await evaluate(`(() => {
+        const buttons = Array.from(document.querySelectorAll('[data-v145-menu="category"] button'));
+        const labels = buttons.map(el => (el.textContent || '').trim());
+        const button = buttons.find(el => (el.textContent || '').trim() === ${JSON.stringify(displayLabel)});
+        if (!button) return { clicked: false, labels };
         button.click();
+        return { clicked: true, labels };
       })()`);
+      if (!clickResult?.clicked) {
+        throw new Error(`Missing category option ${displayLabel}; available=${JSON.stringify(clickResult?.labels || before.categoryOptions || [])}`);
+      }
 
       await waitFor(`document.querySelector('[data-v145-label="category"]')?.textContent?.trim() === ${JSON.stringify(expectedLabel)}`, `custom category label ${expectedLabel}`);
       await waitFor(`JSON.stringify(Array.from(document.querySelectorAll('[data-track-card-id]')).map(el => el.getAttribute('data-track-card-id')).sort()) === ${JSON.stringify(JSON.stringify([...expectedCards].sort()))}`, `filtered cards for ${expectedLabel}`);
 
-      const state = await readState();
+      const state = await persistState(`after-${expectedLabel}`);
       if (JSON.stringify([...state.cards].sort()) !== JSON.stringify([...expectedCards].sort())) {
         throw new Error(`Category filter mismatch for ${expectedLabel}: ${JSON.stringify(state)}`);
       }
@@ -200,17 +224,18 @@ async function main() {
       return state;
     };
 
-    const states = [];
-    states.push(await chooseCategory('事業', '事業', ['v155-business'], 1));
-    states.push(await chooseCategory('營養', '營養', ['v155-nutrition'], 2));
-    states.push(await chooseCategory('心態思維', '心態思維', ['v155-mindset'], 3));
-    states.push(await chooseCategory('全部分類', '全部分類', ['v155-business', 'v155-nutrition', 'v155-mindset'], 4));
+    await chooseCategory('事業', '事業', ['v155-business'], 1);
+    await chooseCategory('營養', '營養', ['v155-nutrition'], 2);
+    await chooseCategory('心態思維', '心態思維', ['v155-mindset'], 3);
+    await chooseCategory('全部分類', '全部分類', ['v155-business', 'v155-nutrition', 'v155-mindset'], 4);
 
-    await writeFile(DEBUG_JSON, JSON.stringify({ states }, null, 2), 'utf8');
     console.log('Category filter browser UI verified across four consecutive selections without reload.');
     console.log(JSON.stringify(states));
     socket.close();
   } catch (error) {
+    try {
+      await writeFile(DEBUG_JSON, JSON.stringify({ fatal: String(error?.stack || error) }, null, 2), 'utf8');
+    } catch {}
     if (chromeErrors.trim()) {
       console.error('Chrome stderr (tail):');
       console.error(chromeErrors.trim());
