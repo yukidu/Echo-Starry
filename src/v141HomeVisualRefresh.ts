@@ -534,7 +534,15 @@ function queueSync() {
 installStyles();
 syncHomeLayout();
 
-const observer = new MutationObserver(queueSync);
+function shouldSkipLuckyGridMutations(records: MutationRecord[]) {
+  const grid = document.querySelector<HTMLElement>('.audio-card-grid.lucky-spin-active');
+  return Boolean(grid && records.length && records.every(record => record.target === grid || grid.contains(record.target)));
+}
+
+const observer = new MutationObserver(records => {
+  if (shouldSkipLuckyGridMutations(records)) return;
+  queueSync();
+});
 observer.observe(document.body, { childList: true, subtree: true });
 window.addEventListener('pageshow', syncHomeLayout);
 window.addEventListener('echostars-favorites-changed', queueSync);

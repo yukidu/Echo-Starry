@@ -584,6 +584,8 @@ export default function App() {
   const [luckyAnswerText, setLuckyAnswerText] = useState<string | null>(null);
   const luckyTimersRef = useRef<number[]>([]);
   const luckyAudioContextRef = useRef<AudioContext | null>(null);
+  const luckyRequestPending = useRef(false);
+  const luckyDrawGenerationRef = useRef(0);
 
   const clearLuckyTimers = useCallback(() => {
     luckyTimersRef.current.forEach(timer => window.clearTimeout(timer));
@@ -591,6 +593,8 @@ export default function App() {
   }, []);
 
   const resetLuckyDrawState = useCallback(() => {
+    luckyDrawGenerationRef.current += 1;
+    luckyRequestPending.current = false;
     clearLuckyTimers();
     setLuckyPhase('idle');
     setLuckyOrderIds(null);
@@ -2163,7 +2167,6 @@ export default function App() {
     );
   };
 
-  const luckyRequestPending = useRef(false);
   const handleLuckyDraw = (anchor: HTMLElement) => {
     if (luckyPhase === 'spin' || luckyRequestPending.current) return;
     setIsSearchFocused(false);
@@ -2177,16 +2180,21 @@ export default function App() {
       return;
     }
 
-    // Start the reel immediately from the user's gesture. Server sticker validation runs in parallel.
+    // v148: the visual reel has a hard, short budget. Sticker validation may finish
+    // later, but network latency is never allowed to keep the phone animating/reordering.
     getLuckyAudioContext();
     const baseIds = filteredTracks.map(track => track.id);
     const winner = candidates[Math.floor(Math.random() * candidates.length)];
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const minSpinSteps = Math.max(16, Math.min(26, candidates.length * 4));
+    const visualSpinSteps = Math.max(10, Math.min(14, candidates.length * 2));
+    const drawGeneration = ++luckyDrawGenerationRef.current;
     let spinStep = 0;
+    let visualComplete = false;
+    let settled = false;
     let approvalState: 'pending' | 'approved' | 'failed' = currentUser ? 'pending' : 'approved';
     let approvalError: unknown = null;
     let luckyNotice: any = { bonus: 0, settings: getFeedbackRules() };
+    const isCurrentDraw = () => luckyDrawGenerationRef.current === drawGeneration;
 
     luckyRequestPending.current = true;
     setLuckyOrderIds(baseIds);
@@ -2194,6 +2202,8 @@ export default function App() {
     setLuckyPhase('spin');
 
     const fail = () => {
+      if (settled || !isCurrentDraw()) return;
+      settled = true;
       clearLuckyTimers();
       luckyRequestPending.current = false;
       setLuckyPhase('idle');
@@ -2204,6 +2214,8 @@ export default function App() {
     };
 
     const finish = () => {
+      if (settled || !isCurrentDraw()) return;
+      settled = true;
       clearLuckyTimers();
       luckyRequestPending.current = false;
       setLuckyOrderIds(moveTrackIdToSecondSlot(baseIds, winner.id));
@@ -2216,41 +2228,63 @@ export default function App() {
       playLuckyWin();
     };
 
+    const completeVisualSpin = () => {
+      if (visualComplete || settled || !isCurrentDraw()) return;
+      visualComplete = true;
+      setLuckyOrderIds(moveTrackIdToSecondSlot(baseIds, winner.id));
+      setLuckyWinnerId(null);
+      // Stop the reel immediately. If the server is still validating stickers,
+      // keep the chosen card still instead of burning CPU/GPU with an endless reel.
+      setLuckyPhase('idle');
+      if (approvalState === 'approved') finish();
+      else if (approvalState === 'failed') fail();
+    };
+
     const approvalPromise = currentUser
       ? apiJson('/api/stickers/lucky-spend', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ operationId: crypto.randomUUID(), trackId: winner.id })
         }).then(data => {
+          if (!isCurrentDraw() || settled) return;
           luckyNotice = data;
           approvalState = 'approved';
           void refreshStickerSummary();
+          if (visualComplete) finish();
         }).catch(error => {
+          if (!isCurrentDraw() || settled) return;
           approvalError = error;
           approvalState = 'failed';
+          if (visualComplete) fail();
         })
-      : Promise.resolve();
+      : Promise.resolve().then(() => {
+          if (!isCurrentDraw() || settled) return;
+          approvalState = 'approved';
+          if (visualComplete) finish();
+        });
 
     const approvalTimeout = window.setTimeout(() => {
-      if (approvalState === 'pending') {
-        approvalError = new Error('連線時間過久，請再試一次。');
-        approvalState = 'failed';
-      }
+      if (!isCurrentDraw() || settled || approvalState !== 'pending') return;
+      approvalError = new Error('連線時間過久，請再試一次。');
+      approvalState = 'failed';
+      if (visualComplete) fail();
     }, 20000);
     luckyTimersRef.current.push(approvalTimeout);
 
     if (reducedMotion || candidates.length === 1 || filteredTracks.length === 1) {
-      void approvalPromise.then(() => approvalState === 'approved' ? finish() : fail());
+      completeVisualSpin();
+      void approvalPromise;
       return;
     }
 
     const spin = () => {
+      if (settled || !isCurrentDraw()) return;
       if (approvalState === 'failed') {
         fail();
         return;
       }
-      if (spinStep >= minSpinSteps && approvalState === 'approved') {
-        finish();
+      if (spinStep >= visualSpinSteps) {
+        completeVisualSpin();
         return;
       }
 
@@ -2258,12 +2292,10 @@ export default function App() {
       setLuckyOrderIds(moveTrackIdToSecondSlot(baseIds, candidate.id));
       setLuckyWinnerId(null);
       setLuckyPhase('spin');
-      playLuckyTick(spinStep);
+      if (spinStep % 2 === 0) playLuckyTick(spinStep);
 
-      const progress = Math.min(1, spinStep / Math.max(1, minSpinSteps - 1));
-      const delay = spinStep < minSpinSteps
-        ? Math.round(58 + progress * progress * 190)
-        : 140;
+      const progress = Math.min(1, spinStep / Math.max(1, visualSpinSteps - 1));
+      const delay = Math.round(62 + progress * progress * 70);
       spinStep += 1;
       const timer = window.setTimeout(spin, delay);
       luckyTimersRef.current.push(timer);

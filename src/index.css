@@ -394,27 +394,20 @@ input[type="range"].audio-scrubber::-moz-range-thumb {
 }
 
 .audio-card-grid.lucky-spin-active > .lucky-card {
-  filter: brightness(0.34) saturate(0.55);
+  filter: none;
   opacity: 0.48;
   z-index: 10;
-  animation: echostars-lucky-reel 180ms cubic-bezier(.35,0,.65,1) infinite alternate;
-}
-
-.audio-card-grid.lucky-spin-active > .lucky-card:nth-child(3n + 1) {
-  animation-delay: -55ms;
-}
-
-.audio-card-grid.lucky-spin-active > .lucky-card:nth-child(3n + 3) {
-  animation-delay: -105ms;
-  animation-direction: alternate-reverse;
+  animation: none;
+  transition: opacity 80ms linear, box-shadow 80ms linear;
 }
 
 .audio-card-grid.lucky-spin-active > .lucky-card:nth-child(2) {
-  filter: brightness(1.18) saturate(1.2);
+  filter: none;
   opacity: 1;
   z-index: 20;
-  box-shadow: 0 0 0 3px var(--color-primary, #c06c84), 0 0 30px var(--color-primary, #c06c84);
-  animation: echostars-lucky-reel-focus 170ms ease-in-out infinite alternate;
+  box-shadow: 0 0 0 3px var(--color-primary, #c06c84), 0 0 24px var(--color-primary, #c06c84);
+  animation: echostars-lucky-reel-focus 160ms ease-in-out infinite alternate;
+  will-change: transform;
 }
 
 .audio-card-grid.lucky-win-active > .lucky-card {
