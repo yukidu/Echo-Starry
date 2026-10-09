@@ -185,6 +185,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   })();
   const isContributor = currentUser?.isContributor === true;
   const canAccessSettings = isSuperAdmin || isAdministrator || isPlatinumOrAbove || isContributor;
+  const themeActionLabel = isDark ? '開燈' : '關燈';
 
   const menuRowClass = (active: boolean) => `mobile-menu-row flex items-center gap-2 px-2.5 py-2 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap ${
     active
@@ -561,10 +562,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             <div className={menuRowClass(false)}>
-              {renderPinControl('theme', '淺色／暗色切換')}
+              {renderPinControl('theme', themeActionLabel)}
               <button type="button" onClick={onToggleTheme} className={menuActionClass}>
                 {isDark ? <Sun className="w-4 h-4 shrink-0" /> : <Moon className="w-4 h-4 shrink-0" />}
-                <span className="min-w-0 flex-1">淺色／暗色切換</span>
+                <span className="min-w-0 flex-1">{themeActionLabel}</span>
               </button>
             </div>
 
