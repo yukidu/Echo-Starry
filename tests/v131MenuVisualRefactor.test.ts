@@ -8,9 +8,10 @@ const menuPolish = readFileSync(new URL('../src/v126MenuPolish.ts', import.meta.
 const identityPolicy = readFileSync(new URL('../src/v127MenuIdentityPalette.ts', import.meta.url), 'utf8');
 const main = readFileSync(new URL('../src/main.tsx', import.meta.url), 'utf8');
 
-test('v131 keeps pin controls and quick-action limits in the React menu', () => {
+test('v152 keeps pin controls and quick-action limits in the React menu with a dynamic theme action label', () => {
   assert.match(navbar, /renderPinControl\('font', '字體'\)/);
-  assert.match(navbar, /renderPinControl\('theme', '淺色／暗色切換'\)/);
+  assert.match(navbar, /const themeActionLabel = isDark \? '開燈' : '關燈'/);
+  assert.match(navbar, /renderPinControl\('theme', themeActionLabel\)/);
   assert.match(navbar, /renderPinControl\('stats', '排行榜'\)/);
   assert.match(navbar, /renderPinControl\('notifications', '通知'\)/);
   assert.match(navbar, /renderPinControl\('stickers', '我的貼紙'\)/);

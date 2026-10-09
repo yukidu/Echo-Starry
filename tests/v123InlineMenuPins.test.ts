@@ -8,7 +8,7 @@ const css = readFileSync(new URL('../src/components/Navbar.css', import.meta.url
 
 test('font and theme controls stay at the top of the hamburger function list', () => {
   const font = navbar.indexOf("renderPinControl('font', '字體')");
-  const theme = navbar.indexOf("renderPinControl('theme', '淺色／暗色切換')");
+  const theme = navbar.indexOf("renderPinControl('theme', themeActionLabel)");
   const stats = navbar.indexOf("renderPinControl('stats', '排行榜')");
   assert.ok(font >= 0 && theme >= 0 && stats >= 0);
   assert.ok(font < stats);
@@ -18,7 +18,6 @@ test('font and theme controls stay at the top of the hamburger function list', (
 test('eligible signed-in hamburger actions expose inline pin controls while fixed header actions do not', () => {
   for (const [id, label] of [
     ['font', '字體'],
-    ['theme', '淺色／暗色切換'],
     ['stats', '排行榜'],
     ['notifications', '通知'],
     ['stickers', '我的貼紙'],
@@ -28,6 +27,8 @@ test('eligible signed-in hamburger actions expose inline pin controls while fixe
   ]) {
     assert.match(navbar, new RegExp(`renderPinControl\\('${id}', '${label}'\\)`));
   }
+  assert.match(navbar, /const themeActionLabel = isDark \? '開燈' : '關燈'/);
+  assert.match(navbar, /renderPinControl\('theme', themeActionLabel\)/);
   assert.doesNotMatch(navbar, /renderPinControl\('home'/);
   assert.doesNotMatch(navbar, /renderPinControl\('logout'/);
   assert.doesNotMatch(navbar, /renderPinControl\('install'/);
