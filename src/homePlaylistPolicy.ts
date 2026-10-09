@@ -62,11 +62,11 @@ export function sortDefaultHomeTracks<T extends HomePlaylistTrack>(
   });
 }
 
+// Legacy export name is retained so the lucky-draw call sites stay stable.
+// v156 changes the visual focus target from the second card to the first card.
 export function moveTrackIdToSecondSlot(ids: readonly string[], targetId: string): string[] {
-  if (ids.length <= 1) return [...ids];
   const next = ids.filter(id => id !== targetId);
-  const insertAt = Math.min(1, next.length);
-  next.splice(insertAt, 0, targetId);
+  next.unshift(targetId);
   return next;
 }
 
