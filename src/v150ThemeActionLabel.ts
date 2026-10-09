@@ -1,4 +1,4 @@
-const THEME_LABELS = new Set(['淺色／暗色切換', '開燈', '關燈']);
+const THEME_LABELS = new Set(['淺色／暗色切換', '開燈/關燈', '開燈／關燈', '開燈', '關燈']);
 let syncFrame = 0;
 
 function desiredThemeActionLabel() {
@@ -12,7 +12,8 @@ function patchThemeActionLabel() {
   for (const button of buttons) {
     const label = button.querySelector<HTMLElement>('span.min-w-0.flex-1');
     const text = label?.textContent?.trim() || '';
-    if (!label || !THEME_LABELS.has(text)) continue;
+    const isThemeLabel = THEME_LABELS.has(text) || /^開燈\s*[／/]\s*關燈$/.test(text);
+    if (!label || !isThemeLabel) continue;
 
     if (label.textContent !== nextLabel) label.textContent = nextLabel;
     button.setAttribute('aria-label', nextLabel);
