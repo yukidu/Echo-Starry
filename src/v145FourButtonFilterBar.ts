@@ -181,11 +181,13 @@ async function driveSort(label: string, desired: SortDirection) {
     await afterReactPaint();
   }
 }
-function readCategories() {
+function readCategories(): string[] {
   try {
     const parsed = JSON.parse(localStorage.getItem(HOME_CACHE_KEY) || 'null');
-    const categories = Array.isArray(parsed?.categories) ? parsed.categories.map(String).filter(Boolean) : [];
-    const unique = Array.from(new Set(categories));
+    const categories: string[] = Array.isArray(parsed?.categories)
+      ? parsed.categories.map((value: unknown) => String(value)).filter(Boolean)
+      : [];
+    const unique: string[] = Array.from(new Set<string>(categories));
     return unique.includes('全部') ? unique : ['全部', ...unique];
   } catch { return ['全部']; }
 }
