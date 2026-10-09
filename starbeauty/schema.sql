@@ -1,0 +1,4 @@
+-- 美力之星正式資料表由 Worker 在第一次請求時以 CREATE TABLE IF NOT EXISTS 自動建立。
+-- 本檔保留作為資料架構說明；實際 schema 以 worker/index.js 的 ensureSchema() 為準。
+-- 核心資料：users / sessions / courses / course_members / assignments / submissions /
+-- submission_files / upload_sessions / notifications / audit_logs / line_link_codes / line_inbox / line_messages
