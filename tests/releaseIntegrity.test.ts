@@ -7,8 +7,8 @@ const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url),
 const wrangler = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
 const workflow = readFileSync(new URL('../.github/workflows/regression.yml', import.meta.url), 'utf8');
 
-test('v153 is the single current PWA cache version', () => {
-  assert.match(sw, /const CACHE_NAME = 'echostars-shell-v153'/);
+test('v154 is the single current PWA cache version', () => {
+  assert.match(sw, /const CACHE_NAME = 'echostars-shell-v154'/);
   const testsDir = new URL('./', import.meta.url);
   for (const file of readdirSync(testsDir).filter(name => name.endsWith('.test.ts') && name !== 'releaseIntegrity.test.ts')) {
     const source = readFileSync(new URL(file, testsDir), 'utf8');
@@ -22,13 +22,15 @@ test('service worker never caches API responses or personalized share HTML as ap
   assert.doesNotMatch(sw, /cacheableNavigation[\s\S]*url\.pathname\.startsWith\('\/share\/'\)/);
 });
 
-test('release verification runs every test file and still executes diagnostics and production build', () => {
+test('release verification runs tests, diagnostics, production build, and real browser UI check', () => {
   assert.equal(pkg.scripts.verify, 'npm test && npm run build');
   assert.match(workflow, /for test_file in tests\/\*\.test\.ts/);
   assert.match(workflow, /node --import tsx --test "\$\{test_file\}"/);
   assert.match(workflow, /Regression files passed:/);
   assert.match(workflow, /TypeScript diagnostic[\s\S]*if: always\(\)[\s\S]*run: npm run lint/);
   assert.match(workflow, /Production build[\s\S]*if: always\(\)[\s\S]*run: npm run build/);
+  assert.match(workflow, /Browser UI check[\s\S]*node scripts\/verifyThemeMenuUi\.mjs/);
+  assert.match(workflow, /Upload browser UI screenshots[\s\S]*actions\/upload-artifact@v4/);
   assert.match(wrangler, /\[build\][\s\S]*command = "npm run build"/);
   assert.doesNotMatch(wrangler, /command = "npm run verify"/);
 });
