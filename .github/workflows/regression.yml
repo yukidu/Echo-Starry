@@ -103,6 +103,12 @@ jobs:
             node scripts/verifyCategoryFilterUi.mjs
           fi
 
+          if ! node scripts/verifyV156Ui.mjs; then
+            echo "v156 browser UI check startup failed once; retrying one final time."
+            sleep 2
+            node scripts/verifyV156Ui.mjs
+          fi
+
       - name: Upload browser UI evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -111,5 +117,6 @@ jobs:
           path: |
             /tmp/echostars-theme-*
             /tmp/echostars-category-*
+            /tmp/echostars-v156-*
           if-no-files-found: ignore
           retention-days: 7
