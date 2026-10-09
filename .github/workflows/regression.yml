@@ -65,6 +65,9 @@ jobs:
             echo "dist/index.html missing; production build did not produce a runnable app."
             exit 1
           fi
+
+          node scripts/scanThemeLegacy.mjs
+
           npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/echostars-preview.log 2>&1 &
           preview_pid=$!
           cleanup() {
@@ -88,11 +91,11 @@ jobs:
 
           node scripts/verifyThemeMenuUi.mjs
 
-      - name: Upload browser UI screenshots
+      - name: Upload browser UI evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: theme-menu-ui-${{ github.sha }}
-          path: /tmp/echostars-theme-menu-*.png
+          path: /tmp/echostars-theme-*
           if-no-files-found: ignore
           retention-days: 7
