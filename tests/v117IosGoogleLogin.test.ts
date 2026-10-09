@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const platformUx = readFileSync(new URL('../src/googleIdentityPlatformUx.ts', import.meta.url), 'utf8');
 const redirectRouter = readFileSync(new URL('../worker/iosGoogleRedirectRouter.ts', import.meta.url), 'utf8');
+const favoriteRouter = readFileSync(new URL('../worker/favoriteRouter.ts', import.meta.url), 'utf8');
 const privacyRouter = readFileSync(new URL('../worker/privacyCrawlerRouter.ts', import.meta.url), 'utf8');
 
 test('platform UX layer loads before the legacy Google bridge', () => {
@@ -30,7 +31,8 @@ test('desktop and Android keep popup with One Tap fallback', () => {
 });
 
 test('redirect endpoint verifies Google double-submit CSRF before exchanging credential', () => {
-  assert.equal(privacyRouter.includes("import appWorker from './adminUserDeleteRouter';"), true);
+  assert.equal(privacyRouter.includes("import appWorker from './favoriteRouter';"), true);
+  assert.equal(favoriteRouter.includes("import appWorker from './adminUserDeleteRouter';"), true);
   assert.equal(privacyRouter.includes("import iosGoogleRedirectWorker from './iosGoogleRedirectRouter';"), true);
   assert.equal(privacyRouter.includes("request.method === 'POST' && url.pathname === '/'"), true);
   assert.equal(privacyRouter.includes('iosGoogleRedirectWorker.fetch(request, env)'), true);
