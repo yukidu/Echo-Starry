@@ -160,6 +160,7 @@ async function main() {
     const seedScript = `(() => {
       try {
         localStorage.removeItem('sq_current_user_v1');
+        localStorage.setItem('echostars_live_categories_v71', ${JSON.stringify(JSON.stringify(['事業', '營養', '心態思維']))});
         localStorage.setItem('echostars_home_cache_v3_3', ${JSON.stringify(JSON.stringify({
           tracks: seededTracks,
           categories: ['全部', '事業', '營養', '心態思維'],
