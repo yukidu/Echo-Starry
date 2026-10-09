@@ -1,7 +1,5 @@
 const STYLE_ID = 'echostars-v144-guest-cta-filter-preview';
 let syncFrame = 0;
-let registrationObserver: MutationObserver | null = null;
-let registrationTimer = 0;
 
 function isGuestMode() {
   try { return !localStorage.getItem('sq_current_user_v1'); }
@@ -125,53 +123,23 @@ function patchFilterPreview() {
   toolbar.dataset.v144FilterPreview = 'dark';
 }
 
-function findAndOpenGuestProfile() {
-  const identity = document.querySelector<HTMLButtonElement>('.navbar-menu-identity');
-  if (identity) {
-    registrationObserver?.disconnect();
-    registrationObserver = null;
-    if (registrationTimer) window.clearTimeout(registrationTimer);
-    registrationTimer = 0;
-    identity.click();
-    return true;
-  }
-  const login = Array.from(document.querySelectorAll<HTMLButtonElement>('.navbar-menu-footer-button'))
-    .find(button => button.textContent?.trim() === '登入');
-  if (login) {
-    registrationObserver?.disconnect();
-    registrationObserver = null;
-    if (registrationTimer) window.clearTimeout(registrationTimer);
-    registrationTimer = 0;
-    login.click();
-    return true;
-  }
-  return false;
-}
-
 function openGuestRegistration() {
   if (!isGuestMode()) return;
-  if (findAndOpenGuestProfile()) return;
 
-  const hamburger = document.querySelector<HTMLButtonElement>('button[data-main-menu="hamburger"]');
-  if (!hamburger) return;
-  if (hamburger.getAttribute('aria-expanded') !== 'true') hamburger.click();
+  // v149: directly use the app's existing SPA history route. This is stateless and
+  // repeatable, so reopening login never depends on hamburger DOM or a stale observer.
+  const state = { echostars: true, view: 'tab', tab: 'profile' } as const;
+  const currentState = window.history.state as Partial<typeof state> | null;
+  const alreadyProfile =
+    currentState?.echostars === true &&
+    currentState.view === 'tab' &&
+    currentState.tab === 'profile';
 
-  registrationObserver?.disconnect();
-  registrationObserver = new MutationObserver(() => {
-    findAndOpenGuestProfile();
-  });
-  registrationObserver.observe(document.body, { childList: true, subtree: true });
-
-  if (registrationTimer) window.clearTimeout(registrationTimer);
-  registrationTimer = window.setTimeout(() => {
-    if (!findAndOpenGuestProfile()) {
-      registrationObserver?.disconnect();
-      registrationObserver = null;
-    }
-    registrationTimer = 0;
-  }, 2000);
-
-  window.requestAnimationFrame(() => findAndOpenGuestProfile());
+  if (!alreadyProfile) {
+    try { window.history.pushState(state, '', window.location.href); }
+    catch { /* popstate below still opens the profile view */ }
+  }
+  window.dispatchEvent(new PopStateEvent('popstate', { state }));
 }
 
 function sync() {
@@ -192,8 +160,8 @@ installStyles();
 sync();
 
 /*
- * v143 在 document capture 階段攔截 CTA；v144 改在更早的 window capture 階段處理，
- * 保證點擊一定進入有上限（2 秒）的登入／註冊開啟流程，不做無限輪詢。
+ * v143 在 document capture 階段也會處理 CTA；v144/v149 維持更早的 window capture，
+ * 但直接走 App 已有的 profile 歷史路由，不再開漢堡選單、輪詢 DOM 或保存一次性狀態。
  */
 window.addEventListener('click', event => {
   const target = event.target as Element | null;
