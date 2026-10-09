@@ -8,6 +8,7 @@ const sessionRouter = readFileSync(new URL('../worker/sessionCookieRouter.ts', i
 const categoryRouter = readFileSync(new URL('../worker/categoryIntegrityRouter.ts', import.meta.url), 'utf8');
 const organizationRouter = readFileSync(new URL('../worker/organizationRouter.ts', import.meta.url), 'utf8');
 const adminUserDeleteRouter = readFileSync(new URL('../worker/adminUserDeleteRouter.ts', import.meta.url), 'utf8');
+const favoriteRouter = readFileSync(new URL('../worker/favoriteRouter.ts', import.meta.url), 'utf8');
 const privacyRouter = readFileSync(new URL('../worker/privacyCrawlerRouter.ts', import.meta.url), 'utf8');
 const bridge = readFileSync(new URL('../src/googleIdentityBridge.ts', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
@@ -83,7 +84,8 @@ test('changed local progress is eligible for another safe import instead of a pe
 
 test('playback owner stays in the active privacy/member-delete/category/organization/session/preferences wrapper chain', () => {
   assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
-  assert.match(privacyRouter, /import appWorker from '\.\/adminUserDeleteRouter'/);
+  assert.match(privacyRouter, /import appWorker from '\.\/favoriteRouter'/);
+  assert.match(favoriteRouter, /import appWorker from '\.\/adminUserDeleteRouter'/);
   assert.match(adminUserDeleteRouter, /import appWorker from '\.\/categoryIntegrityRouter'/);
   assert.match(categoryRouter, /import appWorker from '\.\/organizationRouter'/);
   assert.match(organizationRouter, /import appWorker from '\.\/stickerRouter'/);
