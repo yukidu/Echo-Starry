@@ -24,7 +24,7 @@ test('visitor conversion teaser compares guest and registered member recording t
 
 test('summon-stars feature remains on the home page', () => {
   assert.match(app, /handleLuckyDraw/);
-  assert.match(app, /招喚繁星/);
+  assert.match(app, /召喚繁星解答/);
 });
 
 test('audio card keeps title first and speaker plus rank second without description text', () => {
