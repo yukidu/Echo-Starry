@@ -1,3 +1,4 @@
+import { userColumns, normalizeMember as normalizeUser } from './memberRepository';
 import { legacyData } from '../shared/legacyData';
 import { formatCommentTimestamp } from '../shared/commentTime';
 import type { Env } from './index';
@@ -13,12 +14,6 @@ const parse = (value: any, fallback: any) => {
   } catch { return fallback; }
 };
 const boolFields = ['rankApproved', 'isContributor', 'isAdminUser', 'isBlocked', 'canUpload'];
-const userColumns: Record<string, string> = {
-  auditedBy: 'TEXT', auditedAt: 'TEXT',
-  residence: 'TEXT', birthday: 'TEXT', approvedRank: 'TEXT', rankAuditType: 'TEXT', canUpload: 'INTEGER DEFAULT 0',
-  playCount: 'INTEGER DEFAULT 0', googleAvatar: 'TEXT', avatarUploadCount: 'INTEGER DEFAULT 0', avatarUploadMonth: 'TEXT',
-  profileEditCount: 'INTEGER DEFAULT 0', profileEditMonth: 'TEXT', zodiac: 'TEXT', talentNumber: 'INTEGER', lifeNumber: 'INTEGER'
-};
 const editable = ['name', 'avatar', 'phone', 'amwayId', 'center', 'rank', 'approvedRank', 'rankApproved', 'rankAuditStatus', 'rankAuditType',
   'joinReason', 'stayReason', 'sponsor', 'platinumUpline', 'diamondUpline', 'birthDate', 'notes', 'rankUpdatedAt', ...Object.keys(userColumns).filter(k => k !== 'googleAvatar')];
 const initialized = new WeakMap<object, Promise<void>>();
@@ -66,14 +61,6 @@ async function ensureSchema(db: any) {
   await initialized.get(db);
 }
 
-function normalizeUser(row: any) {
-  const user = { ...row, birthday: row.birthday ?? row.birthDate ?? '' };
-  if (user.center === '非繁星體系') user.center = '非寰宇體系';
-  boolFields.forEach(k => user[k] = Boolean(user[k]));
-  user.canUpload = Boolean(row.canUpload || row.isContributor);
-  if (user.email?.toLowerCase().trim() === 'yukidu@gmail.com') Object.assign(user, { role: '超級管理員', isAdminUser: true, isContributor: true, canUpload: true });
-  return user;
-}
 function normalizeTrack(row: any) {
   const track = { ...row, isPrivateVip: Boolean(row.isPrivateVip), guestVisible: Boolean(row.guestVisible) };
   ['categories', 'keywords', 'externalVideos', 'externalPpts', 'externalFiles', 'likedBy'].forEach(k => track[k] = parse(row[k], []));

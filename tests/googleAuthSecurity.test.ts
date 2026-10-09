@@ -37,7 +37,7 @@ test('super admin is anchored to the single verified Google email', () => {
 test('browser uses Google Identity Services credential flow and authenticated API sessions', () => {
   assert.match(bridge, /google\.accounts\.id\.initialize/);
   assert.match(bridge, /google\.accounts\.id\.renderButton/);
-  assert.match(bridge, /JSON\.stringify\(\{ credential \}\)/);
+  assert.match(readFileSync(new URL('../src/googleCredentialExchange.ts', import.meta.url), 'utf8'), /JSON\.stringify\(\{ credential \}\)/);
   assert.match(bridge, /headers\.set\('Authorization', `Bearer \$\{token\}`\)/);
   assert.doesNotMatch(bridge, /initTokenClient/);
   assert.match(profile, /initTokenClient/); // old Profile UI remains behind the verified bridge

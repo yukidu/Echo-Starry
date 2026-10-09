@@ -1,5 +1,6 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import appWorker from './shareRouter';
+import { syncVerifiedMember, MemberIdentityError, normalizeMember } from './memberRepository';
 import type { Env } from './index';
 
 const GOOGLE_CLIENT_ID = '400699489182-lb412nhvj4s6t1qr5ovkg40hc646dq79.apps.googleusercontent.com';
@@ -152,47 +153,18 @@ async function requestBody(request: Request) {
 
 async function handleGoogleLogin(request: Request, env: Env) {
   if (!env.DB) return json({ error: '資料庫尚未連線' }, 503);
+  const requestId = crypto.randomUUID();
+  let stage = 'credential';
+  const startedAt = Date.now();
   try {
     const body = await requestBody(request);
     const identity = await verifyGoogleCredential(String(body.credential || ''));
+    stage = 'member';
     await ensureAuthSchema(env.DB);
 
-    const subjectOwner: any = await env.DB.prepare(
-      'SELECT id, email FROM users WHERE googleSubject = ? LIMIT 1'
-    ).bind(identity.subject).first();
-    if (subjectOwner && normalizeEmail(subjectOwner.email) !== identity.email) {
-      return json({ error: '此 Google 帳號的 Email 已變更，請聯絡管理員重新綁定。' }, 409);
-    }
+    const data = await syncVerifiedMember(env.DB, identity);
 
-    const emailOwner: any = await env.DB.prepare(
-      'SELECT id, googleSubject FROM users WHERE LOWER(TRIM(email)) = ? LIMIT 1'
-    ).bind(identity.email).first();
-    if (emailOwner?.googleSubject && String(emailOwner.googleSubject) !== identity.subject) {
-      return json({ error: '此 Email 已綁定另一個 Google 帳號。' }, 409);
-    }
-
-    const verifiedRequest = new Request(new URL('/api/users/google-sync', request.url), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: identity.email,
-        name: identity.name,
-        avatar: identity.avatar
-      })
-    });
-    const response = await appWorker.fetch(verifiedRequest, env);
-    const data: any = await response.clone().json().catch(() => ({}));
-    if (!response.ok || !data?.user?.id) return response;
-
-    await env.DB.prepare(
-      'UPDATE users SET googleSubject = ? WHERE id = ? AND (googleSubject IS NULL OR googleSubject = ? OR googleSubject = \'\')'
-    ).bind(identity.subject, data.user.id, identity.subject).run();
-
-    const saved: any = await env.DB.prepare('SELECT googleSubject FROM users WHERE id = ?').bind(data.user.id).first();
-    if (String(saved?.googleSubject || '') !== identity.subject) {
-      return json({ error: 'Google 帳號綁定衝突，請聯絡管理員。' }, 409);
-    }
-
+    stage = 'session';
     const session = await createSession(env.DB, data.user.id);
     return json({
       ...data,
@@ -200,8 +172,14 @@ async function handleGoogleLogin(request: Request, env: Env) {
       sessionExpiresAt: session.expiresAt
     });
   } catch (error) {
-    console.warn('Google credential verification failed:', error);
-    return json({ error: 'Google 登入驗證失敗，請重新選擇 Google 帳號。' }, 401);
+    const code = String((error as any)?.code || '');
+    const temporary = stage !== 'credential' || code === 'ERR_JWKS_TIMEOUT' || error instanceof TypeError;
+    const status = error instanceof MemberIdentityError ? error.status : temporary ? 503 : 401;
+    // Never log credentials, profiles or session tokens.
+    console.warn('Google login failed', { requestId, stage, status, code, elapsedMs: Date.now() - startedAt });
+    return json({ requestId, code: status === 503 ? 'LOGIN_SERVICE_UNAVAILABLE' : 'LOGIN_REJECTED',
+      error: error instanceof MemberIdentityError ? error.message : status === 503
+        ? '登入服務暫時忙碌，請稍後重試。' : 'Google 登入驗證失敗，請重新選擇 Google 帳號。' }, status);
   }
 }
 
@@ -376,7 +354,27 @@ export default {
       const user = await sessionUser(request, env);
       if (!user) return json({ authenticated: false }, 401);
       const { __sessionExpiresAt, googleSubject, ...publicUser } = user;
-      return json({ authenticated: true, user: publicUser, sessionExpiresAt: __sessionExpiresAt });
+      return json({ authenticated: true, user: normalizeMember(publicUser), sessionExpiresAt: __sessionExpiresAt });
+    }
+
+    // Private member fields are available only to the owner or authorized staff.
+    if (method === 'GET' && ['/api/users', '/api/users/profile', '/api/users/activity-logs'].includes(path)) {
+      const user = await sessionUser(request, env);
+      if (!user) return json({ error: '請先登入會員' }, 401);
+      const staff = isSuperAdmin(user) || Boolean(user.isAdminUser) || user.role === '獎銜審核員' || user.role === '管理員';
+      if (path === '/api/users/activity-logs' && !staff) return json({ error: '沒有會員管理權限' }, 403);
+      if (path === '/api/users/profile' && !staff) {
+        const id = url.searchParams.get('id');
+        const email = url.searchParams.get('email');
+        if ((email && normalizeEmail(email) !== normalizeEmail(user.email)) ||
+            (!email && id !== String(user.id))) return json({ error: '只能讀取自己的完整資料' }, 403);
+      }
+      if (path === '/api/users' && !staff) {
+        const { results } = await env.DB.prepare(
+          'SELECT id, name, avatar, rank, approvedRank, rankApproved, center FROM users WHERE COALESCE(isBlocked,0) = 0'
+        ).all();
+        return json((results || []).map((member: any) => member.id === user.id ? normalizeMember(user) : member));
+      }
     }
 
     let nextRequest = request;

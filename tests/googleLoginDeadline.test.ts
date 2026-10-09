@@ -26,7 +26,7 @@ test('verified login does not wait for optional playback import and always relea
   const bridge = readFileSync(new URL('../src/googleIdentityBridge.ts', import.meta.url), 'utf8');
   const login = bridge.slice(bridge.indexOf('async function handleGoogleCredential'), bridge.indexOf('function ensureGoogleInitialized'));
   assert.match(login, /if \(loginInFlight\) return/);
-  assert.match(login, /withGoogleLoginDeadline/);
+  assert.match(login, /exchangeGoogleCredential/);
   assert.doesNotMatch(login, /await claimLocalPlayback/);
   assert.match(login, /finally \{\s*loginInFlight = false/);
 });

@@ -1,4 +1,6 @@
-import { withGoogleLoginDeadline } from './googleLoginDeadline';
+import { exchangeGoogleCredential } from './googleCredentialExchange';
+import { shouldDiscardSession } from './authSessionPolicy';
+import { discardCachedIdentity } from './sessionCache';
 import { GOOGLE_CLIENT_ID } from './config/auth';
 
 declare global {
@@ -184,7 +186,7 @@ async function validateCachedSession() {
   // Security migration: legacy localStorage identities were never backed by a
   // verified Google session. Force one clean Google sign-in after this release.
   if (!user._authToken) {
-    localStorage.removeItem(USER_KEY);
+    discardCachedIdentity();
     sessionStorage.removeItem(SESSION_CHECK_KEY);
     return;
   }
@@ -200,14 +202,15 @@ async function validateCachedSession() {
       headers: { Authorization: `Bearer ${user._authToken}` },
       cache: 'no-store'
     });
-    if (!response.ok) {
-      localStorage.removeItem(USER_KEY);
+    if (shouldDiscardSession(response.status, user._authToken, authToken())) {
+      discardCachedIdentity();
       sessionStorage.removeItem(SESSION_CHECK_KEY);
       window.location.reload();
       return;
     }
+    if (!response.ok || authToken() !== user._authToken) return;
     sessionStorage.setItem(SESSION_CHECK_KEY, String(Date.now()));
-    await claimLocalPlayback(user);
+    void claimLocalPlayback(user);
   } catch {
     // Offline use remains available. Do not sign a user out merely because the
     // network is temporarily unavailable. The claim will retry when online.
@@ -273,20 +276,7 @@ async function handleGoogleCredential(response: any) {
   loginInFlight = true;
   setStatus('登入中請稍後');
   try {
-    const { result, data } = await withGoogleLoginDeadline(async signal => {
-      const result = await originalFetch('/api/users/google-sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential }),
-        signal,
-        cache: 'no-store'
-      });
-      const data = await result.json().catch(() => ({}));
-      return { result, data };
-    });
-    if (!result.ok || !data?.user || !data?.authToken) {
-      throw new Error(data?.error || 'Google 登入失敗，請稍後重試。');
-    }
+    const data = await exchangeGoogleCredential(credential, originalFetch);
 
     const user = {
       ...data.user,
