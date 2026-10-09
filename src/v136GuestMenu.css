@@ -19,21 +19,17 @@
   margin-bottom: 0.125rem !important;
 }
 
-/* Keep the theme wording at exactly the same inherited size/weight as every menu item. */
+/* v154: React owns the theme action wording.
+   The old v136 pseudo-element used a fixed 「開燈/關燈」 string and hid the
+   real React text, which is why later React fixes never became visible. */
 .mobile-menu-panel[data-react-menu] .mobile-menu-row:has(.lucide-moon, .lucide-sun) > button:last-child > span {
-  position: relative;
+  position: static;
   font-size: inherit !important;
   line-height: inherit !important;
-  visibility: hidden;
+  visibility: visible !important;
 }
 
 .mobile-menu-panel[data-react-menu] .mobile-menu-row:has(.lucide-moon, .lucide-sun) > button:last-child > span::after {
-  content: "開燈/關燈";
-  position: absolute;
-  left: 0;
-  top: 0;
-  visibility: visible;
-  font: inherit;
-  line-height: inherit;
-  white-space: nowrap;
+  content: none !important;
+  display: none !important;
 }
