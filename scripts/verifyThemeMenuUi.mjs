@@ -5,6 +5,7 @@ const APP_URL = process.env.ECHOSTARS_UI_CHECK_URL || 'http://127.0.0.1:4173/';
 const DEBUG_PORT = Number(process.env.ECHOSTARS_CHROME_DEBUG_PORT || 9222);
 const SCREENSHOT_BEFORE = '/tmp/echostars-theme-menu-before.png';
 const SCREENSHOT_AFTER = '/tmp/echostars-theme-menu-after.png';
+const DEBUG_JSON = '/tmp/echostars-theme-menu-debug.json';
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -132,6 +133,31 @@ async function main() {
       await writeFile(path, Buffer.from(shot.data, 'base64'));
     };
 
+    const captureThemeRowBase64 = async () => {
+      const rect = await evaluate(`(() => {
+        const panel = document.querySelector('.mobile-menu-panel');
+        const icon = panel?.querySelector('svg.lucide-moon, svg.lucide-sun');
+        const button = icon?.closest('button');
+        const row = button?.closest('.mobile-menu-row') || button;
+        if (!row) return null;
+        const r = row.getBoundingClientRect();
+        return {
+          x: Math.max(0, r.x - 6),
+          y: Math.max(0, r.y - 6),
+          width: Math.min(innerWidth - Math.max(0, r.x - 6), r.width + 12),
+          height: Math.min(innerHeight - Math.max(0, r.y - 6), r.height + 12)
+        };
+      })()`);
+      if (!rect || rect.width <= 0 || rect.height <= 0) return '';
+      const shot = await send('Page.captureScreenshot', {
+        format: 'jpeg',
+        quality: 70,
+        captureBeyondViewport: false,
+        clip: { ...rect, scale: 1 }
+      });
+      return shot.data || '';
+    };
+
     await send('Page.enable');
     await send('Runtime.enable');
     await send('Page.navigate', { url: APP_URL });
@@ -139,6 +165,7 @@ async function main() {
 
     await evaluate(`document.querySelector('button[data-main-menu="hamburger"]')?.click()`);
     await waitFor('!!document.querySelector(".mobile-menu-panel")', 'hamburger menu');
+    await delay(200);
 
     const readThemeState = async () => evaluate(`(() => {
       const panel = document.querySelector('.mobile-menu-panel');
@@ -146,13 +173,29 @@ async function main() {
       const icon = panel.querySelector('svg.lucide-moon, svg.lucide-sun');
       const button = icon?.closest('button');
       if (!icon || !button) return null;
+      const span = button.querySelector('span');
       const kind = icon.classList.contains('lucide-moon') ? 'moon' : icon.classList.contains('lucide-sun') ? 'sun' : 'unknown';
+      const buttonStyle = getComputedStyle(button);
+      const spanStyle = span ? getComputedStyle(span) : null;
       return {
         kind,
         text: button.innerText.trim().replace(/\\s+/g, ' '),
+        textContent: (button.textContent || '').trim().replace(/\\s+/g, ' '),
+        spanText: span ? span.innerText.trim().replace(/\\s+/g, ' ') : null,
+        spanTextContent: span ? (span.textContent || '').trim().replace(/\\s+/g, ' ') : null,
+        ariaLabel: button.getAttribute('aria-label'),
+        buttonDisplay: buttonStyle.display,
+        buttonVisibility: buttonStyle.visibility,
+        buttonOpacity: buttonStyle.opacity,
+        spanDisplay: spanStyle?.display || null,
+        spanVisibility: spanStyle?.visibility || null,
+        spanOpacity: spanStyle?.opacity || null,
+        spanFontSize: spanStyle?.fontSize || null,
         width: Math.round(button.getBoundingClientRect().width),
+        height: Math.round(button.getBoundingClientRect().height),
         panelWidth: Math.round(panel.getBoundingClientRect().width),
-        overflow: button.scrollWidth > button.clientWidth + 1
+        overflow: button.scrollWidth > button.clientWidth + 1,
+        html: button.outerHTML
       };
     })()`);
 
@@ -160,33 +203,43 @@ async function main() {
       if (!state) throw new Error('Theme action button was not found in the rendered menu.');
       const expected = state.kind === 'moon' ? '關燈' : state.kind === 'sun' ? '開燈' : null;
       if (!expected) throw new Error(`Unexpected theme icon state: ${JSON.stringify(state)}`);
-      if (state.text !== expected) {
-        throw new Error(`Theme action label mismatch. icon=${state.kind}, expected=${expected}, visible=${state.text}`);
+      if (state.text !== expected || state.spanText !== expected || state.textContent !== expected) {
+        throw new Error(`Theme action label mismatch. expected=${expected}, rendered=${JSON.stringify(state)}`);
       }
-      if (state.text.includes('/') || state.text.includes('／')) {
-        throw new Error(`Legacy combined label is still visible: ${state.text}`);
+      if (state.text.includes('/') || state.text.includes('／') || state.textContent.includes('/') || state.textContent.includes('／')) {
+        throw new Error(`Legacy combined label is still visible/present: ${JSON.stringify(state)}`);
+      }
+      if (state.spanDisplay === 'none' || state.spanVisibility === 'hidden' || state.spanOpacity === '0' || state.spanFontSize === '0px') {
+        throw new Error(`Theme action label is not visibly rendered: ${JSON.stringify(state)}`);
       }
       if (state.overflow) throw new Error(`Theme action row overflows its button: ${JSON.stringify(state)}`);
       return expected;
     };
 
     const before = await readThemeState();
-    const beforeExpected = assertState(before);
     await capture(SCREENSHOT_BEFORE);
+    const beforeCrop = await captureThemeRowBase64();
+    console.log(`THEME_ROW_BEFORE=${JSON.stringify(before)}`);
+    if (beforeCrop) console.log(`THEME_ROW_BEFORE_JPEG_BASE64=${beforeCrop}`);
+    const beforeExpected = assertState(before);
 
     await evaluate(`(() => {
       const icon = document.querySelector('.mobile-menu-panel svg.lucide-moon, .mobile-menu-panel svg.lucide-sun');
       icon?.closest('button')?.click();
     })()`);
-    await delay(250);
+    await delay(300);
 
     const after = await readThemeState();
+    await capture(SCREENSHOT_AFTER);
+    const afterCrop = await captureThemeRowBase64();
+    console.log(`THEME_ROW_AFTER=${JSON.stringify(after)}`);
+    if (afterCrop) console.log(`THEME_ROW_AFTER_JPEG_BASE64=${afterCrop}`);
     const afterExpected = assertState(after);
     if (before.kind === after.kind || beforeExpected === afterExpected) {
       throw new Error(`Theme toggle did not change action state. before=${JSON.stringify(before)} after=${JSON.stringify(after)}`);
     }
-    await capture(SCREENSHOT_AFTER);
 
+    await writeFile(DEBUG_JSON, JSON.stringify({ before, after }, null, 2), 'utf8');
     console.log(`Browser UI verified: ${before.kind} -> ${before.text}; ${after.kind} -> ${after.text}`);
     console.log(`Screenshots: ${SCREENSHOT_BEFORE}, ${SCREENSHOT_AFTER}`);
 
