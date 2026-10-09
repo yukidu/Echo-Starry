@@ -7,7 +7,7 @@ const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8'
 
 test('v150 hamburger theme label describes the next action', () => {
   assert.match(visual, /classList\.contains\('dark'\) \? '開燈' : '關燈'/);
-  assert.match(visual, /THEME_LABELS = new Set\(\['淺色／暗色切換', '開燈', '關燈'\]\)/);
+  assert.match(visual, /THEME_LABELS = new Set\(\['淺色／暗色切換', '開燈', '關燈', '開燈\/關燈', '開燈／關燈'\]\)/);
   assert.match(visual, /label\.textContent = nextLabel/);
   assert.match(visual, /attributeFilter: \['class'\]/);
 });
