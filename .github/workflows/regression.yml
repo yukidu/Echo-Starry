@@ -90,18 +90,26 @@ jobs:
           fi
 
           # Headless Chrome can very occasionally fail to expose its debug port on a hosted runner.
-          # Retry the real browser check once only; the second failure remains a hard failure.
+          # Retry each real browser check once only; the second failure remains a hard failure.
           if ! node scripts/verifyThemeMenuUi.mjs; then
-            echo "Browser UI check startup failed once; retrying one final time."
+            echo "Theme browser UI check startup failed once; retrying one final time."
             sleep 2
             node scripts/verifyThemeMenuUi.mjs
+          fi
+
+          if ! node scripts/verifyCategoryFilterUi.mjs; then
+            echo "Category browser UI check startup failed once; retrying one final time."
+            sleep 2
+            node scripts/verifyCategoryFilterUi.mjs
           fi
 
       - name: Upload browser UI evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: theme-menu-ui-${{ github.sha }}
-          path: /tmp/echostars-theme-*
+          name: browser-ui-${{ github.sha }}
+          path: |
+            /tmp/echostars-theme-*
+            /tmp/echostars-category-*
           if-no-files-found: ignore
           retention-days: 7

@@ -219,6 +219,11 @@ function findOriginalButton(label: string) {
   return originalButtons().find(button => (button.textContent || '').replace(/\s+/g, '').startsWith(label));
 }
 
+function findOriginalCategoryButton() {
+  const buttons = originalButtons();
+  return buttons.length ? buttons[buttons.length - 1] : undefined;
+}
+
 function currentSortDirection(button: HTMLButtonElement) {
   if (button.querySelector('.lucide-arrow-down')) return 'desc';
   if (button.querySelector('.lucide-arrow-up')) return 'asc';
@@ -269,13 +274,16 @@ function setOriginalSort(label: string, direction: SortDirection) {
 
 function setOriginalCategory(category: string) {
   const toolbar = getOriginalToolbar();
-  const categoryButton = findOriginalButton('分類');
+  const categoryButton = findOriginalCategoryButton();
   if (!toolbar || !categoryButton) return;
 
   let attempt = 0;
   const choose = () => {
-    const option = Array.from(toolbar.querySelectorAll<HTMLButtonElement>('button'))
-      .find(button => button !== categoryButton && button.textContent?.trim() === category);
+    const liveToolbar = getOriginalToolbar();
+    const liveCategoryButton = findOriginalCategoryButton();
+    if (!liveToolbar || !liveCategoryButton) return;
+    const option = Array.from(liveToolbar.querySelectorAll<HTMLButtonElement>('button'))
+      .find(button => button !== liveCategoryButton && button.textContent?.trim() === category);
     if (option) {
       option.click();
       categoryLabel = category === '全部' ? '全部分類' : category;
@@ -283,12 +291,12 @@ function setOriginalCategory(category: string) {
       queueSync();
       return;
     }
-    if (attempt === 0) categoryButton.click();
+    if (attempt === 0) liveCategoryButton.click();
     attempt += 1;
     if (attempt < 9) {
       window.setTimeout(choose, 45);
     } else {
-      const openedCategoryButton = findOriginalButton('分類');
+      const openedCategoryButton = findOriginalCategoryButton();
       if (openedCategoryButton?.getAttribute('aria-expanded') === 'true') openedCategoryButton.click();
     }
   };
