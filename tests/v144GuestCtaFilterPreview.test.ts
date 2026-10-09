@@ -14,12 +14,14 @@ test('v144 guest statistics copy exactly follows the requested wording', () => {
   assert.match(visual, /font-size: \.92rem !important/);
 });
 
-test('v144 registration CTA uses an earlier bounded capture path instead of an unbounded retry loop', () => {
+test('v149 registration CTA uses the app profile route directly and is repeatable', () => {
   assert.match(visual, /window\.addEventListener\('click',[\s\S]*true\);/);
   assert.match(visual, /event\.stopPropagation\(\)/);
-  assert.match(visual, /button\[data-main-menu="hamburger"\]/);
-  assert.match(visual, /new MutationObserver/);
-  assert.match(visual, /}, 2000\)/);
+  assert.match(visual, /window\.history\.pushState\(state, '', window\.location\.href\)/);
+  assert.match(visual, /new PopStateEvent\('popstate', \{ state \}\)/);
+  assert.match(visual, /tab: 'profile'/);
+  assert.doesNotMatch(visual, /registrationObserver|registrationTimer|findAndOpenGuestProfile/);
+  assert.doesNotMatch(visual, /button\[data-main-menu="hamburger"\]|navbar-menu-identity/);
   assert.doesNotMatch(visual, /setInterval|while\s*\(/);
 });
 
