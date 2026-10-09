@@ -1,8 +1,9 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
+import net from 'node:net';
 
 const APP_URL = process.env.ECHOSTARS_UI_CHECK_URL || 'http://127.0.0.1:4173/';
-const DEBUG_PORT = Number(process.env.ECHOSTARS_CATEGORY_CHROME_DEBUG_PORT || 9223);
+const REQUESTED_DEBUG_PORT = Number(process.env.ECHOSTARS_CATEGORY_CHROME_DEBUG_PORT || 0);
 const DEBUG_JSON = '/tmp/echostars-category-filter-debug.json';
 
 function delay(ms) {
@@ -17,6 +18,24 @@ function resolveChromeBinary() {
     if (probe.status === 0 && probe.stdout.trim()) return probe.stdout.trim();
   }
   throw new Error(`Chrome/Chromium not found. Checked: ${candidates.join(', ')}`);
+}
+
+async function getFreePort() {
+  if (REQUESTED_DEBUG_PORT > 0) return REQUESTED_DEBUG_PORT;
+  return await new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.unref();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      server.close(error => {
+        if (error) reject(error);
+        else if (!port) reject(new Error('Could not allocate a Chrome debug port.'));
+        else resolve(port);
+      });
+    });
+  });
 }
 
 async function waitForJson(url, attempts = 60) {
@@ -36,11 +55,12 @@ async function waitForJson(url, attempts = 60) {
 
 async function main() {
   const chromeBinary = resolveChromeBinary();
+  const debugPort = await getFreePort();
   const userDataDir = `/tmp/echostars-category-ui-${process.pid}`;
   const chrome = spawn(chromeBinary, [
     '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--hide-scrollbars',
     '--window-size=412,915', '--remote-debugging-address=127.0.0.1',
-    `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${userDataDir}`, 'about:blank'
+    `--remote-debugging-port=${debugPort}`, `--user-data-dir=${userDataDir}`, 'about:blank'
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
 
   let chromeErrors = '';
@@ -50,8 +70,9 @@ async function main() {
   });
 
   try {
-    await waitForJson(`http://127.0.0.1:${DEBUG_PORT}/json/version`);
-    const targetResponse = await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/new?about%3Ablank`, { method: 'PUT' });
+    console.log(`Category UI Chrome debug port: ${debugPort}`);
+    await waitForJson(`http://127.0.0.1:${debugPort}/json/version`);
+    const targetResponse = await fetch(`http://127.0.0.1:${debugPort}/json/new?about%3Ablank`, { method: 'PUT' });
     if (!targetResponse.ok) throw new Error(`Could not open browser target: ${targetResponse.status}`);
     const target = await targetResponse.json();
     if (!target.webSocketDebuggerUrl) throw new Error('Browser target did not expose a DevTools websocket.');
