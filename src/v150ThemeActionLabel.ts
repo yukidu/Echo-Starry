@@ -1,4 +1,4 @@
-const THEME_LABELS = new Set(['淺色／暗色切換', '開燈', '關燈']);
+const THEME_LABELS = new Set(['淺色／暗色切換', '開燈', '關燈', '開燈/關燈', '開燈／關燈']);
 let syncFrame = 0;
 
 function desiredThemeActionLabel() {
