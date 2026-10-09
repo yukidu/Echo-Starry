@@ -6,13 +6,13 @@ const navbar = readFileSync(new URL('../src/components/Navbar.tsx', import.meta.
 const navbarCss = readFileSync(new URL('../src/components/Navbar.css', import.meta.url), 'utf8');
 const quickPrefs = readFileSync(new URL('../src/quickShortcutPreferences.ts', import.meta.url), 'utf8');
 
-test('v125 keeps font and theme available in both toolbar rendering and hamburger menu', () => {
+test('v152 keeps font and dynamic theme action available in both toolbar rendering and hamburger menu', () => {
   assert.match(navbar, /data-echostars-top-toolbar="true"/);
   assert.match(navbar, /renderPinControl\('font', '字體'\)/);
-  assert.match(navbar, /renderPinControl\('theme', '淺色／暗色切換'\)/);
+  assert.match(navbar, /const themeActionLabel = isDark \? '開燈' : '關燈'/);
+  assert.match(navbar, /renderPinControl\('theme', themeActionLabel\)/);
   assert.match(navbar, /aria-label="縮小字體"/);
   assert.match(navbar, /aria-label="放大字體"/);
-  assert.match(navbar, /淺色／暗色切換/);
 });
 
 test('v123 removes the old separate shortcut customizer and keeps font zoom local', () => {
