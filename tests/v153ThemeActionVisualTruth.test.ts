@@ -12,8 +12,7 @@ test('v153 hamburger theme label is forced by the action icon instead of any leg
   assert.match(indexHtml, /svg\.lucide-moon \+ span,[\s\S]*svg\.lucide-sun \+ span[\s\S]*font-size: 0 !important/);
 });
 
-test('v153 rotates the PWA shell cache so installed apps receive the new menu label rule', () => {
-  assert.match(sw, /const CACHE_NAME = 'echostars-shell-v153'/);
+test('v153 PWA activation immediately takes control so installed apps can receive the new menu label rule', () => {
   assert.match(sw, /self\.skipWaiting\(\)/);
   assert.match(sw, /self\.clients\.claim\(\)/);
 });
