@@ -1,16 +1,34 @@
 const STYLE_ID = 'echostars-v145-four-filter-toolbar';
 const HOME_CACHE_KEY = 'echostars_home_cache_v3_3';
-const RESTORE_CODE = 'FILTER-RESTORE-145';
 let syncFrame = 0;
 let categoryLabel = '全部分類';
+let categoryWasChosen = false;
 let openMenuKey = '';
+let activeSortGroup: '' | 'time' | 'popular' | 'advanced' = '';
+let timeModeIndex = 0;
+let popularModeIndex = 0;
+
+type SortDirection = 'asc' | 'desc';
+type SortMode = { label: string; originalLabel?: string; direction?: SortDirection; favorite?: boolean };
+type CachedTrack = { id?: string; favoriteCount?: number };
+
+const TIME_MODES: SortMode[] = [
+  { label: '最新上架', originalLabel: '時間', direction: 'desc' },
+  { label: '最早上架', originalLabel: '時間', direction: 'asc' }
+];
+
+const POPULAR_MODES: SortMode[] = [
+  { label: '評價最高', originalLabel: '評價', direction: 'desc' },
+  { label: '按讚最多', originalLabel: '按讚', direction: 'desc' },
+  { label: '心得最多', originalLabel: '心得', direction: 'desc' },
+  { label: '收藏人數', favorite: true }
+];
 
 function installStyles() {
   if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
-    /* ${RESTORE_CODE}: remove/disable only this v145 toolbar layer to restore the previous filter row. */
     .v141-member-teaser-summary .v141-member-teaser-unlock {
       flex: 0 0 76% !important;
       width: 76% !important;
@@ -51,26 +69,34 @@ function installStyles() {
       min-width: 0;
       padding: 0 .55rem;
       border-radius: 15px;
-      border: 1px solid #41506a;
-      background: linear-gradient(180deg,#1d293b 0%,#111827 100%);
-      color: #f8fafc;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 8px 18px rgba(2,6,23,.25);
+      border: 1px solid color-mix(in srgb,var(--color-primary,#c06c84) 64%,white);
+      background: var(--color-primary,#c06c84);
+      color: #fff;
+      box-shadow: 0 8px 18px color-mix(in srgb,var(--color-primary,#c06c84) 24%,transparent);
       display: flex;
       align-items: center;
       justify-content: center;
       gap: .28rem;
       font-size: .78rem;
-      font-weight: 850;
+      font-weight: 900;
       line-height: 1;
       white-space: nowrap;
       cursor: pointer;
-      transition: border-color .15s ease, background .15s ease, transform .15s ease, box-shadow .15s ease;
+      transition: border-color .15s ease, background .15s ease, transform .15s ease, box-shadow .15s ease, filter .15s ease;
     }
     .v145-filter-button:hover,
     .v145-filter-button[data-open="true"] {
-      border-color: color-mix(in srgb,var(--color-primary,#c06c84) 68%,#64748b);
-      background: linear-gradient(180deg,#26364e 0%,#172033 100%);
-      box-shadow: 0 0 0 1px color-mix(in srgb,var(--color-primary,#c06c84) 18%,transparent), 0 9px 20px rgba(2,6,23,.28);
+      filter: brightness(1.08);
+      border-color: color-mix(in srgb,var(--color-primary,#c06c84) 44%,white);
+    }
+    .v145-filter-button[data-active="true"] {
+      background: color-mix(in srgb,var(--color-primary,#c06c84) 70%,white);
+      border-color: #fff;
+      box-shadow:
+        0 0 0 3px color-mix(in srgb,var(--color-primary,#c06c84) 26%,transparent),
+        0 10px 24px color-mix(in srgb,var(--color-primary,#c06c84) 42%,transparent);
+      transform: translateY(-1px);
+      filter: saturate(1.16) brightness(1.08);
     }
     .v145-filter-button:active { transform: scale(.98); }
     .v145-filter-button-label {
@@ -82,7 +108,7 @@ function installStyles() {
     .v145-filter-chevron {
       flex: 0 0 auto;
       font-size: .72rem;
-      color: #cbd5e1;
+      color: rgba(255,255,255,.9);
       transform: translateY(-1px);
     }
     .v145-filter-sliders {
@@ -100,14 +126,13 @@ function installStyles() {
       max-width: min(78vw, 260px);
       padding: .35rem;
       border-radius: 14px;
-      border: 1px solid #334155;
-      background: rgba(15,23,42,.98);
-      color: #f8fafc;
-      box-shadow: 0 16px 36px rgba(2,6,23,.42);
+      border: 1px solid color-mix(in srgb,var(--color-primary,#c06c84) 56%,white);
+      background: color-mix(in srgb,var(--color-primary,#c06c84) 84%,#111827);
+      color: #fff;
+      box-shadow: 0 16px 36px color-mix(in srgb,var(--color-primary,#c06c84) 34%,transparent);
       backdrop-filter: blur(14px);
       z-index: 260;
     }
-    .v145-filter-group:nth-child(3) .v145-filter-menu,
     .v145-filter-group:nth-child(4) .v145-filter-menu { left: auto; right: 0; }
     .v145-filter-menu button {
       width: 100%;
@@ -115,25 +140,19 @@ function installStyles() {
       border-radius: 10px;
       padding: .62rem .7rem;
       background: transparent;
-      color: #e2e8f0;
+      color: #fff;
       text-align: left;
       font-size: .78rem;
-      font-weight: 750;
+      font-weight: 800;
       white-space: nowrap;
       cursor: pointer;
     }
     .v145-filter-menu button:hover,
-    .v145-filter-menu button:focus-visible {
+    .v145-filter-menu button:focus-visible,
+    .v145-filter-menu button[data-selected="true"] {
       outline: none;
-      background: color-mix(in srgb,var(--color-primary,#c06c84) 22%,#111827);
+      background: color-mix(in srgb,var(--color-primary,#c06c84) 62%,white);
       color: #fff;
-    }
-    .v145-filter-menu-note {
-      padding: .45rem .7rem .25rem;
-      color: #94a3b8;
-      font-size: .64rem;
-      line-height: 1.35;
-      white-space: normal;
     }
 
     @media (max-width: 639px) {
@@ -177,6 +196,15 @@ function readCategories(): string[] {
   }
 }
 
+function readCachedTracks(): CachedTrack[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(HOME_CACHE_KEY) || 'null');
+    return Array.isArray(parsed?.tracks) ? parsed.tracks : [];
+  } catch {
+    return [];
+  }
+}
+
 function getOriginalToolbar() {
   return document.querySelector<HTMLElement>('.sort-toolbar');
 }
@@ -197,7 +225,34 @@ function currentSortDirection(button: HTMLButtonElement) {
   return '';
 }
 
-function setOriginalSort(label: string, direction: 'asc' | 'desc') {
+function clearFavoriteOrder() {
+  document.querySelectorAll<HTMLElement>('[data-track-card-id]').forEach(card => {
+    if (card.dataset.v145FavoriteOrder === '1') {
+      card.style.removeProperty('order');
+      delete card.dataset.v145FavoriteOrder;
+    }
+  });
+}
+
+function applyFavoriteOrder() {
+  const counts = new Map<string, number>();
+  readCachedTracks().forEach(track => {
+    const id = String(track.id || '');
+    if (!id) return;
+    counts.set(id, Math.max(0, Number(track.favoriteCount || 0)));
+  });
+  const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-track-card-id]'));
+  const ranked = cards
+    .map((card, index) => ({ card, index, id: String(card.dataset.trackCardId || ''), count: counts.get(String(card.dataset.trackCardId || '')) || 0 }))
+    .sort((a, b) => b.count - a.count || a.index - b.index);
+  ranked.forEach((item, index) => {
+    item.card.style.order = String(index);
+    item.card.dataset.v145FavoriteOrder = '1';
+  });
+}
+
+function setOriginalSort(label: string, direction: SortDirection) {
+  clearFavoriteOrder();
   let attempt = 0;
   const apply = () => {
     const button = findOriginalButton(label);
@@ -224,6 +279,7 @@ function setOriginalCategory(category: string) {
     if (option) {
       option.click();
       categoryLabel = category === '全部' ? '全部分類' : category;
+      categoryWasChosen = true;
       queueSync();
       return;
     }
@@ -268,10 +324,13 @@ function makeSlidersSvg() {
 function closeMenus() {
   openMenuKey = '';
   document.querySelectorAll<HTMLElement>('[data-v145-menu]').forEach(menu => { menu.hidden = true; });
-  document.querySelectorAll<HTMLButtonElement>('.v145-filter-button').forEach(button => { button.dataset.open = 'false'; });
+  document.querySelectorAll<HTMLButtonElement>('.v145-filter-button').forEach(button => {
+    button.dataset.open = 'false';
+    button.setAttribute('aria-expanded', 'false');
+  });
 }
 
-function createMenu(key: string, entries: Array<{ label: string; run: () => void }>, note?: string) {
+function createMenu(key: string, entries: Array<{ label: string; selected?: () => boolean; run: () => void }>) {
   const menu = document.createElement('div');
   menu.className = 'v145-filter-menu';
   menu.dataset.v145Menu = key;
@@ -280,6 +339,7 @@ function createMenu(key: string, entries: Array<{ label: string; run: () => void
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = entry.label;
+    if (entry.selected?.()) button.dataset.selected = 'true';
     button.addEventListener('click', event => {
       event.stopPropagation();
       closeMenus();
@@ -287,16 +347,10 @@ function createMenu(key: string, entries: Array<{ label: string; run: () => void
     });
     menu.appendChild(button);
   });
-  if (note) {
-    const help = document.createElement('div');
-    help.className = 'v145-filter-menu-note';
-    help.textContent = note;
-    menu.appendChild(help);
-  }
   return menu;
 }
 
-function createFilterGroup(key: string, label: string, menu: HTMLElement, advanced = false) {
+function createMenuGroup(key: string, label: string, menu: HTMLElement, advanced = false) {
   const group = document.createElement('div');
   group.className = 'v145-filter-group';
   group.dataset.v145Group = key;
@@ -306,6 +360,7 @@ function createFilterGroup(key: string, label: string, menu: HTMLElement, advanc
   button.className = 'v145-filter-button';
   button.dataset.v145Button = key;
   button.dataset.open = 'false';
+  button.dataset.active = 'false';
   button.setAttribute('aria-haspopup', 'menu');
   button.setAttribute('aria-expanded', 'false');
 
@@ -315,12 +370,10 @@ function createFilterGroup(key: string, label: string, menu: HTMLElement, advanc
   text.dataset.v145Label = key;
   text.textContent = label;
   button.appendChild(text);
-  if (!advanced) {
-    const chevron = document.createElement('span');
-    chevron.className = 'v145-filter-chevron';
-    chevron.textContent = '▼';
-    button.appendChild(chevron);
-  }
+  const chevron = document.createElement('span');
+  chevron.className = 'v145-filter-chevron';
+  chevron.textContent = '▼';
+  button.appendChild(chevron);
 
   button.addEventListener('click', event => {
     event.stopPropagation();
@@ -338,6 +391,54 @@ function createFilterGroup(key: string, label: string, menu: HTMLElement, advanc
   return group;
 }
 
+function createCycleGroup(key: 'time' | 'popular', label: string, onPress: () => void) {
+  const group = document.createElement('div');
+  group.className = 'v145-filter-group';
+  group.dataset.v145Group = key;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'v145-filter-button';
+  button.dataset.v145Button = key;
+  button.dataset.open = 'false';
+  button.dataset.active = 'false';
+  const text = document.createElement('span');
+  text.className = 'v145-filter-button-label';
+  text.dataset.v145Label = key;
+  text.textContent = label;
+  button.appendChild(text);
+  button.addEventListener('click', event => {
+    event.stopPropagation();
+    closeMenus();
+    onPress();
+  });
+  group.appendChild(button);
+  return group;
+}
+
+function activateTimeCycle() {
+  if (activeSortGroup === 'time') timeModeIndex = (timeModeIndex + 1) % TIME_MODES.length;
+  activeSortGroup = 'time';
+  const mode = TIME_MODES[timeModeIndex];
+  if (mode.originalLabel && mode.direction) setOriginalSort(mode.originalLabel, mode.direction);
+  queueSync();
+}
+
+function activatePopularCycle() {
+  if (activeSortGroup === 'popular') popularModeIndex = (popularModeIndex + 1) % POPULAR_MODES.length;
+  else popularModeIndex = 0;
+  activeSortGroup = 'popular';
+  const mode = POPULAR_MODES[popularModeIndex];
+  if (mode.favorite) applyFavoriteOrder();
+  else if (mode.originalLabel && mode.direction) setOriginalSort(mode.originalLabel, mode.direction);
+  queueSync();
+}
+
+function activateAdvanced(label: string, direction: SortDirection) {
+  activeSortGroup = 'advanced';
+  setOriginalSort(label, direction);
+  queueSync();
+}
+
 function createToolbar() {
   const bar = document.createElement('section');
   bar.className = 'v145-filter-toolbar';
@@ -346,29 +447,21 @@ function createToolbar() {
 
   const categoryMenu = createMenu('category', readCategories().map(category => ({
     label: category === '全部' ? '全部分類' : category,
+    selected: () => categoryLabel === (category === '全部' ? '全部分類' : category),
     run: () => setOriginalCategory(category)
   })));
-  const timeMenu = createMenu('time', [
-    { label: '最新上架', run: () => setOriginalSort('時間', 'desc') },
-    { label: '最早上架', run: () => setOriginalSort('時間', 'asc') }
-  ]);
-  const popularMenu = createMenu('popular', [
-    { label: '評價最高', run: () => setOriginalSort('評價', 'desc') },
-    { label: '按讚最多', run: () => setOriginalSort('按讚', 'desc') },
-    { label: '心得最多', run: () => setOriginalSort('心得', 'desc') }
-  ]);
   const advancedMenu = createMenu('advanced', [
-    { label: '權限：公開 → 高階', run: () => setOriginalSort('權限', 'asc') },
-    { label: '權限：高階 → 公開', run: () => setOriginalSort('權限', 'desc') },
-    { label: '貼紙排序', run: () => setOriginalSort('貼紙', 'asc') },
-    { label: '恢復預設排序', run: () => setOriginalSort('權限', 'asc') }
-  ], `快速復原代碼：${RESTORE_CODE}`);
+    { label: '權限：公開 → 高階', run: () => activateAdvanced('權限', 'asc') },
+    { label: '權限：高階 → 公開', run: () => activateAdvanced('權限', 'desc') },
+    { label: '貼紙排序', run: () => activateAdvanced('貼紙', 'asc') },
+    { label: '恢復預設排序', run: () => activateAdvanced('權限', 'asc') }
+  ]);
 
   bar.append(
-    createFilterGroup('category', categoryLabel, categoryMenu),
-    createFilterGroup('time', '最新上架', timeMenu),
-    createFilterGroup('popular', '熱門推薦', popularMenu),
-    createFilterGroup('advanced', '進階篩選', advancedMenu, true)
+    createMenuGroup('category', categoryLabel, categoryMenu),
+    createCycleGroup('time', TIME_MODES[timeModeIndex].label, activateTimeCycle),
+    createCycleGroup('popular', '熱門推薦', activatePopularCycle),
+    createMenuGroup('advanced', '進階篩選', advancedMenu, true)
   );
   return bar;
 }
@@ -379,7 +472,6 @@ function syncToolbar() {
   if (!original) return;
   original.classList.add('v145-original-sort-engine');
   original.setAttribute('aria-hidden', 'true');
-  original.dataset.v145RestoreCode = RESTORE_CODE;
 
   let custom = document.querySelector<HTMLElement>('[data-v145-filter-toolbar]');
   if (!custom) {
@@ -388,8 +480,30 @@ function syncToolbar() {
   } else if (custom.nextElementSibling !== original) {
     original.before(custom);
   }
-  const categoryText = custom.querySelector<HTMLElement>('[data-v145-label="category"]');
-  if (categoryText && categoryText.textContent !== categoryLabel) categoryText.textContent = categoryLabel;
+
+  const labels: Record<string, string> = {
+    category: categoryLabel,
+    time: TIME_MODES[timeModeIndex].label,
+    popular: activeSortGroup === 'popular' ? POPULAR_MODES[popularModeIndex].label : '熱門推薦',
+    advanced: '進階篩選'
+  };
+  Object.entries(labels).forEach(([key, value]) => {
+    const label = custom?.querySelector<HTMLElement>(`[data-v145-label="${key}"]`);
+    if (label && label.textContent !== value) label.textContent = value;
+  });
+
+  const activeStates: Record<string, boolean> = {
+    category: categoryWasChosen,
+    time: activeSortGroup === 'time',
+    popular: activeSortGroup === 'popular',
+    advanced: activeSortGroup === 'advanced'
+  };
+  Object.entries(activeStates).forEach(([key, active]) => {
+    const button = custom?.querySelector<HTMLButtonElement>(`[data-v145-button="${key}"]`);
+    if (button) button.dataset.active = active ? 'true' : 'false';
+  });
+
+  if (activeSortGroup === 'popular' && POPULAR_MODES[popularModeIndex].favorite) applyFavoriteOrder();
 }
 
 function queueSync() {
@@ -412,6 +526,7 @@ window.addEventListener('pageshow', queueSync);
 window.addEventListener('storage', event => {
   if (event.key === HOME_CACHE_KEY) queueSync();
 });
+window.addEventListener('echostars-favorites-changed', () => window.setTimeout(queueSync, 250));
 
 const observer = new MutationObserver(queueSync);
 observer.observe(document.body, { childList: true, subtree: true });
