@@ -22,6 +22,11 @@ test('visitor conversion teaser compares guest and registered member recording t
   assert.doesNotMatch(visual, /fetch\(/);
 });
 
+test('visitor conversion teaser is removed after a member is logged in', () => {
+  assert.match(visual, /if \(!isGuestMode\(\)\) \{\s*teaser\?\.remove\(\);\s*return;/s);
+  assert.doesNotMatch(visual, /cta\.hidden\s*=\s*!isGuestMode\(\)/);
+});
+
 test('summon-stars feature remains on the home page', () => {
   assert.match(app, /handleLuckyDraw/);
   assert.match(app, /召喚繁星解答/);
