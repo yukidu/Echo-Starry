@@ -56,3 +56,52 @@ jobs:
       - name: Production build
         if: always()
         run: npm run build
+
+      - name: Browser UI check
+        if: always()
+        shell: bash
+        run: |
+          if [ ! -f dist/index.html ]; then
+            echo "dist/index.html missing; production build did not produce a runnable app."
+            exit 1
+          fi
+
+          node scripts/scanThemeLegacy.mjs
+
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/echostars-preview.log 2>&1 &
+          preview_pid=$!
+          cleanup() {
+            kill ${preview_pid} >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          ready=0
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ ${ready} -ne 1 ]; then
+            echo "Vite preview did not become ready."
+            cat /tmp/echostars-preview.log || true
+            exit 1
+          fi
+
+          # Headless Chrome can very occasionally fail to expose its debug port on a hosted runner.
+          # Retry the real browser check once only; the second failure remains a hard failure.
+          if ! node scripts/verifyThemeMenuUi.mjs; then
+            echo "Browser UI check startup failed once; retrying one final time."
+            sleep 2
+            node scripts/verifyThemeMenuUi.mjs
+          fi
+
+      - name: Upload browser UI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: theme-menu-ui-${{ github.sha }}
+          path: /tmp/echostars-theme-*
+          if-no-files-found: ignore
+          retention-days: 7

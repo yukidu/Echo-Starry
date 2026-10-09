@@ -21,27 +21,6 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
-    <style id="echostars-v153-theme-action-label">
-      /* v153: the hamburger theme label is decided by the icon that represents
-         the action the button will perform. This visual rule is independent of
-         any old text node, so a stale "開燈/關燈" string can never remain visible. */
-      .mobile-menu-panel .mobile-menu-row > button > svg.lucide-moon + span,
-      .mobile-menu-panel .mobile-menu-row > button > svg.lucide-sun + span {
-        font-size: 0 !important;
-      }
-      .mobile-menu-panel .mobile-menu-row > button > svg.lucide-moon + span::after {
-        content: "關燈";
-        font-size: 0.875rem;
-        line-height: 1.25rem;
-        font-weight: inherit;
-      }
-      .mobile-menu-panel .mobile-menu-row > button > svg.lucide-sun + span::after {
-        content: "開燈";
-        font-size: 0.875rem;
-        line-height: 1.25rem;
-        font-weight: inherit;
-      }
-    </style>
     <script>
       // v126: personal font zoom starts at 100% and can only grow from there.
       try {

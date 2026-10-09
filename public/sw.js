@@ -1,22 +1,37 @@
-const CACHE_NAME = 'echostars-shell-v153';
+const CACHE_NAME = 'echostars-shell-v154';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-monochrome.svg', '/icon-192.png', '/icon-512.png'];
+const FORCE_STALE_CLIENT_REFRESH = CACHE_NAME === 'echostars-shell-v154';
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
-  // Activate updates quietly in the background without forcing a page reload.
   self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(
-        keys
-          .filter(key => key.startsWith('echostars-shell-') && key !== CACHE_NAME)
-          .map(key => caches.delete(key))
-      ))
-      .then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    const oldShellKeys = keys.filter(key => key.startsWith('echostars-shell-') && key !== CACHE_NAME);
+    const upgradingExistingClient = oldShellKeys.length > 0;
+
+    await Promise.all(oldShellKeys.map(key => caches.delete(key)));
+    await self.clients.claim();
+
+    // v154 recovery: production screenshots proved that a tab can keep running an
+    // older React bundle even after a successful deployment. Cookies are unrelated
+    // to that in-memory app state. Existing clients are therefore navigated once
+    // when this worker replaces an older shell. New visitors are not reloaded.
+    if (FORCE_STALE_CLIENT_REFRESH && upgradingExistingClient) {
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      await Promise.all(windows.map(async client => {
+        if (typeof client.navigate !== 'function') return;
+        try {
+          await client.navigate(client.url);
+        } catch {
+          // A closed/navigating tab is harmless; the next normal open gets v154.
+        }
+      }));
+    }
+  })());
 });
 
 self.addEventListener('fetch', event => {
