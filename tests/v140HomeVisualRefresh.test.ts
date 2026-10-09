@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const visual = readFileSync(new URL('../src/v140HomeVisualRefresh.ts', import.meta.url), 'utf8');
+const visual = readFileSync(new URL('../src/v141HomeVisualRefresh.ts', import.meta.url), 'utf8');
 const card = readFileSync(new URL('../src/components/AudioCard.tsx', import.meta.url), 'utf8');
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
-test('v140 home refresh keeps the random primary palette instead of hard coding the mockup color', () => {
+test('v141 home refresh keeps the random primary palette instead of hard coding the mockup color', () => {
   assert.match(visual, /var\(--color-primary/);
   assert.match(visual, /var\(--theme-card-bg/);
   assert.match(app, /getRandomLightPalette/);
@@ -47,9 +47,18 @@ test('guest zero progress badge is not rendered', () => {
   assert.match(card, /guestProgressPercent > 0/);
 });
 
-test('v140 visual policy loads after v139 compatibility policy', () => {
+test('v141 observer avoids self-triggering microtask loops', () => {
+  assert.match(visual, /requestAnimationFrame/);
+  assert.doesNotMatch(visual, /queueMicrotask/);
+  assert.doesNotMatch(visual, /innerHTML\s*=/);
+  assert.match(visual, /textContent !== guestText/);
+  assert.match(visual, /previousElementSibling !== sortToolbar/);
+});
+
+test('v141 visual policy replaces the broken v140 bootstrap and loads after v139', () => {
   const v139 = indexHtml.indexOf('/src/v139HomeUploadPolish.ts');
-  const v140 = indexHtml.indexOf('/src/v140HomeVisualRefresh.ts');
+  const v141 = indexHtml.indexOf('/src/v141HomeVisualRefresh.ts');
   assert.ok(v139 >= 0);
-  assert.ok(v140 > v139);
+  assert.ok(v141 > v139);
+  assert.doesNotMatch(indexHtml, /v140HomeVisualRefresh\.ts/);
 });
