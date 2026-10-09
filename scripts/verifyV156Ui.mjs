@@ -140,13 +140,17 @@ async function main() {
       pin?.click();
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const topExists = !!document.querySelector('[data-v156-favorites-top]');
-      const livePin = row.querySelector('[data-v156-favorites-pin]');
-      const pinPressed = livePin?.getAttribute('aria-pressed') || '';
+      const livePinnedButton = document.querySelector('[data-v156-favorites-pin][aria-pressed="true"]');
+      const pinPressed = livePinnedButton?.getAttribute('aria-pressed') || '';
+      const pinSelected = !!livePinnedButton?.classList.contains('is-selected');
+      const pinCheckExists = !!livePinnedButton?.querySelector('.v156-favorites-pin-check');
+      const storedPin = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+        .some(key => key?.startsWith('echostars_favorites_top_pin_v156:') && localStorage.getItem(key) === '1');
       row.remove();
       localStorage.removeItem('sq_current_user_v1');
-      return { guestPlaceholder, pinExists, topExists, pinPressed };
+      return { guestPlaceholder, pinExists, topExists, pinPressed, pinSelected, pinCheckExists, storedPin };
     })()`);
-    if (dynamicState.guestPlaceholder !== '按此分享你的心得收穫' || !dynamicState.pinExists || !dynamicState.topExists || dynamicState.pinPressed !== 'true') {
+    if (dynamicState.guestPlaceholder !== '按此分享你的心得收穫' || !dynamicState.pinExists || !dynamicState.topExists || dynamicState.pinPressed !== 'true' || !dynamicState.pinSelected || !dynamicState.pinCheckExists || !dynamicState.storedPin) {
       throw new Error(`Dynamic UI mismatch: ${JSON.stringify(dynamicState)}`);
     }
 
