@@ -14,13 +14,18 @@ function getOriginalToolbar() {
     || document.querySelector<HTMLElement>('.sort-toolbar');
 }
 
-function getOriginalCategoryButton(toolbar: HTMLElement) {
+function getOriginalCategoryButton() {
+  const toolbar = getOriginalToolbar();
+  if (!toolbar) return null;
   return Array.from(toolbar.querySelectorAll<HTMLButtonElement>('.sort-toolbar-item > button'))
     .find(button => (button.textContent || '').replace(/\s+/g, '').startsWith('分類')) || null;
 }
 
-function findOriginalCategoryOption(toolbar: HTMLElement, category: string) {
-  const trigger = getOriginalCategoryButton(toolbar);
+function findOriginalCategoryOption(category: string) {
+  const toolbar = getOriginalToolbar();
+  if (!toolbar) return null;
+  const trigger = Array.from(toolbar.querySelectorAll<HTMLButtonElement>('.sort-toolbar-item > button'))
+    .find(button => (button.textContent || '').replace(/\s+/g, '').startsWith('分類')) || null;
   return Array.from(toolbar.querySelectorAll<HTMLButtonElement>('button'))
     .find(button => button !== trigger && (button.textContent || '').trim() === category) || null;
 }
@@ -30,25 +35,25 @@ function delay(ms: number) {
 }
 
 async function ensureOriginalCategoryOption(category: string, generation: number) {
-  const toolbar = getOriginalToolbar();
-  if (!toolbar) return false;
-
+  // Important: never keep a toolbar DOM reference across React renders.
+  // Opening the original category dropdown can replace that toolbar node.
+  // Re-query the live React DOM every single attempt instead.
   for (let openAttempt = 0; openAttempt < 3; openAttempt += 1) {
     if (generation !== selectionGeneration) return false;
-    if (findOriginalCategoryOption(toolbar, category)) return true;
+    if (findOriginalCategoryOption(category)) return true;
 
-    const trigger = getOriginalCategoryButton(toolbar);
+    const trigger = getOriginalCategoryButton();
     if (!trigger) return false;
     trigger.click();
 
     for (let waitAttempt = 0; waitAttempt < 20; waitAttempt += 1) {
       if (generation !== selectionGeneration) return false;
-      if (findOriginalCategoryOption(toolbar, category)) return true;
+      if (findOriginalCategoryOption(category)) return true;
       await delay(25);
     }
   }
 
-  return Boolean(findOriginalCategoryOption(toolbar, category));
+  return Boolean(findOriginalCategoryOption(category));
 }
 
 function findCurrentCustomOption(category: string) {
@@ -65,12 +70,9 @@ window.addEventListener('click', event => {
   const category = categoryFromLabel(option.textContent || '');
   if (!category) return;
 
-  // v145 originally opened the hidden React dropdown and then tried to find the
-  // requested option with timers. After the first category change, React list
-  // rerenders can race those timers and leave the proxy toolbar stuck on one
-  // category. Pause this click, make the real React option exist first, then
-  // replay the exact v145 click. Its original handler can now select the option
-  // synchronously and update its own label state without a race.
+  // v145 used a timer while holding a React toolbar node that can become stale
+  // as soon as the dropdown opens. Pause the custom click, prepare the option
+  // against the *current* toolbar node, then replay v145's normal click once.
   event.preventDefault();
   event.stopImmediatePropagation();
 
