@@ -138,9 +138,10 @@ async function main() {
       const pin = row.querySelector('[data-v156-favorites-pin]');
       const pinExists = !!pin;
       pin?.click();
-      await new Promise(resolve => setTimeout(resolve, 80));
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const topExists = !!document.querySelector('[data-v156-favorites-top]');
-      const pinPressed = pin?.getAttribute('aria-pressed') || '';
+      const livePin = row.querySelector('[data-v156-favorites-pin]');
+      const pinPressed = livePin?.getAttribute('aria-pressed') || '';
       row.remove();
       localStorage.removeItem('sq_current_user_v1');
       return { guestPlaceholder, pinExists, topExists, pinPressed };
