@@ -55,9 +55,9 @@ test('playable order is stable for one seed and changes when the home-entry seed
   assert.notDeepEqual(first, nextEntry);
 });
 
-test('lucky draw moves the highlighted candidate to the second card without losing tracks', () => {
+test('lucky draw moves the highlighted candidate to the first card without losing tracks', () => {
   const source = ['a', 'b', 'c', 'd'];
-  assert.deepEqual(moveTrackIdToSecondSlot(source, 'd'), ['a', 'd', 'b', 'c']);
+  assert.deepEqual(moveTrackIdToSecondSlot(source, 'd'), ['d', 'a', 'b', 'c']);
   assert.deepEqual(source, ['a', 'b', 'c', 'd']);
   assert.deepEqual(moveTrackIdToSecondSlot(['only'], 'only'), ['only']);
 });
