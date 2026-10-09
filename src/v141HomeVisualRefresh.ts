@@ -241,6 +241,11 @@ function createMemberTeaser() {
 
 function ensureMemberTeaser(homeShell: HTMLElement, sortToolbar: HTMLElement) {
   let teaser = homeShell.querySelector<HTMLElement>('.v141-member-teaser');
+  if (!isGuestMode()) {
+    teaser?.remove();
+    return;
+  }
+
   if (!teaser) {
     teaser = createMemberTeaser();
     sortToolbar.after(teaser);
@@ -257,9 +262,6 @@ function ensureMemberTeaser(homeShell: HTMLElement, sortToolbar: HTMLElement) {
   const memberText = String(memberCount);
   if (guestNode && guestNode.textContent !== guestText) guestNode.textContent = guestText;
   if (memberNode && memberNode.textContent !== memberText) memberNode.textContent = memberText;
-
-  const cta = teaser.querySelector<HTMLButtonElement>('.v141-member-teaser-cta');
-  if (cta) cta.hidden = !isGuestMode();
 }
 
 function syncHomeLayout() {
