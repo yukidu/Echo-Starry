@@ -252,7 +252,7 @@ function searchRow() {
   return homeShell()?.querySelector<HTMLElement>(':scope > .v141-home-search-row') || null;
 }
 
-function labelText(button: Element | null) {
+function labelText(button: Element | null | undefined) {
   return (button?.textContent || '').replace(/\s+/g,'').trim();
 }
 
@@ -303,10 +303,10 @@ function setProxySort(field: string, direction: SortDirection) {
   syncLabels();
 }
 
-function readCachedCategories() {
+function readCachedCategories(): string[] {
   try {
     const parsed = JSON.parse(localStorage.getItem(HOME_CACHE_KEY) || 'null');
-    const values = Array.isArray(parsed?.categories) ? parsed.categories.map(String) : [];
+    const values: string[] = Array.isArray(parsed?.categories) ? parsed.categories.map(String) : [];
     return values.length ? values : ['全部'];
   } catch {
     return ['全部'];
@@ -393,8 +393,9 @@ function buildCategoryMenu(menu: HTMLElement) {
   categoryTimer = window.setTimeout(() => {
     const root = document.getElementById(ROOT_ID);
     const selected = root?.dataset.category || currentCategoryFromOriginal() || '全部';
-    const live = categoryOptionButtons().map(button => labelText(button));
-    const categories = Array.from(new Set((live.length ? live : readCachedCategories()).filter(Boolean)));
+    const live: string[] = categoryOptionButtons().map(button => labelText(button));
+    const source: string[] = live.length ? live : readCachedCategories();
+    const categories: string[] = Array.from(new Set<string>(source.filter(Boolean)));
     menu.replaceChildren(...categories.map(category =>
       createMenuButton(category === '全部' ? '全部分類' : category, () => chooseCategory(category), category === selected)
     ));
