@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#7b2f6f" />
+  <meta name="robots" content="noindex,nofollow,noarchive" />
+  <title>美力之星</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app"></div>
+  <dialog id="submitDialog" class="dialog">
+    <form id="submitForm" method="dialog" class="dialog-card">
+      <div class="dialog-head">
+        <div>
+          <div class="eyebrow">繳交作業</div>
+          <h2 id="submitTitle">作業</h2>
+        </div>
+        <button class="icon-btn" value="cancel" aria-label="關閉">×</button>
+      </div>
+      <input type="hidden" id="assignmentId" />
+      <label>備註<textarea id="note" rows="3" placeholder="可填寫給老師的說明"></textarea></label>
+      <div id="receiptFields" class="receipt-fields hidden">
+        <label>消費日期<input id="receiptDate" type="date" /></label>
+        <label>店家名稱<input id="merchant" type="text" placeholder="店家名稱" /></label>
+        <label>金額<input id="amount" type="number" min="0" step="0.01" placeholder="0" /></label>
+        <label>發票／收據號碼<input id="invoiceNumber" type="text" /></label>
+        <label>分類<input id="receiptCategory" type="text" placeholder="例如：教材、交通、餐費" /></label>
+      </div>
+      <label>選擇檔案<input id="files" type="file" multiple /></label>
+      <div class="hint">支援文件、簡報、照片與影片；大型檔案會自動分段上傳。</div>
+      <div id="uploadProgress" class="progress-wrap hidden"><div id="uploadProgressBar" class="progress-bar"></div><span id="uploadProgressText">準備上傳</span></div>
+      <div class="dialog-actions">
+        <button type="button" class="btn ghost" id="cancelSubmit">取消</button>
+        <button type="button" class="btn primary" id="confirmSubmit">送出作業</button>
+      </div>
+    </form>
+  </dialog>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
