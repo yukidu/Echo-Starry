@@ -5,40 +5,54 @@ import { readFileSync } from 'node:fs';
 const toolbar = readFileSync(new URL('../src/v145FourFilterToolbar.ts', import.meta.url), 'utf8');
 const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
-test('v145 replaces the visible old sort row with exactly four requested top-level controls', () => {
-  assert.match(toolbar, /createFilterGroup\('category', categoryLabel, categoryMenu\)/);
-  assert.match(toolbar, /createFilterGroup\('time', '最新上架', timeMenu\)/);
-  assert.match(toolbar, /createFilterGroup\('popular', '熱門推薦', popularMenu\)/);
-  assert.match(toolbar, /createFilterGroup\('advanced', '進階篩選', advancedMenu, true\)/);
+test('v146 keeps four top-level controls while time and popular are direct cycle buttons', () => {
+  assert.match(toolbar, /createMenuGroup\('category', categoryLabel, categoryMenu\)/);
+  assert.match(toolbar, /createCycleGroup\('time', TIME_MODES\[timeModeIndex\]\.label, activateTimeCycle\)/);
+  assert.match(toolbar, /createCycleGroup\('popular', '熱門推薦', activatePopularCycle\)/);
+  assert.match(toolbar, /createMenuGroup\('advanced', '進階篩選', advancedMenu, true\)/);
   assert.match(toolbar, /grid-template-columns: 1\.08fr 1fr 1fr 1\.12fr/);
-  assert.match(toolbar, /v145-original-sort-engine/);
+  assert.doesNotMatch(toolbar, /const timeMenu = createMenu/);
+  assert.doesNotMatch(toolbar, /const popularMenu = createMenu/);
 });
 
-test('v145 four controls delegate to the existing category and sorting logic instead of duplicating backend work', () => {
-  assert.match(toolbar, /setOriginalCategory\(category\)/);
-  assert.match(toolbar, /setOriginalSort\('時間', 'desc'\)/);
-  assert.match(toolbar, /setOriginalSort\('時間', 'asc'\)/);
-  assert.match(toolbar, /setOriginalSort\('評價', 'desc'\)/);
-  assert.match(toolbar, /setOriginalSort\('按讚', 'desc'\)/);
-  assert.match(toolbar, /setOriginalSort\('心得', 'desc'\)/);
-  assert.match(toolbar, /setOriginalSort\('權限', 'asc'\)/);
-  assert.match(toolbar, /setOriginalSort\('權限', 'desc'\)/);
-  assert.match(toolbar, /setOriginalSort\('貼紙', 'asc'\)/);
+test('v146 cycles upload time between newest and oldest and updates the visible label', () => {
+  assert.match(toolbar, /label: '最新上架', originalLabel: '時間', direction: 'desc'/);
+  assert.match(toolbar, /label: '最早上架', originalLabel: '時間', direction: 'asc'/);
+  assert.match(toolbar, /timeModeIndex = \(timeModeIndex \+ 1\) % TIME_MODES\.length/);
+  assert.match(toolbar, /time: TIME_MODES\[timeModeIndex\]\.label/);
+});
+
+test('v146 popular recommendation cycles four modes including favorite count', () => {
+  assert.match(toolbar, /label: '評價最高', originalLabel: '評價', direction: 'desc'/);
+  assert.match(toolbar, /label: '按讚最多', originalLabel: '按讚', direction: 'desc'/);
+  assert.match(toolbar, /label: '心得最多', originalLabel: '心得', direction: 'desc'/);
+  assert.match(toolbar, /label: '收藏人數', favorite: true/);
+  assert.match(toolbar, /popularModeIndex = \(popularModeIndex \+ 1\) % POPULAR_MODES\.length/);
+  assert.match(toolbar, /favoriteCount/);
+  assert.match(toolbar, /data-track-card-id/);
   assert.doesNotMatch(toolbar, /fetch\(|\/api\//);
 });
 
-test('v145 shortens the registration CTA but keeps the existing registration behavior untouched', () => {
+test('v146 category button follows the selected category name and marks active controls', () => {
+  assert.match(toolbar, /categoryLabel = category === '全部' \? '全部分類' : category/);
+  assert.match(toolbar, /categoryWasChosen = true/);
+  assert.match(toolbar, /button\.dataset\.active = active \? 'true' : 'false'/);
+  assert.match(toolbar, /\.v145-filter-button\[data-active="true"\]/);
+});
+
+test('v146 derives button and dropdown colors from the current palette primary color', () => {
+  assert.match(toolbar, /background: var\(--color-primary,#c06c84\)/);
+  assert.match(toolbar, /color-mix\(in srgb,var\(--color-primary,#c06c84\)/);
+  assert.doesNotMatch(toolbar, /linear-gradient\(180deg,#1d293b/);
+});
+
+test('v146 removes the temporary restore code while keeping the registration CTA width', () => {
+  assert.doesNotMatch(toolbar, /FILTER-RESTORE-145|RESTORE_CODE|快速復原代碼/);
   assert.match(toolbar, /flex: 0 0 76% !important/);
   assert.match(toolbar, /max-width: 360px !important/);
-  assert.doesNotMatch(toolbar, /openGuestRegistration|navbar-menu-identity/);
 });
 
-test('v145 filter row has a dedicated one-command restore code', () => {
-  assert.match(toolbar, /const RESTORE_CODE = 'FILTER-RESTORE-145'/);
-  assert.match(toolbar, /快速復原代碼：\$\{RESTORE_CODE\}/);
-});
-
-test('v145 loads after v144 so the new four-button design supersedes the temporary preview row', () => {
+test('v145 toolbar file still loads after v144', () => {
   const v144 = indexHtml.indexOf('/src/v144GuestCtaFilterPreview.ts');
   const v145 = indexHtml.indexOf('/src/v145FourFilterToolbar.ts');
   assert.ok(v144 >= 0);
