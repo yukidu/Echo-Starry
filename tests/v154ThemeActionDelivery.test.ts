@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const sw = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
 const browserCheck = readFileSync(new URL('../scripts/verifyThemeMenuUi.mjs', import.meta.url), 'utf8');
+const guestMenuCss = readFileSync(new URL('../src/v136GuestMenu.css', import.meta.url), 'utf8');
 
 test('upgrading an existing app shell refreshes stale window clients once', () => {
   assert.match(sw, /const oldShellKeys = keys\.filter/);
@@ -11,6 +12,13 @@ test('upgrading an existing app shell refreshes stale window clients once', () =
   assert.match(sw, /FORCE_STALE_CLIENT_REFRESH && upgradingExistingClient/);
   assert.match(sw, /self\.clients\.matchAll\(\{ type: 'window', includeUncontrolled: true \}\)/);
   assert.match(sw, /client\.navigate\(client\.url\)/);
+});
+
+test('v136 no longer hides React text behind a fixed combined pseudo-label', () => {
+  assert.doesNotMatch(guestMenuCss, /content:\s*["']開燈\/關燈["']/);
+  assert.doesNotMatch(guestMenuCss, /content:\s*["']開燈／關燈["']/);
+  assert.match(guestMenuCss, /visibility:\s*visible\s*!important/);
+  assert.match(guestMenuCss, /content:\s*none\s*!important/);
 });
 
 test('real browser gate checks the visible theme action before and after toggle', () => {
