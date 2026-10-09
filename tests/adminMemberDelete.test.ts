@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const admin = readFileSync(new URL('../src/components/AdminModal.tsx', import.meta.url), 'utf8');
 const router = readFileSync(new URL('../worker/adminUserDeleteRouter.ts', import.meta.url), 'utf8');
+const favoriteRouter = readFileSync(new URL('../worker/favoriteRouter.ts', import.meta.url), 'utf8');
 const privacyRouter = readFileSync(new URL('../worker/privacyCrawlerRouter.ts', import.meta.url), 'utf8');
 
 test('member list renders permanent delete only for the exact super-admin email and protects the super-admin row', () => {
@@ -34,6 +35,7 @@ test('deleting an account removes member-bound sessions and learning identity da
   assert.doesNotMatch(router, /DELETE FROM tracks/);
 });
 
-test('privacy entrypoint routes requests through the member deletion guard', () => {
-  assert.match(privacyRouter, /import appWorker from '\.\/adminUserDeleteRouter'/);
+test('privacy entrypoint keeps the member deletion guard in its wrapper chain', () => {
+  assert.match(privacyRouter, /import appWorker from '\.\/favoriteRouter'/);
+  assert.match(favoriteRouter, /import appWorker from '\.\/adminUserDeleteRouter'/);
 });
