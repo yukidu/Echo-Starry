@@ -26,6 +26,124 @@ function installStyles() {
       .v145-filter-button { font-size: .875rem !important; }
     }
 
+    /* v163 canonical summon presentation.
+       v141 intentionally styles the whole search row first; this final home UI
+       policy is the single owner of the first button so later patches are not
+       needed. Keep the existing 50px row height, enlarge only width/text/icon. */
+    @keyframes echostars-summon-stars {
+      0% { background-position: 0% 50%, 8px 8px, 38px 26px, 72px 13px; }
+      50% { background-position: 100% 50%, 32px 22px, 62px 7px, 94px 30px; }
+      100% { background-position: 0% 50%, 56px 8px, 86px 26px, 116px 13px; }
+    }
+    @keyframes echostars-summon-icon {
+      0%, 100% { transform: rotate(-10deg) scale(.94); filter: drop-shadow(0 0 3px rgb(255 255 255 / .55)); }
+      50% { transform: rotate(10deg) scale(1.12); filter: drop-shadow(0 0 8px rgb(255 238 140 / .95)); }
+    }
+    .v141-home-search-row > button:first-child {
+      box-sizing: border-box !important;
+      position: relative !important;
+      isolation: isolate;
+      flex: 0 0 clamp(9rem, 38vw, 10.6rem) !important;
+      width: clamp(9rem, 38vw, 10.6rem) !important;
+      min-width: clamp(9rem, 38vw, 10.6rem) !important;
+      height: 50px !important;
+      min-height: 50px !important;
+      max-height: 50px !important;
+      padding: 0 .75rem !important;
+      gap: .45rem !important;
+      overflow: hidden !important;
+      white-space: nowrap !important;
+      border-radius: 17px !important;
+      border: 1px solid color-mix(in srgb,var(--color-primary,#c06c84) 62%,white) !important;
+      background-image:
+        linear-gradient(112deg,
+          color-mix(in srgb,var(--color-primary,#c06c84) 88%,#5b21b6),
+          color-mix(in srgb,var(--color-primary,#c06c84) 84%,#f59e0b),
+          color-mix(in srgb,var(--color-primary,#c06c84) 88%,#7c3aed)),
+        radial-gradient(circle, rgb(255 255 255 / .95) 0 1px, transparent 1.7px),
+        radial-gradient(circle, rgb(255 237 156 / .9) 0 1.2px, transparent 1.9px),
+        radial-gradient(circle, rgb(255 255 255 / .76) 0 .8px, transparent 1.5px) !important;
+      background-size: 230% 100%, 64px 38px, 82px 46px, 96px 42px !important;
+      box-shadow:
+        0 8px 20px color-mix(in srgb,var(--color-primary,#c06c84) 32%,transparent),
+        inset 0 0 0 1px rgb(255 255 255 / .2) !important;
+      animation: echostars-summon-stars 4.2s linear infinite !important;
+    }
+    .v141-home-search-row > button:first-child::before {
+      content: '✦';
+      display: grid;
+      place-items: center;
+      flex: 0 0 1.7rem;
+      width: 1.7rem;
+      height: 1.7rem;
+      border-radius: 999px;
+      border: 1px solid rgb(255 255 255 / .4);
+      background: rgb(255 255 255 / .14);
+      color: #fff6b7;
+      font-size: 1.18rem;
+      line-height: 1;
+      box-shadow: inset 0 0 10px rgb(255 255 255 / .15), 0 0 10px rgb(255 238 140 / .34);
+      animation: echostars-summon-icon 1.8s ease-in-out infinite;
+    }
+    .v141-home-search-row > button:first-child > span {
+      min-width: 0;
+      font-size: 0 !important;
+      line-height: 1 !important;
+    }
+    .v141-home-search-row > button:first-child > span::after {
+      content: '召喚繁星';
+      font-size: clamp(1.08rem, 4.8vw, 1.3rem) !important;
+      line-height: 1 !important;
+      letter-spacing: .02em;
+      font-weight: 950;
+      color: #fff;
+      text-shadow: 0 1px 2px rgb(0 0 0 / .22), 0 0 9px rgb(255 255 255 / .28);
+    }
+    @media (max-width: 365px) {
+      .v141-home-search-row > button:first-child {
+        flex-basis: 8.35rem !important;
+        width: 8.35rem !important;
+        min-width: 8.35rem !important;
+        padding-inline: .55rem !important;
+      }
+      .v141-home-search-row > button:first-child > span::after { font-size: 1.04rem !important; }
+    }
+
+    /* v163: result messages live in normal document flow above AudioCard.
+       They no longer depend on cross-card z-index tricks, so another card,
+       transform or open overflow menu cannot paint over the sticker message. */
+    .audio-card-grid > .lucky-card[data-lucky-winner="true"] {
+      overflow: visible !important;
+    }
+    .audio-card-grid > .lucky-card[data-lucky-winner="true"] > .lucky-answer-notice {
+      position: relative !important;
+      inset: auto !important;
+      left: auto !important;
+      right: auto !important;
+      top: auto !important;
+      bottom: auto !important;
+      transform: none !important;
+      z-index: auto !important;
+      width: calc(100% - 1rem) !important;
+      max-width: 28rem !important;
+      margin: 0 auto .5rem !important;
+      box-sizing: border-box;
+      pointer-events: none;
+    }
+    .audio-card-grid > .lucky-card[data-lucky-winner="true"] > .lucky-winner-badge {
+      position: relative !important;
+      inset: auto !important;
+      left: auto !important;
+      right: auto !important;
+      top: auto !important;
+      bottom: auto !important;
+      transform: none !important;
+      z-index: auto !important;
+      width: max-content;
+      max-width: calc(100% - 1rem);
+      margin: 0 .5rem .35rem auto !important;
+    }
+
     /* v156: 召喚繁星的活動焦點固定在第一張卡片。 */
     .audio-card-grid.lucky-spin-active > .lucky-card:nth-child(2) {
       opacity: .48;
@@ -41,7 +159,9 @@ function installStyles() {
       animation: echostars-lucky-reel-focus 160ms ease-in-out infinite alternate;
     }
     @media (prefers-reduced-motion: reduce) {
-      .audio-card-grid.lucky-spin-active > .lucky-card:first-child { animation: none !important; }
+      .audio-card-grid.lucky-spin-active > .lucky-card:first-child,
+      .v141-home-search-row > button:first-child,
+      .v141-home-search-row > button:first-child::before { animation: none !important; }
     }
 
     .v156-favorites-top {
