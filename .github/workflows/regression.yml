@@ -109,6 +109,12 @@ jobs:
             node scripts/verifyV156Ui.mjs
           fi
 
+          if ! node scripts/verifyV164MobileUi.mjs; then
+            echo "v164 mobile browser UI check startup failed once; retrying one final time."
+            sleep 2
+            node scripts/verifyV164MobileUi.mjs
+          fi
+
       - name: Upload browser UI evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -118,5 +124,6 @@ jobs:
             /tmp/echostars-theme-*
             /tmp/echostars-category-*
             /tmp/echostars-v156-*
+            /tmp/echostars-v164-*
           if-no-files-found: ignore
           retention-days: 7
