@@ -29,9 +29,6 @@ import './mobileMenuHalfLayout.css';
 const embeddedShareTrack = document
   .querySelector<HTMLMetaElement>('meta[name="echostars-share-track"]')
   ?.content.trim();
-const isVipSharePage = Boolean(
-  document.querySelector<HTMLMetaElement>('meta[name="echostars-share-vip"]')
-);
 const originalShareSearch = window.location.pathname.startsWith('/share/')
   ? window.location.search
   : '';
@@ -49,158 +46,63 @@ if (embeddedShareTrack && window.location.pathname.startsWith('/share/')) {
   }
 }
 
-const VIP_AUTOPLAY_FALLBACK_ID = 'echostars-vip-autoplay-fallback';
+/*
+ * Playback policy: entering/opening a detail page must never start audio by
+ * itself. App.tsx has a few historical bootstrap paths that can still call
+ * HTMLMediaElement.play() while opening a shared track, so enforce the rule at
+ * the single browser-media boundary instead of adding more route-specific
+ * patches. Only an explicit playback control grants the next play() call.
+ */
+const nativeMediaPlay = HTMLMediaElement.prototype.play;
+let explicitPlaybackIntentUntil = 0;
 
-function removeVipAutoplayFallback() {
-  document.getElementById(VIP_AUTOPLAY_FALLBACK_ID)?.remove();
+function isPlaybackControl(target: EventTarget | null) {
+  const element = target instanceof Element ? target.closest('button') : null;
+  if (!element) return false;
+  const label = `${element.getAttribute('aria-label') || ''} ${element.getAttribute('title') || ''}`;
+  return /(?:開始播放|繼續播放|暫停播放|照片播放|照片暫停)/.test(label);
 }
 
-function syncVipPlayerUiToActualPlayback(audio: HTMLAudioElement, attempt = 0) {
-  const expectedTitle = audio.paused ? '點擊照片暫停' : '點擊照片播放';
-  const button = document.querySelector<HTMLButtonElement>(`button[title="${expectedTitle}"]`);
-  if (button) {
-    // React currently marks a rejected play() call as playing. Toggling the
-    // existing player control brings the visual state back in line with the
-    // real HTMLAudioElement without inventing a second playback state store.
-    button.click();
+function rememberPlaybackIntent(target: EventTarget | null) {
+  if (isPlaybackControl(target)) {
+    // Keep the intent alive long enough for permission/sticker confirmation
+    // dialogs; it is consumed by the next play() call.
+    explicitPlaybackIntentUntil = performance.now() + 30_000;
+  }
+}
+
+document.addEventListener('pointerdown', event => rememberPlaybackIntent(event.target), true);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Enter' || event.key === ' ') rememberPlaybackIntent(document.activeElement);
+}, true);
+
+function syncBlockedAutoplayUi(media: HTMLMediaElement, attempt = 0) {
+  media.pause();
+  const pauseButton = document.querySelector<HTMLButtonElement>(
+    'button[aria-label="暫停播放"], button[title="點擊照片暫停"]'
+  );
+  if (pauseButton) {
+    // App.tsx historically marks a rejected play() as playing. Use its own
+    // pause control once to bring React state back in line with the real media.
+    pauseButton.click();
     return;
   }
-  if (attempt < 8) {
-    window.setTimeout(() => syncVipPlayerUiToActualPlayback(audio, attempt + 1), 120);
+  if (attempt < 10) {
+    window.setTimeout(() => syncBlockedAutoplayUi(media, attempt + 1), 80);
   }
 }
 
-function showVipAutoplayFallback(audio: HTMLAudioElement) {
-  if (document.getElementById(VIP_AUTOPLAY_FALLBACK_ID)) return;
+HTMLMediaElement.prototype.play = function manualPlaybackOnly() {
+  const now = performance.now();
+  if (explicitPlaybackIntentUntil >= now) {
+    explicitPlaybackIntentUntil = 0;
+    return nativeMediaPlay.call(this);
+  }
 
-  // Mobile Safari/Chrome may legally block audible autoplay even when the page
-  // was opened from a link. Never pretend playback succeeded in that case:
-  // stop the fake spinning state and provide one obvious real user gesture.
-  syncVipPlayerUiToActualPlayback(audio);
-
-  const wrapper = document.createElement('div');
-  wrapper.id = VIP_AUTOPLAY_FALLBACK_ID;
-  Object.assign(wrapper.style, {
-    position: 'fixed',
-    left: '50%',
-    bottom: '96px',
-    transform: 'translateX(-50%)',
-    zIndex: '9999',
-    width: 'min(92vw, 360px)',
-    padding: '10px',
-    borderRadius: '18px',
-    background: 'rgba(15, 23, 42, 0.94)',
-    boxShadow: '0 12px 36px rgba(0,0,0,.28)',
-    color: '#fff',
-    textAlign: 'center',
-    fontFamily: 'system-ui, sans-serif'
-  });
-
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.textContent = '▶ 點一下開始播放';
-  Object.assign(button.style, {
-    width: '100%',
-    border: '0',
-    borderRadius: '13px',
-    padding: '11px 14px',
-    fontSize: '16px',
-    fontWeight: '800',
-    cursor: 'pointer',
-    color: '#fff',
-    background: 'var(--color-primary, #c06c84)'
-  });
-
-  const note = document.createElement('div');
-  note.textContent = '瀏覽器阻擋了自動播放，點一次即可開始';
-  Object.assign(note.style, {
-    marginTop: '6px',
-    fontSize: '11px',
-    opacity: '.78'
-  });
-
-  audio.addEventListener('playing', () => {
-    removeVipAutoplayFallback();
-    window.setTimeout(() => syncVipPlayerUiToActualPlayback(audio), 0);
-  }, { once: true });
-
-  button.addEventListener('click', () => {
-    // play() is called immediately inside this real click event so browsers
-    // that require a user gesture can grant audible playback.
-    const playPromise = audio.play();
-    Promise.resolve(playPromise)
-      .then(() => {
-        removeVipAutoplayFallback();
-        window.setTimeout(() => syncVipPlayerUiToActualPlayback(audio), 0);
-      })
-      .catch(() => {
-        note.textContent = '仍無法播放，請再點一次播放器照片';
-      });
-  });
-
-  wrapper.append(button, note);
-  document.body.appendChild(wrapper);
-}
-
-function startVipShareAutoplay() {
-  if (!isVipSharePage) return;
-
-  let finished = false;
-  let lookupAttempts = 0;
-  let playbackAttempts = 0;
-
-  const attemptPlayback = () => {
-    if (finished) return;
-
-    const audio = document.querySelector<HTMLAudioElement>('audio');
-    if (!audio || !audio.src) {
-      lookupAttempts += 1;
-      if (lookupAttempts <= 80) {
-        window.setTimeout(attemptPlayback, 150);
-      }
-      return;
-    }
-
-    audio.autoplay = true;
-    audio.setAttribute('playsinline', '');
-
-    const onPlaying = () => {
-      if (finished) return;
-      finished = true;
-      removeVipAutoplayFallback();
-      window.setTimeout(() => syncVipPlayerUiToActualPlayback(audio), 0);
-    };
-
-    audio.addEventListener('playing', onPlaying, { once: true });
-
-    const playPromise = audio.play();
-    Promise.resolve(playPromise)
-      .then(() => {
-        if (!audio.paused) onPlaying();
-      })
-      .catch((error: unknown) => {
-        audio.removeEventListener('playing', onPlaying);
-        if (finished) return;
-
-        const name = error instanceof DOMException ? error.name : '';
-        if (name === 'NotAllowedError') {
-          showVipAutoplayFallback(audio);
-          return;
-        }
-
-        playbackAttempts += 1;
-        if (playbackAttempts <= 12) {
-          // A freshly assigned audio src can reject once before metadata/buffer
-          // becomes usable. Retry after the media element has had time to load.
-          window.setTimeout(attemptPlayback, 250);
-        } else {
-          showVipAutoplayFallback(audio);
-        }
-      });
-  };
-
-  window.setTimeout(attemptPlayback, 0);
-}
+  const media = this;
+  window.setTimeout(() => syncBlockedAutoplayUi(media), 0);
+  return Promise.reject(new DOMException('Playback requires an explicit user action.', 'NotAllowedError'));
+};
 
 if ('serviceWorker' in navigator) {
   // PWA updates are intentionally silent:
@@ -231,5 +133,3 @@ if (removeBootstrapTrackParam && embeddedShareTrack) {
     }
   }, 1000);
 }
-
-startVipShareAutoplay();
