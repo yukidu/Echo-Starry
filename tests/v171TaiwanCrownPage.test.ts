@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const main = readFileSync(new URL('../src/main.tsx', import.meta.url), 'utf8');
 const menuLink = readFileSync(new URL('../src/taiwanCrownMenuLink.ts', import.meta.url), 'utf8');
+const changelogNote = readFileSync(new URL('../src/v171ChangelogNote.ts', import.meta.url), 'utf8');
 const page = readFileSync(new URL('../public/taiwan-crown.html', import.meta.url), 'utf8');
 
 test('Taiwan Crown Ambassadors entry is installed globally for members and visitors', () => {
@@ -13,7 +14,9 @@ test('Taiwan Crown Ambassadors entry is installed globally for members and visit
   assert.match(menuLink, /window\.location\.assign\(crownPageUrl\(\)\)/);
   assert.match(menuLink, /--color-primary/);
   assert.match(menuLink, /sq_theme_dark/);
-  assert.doesNotMatch(menuLink, /currentUser/);
+  assert.match(menuLink, /hasSignedInMember\(\)/);
+  assert.match(menuLink, /sq_current_user_v1/);
+  assert.doesNotMatch(menuLink, /if \(!currentUser\)/);
 });
 
 test('crown page automatically uses the signed-in member name or visitor nickname', () => {
@@ -43,4 +46,12 @@ test('crown page keeps personal photo and motto features while following Echo St
   assert.match(page, /primary/);
   assert.match(page, /dark/);
   assert.match(page, /返回繁星回聲/);
+});
+
+test('v171 Crown release is surfaced in the bottom changelog dialog', () => {
+  assert.match(main, /import '\.\/v171ChangelogNote';/);
+  assert.match(changelogNote, /v171 最新改版｜臺灣皇冠大使/);
+  assert.match(changelogNote, /訪客與會員都可直接開啟/);
+  assert.match(changelogNote, /登入會員自動使用會員姓名/);
+  assert.match(changelogNote, /未登入時自動使用目前訪客暱稱/);
 });
