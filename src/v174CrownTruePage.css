@@ -32,6 +32,12 @@ body[data-taiwan-crown-open="true"] #taiwan-crown-integrated-page .taiwan-crown-
   min-height: calc(100dvh - 56px);
 }
 
+/* v175: the Crown page is entered from the shared top navigation / hamburger menu,
+ * so the duplicate in-page "back to playlist" row is intentionally removed. */
+body[data-taiwan-crown-open="true"] #taiwan-crown-integrated-page .taiwan-crown-page-top {
+  display: none !important;
+}
+
 /* The page itself owns the screen while open; the old home list must never
  * show through in light mode or dark mode. */
 body[data-taiwan-crown-open="true"] {
