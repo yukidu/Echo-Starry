@@ -131,6 +131,12 @@ jobs:
             node scripts/verifyV167PageNavigation.mjs
           fi
 
+          if ! node scripts/verifyV168AudioEditSave.mjs; then
+            echo "v168 audio-edit save browser check startup failed once; retrying one final time."
+            sleep 2
+            node scripts/verifyV168AudioEditSave.mjs
+          fi
+
       - name: Upload browser UI evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -142,5 +148,6 @@ jobs:
             /tmp/echostars-v156-*
             /tmp/echostars-v163-*
             /tmp/echostars-v167-*
+            /tmp/echostars-v168-*
           if-no-files-found: ignore
           retention-days: 7
