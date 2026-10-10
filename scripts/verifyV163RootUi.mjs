@@ -173,16 +173,27 @@ async function main() {
       try { await allowedAudio.play(); } catch (error) { allowedMessage = error?.message || ''; }
       intentButton.remove();
 
+      const detailButton = document.createElement('button');
+      detailButton.title = '播放';
+      document.body.appendChild(detailButton);
+      detailButton.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      const detailAudio = document.createElement('audio');
+      let detailAllowedMessage = '';
+      try { await detailAudio.play(); } catch (error) { detailAllowedMessage = error?.message || ''; }
+      detailButton.remove();
+
       return {
         blockedName,
         blockedMessage,
-        allowedMessage
+        allowedMessage,
+        detailAllowedMessage
       };
     })()`);
     if (
       playbackPolicyState.blockedName !== 'NotAllowedError' ||
       !playbackPolicyState.blockedMessage.includes('explicit user action') ||
-      playbackPolicyState.allowedMessage.includes('explicit user action')
+      playbackPolicyState.allowedMessage.includes('explicit user action') ||
+      playbackPolicyState.detailAllowedMessage.includes('explicit user action')
     ) {
       throw new Error(`Manual playback policy mismatch: ${JSON.stringify(playbackPolicyState)}`);
     }
@@ -227,7 +238,7 @@ async function main() {
     const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     await writeFile('/tmp/echostars-v163-root-ui.png', Buffer.from(shot.data, 'base64'));
     await writeFile('/tmp/echostars-v163-root-ui-state.json', JSON.stringify(state, null, 2));
-    console.log('v165 root UI verified:', JSON.stringify(state));
+    console.log('v166 root UI verified:', JSON.stringify(state));
     socket.close();
   } finally {
     chrome.kill('SIGTERM');
