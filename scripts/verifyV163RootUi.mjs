@@ -98,10 +98,11 @@ async function main() {
         fontContent: getComputedStyle(span, '::after').content,
         iconContent: getComputedStyle(button, '::before').content,
         animationName: style.animationName,
-        backgroundImage: style.backgroundImage
+        backgroundImage: style.backgroundImage,
+        touchAction: style.touchAction
       };
     })()`);
-    if (!summonState || summonState.height !== '50px' || summonState.width < 133 || !summonState.fontContent.includes('召喚繁星') || !summonState.iconContent.includes('✦') || summonState.animationName === 'none' || summonState.backgroundImage === 'none') {
+    if (!summonState || summonState.height !== '50px' || summonState.width < 133 || !summonState.fontContent.includes('召喚繁星') || !summonState.iconContent.includes('✦') || summonState.animationName === 'none' || summonState.backgroundImage === 'none' || summonState.touchAction !== 'manipulation') {
       throw new Error(`Summon button mismatch: ${JSON.stringify(summonState)}`);
     }
 
@@ -109,7 +110,10 @@ async function main() {
       const fixture = document.createElement('div');
       fixture.className = 'audio-card-grid';
       fixture.style.display = 'block';
-      fixture.innerHTML = '<div class="lucky-card" data-lucky-winner="true"><div class="lucky-answer-notice">這是宇宙繁星給你的回應 +8</div><div class="lucky-winner-badge">✨ 好手氣！✨</div><div class="audio-card" style="height:120px">WINNER</div></div><div class="lucky-card" style="position:relative;z-index:300"><div class="audio-card" style="height:120px">NEXT CARD</div></div>';
+      fixture.style.position = 'relative';
+      fixture.style.width = '360px';
+      fixture.style.minHeight = '260px';
+      fixture.innerHTML = '<div class="lucky-card" data-lucky-winner="true" style="position:relative;width:360px;min-height:120px;display:block"><div class="lucky-answer-notice">宇宙繁星給你的回應 +20</div><div class="lucky-winner-badge">✨ 好手氣！✨</div><div class="audio-card" style="height:120px;width:360px">WINNER</div></div><div class="lucky-card" style="position:relative;z-index:300;width:360px"><div class="audio-card" style="height:120px;width:360px">NEXT CARD</div></div>';
       document.body.appendChild(fixture);
       const winner = fixture.querySelector('.lucky-card[data-lucky-winner="true"]');
       const notice = fixture.querySelector('.lucky-answer-notice');
@@ -117,31 +121,70 @@ async function main() {
       const ns = getComputedStyle(notice);
       const bs = getComputedStyle(badge);
       const ws = getComputedStyle(winner);
+      const gs = getComputedStyle(fixture);
+      const noticeHasText = Boolean(notice.textContent?.trim());
+      fixture.classList.add('lucky-spin-active');
+      const spinPointerEvents = getComputedStyle(fixture.querySelector('.audio-card')).pointerEvents;
       const result = {
+        gridZ: Number(gs.zIndex || 0),
         winnerPosition: ws.position,
         winnerZ: Number(ws.zIndex || 0),
         noticePosition: ns.position,
-        noticeTransform: ns.transform,
         noticeZ: Number(ns.zIndex || 0),
         noticeBottom: ns.bottom,
+        noticeHasText,
         badgePosition: bs.position,
-        badgeZ: Number(bs.zIndex || 0)
+        badgeZ: Number(bs.zIndex || 0),
+        spinPointerEvents
       };
       fixture.remove();
       return result;
     })()`);
     if (
+      luckyState.gridZ < 700 ||
       luckyState.winnerPosition !== 'relative' ||
-      luckyState.winnerZ < 500 ||
+      luckyState.winnerZ < 700 ||
       luckyState.noticePosition !== 'absolute' ||
       luckyState.noticeZ <= luckyState.winnerZ ||
-      luckyState.noticeZ <= 300 ||
       luckyState.noticeBottom === 'auto' ||
+      !luckyState.noticeHasText ||
       luckyState.badgePosition !== 'absolute' ||
       luckyState.badgeZ <= luckyState.winnerZ ||
-      luckyState.badgeZ <= 300
+      luckyState.spinPointerEvents !== 'none'
     ) {
       throw new Error(`Lucky floating overlay mismatch: ${JSON.stringify(luckyState)}`);
+    }
+
+    const playbackPolicyState = await evaluate(`(async () => {
+      const blockedAudio = document.createElement('audio');
+      let blockedName = '';
+      let blockedMessage = '';
+      try { await blockedAudio.play(); } catch (error) {
+        blockedName = error?.name || '';
+        blockedMessage = error?.message || '';
+      }
+
+      const intentButton = document.createElement('button');
+      intentButton.setAttribute('aria-label', '開始播放');
+      document.body.appendChild(intentButton);
+      intentButton.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      const allowedAudio = document.createElement('audio');
+      let allowedMessage = '';
+      try { await allowedAudio.play(); } catch (error) { allowedMessage = error?.message || ''; }
+      intentButton.remove();
+
+      return {
+        blockedName,
+        blockedMessage,
+        allowedMessage
+      };
+    })()`);
+    if (
+      playbackPolicyState.blockedName !== 'NotAllowedError' ||
+      !playbackPolicyState.blockedMessage.includes('explicit user action') ||
+      playbackPolicyState.allowedMessage.includes('explicit user action')
+    ) {
+      throw new Error(`Manual playback policy mismatch: ${JSON.stringify(playbackPolicyState)}`);
     }
 
     const menuState = await evaluate(`(async () => {
@@ -180,10 +223,11 @@ async function main() {
       throw new Error(`Hamburger dismissal mismatch: ${JSON.stringify(menuState)}`);
     }
 
+    const state = { summonState, luckyState, playbackPolicyState, menuState };
     const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     await writeFile('/tmp/echostars-v163-root-ui.png', Buffer.from(shot.data, 'base64'));
-    await writeFile('/tmp/echostars-v163-root-ui-state.json', JSON.stringify({ summonState, luckyState, menuState }, null, 2));
-    console.log('v163 root UI verified:', JSON.stringify({ summonState, luckyState, menuState }));
+    await writeFile('/tmp/echostars-v163-root-ui-state.json', JSON.stringify(state, null, 2));
+    console.log('v165 root UI verified:', JSON.stringify(state));
     socket.close();
   } finally {
     chrome.kill('SIGTERM');

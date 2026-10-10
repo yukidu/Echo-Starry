@@ -4,27 +4,29 @@ import { readFileSync } from 'node:fs';
 
 const main = readFileSync(new URL('../src/main.tsx', import.meta.url), 'utf8');
 
-test('VIP share pages retry real audio playback after React selects the shared track', () => {
-  assert.match(main, /meta\[name="echostars-share-vip"\]/);
-  assert.match(main, /function startVipShareAutoplay\(\)/);
-  assert.match(main, /if \(!isVipSharePage\) return;/);
-  assert.match(main, /document\.querySelector<HTMLAudioElement>\('audio'\)/);
-  assert.match(main, /audio\.play\(\)/);
-  assert.match(main, /audio\.autoplay = true/);
-  assert.match(main, /audio\.setAttribute\('playsinline', ''\)/);
-  assert.match(main, /startVipShareAutoplay\(\);/);
+test('entering VIP/shared detail pages never starts audio automatically', () => {
+  assert.doesNotMatch(main, /meta\[name="echostars-share-vip"\]/);
+  assert.doesNotMatch(main, /function startVipShareAutoplay\(\)/);
+  assert.doesNotMatch(main, /audio\.autoplay = true/);
+  assert.doesNotMatch(main, /startVipShareAutoplay\(\);/);
+  assert.match(main, /const nativeMediaPlay = HTMLMediaElement\.prototype\.play/);
+  assert.match(main, /HTMLMediaElement\.prototype\.play = function manualPlaybackOnly\(\)/);
 });
 
-test('blocked audible autoplay never leaves a fake playing animation', () => {
-  assert.match(main, /NotAllowedError/);
-  assert.match(main, /syncVipPlayerUiToActualPlayback/);
-  assert.match(main, /點擊照片暫停/);
-  assert.match(main, /點一下開始播放/);
-  assert.match(main, /瀏覽器阻擋了自動播放/);
+test('only an explicit playback control grants the next play call', () => {
+  assert.match(main, /function isPlaybackControl\(target: EventTarget \| null\)/);
+  assert.match(main, /開始播放\|繼續播放\|暫停播放\|照片播放\|照片暫停/);
+  assert.match(main, /explicitPlaybackIntentUntil = performance\.now\(\) \+ 30_000/);
+  assert.match(main, /document\.addEventListener\('pointerdown'/);
+  assert.match(main, /event\.key === 'Enter' \|\| event\.key === ' '/);
+  assert.match(main, /return nativeMediaPlay\.call\(this\)/);
 });
 
-test('VIP autoplay fallback performs play directly inside the real click handler', () => {
-  const clickHandler = main.match(/button\.addEventListener\('click', \(\) => \{([\s\S]*?)\n  \}\);/);
-  assert.ok(clickHandler, 'VIP fallback click handler should exist');
-  assert.match(clickHandler![1], /const playPromise = audio\.play\(\);/);
+test('blocked programmatic autoplay is rejected and fake playing UI is reset', () => {
+  assert.match(main, /new DOMException\('Playback requires an explicit user action\.', 'NotAllowedError'\)/);
+  assert.match(main, /function syncBlockedAutoplayUi\(media: HTMLMediaElement/);
+  assert.match(main, /button\[aria-label="暫停播放"\]/);
+  assert.match(main, /button\[title="點擊照片暫停"\]/);
+  assert.doesNotMatch(main, /點一下開始播放/);
+  assert.doesNotMatch(main, /瀏覽器阻擋了自動播放/);
 });
