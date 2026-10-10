@@ -1,4 +1,4 @@
-import appWorker from './privacyCrawlerRouter';
+import sessionWorker from './sessionCookieRouter';
 import type { Env } from './index';
 
 const STARBEAUTY_URL = 'https://starbeauty.yukidu.workers.dev';
@@ -50,7 +50,7 @@ async function verifiedSession(request: Request, env: Env) {
     headers: request.headers,
     redirect: 'manual'
   });
-  const response = await appWorker.fetch(probe, env);
+  const response = await sessionWorker.fetch(probe, env);
   if (!response.ok) return null;
   const data: any = await response.json().catch(() => null);
   return data?.authenticated && data?.user?.id ? data.user : null;
@@ -71,6 +71,53 @@ async function issueTicket(request: Request, env: Env) {
   return json({ code, redirect: `${STARBEAUTY_URL}/auth/callback?code=${encodeURIComponent(code)}` });
 }
 
+function starBeautyProfile(row: any) {
+  // 繁星回聲是會員主資料庫；這裡輸出「基本資料頁」完整快照與必要會員狀態。
+  // StarBeauty 將快照存成 JSON，所以往後新增基本資料欄位，不需要重做 StarBeauty D1 表結構。
+  // StarBeauty 自己的 student / teacher / admin / superadmin 權限不由這個 profile 覆蓋。
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    avatar: row.avatar,
+    googleAvatar: row.googleAvatar,
+    amwayId: row.amwayId,
+    phone: row.phone,
+    residence: row.residence,
+    center: row.center,
+    rank: row.rank,
+    approvedRank: row.approvedRank,
+    rankApproved: Boolean(row.rankApproved),
+    rankAuditStatus: row.rankAuditStatus,
+    rankAuditType: row.rankAuditType,
+    rankUpdatedAt: row.rankUpdatedAt,
+    role: row.role,
+    joinReason: row.joinReason,
+    stayReason: row.stayReason,
+    sponsor: row.sponsor,
+    platinumUpline: row.platinumUpline,
+    diamondUpline: row.diamondUpline,
+    birthday: row.birthday || row.birthDate || '',
+    birthDate: row.birthDate,
+    zodiac: row.zodiac,
+    talentNumber: row.talentNumber,
+    lifeNumber: row.lifeNumber,
+    registerDate: row.registerDate,
+    auditedBy: row.auditedBy,
+    auditedAt: row.auditedAt,
+    isContributor: Boolean(row.isContributor),
+    isAdminUser: Boolean(row.isAdminUser),
+    canUpload: Boolean(row.canUpload),
+    isBlocked: Boolean(row.isBlocked),
+    avatarUploadCount: Number(row.avatarUploadCount || 0),
+    avatarUploadMonth: row.avatarUploadMonth,
+    profileEditCount: Number(row.profileEditCount || 0),
+    profileEditMonth: row.profileEditMonth,
+    playCount: Number(row.playCount || 0),
+    lastActive: row.lastActive
+  };
+}
+
 async function exchangeTicket(request: Request, env: Env) {
   await ensureTicketSchema(env);
   const body: any = await request.clone().json().catch(() => ({}));
@@ -83,12 +130,24 @@ async function exchangeTicket(request: Request, env: Env) {
     RETURNING userId
   `).bind(codeHash, Date.now()).first();
   if (!row?.userId) return json({ error: '授權碼無效或已過期' }, 401);
-  const user: any = await env.DB.prepare(`
-    SELECT id,email,name,avatar,role,rank,approvedRank,rankApproved,center
-    FROM users WHERE id = ? AND COALESCE(isBlocked,0) = 0 LIMIT 1
-  `).bind(String(row.userId)).first();
-  if (!user) return json({ error: '會員不存在或已停權' }, 401);
-  return json({ user });
+
+  const user: any = await env.DB.prepare('SELECT * FROM users WHERE id = ? LIMIT 1').bind(String(row.userId)).first();
+  if (!user || Number(user.isBlocked || 0) !== 0) return json({ error: '會員不存在或已停權' }, 401);
+
+  const profile = starBeautyProfile(user);
+  const profileHash = await hash(JSON.stringify(profile));
+  const profileUpdatedAt = String(user.rankUpdatedAt || user.auditedAt || user.registerDate || '');
+  return json({
+    user: {
+      id: String(user.id),
+      email: String(user.email || ''),
+      name: String(user.name || user.email || ''),
+      avatar: String(user.avatar || user.googleAvatar || '')
+    },
+    profile,
+    profileHash,
+    profileUpdatedAt
+  });
 }
 
 function loginPage() {
@@ -104,12 +163,12 @@ btn.onclick=go;go().catch(()=>renderGoogle());
   return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer' } });
 }
 
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-    if (url.pathname === '/auth/starbeauty' && request.method === 'GET') return loginPage();
-    if (url.pathname === '/api/auth/starbeauty-ticket' && request.method === 'POST') return issueTicket(request, env);
-    if (url.pathname === '/api/auth/starbeauty-exchange' && request.method === 'POST') return exchangeTicket(request, env);
-    return appWorker.fetch(request, env);
-  }
-};
+export async function handleStarbeautySso(request: Request, env: Env): Promise<Response | null> {
+  const url = new URL(request.url);
+  if (url.pathname === '/auth/starbeauty' && request.method === 'GET') return loginPage();
+  if (url.pathname === '/api/auth/starbeauty-ticket' && request.method === 'POST') return issueTicket(request, env);
+  if (url.pathname === '/api/auth/starbeauty-exchange' && request.method === 'POST') return exchangeTicket(request, env);
+  return null;
+}
+
+export default { handleStarbeautySso };

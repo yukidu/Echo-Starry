@@ -1,6 +1,7 @@
 import appWorker from './favoriteRouter';
 import sessionWorker from './sessionCookieRouter';
 import iosGoogleRedirectWorker from './iosGoogleRedirectRouter';
+import { handleStarbeautySso } from './starbeautySsoRouter';
 import type { Env } from './index';
 import { unitsToStickers } from '../shared/stickers';
 
@@ -200,6 +201,13 @@ export default {
       const ranked = await spentStickerLeaderboard(env);
       if (ranked) return withPrivacyHeaders(ranked);
     }
+
+    // StarBeauty SSO is composed into the privacy router instead of replacing
+    // the site entrypoint. This keeps every EchoStars request under the same
+    // crawler/privacy boundary while allowing the external app to exchange a
+    // short-lived one-time code for the member's current basic-profile snapshot.
+    const starBeautyResponse = await handleStarbeautySso(request, env);
+    if (starBeautyResponse) return withPrivacyHeaders(starBeautyResponse);
 
     // Authentication must not wait for unrelated sticker/catalog migrations.
     if (url.pathname === '/api/users/google-sync' || url.pathname.startsWith('/api/auth/')) {
