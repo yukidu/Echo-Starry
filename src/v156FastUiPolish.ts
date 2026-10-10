@@ -109,39 +109,41 @@ function installStyles() {
       .v141-home-search-row > button:first-child > span::after { font-size: 1.04rem !important; }
     }
 
-    /* v163: result messages live in normal document flow above AudioCard.
-       They no longer depend on cross-card z-index tricks, so another card,
-       transform or open overflow menu cannot paint over the sticker message. */
+    /* v164: keep the v162 floating result presentation, but give the winner
+       one explicit stacking owner above every normal/open AudioCard. This is
+       intentionally not another patch layer: the same final home UI policy owns
+       summon styling and lucky-result layering. */
     .audio-card-grid > .lucky-card[data-lucky-winner="true"] {
+      position: relative !important;
+      z-index: 520 !important;
       overflow: visible !important;
+      isolation: isolate;
     }
     .audio-card-grid > .lucky-card[data-lucky-winner="true"] > .lucky-answer-notice {
-      position: relative !important;
-      inset: auto !important;
-      left: auto !important;
+      position: absolute !important;
+      left: 50% !important;
       right: auto !important;
       top: auto !important;
-      bottom: auto !important;
-      transform: none !important;
-      z-index: auto !important;
-      width: calc(100% - 1rem) !important;
+      bottom: calc(100% + .55rem) !important;
+      transform: translateX(-50%) !important;
+      z-index: 560 !important;
+      width: min(88vw, 28rem) !important;
       max-width: 28rem !important;
-      margin: 0 auto .5rem !important;
+      margin: 0 !important;
       box-sizing: border-box;
       pointer-events: none;
     }
     .audio-card-grid > .lucky-card[data-lucky-winner="true"] > .lucky-winner-badge {
-      position: relative !important;
-      inset: auto !important;
+      position: absolute !important;
       left: auto !important;
-      right: auto !important;
-      top: auto !important;
+      right: .5rem !important;
+      top: -1.25rem !important;
       bottom: auto !important;
       transform: none !important;
-      z-index: auto !important;
+      z-index: 550 !important;
       width: max-content;
       max-width: calc(100% - 1rem);
-      margin: 0 .5rem .35rem auto !important;
+      margin: 0 !important;
     }
 
     /* v156: 召喚繁星的活動焦點固定在第一張卡片。 */

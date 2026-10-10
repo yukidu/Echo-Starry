@@ -109,21 +109,39 @@ async function main() {
       const fixture = document.createElement('div');
       fixture.className = 'audio-card-grid';
       fixture.style.display = 'block';
-      fixture.innerHTML = '<div class="lucky-card" data-lucky-winner="true"><div class="lucky-answer-notice">這是宇宙繁星給你的回應 +8</div><div class="lucky-winner-badge">✨ 好手氣！✨</div><div class="audio-card" style="height:120px">CARD</div></div>';
+      fixture.innerHTML = '<div class="lucky-card" data-lucky-winner="true"><div class="lucky-answer-notice">這是宇宙繁星給你的回應 +8</div><div class="lucky-winner-badge">✨ 好手氣！✨</div><div class="audio-card" style="height:120px">WINNER</div></div><div class="lucky-card" style="position:relative;z-index:300"><div class="audio-card" style="height:120px">NEXT CARD</div></div>';
       document.body.appendChild(fixture);
+      const winner = fixture.querySelector('.lucky-card[data-lucky-winner="true"]');
       const notice = fixture.querySelector('.lucky-answer-notice');
       const badge = fixture.querySelector('.lucky-winner-badge');
-      const card = fixture.querySelector('.audio-card');
       const ns = getComputedStyle(notice);
       const bs = getComputedStyle(badge);
-      const nr = notice.getBoundingClientRect();
-      const cr = card.getBoundingClientRect();
-      const result = { noticePosition: ns.position, noticeTransform: ns.transform, noticeZ: ns.zIndex, badgePosition: bs.position, noticeBeforeCard: nr.bottom <= cr.top + 1 };
+      const ws = getComputedStyle(winner);
+      const result = {
+        winnerPosition: ws.position,
+        winnerZ: Number(ws.zIndex || 0),
+        noticePosition: ns.position,
+        noticeTransform: ns.transform,
+        noticeZ: Number(ns.zIndex || 0),
+        noticeBottom: ns.bottom,
+        badgePosition: bs.position,
+        badgeZ: Number(bs.zIndex || 0)
+      };
       fixture.remove();
       return result;
     })()`);
-    if (luckyState.noticePosition !== 'relative' || luckyState.noticeTransform !== 'none' || luckyState.noticeZ !== 'auto' || luckyState.badgePosition !== 'relative' || !luckyState.noticeBeforeCard) {
-      throw new Error(`Lucky result flow mismatch: ${JSON.stringify(luckyState)}`);
+    if (
+      luckyState.winnerPosition !== 'relative' ||
+      luckyState.winnerZ < 500 ||
+      luckyState.noticePosition !== 'absolute' ||
+      luckyState.noticeZ <= luckyState.winnerZ ||
+      luckyState.noticeZ <= 300 ||
+      luckyState.noticeBottom === 'auto' ||
+      luckyState.badgePosition !== 'absolute' ||
+      luckyState.badgeZ <= luckyState.winnerZ ||
+      luckyState.badgeZ <= 300
+    ) {
+      throw new Error(`Lucky floating overlay mismatch: ${JSON.stringify(luckyState)}`);
     }
 
     const menuState = await evaluate(`(async () => {
