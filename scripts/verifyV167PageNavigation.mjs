@@ -105,7 +105,12 @@ async function main() {
           cardMinHeight: card ? getComputedStyle(card).minHeight : ''
         };
       })()`);
-      if (pageStates[key].title !== title || pageStates[key].position !== 'static' || pageStates[key].optionCount < 2 || !pageStates[key].hostMarked || pageStates[key].hiddenSiblingCount < 1) {
+      // This generic page-shell check may run without seeded live categories, so the
+      // category page can legitimately contain only "全部分類". The dedicated
+      // verifyV167CategoryFilterUi.mjs test seeds several categories and verifies
+      // consecutive real filtering selections end-to-end.
+      const minimumOptions = key === 'category' ? 1 : 2;
+      if (pageStates[key].title !== title || pageStates[key].position !== 'static' || pageStates[key].optionCount < minimumOptions || !pageStates[key].hostMarked || pageStates[key].hiddenSiblingCount < 1) {
         throw new Error(`${key} page mismatch: ${JSON.stringify(pageStates[key])}`);
       }
       await evaluate(`document.querySelector('[data-v167-filter-page-close]')?.click()`);
