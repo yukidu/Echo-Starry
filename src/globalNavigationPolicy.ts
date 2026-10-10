@@ -3,7 +3,7 @@ const ROOT_CLASS = 'echostars-fixed-main-nav';
 const NAV_SELECTOR = 'header.sticky.top-0';
 const MENU_PANEL_SELECTOR = '.mobile-menu-panel[data-react-menu="true"]';
 const MENU_BUTTON_SELECTOR = '[data-main-menu="hamburger"]';
-const MENU_KEEP_OPEN_SELECTOR = '.navbar-menu-font-row, .navbar-menu-palette-shortcut';
+const MENU_KEEP_OPEN_SELECTOR = '.navbar-menu-font-controls, .navbar-menu-palette-shortcut';
 
 function installGlobalNavigationStyle() {
   if (document.getElementById(STYLE_ID)) return;
