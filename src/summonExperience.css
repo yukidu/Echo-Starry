@@ -1,0 +1,158 @@
+/* v164: single owner for the Summon Stars control and lucky-result presentation.
+   This stylesheet intentionally overrides legacy home-polish runtime CSS so the
+   same controls are not owned by multiple historical patches. */
+
+@keyframes echostars-summon-sky {
+  0% { background-position: 0% 50%, 8px 7px, 34px 27px, 58px 10px; }
+  50% { background-position: 100% 50%, 28px 18px, 54px 8px, 76px 28px; }
+  100% { background-position: 0% 50%, 48px 7px, 74px 27px, 96px 10px; }
+}
+
+@keyframes echostars-summon-icon {
+  0%, 100% {
+    transform: rotate(-10deg) scale(.94);
+    filter: drop-shadow(0 0 3px rgba(255,255,255,.55));
+  }
+  50% {
+    transform: rotate(12deg) scale(1.12);
+    filter: drop-shadow(0 0 8px rgba(255,244,166,.95));
+  }
+}
+
+/* Canonical Summon Stars control.
+   The legacy v141 runtime stylesheet targets this same first button and forces
+   50px/.75rem on mobile, so this selector is deliberately more specific. */
+html.echostars-v141-home .v141-home-search-row > button[title="從目前條件下可播放的音檔中召喚繁星解答"]:first-child {
+  box-sizing: border-box !important;
+  position: relative !important;
+  isolation: isolate;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  height: 46px !important;
+  min-height: 46px !important;
+  max-height: 46px !important;
+  min-width: 190px !important;
+  padding: 0 18px !important;
+  gap: 8px !important;
+  overflow: hidden;
+  white-space: nowrap;
+  border-radius: 17px !important;
+  background-image:
+    linear-gradient(115deg,
+      color-mix(in srgb, var(--color-primary, #c06c84) 92%, #5b21b6),
+      color-mix(in srgb, var(--color-primary, #c06c84) 82%, #fbbf24),
+      color-mix(in srgb, var(--color-primary, #c06c84) 90%, #7c3aed)),
+    radial-gradient(circle, rgba(255,255,255,.95) 0 1px, transparent 1.7px),
+    radial-gradient(circle, rgba(255,236,153,.9) 0 1.2px, transparent 1.9px),
+    radial-gradient(circle, rgba(255,255,255,.75) 0 .8px, transparent 1.5px) !important;
+  background-size: 220% 100%, 64px 38px, 82px 46px, 96px 42px !important;
+  box-shadow:
+    0 5px 18px color-mix(in srgb, var(--color-primary, #c06c84) 38%, transparent),
+    inset 0 0 0 1px rgba(255,255,255,.28) !important;
+  animation: echostars-summon-sky 4.2s linear infinite;
+}
+
+html.echostars-v141-home .v141-home-search-row > button[title="從目前條件下可播放的音檔中召喚繁星解答"]:first-child::before {
+  content: "✦";
+  display: grid;
+  place-items: center;
+  flex: 0 0 29px;
+  width: 29px;
+  height: 29px;
+  border-radius: 50%;
+  font-size: 21px;
+  line-height: 1;
+  color: #fff8bf;
+  background: rgba(255,255,255,.16);
+  border: 1px solid rgba(255,255,255,.42);
+  box-shadow:
+    inset 0 0 12px rgba(255,255,255,.18),
+    0 0 10px rgba(255,244,166,.36);
+  animation: echostars-summon-icon 1.8s ease-in-out infinite;
+}
+
+/* Hide the old emoji label and render one canonical large label. */
+html.echostars-v141-home .v141-home-search-row > button[title="從目前條件下可播放的音檔中召喚繁星解答"]:first-child > span {
+  font-size: 0 !important;
+  line-height: 1 !important;
+}
+
+html.echostars-v141-home .v141-home-search-row > button[title="從目前條件下可播放的音檔中召喚繁星解答"]:first-child > span::after {
+  content: "召喚繁星";
+  font-size: 23px !important;
+  line-height: 1 !important;
+  letter-spacing: .035em;
+  font-weight: 950;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,.2), 0 0 9px rgba(255,255,255,.28);
+}
+
+@media (max-width: 420px) {
+  html.echostars-v141-home .v141-home-search-row > button[title="從目前條件下可播放的音檔中召喚繁星解答"]:first-child {
+    min-width: 168px !important;
+    padding-inline: 12px !important;
+  }
+
+  html.echostars-v141-home .v141-home-search-row > button[title="從目前條件下可播放的音檔中召喚繁星解答"]:first-child > span::after {
+    font-size: 20px !important;
+  }
+}
+
+/* Lucky result layout: notices are normal-flow content above the AudioCard.
+   They no longer float outside the card and therefore do not depend on a z-index
+   arms race with neighbouring cards, menus, or other historical overlays. */
+html.echostars-v141-home .audio-card-grid > .lucky-card[data-lucky-winner="true"] {
+  position: relative !important;
+  z-index: 2 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0;
+  overflow: visible !important;
+}
+
+html.echostars-v141-home .audio-card-grid > .lucky-card[data-lucky-winner="true"] > .lucky-answer-notice {
+  position: relative !important;
+  inset: auto !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  z-index: 2 !important;
+  width: calc(100% - .75rem) !important;
+  max-width: none !important;
+  margin: 0 auto .55rem !important;
+  order: -2;
+  box-sizing: border-box;
+  pointer-events: none;
+  box-shadow: 0 10px 28px rgb(0 0 0 / .22) !important;
+}
+
+html.echostars-v141-home .audio-card-grid > .lucky-card[data-lucky-winner="true"] > .lucky-winner-badge {
+  position: relative !important;
+  inset: auto !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  z-index: 1 !important;
+  align-self: flex-end;
+  width: max-content;
+  max-width: calc(100% - .75rem);
+  margin: 0 .38rem .5rem 0 !important;
+  order: -1;
+}
+
+html.echostars-v141-home .audio-card-grid > .lucky-card[data-lucky-winner="true"] > .audio-card {
+  position: relative;
+  z-index: 0;
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.echostars-v141-home .v141-home-search-row > button[title="從目前條件下可播放的音檔中召喚繁星解答"]:first-child,
+  html.echostars-v141-home .v141-home-search-row > button[title="從目前條件下可播放的音檔中召喚繁星解答"]:first-child::before {
+    animation: none !important;
+  }
+}
