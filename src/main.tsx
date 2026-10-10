@@ -4,6 +4,8 @@ import App from './App.tsx';
 import './index.css';
 import './mobileMenuHalfLayout.css';
 import './v166FilterSearchMatch.css';
+import './taiwanCrownMenuLink';
+import './v171ChangelogNote';
 
 // Old long VIP links (?vipToken=...&trackId=...) are retired. Strip those
 // named parameters before React starts, including when somebody appends them
