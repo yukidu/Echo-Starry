@@ -97,10 +97,20 @@ jobs:
             node scripts/verifyThemeMenuUi.mjs
           fi
 
-          if ! node scripts/verifyCategoryFilterUi.mjs; then
-            echo "Category browser UI check startup failed once; retrying one final time."
-            sleep 2
-            node scripts/verifyCategoryFilterUi.mjs
+          # v167 intentionally replaces the old category dropdown with a full-page selector.
+          # Keep the old checker only as a fallback for branches that do not contain v167.
+          if [ -f scripts/verifyV167CategoryFilterUi.mjs ]; then
+            if ! node scripts/verifyV167CategoryFilterUi.mjs; then
+              echo "v167 category browser UI check startup failed once; retrying one final time."
+              sleep 2
+              node scripts/verifyV167CategoryFilterUi.mjs
+            fi
+          else
+            if ! node scripts/verifyCategoryFilterUi.mjs; then
+              echo "Category browser UI check startup failed once; retrying one final time."
+              sleep 2
+              node scripts/verifyCategoryFilterUi.mjs
+            fi
           fi
 
           if ! node scripts/verifyV156Ui.mjs; then
