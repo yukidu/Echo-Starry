@@ -1,0 +1,46 @@
+/* v174: Taiwan Crown Ambassadors is a real in-app page, not a fixed overlay.
+ * The existing Crown renderer is preserved, but while it is open the regular
+ * Echo Stars <main> stops participating in layout/paint and the Crown section
+ * becomes normal document flow below the shared navbar. */
+
+body[data-taiwan-crown-open="true"] #root > div {
+  min-height: 0 !important;
+}
+
+body[data-taiwan-crown-open="true"] #root > div > main {
+  display: none !important;
+}
+
+body[data-taiwan-crown-open="true"] #taiwan-crown-integrated-page.taiwan-crown-overlay {
+  position: static !important;
+  inset: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  z-index: auto !important;
+  width: 100%;
+  min-height: calc(100dvh - 56px);
+  overflow: visible !important;
+  overscroll-behavior: auto !important;
+  background: var(--theme-gradient-bg, linear-gradient(135deg, #fdf8f9, #f9f1f3)) !important;
+  isolation: isolate;
+  contain: layout style paint;
+}
+
+body[data-taiwan-crown-open="true"] #taiwan-crown-integrated-page .taiwan-crown-page-shell {
+  min-height: calc(100dvh - 56px);
+}
+
+/* The page itself owns the screen while open; the old home list must never
+ * show through in light mode or dark mode. */
+body[data-taiwan-crown-open="true"] {
+  background: var(--theme-gradient-bg, linear-gradient(135deg, #fdf8f9, #f9f1f3));
+}
+
+@supports not (height: 100dvh) {
+  body[data-taiwan-crown-open="true"] #taiwan-crown-integrated-page.taiwan-crown-overlay,
+  body[data-taiwan-crown-open="true"] #taiwan-crown-integrated-page .taiwan-crown-page-shell {
+    min-height: calc(100vh - 56px);
+  }
+}
