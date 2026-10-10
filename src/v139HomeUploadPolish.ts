@@ -197,9 +197,18 @@ function syncManagementMode(page: HTMLElement, tab: UploadWorkspaceTab) {
   if (button && button.getAttribute('aria-selected') !== 'true') button.click();
 }
 
+function centerSelectedUploadTab(page: HTMLElement, tab: UploadWorkspaceTab) {
+  const selected = page.querySelector<HTMLButtonElement>(`.v139-upload-tab[data-tab="${tab}"]`);
+  const scroller = selected?.closest<HTMLElement>('.v139-upload-tabs-scroll');
+  if (!selected || !scroller) return;
+  const left = selected.offsetLeft - Math.max(0, (scroller.clientWidth - selected.offsetWidth) / 2);
+  scroller.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
+}
+
 function setUploadTab(page: HTMLElement, tab: UploadWorkspaceTab) {
   const allowedTab: UploadWorkspaceTab = tab === 'community' && !isSuperAdminMode() ? 'manage' : tab;
-  if (page.dataset.v139UploadTab !== allowedTab) page.dataset.v139UploadTab = allowedTab;
+  const changed = page.dataset.v139UploadTab !== allowedTab;
+  if (changed) page.dataset.v139UploadTab = allowedTab;
   page.querySelectorAll<HTMLButtonElement>('.v139-upload-tab').forEach(button => {
     const desired = button.dataset.tab === allowedTab ? 'true' : 'false';
     if (button.getAttribute('aria-selected') !== desired) button.setAttribute('aria-selected', desired);
@@ -213,8 +222,7 @@ function setUploadTab(page: HTMLElement, tab: UploadWorkspaceTab) {
   if (actionGroup && actionGroup.dataset.v139UploadActions !== '1') actionGroup.dataset.v139UploadActions = '1';
 
   syncManagementMode(page, allowedTab);
-  const selected = page.querySelector<HTMLButtonElement>(`.v139-upload-tab[data-tab="${allowedTab}"]`);
-  selected?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  if (changed) centerSelectedUploadTab(page, allowedTab);
 }
 
 function makeScrollButton(direction: 'left' | 'right', scroller: HTMLElement) {
