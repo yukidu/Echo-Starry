@@ -53,6 +53,7 @@ function installStyles() {
       gap: .45rem !important;
       overflow: hidden !important;
       white-space: nowrap !important;
+      touch-action: manipulation;
       border-radius: 17px !important;
       border: 1px solid color-mix(in srgb,var(--color-primary,#c06c84) 62%,white) !important;
       background-image:
@@ -109,13 +110,17 @@ function installStyles() {
       .v141-home-search-row > button:first-child > span::after { font-size: 1.04rem !important; }
     }
 
-    /* v164: keep the v162 floating result presentation, but give the winner
-       one explicit stacking owner above every normal/open AudioCard. This is
-       intentionally not another patch layer: the same final home UI policy owns
-       summon styling and lucky-result layering. */
+    /* v165: keep the original v162 floating result, but let the result layer
+       own the frontmost stack and size the notice only to its actual content. */
+    html.echostars-v141-home .audio-card-grid:has(> .lucky-card[data-lucky-winner="true"]) {
+      position: relative !important;
+      z-index: 700 !important;
+      overflow: visible !important;
+      isolation: isolate;
+    }
     .audio-card-grid > .lucky-card[data-lucky-winner="true"] {
       position: relative !important;
-      z-index: 520 !important;
+      z-index: 720 !important;
       overflow: visible !important;
       isolation: isolate;
     }
@@ -126,9 +131,9 @@ function installStyles() {
       top: auto !important;
       bottom: calc(100% + .55rem) !important;
       transform: translateX(-50%) !important;
-      z-index: 560 !important;
-      width: min(88vw, 28rem) !important;
-      max-width: 28rem !important;
+      z-index: 760 !important;
+      width: max-content !important;
+      max-width: min(88vw, 28rem) !important;
       margin: 0 !important;
       box-sizing: border-box;
       pointer-events: none;
@@ -140,10 +145,17 @@ function installStyles() {
       top: -1.25rem !important;
       bottom: auto !important;
       transform: none !important;
-      z-index: 550 !important;
+      z-index: 750 !important;
       width: max-content;
       max-width: calc(100% - 1rem);
       margin: 0 !important;
+    }
+
+    /* During the reel, cards are visual output only. Disabling pointer events
+       prevents a mobile release/ghost click from opening a card while cards are
+       being reordered under the finger. */
+    .audio-card-grid.lucky-spin-active .audio-card {
+      pointer-events: none !important;
     }
 
     /* v156: 召喚繁星的活動焦點固定在第一張卡片。 */
