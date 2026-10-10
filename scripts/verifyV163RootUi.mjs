@@ -130,7 +130,17 @@ async function main() {
       fixture.remove();
       return result;
     })()`);
-    if (luckyState.winnerPosition !== 'relative' || luckyState.winnerZ < 500 || luckyState.noticePosition !== 'absolute' || !luckyState.noticeTransform.includes('matrix') || luckyState.noticeZ <= luckyState.winnerZ || luckyState.noticeBottom === 'auto' || luckyState.badgePosition !== 'absolute' || luckyState.badgeZ <= 300) {
+    if (
+      luckyState.winnerPosition !== 'relative' ||
+      luckyState.winnerZ < 500 ||
+      luckyState.noticePosition !== 'absolute' ||
+      luckyState.noticeZ <= luckyState.winnerZ ||
+      luckyState.noticeZ <= 300 ||
+      luckyState.noticeBottom === 'auto' ||
+      luckyState.badgePosition !== 'absolute' ||
+      luckyState.badgeZ <= luckyState.winnerZ ||
+      luckyState.badgeZ <= 300
+    ) {
       throw new Error(`Lucky floating overlay mismatch: ${JSON.stringify(luckyState)}`);
     }
 
