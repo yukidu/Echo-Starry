@@ -110,7 +110,10 @@ async function main() {
       const fixture = document.createElement('div');
       fixture.className = 'audio-card-grid';
       fixture.style.display = 'block';
-      fixture.innerHTML = '<div class="lucky-card" data-lucky-winner="true"><div class="lucky-answer-notice">宇宙繁星給你的回應 +20</div><div class="lucky-winner-badge">✨ 好手氣！✨</div><div class="audio-card" style="height:120px">WINNER</div></div><div class="lucky-card" style="position:relative;z-index:300"><div class="audio-card" style="height:120px">NEXT CARD</div></div>';
+      fixture.style.position = 'relative';
+      fixture.style.width = '360px';
+      fixture.style.minHeight = '260px';
+      fixture.innerHTML = '<div class="lucky-card" data-lucky-winner="true" style="position:relative;width:360px;min-height:120px;display:block"><div class="lucky-answer-notice">宇宙繁星給你的回應 +20</div><div class="lucky-winner-badge">✨ 好手氣！✨</div><div class="audio-card" style="height:120px;width:360px">WINNER</div></div><div class="lucky-card" style="position:relative;z-index:300;width:360px"><div class="audio-card" style="height:120px;width:360px">NEXT CARD</div></div>';
       document.body.appendChild(fixture);
       const winner = fixture.querySelector('.lucky-card[data-lucky-winner="true"]');
       const notice = fixture.querySelector('.lucky-answer-notice');
