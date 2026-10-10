@@ -402,8 +402,8 @@ function renderCrownPage() {
 
 function openCrownPage() {
   const overlay = ensureOverlay();
-  renderCrownPage();
   overlay.hidden = false;
+  renderCrownPage();
   overlay.scrollTop = 0;
   document.body.dataset.taiwanCrownOpen = 'true';
   closeReactMenu();
@@ -584,7 +584,8 @@ function syncProfileMottoFields() {
       if (!existing) host.insertAdjacentElement('afterend', createProfileMottoView(member));
       else {
         const value = existing.querySelector<HTMLElement>('[data-profile-motto-value]');
-        if (value) value.textContent = effectiveMotto(member) || '未填寫';
+        const nextText = effectiveMotto(member) || '未填寫';
+        if (value && value.textContent !== nextText) value.textContent = nextText;
       }
     } else if (label.tagName === 'LABEL' && !parent.querySelector('[data-profile-motto-edit]')) {
       host.insertAdjacentElement('afterend', createProfileMottoEditor(member));
@@ -615,7 +616,12 @@ function shouldKeepCrownOpenForHeaderAction(target: Element) {
 
 function startCrownIntegration() {
   syncCrownUi();
-  const observer = new MutationObserver(syncCrownUi);
+  let observer: MutationObserver;
+  observer = new MutationObserver(() => {
+    observer.disconnect();
+    try { syncCrownUi(); }
+    finally { observer.observe(document.body, { childList: true, subtree: true }); }
+  });
   observer.observe(document.body, { childList: true, subtree: true });
 
   window.addEventListener('resize', syncCrownFontZoom);
