@@ -42,7 +42,7 @@ async function main() {
   const chrome = spawn(chromeBinary(), [
     '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--hide-scrollbars',
     '--window-size=412,915', '--remote-debugging-address=127.0.0.1', `--remote-debugging-port=${port}`,
-    `--user-data-dir=/tmp/echostars-v167-ui-${process.pid}`, 'about:blank'
+    `--user-data-dir=/tmp/echostars-v169-filter-${process.pid}`, 'about:blank'
   ], { stdio: 'ignore' });
 
   try {
@@ -87,43 +87,69 @@ async function main() {
     await send('Page.navigate', { url: APP_URL });
     await waitFor(`document.readyState === 'complete' && document.querySelectorAll('.v145-filter-button').length === 4`, 'four home filter buttons');
 
-    const pageTitles = { category: '分類', time: '時間排序', popular: '熱門推薦', advanced: '進階篩選' };
-    const pageStates = {};
-    for (const [key, title] of Object.entries(pageTitles)) {
-      await evaluate(`document.querySelector('.v145-filter-button[data-v145-button="${key}"]').click()`);
-      await waitFor(`document.querySelector('[data-v167-filter-page="${key}"]')`, `${key} filter page`);
-      pageStates[key] = await evaluate(`(() => {
-        const page = document.querySelector('[data-v167-filter-page="${key}"]');
-        const host = page?.parentElement;
-        const card = page?.querySelector('.v167-filter-page-card');
-        return {
-          title: page?.querySelector('.v167-filter-page-title')?.textContent || '',
-          position: page ? getComputedStyle(page).position : '',
-          optionCount: page?.querySelectorAll('[data-v167-option]').length || 0,
-          hostMarked: host?.dataset.v167FilterPageOpen === 'true',
-          hiddenSiblingCount: host ? Array.from(host.children).filter(node => node !== page && node instanceof HTMLElement && node.dataset.v167FilterHidden === '1').length : 0,
-          cardMinHeight: card ? getComputedStyle(card).minHeight : ''
-        };
-      })()`);
-      // This generic page-shell check may run without seeded live categories, so the
-      // category page can legitimately contain only "全部分類". The dedicated
-      // verifyV167CategoryFilterUi.mjs test seeds several categories and verifies
-      // consecutive real filtering selections end-to-end.
-      const minimumOptions = key === 'category' ? 1 : 2;
-      if (pageStates[key].title !== title || pageStates[key].position !== 'static' || pageStates[key].optionCount < minimumOptions || !pageStates[key].hostMarked || pageStates[key].hiddenSiblingCount < 1) {
-        throw new Error(`${key} page mismatch: ${JSON.stringify(pageStates[key])}`);
-      }
-      await evaluate(`document.querySelector('[data-v167-filter-page-close]')?.click()`);
-      await waitFor(`!document.querySelector('[data-v167-filter-page]')`, `${key} filter page close`);
+    // Category and advanced return to direct dropdowns; they must never create a v167 full page.
+    await evaluate(`document.querySelector('.v145-filter-button[data-v145-button="category"]')?.click()`);
+    await waitFor(`document.querySelector('[data-v145-menu="category"]') && !document.querySelector('[data-v145-menu="category"]').hidden`, 'category dropdown');
+    const categoryState = await evaluate(`(() => ({
+      menuOpen: !document.querySelector('[data-v145-menu="category"]')?.hidden,
+      fullPage: !!document.querySelector('[data-v167-filter-page]'),
+      optionCount: document.querySelectorAll('[data-v145-menu="category"] button').length
+    }))()`);
+    if (!categoryState.menuOpen || categoryState.fullPage || categoryState.optionCount < 1) throw new Error(`Category dropdown mismatch: ${JSON.stringify(categoryState)}`);
+    await evaluate(`document.body.click()`);
+
+    await evaluate(`document.querySelector('.v145-filter-button[data-v145-button="advanced"]')?.click()`);
+    await waitFor(`document.querySelector('[data-v145-menu="advanced"]') && !document.querySelector('[data-v145-menu="advanced"]').hidden`, 'advanced dropdown');
+    const advancedState = await evaluate(`(() => ({
+      menuOpen: !document.querySelector('[data-v145-menu="advanced"]')?.hidden,
+      fullPage: !!document.querySelector('[data-v167-filter-page]'),
+      optionCount: document.querySelectorAll('[data-v145-menu="advanced"] button').length
+    }))()`);
+    if (!advancedState.menuOpen || advancedState.fullPage || advancedState.optionCount < 2) throw new Error(`Advanced dropdown mismatch: ${JSON.stringify(advancedState)}`);
+    await evaluate(`document.body.click()`);
+
+    // Time and popular are direct cycle buttons. Their labels must show the live mode.
+    const timeBefore = await evaluate(`document.querySelector('[data-v145-label="time"]')?.textContent?.trim() || ''`);
+    await evaluate(`document.querySelector('.v145-filter-button[data-v145-button="time"]')?.click()`);
+    await waitFor(`document.querySelector('.v145-filter-button[data-v145-button="time"]')?.dataset.active === 'true'`, 'time sort active');
+    const timeFirst = await evaluate(`document.querySelector('[data-v145-label="time"]')?.textContent?.trim() || ''`);
+    await evaluate(`document.querySelector('.v145-filter-button[data-v145-button="time"]')?.click()`);
+    await waitFor(`document.querySelector('[data-v145-label="time"]')?.textContent?.trim() !== ${JSON.stringify(timeFirst)}`, 'time sort cycle');
+    const timeSecond = await evaluate(`document.querySelector('[data-v145-label="time"]')?.textContent?.trim() || ''`);
+    if (timeBefore !== '最新上架' || timeFirst !== '最新上架' || timeSecond !== '最早上架') {
+      throw new Error(`Time cycle mismatch: ${JSON.stringify({ timeBefore, timeFirst, timeSecond })}`);
     }
 
-    await evaluate(`document.querySelector('.v145-filter-button[data-v145-button="time"]').click()`);
-    await waitFor(`document.querySelector('[data-v167-filter-page="time"]')`, 'time filter page selection');
-    await evaluate(`Array.from(document.querySelectorAll('[data-v167-option]')).find(button => button.textContent.includes('最新上架'))?.click()`);
-    await waitFor(`!document.querySelector('[data-v167-filter-page]') && document.querySelector('.v145-filter-button[data-v145-button="time"]')?.dataset.active === 'true'`, 'time choice applied');
-    const timeLabel = await evaluate(`document.querySelector('[data-v145-label="time"]')?.textContent?.trim() || ''`);
-    if (timeLabel !== '最新上架') throw new Error(`Time selection did not apply: ${timeLabel}`);
+    await evaluate(`document.querySelector('.v145-filter-button[data-v145-button="popular"]')?.click()`);
+    await waitFor(`document.querySelector('.v145-filter-button[data-v145-button="popular"]')?.dataset.active === 'true'`, 'popular sort active');
+    const popularFirst = await evaluate(`document.querySelector('[data-v145-label="popular"]')?.textContent?.trim() || ''`);
+    await evaluate(`document.querySelector('.v145-filter-button[data-v145-button="popular"]')?.click()`);
+    await waitFor(`document.querySelector('[data-v145-label="popular"]')?.textContent?.trim() !== ${JSON.stringify(popularFirst)}`, 'popular sort cycle');
+    const popularSecond = await evaluate(`document.querySelector('[data-v145-label="popular"]')?.textContent?.trim() || ''`);
+    if (popularFirst !== '評價最高' || popularSecond !== '按讚最多') {
+      throw new Error(`Popular cycle mismatch: ${JSON.stringify({ popularFirst, popularSecond })}`);
+    }
 
+    const activePaletteState = await evaluate(`(() => {
+      const active = document.querySelector('.v145-filter-button[data-v145-button="popular"]');
+      const probe = document.createElement('div');
+      probe.style.backgroundColor = 'var(--color-primary,#c06c84)';
+      document.body.appendChild(probe);
+      const result = {
+        active: active?.dataset.active === 'true',
+        activeBg: active ? getComputedStyle(active).backgroundColor : '',
+        primaryBg: getComputedStyle(probe).backgroundColor,
+        activeColor: active ? getComputedStyle(active).color : '',
+        fullPage: !!document.querySelector('[data-v167-filter-page]')
+      };
+      probe.remove();
+      return result;
+    })()`);
+    if (!activePaletteState.active || activePaletteState.activeBg !== activePaletteState.primaryBg || activePaletteState.fullPage) {
+      throw new Error(`Active palette mismatch: ${JSON.stringify(activePaletteState)}`);
+    }
+
+    // The audio editor remains a real full page below the navbar.
     const editorState = await evaluate(`(async () => {
       const fixture = document.createElement('div');
       fixture.className = 'v161-track-editor-overlay';
@@ -149,10 +175,11 @@ async function main() {
       throw new Error(`Audio editor page mismatch: ${JSON.stringify(editorState)}`);
     }
 
+    const state = { categoryState, advancedState, timeBefore, timeFirst, timeSecond, popularFirst, popularSecond, activePaletteState, editorState };
     const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
-    await writeFile('/tmp/echostars-v167-page-navigation.png', Buffer.from(shot.data, 'base64'));
-    await writeFile('/tmp/echostars-v167-page-navigation-state.json', JSON.stringify({ pageStates, timeLabel, editorState }, null, 2));
-    console.log('v167 page navigation verified:', JSON.stringify({ pageStates, timeLabel, editorState }));
+    await writeFile('/tmp/echostars-v169-filter-toolbar.png', Buffer.from(shot.data, 'base64'));
+    await writeFile('/tmp/echostars-v169-filter-toolbar-state.json', JSON.stringify(state, null, 2));
+    console.log('v169 direct filter behavior verified:', JSON.stringify(state));
     socket.close();
   } finally {
     chrome.kill('SIGTERM');
