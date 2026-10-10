@@ -1,0 +1,419 @@
+.taiwan-crown-line-icon {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 1rem;
+  color: currentColor;
+}
+
+.taiwan-crown-top-slot {
+  cursor: pointer !important;
+}
+
+.taiwan-crown-top-action {
+  background: rgb(241 245 249);
+  color: rgb(51 65 85);
+}
+
+.dark .taiwan-crown-top-action {
+  background: rgb(30 41 59);
+  color: rgb(226 232 240);
+}
+
+.taiwan-crown-top-action:hover {
+  background: rgb(226 232 240);
+  color: var(--color-primary, #c06c84);
+}
+
+.dark .taiwan-crown-top-action:hover {
+  background: rgb(51 65 85);
+  color: var(--color-primary, #c06c84);
+}
+
+.taiwan-crown-overlay {
+  --taiwan-crown-font-zoom: 1;
+  position: fixed;
+  top: 56px;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--theme-gradient-bg, linear-gradient(135deg, #fdf8f9, #f9f1f3));
+  color: var(--theme-text-primary, #1e293b);
+  font-size: calc(16px * var(--taiwan-crown-font-zoom));
+  -webkit-overflow-scrolling: touch;
+}
+
+.taiwan-crown-overlay[hidden] {
+  display: none !important;
+}
+
+.taiwan-crown-page-shell {
+  width: min(100%, 680px);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 0.8em 1em calc(7.5em + env(safe-area-inset-bottom));
+}
+
+.taiwan-crown-page-top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 2.7em;
+}
+
+.taiwan-crown-back {
+  min-height: 2.5em;
+  padding: 0 1em;
+  border: 1px solid var(--theme-border-subtle, #e2e8f0);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--theme-card-bg, #fff) 92%, transparent);
+  color: var(--theme-text-primary, #1e293b);
+  box-shadow: 0 4px 14px rgb(15 23 42 / 0.08);
+  font-size: 0.78em;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.dark .taiwan-crown-back {
+  border-color: rgb(71 85 105);
+  background: rgb(30 41 59 / 0.92);
+  color: rgb(241 245 249);
+}
+
+.taiwan-crown-hero {
+  padding: 1.25em 0.5em 1.4em;
+  text-align: center;
+}
+
+.taiwan-crown-emblem {
+  display: grid;
+  width: 3.8em;
+  height: 3.8em;
+  margin: 0 auto 0.7em;
+  place-items: center;
+  border-radius: 1.2em;
+  background: color-mix(in srgb, var(--color-primary, #c06c84) 13%, var(--theme-card-bg, #fff));
+  color: var(--color-primary, #c06c84);
+  border: 1px solid color-mix(in srgb, var(--color-primary, #c06c84) 34%, transparent);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--color-primary, #c06c84) 18%, transparent);
+}
+
+.taiwan-crown-hero-icon {
+  width: 2.15em;
+  height: 2.15em;
+  color: currentColor;
+}
+
+.taiwan-crown-hero h1 {
+  margin: 0;
+  color: var(--color-primary, #c06c84);
+  font-size: clamp(1.55em, 6vw, 2.25em);
+  font-weight: 950;
+  line-height: 1.2;
+  letter-spacing: 0.045em;
+}
+
+.taiwan-crown-hero p {
+  margin: 0.55em 0 0;
+  color: var(--theme-text-secondary, #64748b);
+  font-size: 0.92em;
+  font-weight: 750;
+}
+
+.taiwan-crown-cards {
+  display: grid;
+  gap: 0.8em;
+}
+
+.taiwan-crown-card {
+  display: grid;
+  grid-template-columns: 5.2em minmax(0, 1fr) 1.4em;
+  align-items: center;
+  gap: 0.85em;
+  width: 100%;
+  min-height: 7em;
+  padding: 0.85em;
+  border: 1px solid var(--theme-border-subtle, #e2e8f0);
+  border-radius: 1.45em;
+  background: color-mix(in srgb, var(--theme-card-bg, #fff) 94%, transparent);
+  color: var(--theme-text-primary, #1e293b);
+  text-align: left;
+  text-decoration: none;
+  box-shadow: 0 12px 30px rgb(15 23 42 / 0.09);
+  cursor: pointer;
+  transition: transform 150ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  animation: taiwanCrownFadeUp 420ms ease both;
+}
+
+.dark .taiwan-crown-card {
+  border-color: rgb(71 85 105 / 0.78);
+  background: rgb(15 23 42 / 0.88);
+  color: rgb(248 250 252);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 0.3);
+}
+
+.taiwan-crown-card:hover {
+  border-color: color-mix(in srgb, var(--color-primary, #c06c84) 52%, var(--theme-border-subtle, #e2e8f0));
+  box-shadow: 0 16px 36px color-mix(in srgb, var(--color-primary, #c06c84) 15%, rgb(15 23 42 / 0.12));
+  transform: translateY(-2px);
+}
+
+.taiwan-crown-card:active {
+  transform: scale(0.985);
+}
+
+.taiwan-crown-member-card {
+  margin-bottom: 0.35em;
+  border-width: 2px;
+  border-color: color-mix(in srgb, var(--color-primary, #c06c84) 70%, #d4af37);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--color-primary, #c06c84) 10%, var(--theme-card-bg, #fff)),
+    var(--theme-card-bg, #fff));
+}
+
+.dark .taiwan-crown-member-card {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--color-primary, #c06c84) 18%, #0f172a),
+    #0f172a);
+}
+
+.taiwan-crown-avatar-ring {
+  width: 5em;
+  height: 5em;
+  padding: 0.2em;
+  border-radius: 50%;
+  background: linear-gradient(145deg,
+    var(--color-primary, #c06c84),
+    color-mix(in srgb, var(--color-primary, #c06c84) 45%, #eab308),
+    var(--color-primary, #c06c84));
+  box-shadow: 0 0 1.1em color-mix(in srgb, var(--color-primary, #c06c84) 18%, transparent);
+}
+
+.taiwan-crown-avatar {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid var(--theme-card-bg, #fff);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-primary, #c06c84) 10%, #e2e8f0);
+  color: var(--color-primary, #c06c84);
+  font-size: 1.7em;
+  font-weight: 950;
+}
+
+.dark .taiwan-crown-avatar {
+  border-color: #1e293b;
+  background: #0f172a;
+}
+
+.taiwan-crown-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.taiwan-crown-card-copy {
+  min-width: 0;
+}
+
+.taiwan-crown-card-name {
+  margin: 0 0 0.22em;
+  color: inherit;
+  font-size: 1.05em;
+  font-weight: 950;
+  line-height: 1.25;
+}
+
+.taiwan-crown-member-card .taiwan-crown-card-name {
+  color: var(--color-primary, #c06c84);
+}
+
+.taiwan-crown-card-quote {
+  margin: 0;
+  color: var(--theme-text-secondary, #64748b);
+  font-size: 0.8em;
+  font-style: italic;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+.dark .taiwan-crown-card-quote {
+  color: rgb(148 163 184);
+}
+
+.taiwan-crown-card-arrow {
+  color: var(--color-primary, #c06c84);
+  font-size: 1.45em;
+  font-weight: 900;
+  text-align: center;
+}
+
+.taiwan-crown-footer {
+  padding: 2.5em 0 1em;
+  color: var(--theme-text-secondary, #64748b);
+  font-size: 0.68em;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+.taiwan-crown-motto-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: 1.25em;
+  background: rgb(2 6 23 / 0.68);
+  backdrop-filter: blur(8px);
+}
+
+.taiwan-crown-motto-backdrop[hidden] {
+  display: none !important;
+}
+
+.taiwan-crown-motto-dialog {
+  width: min(100%, 25em);
+  padding: 1.25em;
+  border: 1px solid color-mix(in srgb, var(--color-primary, #c06c84) 38%, var(--theme-border-subtle, #e2e8f0));
+  border-radius: 1.4em;
+  background: var(--theme-card-bg, #fff);
+  color: var(--theme-text-primary, #1e293b);
+  box-shadow: 0 24px 65px rgb(0 0 0 / 0.3);
+}
+
+.dark .taiwan-crown-motto-dialog {
+  border-color: rgb(71 85 105);
+  background: #0f172a;
+  color: rgb(248 250 252);
+}
+
+.taiwan-crown-motto-dialog h2 {
+  margin: 0;
+  color: var(--color-primary, #c06c84);
+  font-size: 1.2em;
+  font-weight: 950;
+  text-align: center;
+}
+
+.taiwan-crown-motto-dialog > p {
+  margin: 0.4em 0 1em;
+  color: var(--theme-text-secondary, #64748b);
+  font-size: 0.76em;
+  text-align: center;
+}
+
+.taiwan-crown-motto-dialog textarea {
+  width: 100%;
+  min-height: 6em;
+  padding: 0.85em;
+  border: 1px solid var(--theme-border-subtle, #e2e8f0);
+  border-radius: 0.9em;
+  outline: none;
+  background: color-mix(in srgb, var(--theme-card-bg, #fff) 94%, #f8fafc);
+  color: var(--theme-text-primary, #1e293b);
+  font-size: 0.9em;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.dark .taiwan-crown-motto-dialog textarea {
+  border-color: rgb(71 85 105);
+  background: #1e293b;
+  color: rgb(248 250 252);
+}
+
+.taiwan-crown-motto-dialog textarea:focus {
+  border-color: var(--color-primary, #c06c84);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary, #c06c84) 15%, transparent);
+}
+
+.taiwan-crown-motto-status {
+  min-height: 1.3em;
+  margin-top: 0.45em;
+  color: var(--color-primary, #c06c84);
+  font-size: 0.72em;
+  font-weight: 750;
+  text-align: center;
+}
+
+.taiwan-crown-motto-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 0.55em;
+  margin-top: 0.7em;
+}
+
+.taiwan-crown-motto-actions button {
+  min-height: 2.8em;
+  border: 0;
+  border-radius: 0.85em;
+  font-size: 0.82em;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.taiwan-crown-motto-actions button:first-child {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.dark .taiwan-crown-motto-actions button:first-child {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+.taiwan-crown-motto-actions button:last-child {
+  background: var(--color-primary, #c06c84);
+  color: #fff;
+}
+
+.taiwan-crown-motto-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+@keyframes taiwanCrownFadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 420px) {
+  .taiwan-crown-page-shell {
+    padding-inline: 0.7em;
+  }
+
+  .taiwan-crown-card {
+    grid-template-columns: 4.55em minmax(0, 1fr) 1em;
+    gap: 0.65em;
+    min-height: 6.35em;
+    padding: 0.7em;
+    border-radius: 1.2em;
+  }
+
+  .taiwan-crown-avatar-ring {
+    width: 4.35em;
+    height: 4.35em;
+  }
+
+  .taiwan-crown-card-name {
+    font-size: 0.95em;
+  }
+
+  .taiwan-crown-card-quote {
+    font-size: 0.74em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .taiwan-crown-card {
+    animation: none;
+    transition: none;
+  }
+}
