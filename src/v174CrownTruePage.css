@@ -12,7 +12,7 @@ body[data-taiwan-crown-open="true"] #root > div > main {
 }
 
 body[data-taiwan-crown-open="true"] #taiwan-crown-integrated-page.taiwan-crown-overlay {
-  position: static !important;
+  position: relative !important;
   inset: auto !important;
   top: auto !important;
   right: auto !important;
