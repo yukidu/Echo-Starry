@@ -87,6 +87,9 @@ async function main() {
     await send('Runtime.enable');
     await send('Page.navigate', { url: APP_URL });
     await waitFor(`document.readyState === 'complete' && !!document.querySelector('[data-v145-filter-toolbar]')`, 'home filter toolbar');
+    // The search input and v145 buttons both animate color/background for 150ms.
+    // Compare their final rendered colors, not an intermediate transition frame.
+    await delay(300);
 
     const filterState = await evaluate(`(() => {
       const buttons = Array.from(document.querySelectorAll('.v145-filter-button'));
