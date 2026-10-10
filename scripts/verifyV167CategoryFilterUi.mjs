@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import net from 'node:net';
 
 const APP_URL = process.env.ECHOSTARS_UI_CHECK_URL || 'http://127.0.0.1:4173/';
-const DEBUG_JSON = '/tmp/echostars-v167-category-filter-state.json';
+const DEBUG_JSON = '/tmp/echostars-v169-category-filter-state.json';
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function chromeBinary() {
@@ -40,12 +40,12 @@ async function waitJson(url) {
 
 async function main() {
   const seededTracks = [
-    ['v167-business', '事業'],
-    ['v167-nutrition', '營養'],
-    ['v167-mindset', '心態思維']
+    ['v169-business', '事業'],
+    ['v169-nutrition', '營養'],
+    ['v169-mindset', '心態思維']
   ].map(([id, category], index) => ({
     id,
-    title: `V167 ${category} 測試音檔`,
+    title: `V169 ${category} 測試音檔`,
     speaker: '測試講者',
     speakerRank: '無',
     speakerAvatar: '',
@@ -73,7 +73,7 @@ async function main() {
   const chrome = spawn(chromeBinary(), [
     '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--hide-scrollbars',
     '--window-size=412,915', '--remote-debugging-address=127.0.0.1', `--remote-debugging-port=${port}`,
-    `--user-data-dir=/tmp/echostars-v167-category-${process.pid}`, 'about:blank'
+    `--user-data-dir=/tmp/echostars-v169-category-${process.pid}`, 'about:blank'
   ], { stdio: 'ignore' });
 
   try {
@@ -112,10 +112,6 @@ async function main() {
       }
       throw new Error(`Timed out waiting for ${label}`);
     };
-    const capture = async path => {
-      const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
-      await writeFile(path, Buffer.from(shot.data, 'base64'));
-    };
 
     await send('Page.enable');
     await send('Runtime.enable');
@@ -135,45 +131,39 @@ async function main() {
     const readState = () => evaluate(`(() => ({
       label: document.querySelector('[data-v145-label="category"]')?.textContent?.trim() || '',
       cards: Array.from(document.querySelectorAll('[data-track-card-id]')).map(el => el.getAttribute('data-track-card-id')),
-      pageOpen: !!document.querySelector('[data-v167-filter-page="category"]'),
-      pageOptions: Array.from(document.querySelectorAll('[data-v167-filter-page="category"] [data-v167-option]')).map(el => (el.textContent || '').trim())
+      menuOpen: !!document.querySelector('[data-v145-menu="category"]') && !document.querySelector('[data-v145-menu="category"]').hidden,
+      fullPage: !!document.querySelector('[data-v167-filter-page]'),
+      active: document.querySelector('.v145-filter-button[data-v145-button="category"]')?.dataset.active === 'true'
     }))()`);
 
-    const chooseCategory = async (displayLabel, expectedLabel, expectedCards, index) => {
+    const chooseCategory = async (displayLabel, expectedLabel, expectedCards) => {
       await evaluate(`document.querySelector('.v145-filter-button[data-v145-button="category"]')?.click()`);
-      await waitFor(`!!document.querySelector('[data-v167-filter-page="category"]')`, `full-page category view for ${displayLabel}`);
-      const before = await readState();
-      if (!before.pageOptions.includes(displayLabel)) {
-        throw new Error(`Missing category option ${displayLabel}; available=${JSON.stringify(before.pageOptions)}`);
-      }
-      await capture(`/tmp/echostars-v167-category-${index}-page.png`);
+      await waitFor(`document.querySelector('[data-v145-menu="category"]') && !document.querySelector('[data-v145-menu="category"]').hidden`, `category dropdown for ${displayLabel}`);
       const clicked = await evaluate(`(() => {
-        const button = Array.from(document.querySelectorAll('[data-v167-filter-page="category"] [data-v167-option]')).find(el => (el.textContent || '').trim().replace(/✓$/,'').trim() === ${JSON.stringify(displayLabel)});
+        const button = Array.from(document.querySelectorAll('[data-v145-menu="category"] button')).find(el => (el.textContent || '').trim() === ${JSON.stringify(displayLabel)});
         if (!button) return false;
         button.click();
         return true;
       })()`);
-      if (!clicked) throw new Error(`Could not click full-page category option ${displayLabel}`);
+      if (!clicked) throw new Error(`Could not click dropdown category ${displayLabel}`);
 
-      await waitFor(`!document.querySelector('[data-v167-filter-page]')`, `category page close for ${displayLabel}`);
       await waitFor(`document.querySelector('[data-v145-label="category"]')?.textContent?.trim() === ${JSON.stringify(expectedLabel)}`, `category label ${expectedLabel}`);
       await waitFor(`JSON.stringify(Array.from(document.querySelectorAll('[data-track-card-id]')).map(el => el.getAttribute('data-track-card-id')).sort()) === ${JSON.stringify(JSON.stringify([...expectedCards].sort()))}`, `filtered cards for ${expectedLabel}`);
 
       const state = await readState();
       states.push({ requested: displayLabel, ...state });
-      if (JSON.stringify([...state.cards].sort()) !== JSON.stringify([...expectedCards].sort())) {
+      if (state.menuOpen || state.fullPage || !state.active || JSON.stringify([...state.cards].sort()) !== JSON.stringify([...expectedCards].sort())) {
         throw new Error(`Category filter mismatch for ${expectedLabel}: ${JSON.stringify(state)}`);
       }
-      await capture(`/tmp/echostars-v167-category-${index}-result.png`);
     };
 
-    await chooseCategory('事業', '事業', ['v167-business'], 1);
-    await chooseCategory('營養', '營養', ['v167-nutrition'], 2);
-    await chooseCategory('心態思維', '心態思維', ['v167-mindset'], 3);
-    await chooseCategory('全部分類', '全部分類', ['v167-business', 'v167-nutrition', 'v167-mindset'], 4);
+    await chooseCategory('事業', '事業', ['v169-business']);
+    await chooseCategory('營養', '營養', ['v169-nutrition']);
+    await chooseCategory('心態思維', '心態思維', ['v169-mindset']);
+    await chooseCategory('全部', '全部分類', ['v169-business', 'v169-nutrition', 'v169-mindset']);
 
     await writeFile(DEBUG_JSON, JSON.stringify({ states }, null, 2), 'utf8');
-    console.log('v167 full-page category filtering verified across four consecutive selections:', JSON.stringify(states));
+    console.log('v169 dropdown category filtering verified across four consecutive selections:', JSON.stringify(states));
     socket.close();
   } finally {
     chrome.kill('SIGTERM');
