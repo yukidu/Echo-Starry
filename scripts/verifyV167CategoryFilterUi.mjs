@@ -160,7 +160,7 @@ async function main() {
     await chooseCategory('事業', '事業', ['v169-business']);
     await chooseCategory('營養', '營養', ['v169-nutrition']);
     await chooseCategory('心態思維', '心態思維', ['v169-mindset']);
-    await chooseCategory('全部', '全部分類', ['v169-business', 'v169-nutrition', 'v169-mindset']);
+    await chooseCategory('全部分類', '全部分類', ['v169-business', 'v169-nutrition', 'v169-mindset']);
 
     await writeFile(DEBUG_JSON, JSON.stringify({ states }, null, 2), 'utf8');
     console.log('v169 dropdown category filtering verified across four consecutive selections:', JSON.stringify(states));
