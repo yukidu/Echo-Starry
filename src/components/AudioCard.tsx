@@ -256,7 +256,7 @@ export const AudioCard: React.FC<AudioCardProps> = ({
                   className="absolute top-0 inset-x-0 text-white text-[7px] sm:text-[8px] font-black text-center px-1 py-1 whitespace-nowrap flex items-center justify-center z-30 shadow-2xs leading-none"
                   style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
                 >
-                  <span className="whitespace-nowrap">已聽 {guestProgressPercent}%</span>
+                  <span className="whitespace-nowrap">已聽{guestProgressPercent}%</span>
                 </div>
               ) : null
             ) : isCompleted ? (
@@ -264,23 +264,23 @@ export const AudioCard: React.FC<AudioCardProps> = ({
                 className="absolute top-0 inset-x-0 text-white text-[7px] sm:text-[8px] font-black text-center px-1 py-1 whitespace-nowrap flex items-center justify-center z-30 shadow-2xs leading-none"
                 style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
               >
-                <span className="whitespace-nowrap">[已聽100%]{commentRewardClaimed ? '已發' : '寫心得'}<span className="text-amber-200"> +{track.commentStickerReward || 0}</span> 張貼紙</span>
+                <span className="whitespace-nowrap">[已聽100%]{commentRewardClaimed ? '已發' : '寫心得'}<span className="text-red-500">+{track.commentStickerReward || 0}</span><span className="text-white">張貼紙</span></span>
               </div>
             ) : progressRatio > 0 ? (
               <div
                 className="absolute top-0 inset-x-0 text-white text-[7px] sm:text-[8px] font-black text-center px-1 py-1 z-30 shadow-2xs whitespace-nowrap leading-none"
                 style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}
               >
-                <span className="whitespace-nowrap">已聽 {Math.round(progressRatio * 100)}%｜聽完<span className="text-amber-200"> +{track.commentStickerReward || 0}</span> 張貼紙</span>
+                <span className="whitespace-nowrap">已聽{Math.round(progressRatio * 100)}%｜聽完<span className="text-red-500">+{track.commentStickerReward || 0}</span><span className="text-white">張貼紙</span></span>
               </div>
-            ) : <div className="absolute top-0 inset-x-0 z-30 bg-black/50 text-center py-1 text-[7px] sm:text-[8px] leading-none text-white whitespace-nowrap">寫心得 <span className="text-amber-200">+{track.commentStickerReward || 0}</span> 張貼紙</div>}
+            ) : <div className="absolute top-0 inset-x-0 z-30 bg-black/50 text-center py-1 text-[7px] sm:text-[8px] leading-none text-white whitespace-nowrap">寫心得<span className="text-red-500">+{track.commentStickerReward || 0}</span><span className="text-white">張貼紙</span></div>}
 
             <div
               className="absolute bottom-0 inset-x-0 z-30 flex items-center justify-center gap-0.5 bg-black/45 px-1 py-1 text-[7px] sm:text-[8px] leading-none font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)] whitespace-nowrap"
               title={`收聽權限：${isGuest ? displayRequiredRank : permissionStickerLabel}`}
             >
               {displayRequiredRank !== '公開' && <Lock className="w-2.5 h-2.5 shrink-0" />}
-              <span className="whitespace-nowrap">{displayRequiredRank}{!isGuest && stickerUnlockCost>0 && <>｜<span className="text-emerald-300">-{stickerUnlockCost}</span> 張貼紙</>}</span>
+              <span className="whitespace-nowrap">{displayRequiredRank}{!isGuest && stickerUnlockCost>0 && <>｜<span className="text-emerald-300">-{stickerUnlockCost}</span><span className="text-white">張貼紙</span></>}</span>
             </div>
           </button>
 
