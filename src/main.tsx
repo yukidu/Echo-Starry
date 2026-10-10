@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import './mobileMenuHalfLayout.css';
+import './homeLuckyDrawPresentation.css';
 import './globalNavigationPolicy';
 
 // Old long VIP links (?vipToken=...&trackId=...) are retired. Strip those
