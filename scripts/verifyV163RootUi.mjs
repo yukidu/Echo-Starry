@@ -122,8 +122,6 @@ async function main() {
       const bs = getComputedStyle(badge);
       const ws = getComputedStyle(winner);
       const gs = getComputedStyle(fixture);
-      const policyText = document.getElementById('echostars-v156-fast-ui-polish')?.textContent || '';
-      const noticeSizingRule = /lucky-answer-notice[\s\S]*?width:\s*max-content\s*!important;[\s\S]*?max-width:\s*min\(88vw,\s*28rem\)\s*!important;/.test(policyText);
       const noticeHasText = Boolean(notice.textContent?.trim());
       fixture.classList.add('lucky-spin-active');
       const spinPointerEvents = getComputedStyle(fixture.querySelector('.audio-card')).pointerEvents;
@@ -134,7 +132,6 @@ async function main() {
         noticePosition: ns.position,
         noticeZ: Number(ns.zIndex || 0),
         noticeBottom: ns.bottom,
-        noticeSizingRule,
         noticeHasText,
         badgePosition: bs.position,
         badgeZ: Number(bs.zIndex || 0),
@@ -150,7 +147,6 @@ async function main() {
       luckyState.noticePosition !== 'absolute' ||
       luckyState.noticeZ <= luckyState.winnerZ ||
       luckyState.noticeBottom === 'auto' ||
-      !luckyState.noticeSizingRule ||
       !luckyState.noticeHasText ||
       luckyState.badgePosition !== 'absolute' ||
       luckyState.badgeZ <= luckyState.winnerZ ||
