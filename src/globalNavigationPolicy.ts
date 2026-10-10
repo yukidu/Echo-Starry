@@ -73,15 +73,18 @@ function installGlobalNavigationStyle() {
     }
 
     /* v164: summon presentation is injected from the same runtime policy that
-       is known to execute on the live site, rather than depending on a fragile
-       text attribute stylesheet path. */
+       is known to execute on the live site. Inline-important sizing is also
+       applied in syncGlobalNavigationState so older high-specificity mobile
+       rules cannot shrink this dedicated action again. */
     .${SUMMON_BUTTON_CLASS} {
       position: relative !important;
       isolation: isolate !important;
       overflow: hidden !important;
+      box-sizing: border-box !important;
       height: 46px !important;
       min-height: 46px !important;
       max-height: 46px !important;
+      padding-block: 0 !important;
       padding-inline: 1.05rem !important;
       gap: 0.38rem !important;
       font-size: 1.28rem !important;
@@ -130,7 +133,7 @@ function installGlobalNavigationStyle() {
 
     .${SUMMON_BUTTON_CLASS} > span::after {
       content: "召喚繁星";
-      font-size: 1.28rem;
+      font-size: 1.28rem !important;
       font-weight: 900;
       line-height: 1;
     }
@@ -193,7 +196,7 @@ function installGlobalNavigationStyle() {
         padding-inline: 0.68rem !important;
       }
       .${SUMMON_BUTTON_CLASS} > span::after {
-        font-size: 1.08rem;
+        font-size: 1.08rem !important;
       }
     }
 
@@ -213,6 +216,16 @@ function syncGlobalNavigationState() {
 
   document.querySelectorAll<HTMLButtonElement>(SUMMON_BUTTON_SELECTOR).forEach(button => {
     button.classList.add(SUMMON_BUTTON_CLASS);
+    // Inline !important deliberately wins against legacy presentation rules
+    // that used selector specificity to force 50px/12px on this first button.
+    button.style.setProperty('box-sizing', 'border-box', 'important');
+    button.style.setProperty('height', '46px', 'important');
+    button.style.setProperty('min-height', '46px', 'important');
+    button.style.setProperty('max-height', '46px', 'important');
+    button.style.setProperty('padding-top', '0', 'important');
+    button.style.setProperty('padding-bottom', '0', 'important');
+    button.style.setProperty('font-size', '22px', 'important');
+    button.style.setProperty('line-height', '1', 'important');
   });
 }
 
