@@ -178,3 +178,10 @@
   header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button.sticker-menu-row > span,
   header > div[class~="md:hidden"][class*="slide-in-from-top-2"][class*="space-y-1"] > button.notification-menu-row > span { white-space: nowrap !important; }
 }
+
+/* v162: the track editor opened from detail/management is rendered in a body
+   portal. Keep that editor above normal page content but below the sticky
+   navbar (z-40), so the hamburger menu remains visible and clickable. */
+.v161-track-editor-overlay {
+  z-index: 30 !important;
+}
