@@ -48,6 +48,13 @@ export async function ensureMemberSchema(db: NonNullable<Env['DB']>) {
   await ready.get(db);
 }
 
+/** Canonical read path for internal and external member adapters. */
+export async function getMemberById(db: NonNullable<Env['DB']>, userId: string) {
+  await ensureMemberSchema(db);
+  const row: any = await db.prepare('SELECT * FROM users WHERE id = ? LIMIT 1').bind(userId).first();
+  return row ? normalizeMember(row) : null;
+}
+
 /** Called only after cryptographic Google verification; never accepts raw browser profile data. */
 export async function syncVerifiedMember(db: NonNullable<Env['DB']>, identity: VerifiedGoogleIdentity) {
   await ensureMemberSchema(db);
