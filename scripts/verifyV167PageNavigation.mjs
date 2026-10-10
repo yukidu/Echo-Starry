@@ -120,6 +120,10 @@ async function main() {
       throw new Error(`Time cycle mismatch: ${JSON.stringify({ timeBefore, timeFirst, timeSecond })}`);
     }
 
+    const popularInactiveBg = await evaluate(`(() => {
+      const button = document.querySelector('.v145-filter-button[data-v145-button="popular"]');
+      return button ? getComputedStyle(button).backgroundColor : '';
+    })()`);
     await evaluate(`document.querySelector('.v145-filter-button[data-v145-button="popular"]')?.click()`);
     await waitFor(`document.querySelector('.v145-filter-button[data-v145-button="popular"]')?.dataset.active === 'true'`, 'popular sort active');
     const popularFirst = await evaluate(`document.querySelector('[data-v145-label="popular"]')?.textContent?.trim() || ''`);
@@ -130,23 +134,25 @@ async function main() {
       throw new Error(`Popular cycle mismatch: ${JSON.stringify({ popularFirst, popularSecond })}`);
     }
 
+    // Browsers may serialize var()/color-mix() in different color spaces (rgb/oklab),
+    // so verify the visible contract instead of comparing serialization strings.
     const activePaletteState = await evaluate(`(() => {
       const active = document.querySelector('.v145-filter-button[data-v145-button="popular"]');
-      const probe = document.createElement('div');
-      probe.style.backgroundColor = 'var(--color-primary,#c06c84)';
-      document.body.appendChild(probe);
-      const result = {
+      return {
         active: active?.dataset.active === 'true',
         activeBg: active ? getComputedStyle(active).backgroundColor : '',
-        primaryBg: getComputedStyle(probe).backgroundColor,
         activeColor: active ? getComputedStyle(active).color : '',
         fullPage: !!document.querySelector('[data-v167-filter-page]')
       };
-      probe.remove();
-      return result;
     })()`);
-    if (!activePaletteState.active || activePaletteState.activeBg !== activePaletteState.primaryBg || activePaletteState.fullPage) {
-      throw new Error(`Active palette mismatch: ${JSON.stringify(activePaletteState)}`);
+    if (
+      !activePaletteState.active ||
+      !activePaletteState.activeBg ||
+      activePaletteState.activeBg === popularInactiveBg ||
+      activePaletteState.activeColor !== 'rgb(255, 255, 255)' ||
+      activePaletteState.fullPage
+    ) {
+      throw new Error(`Active palette mismatch: ${JSON.stringify({ popularInactiveBg, ...activePaletteState })}`);
     }
 
     // The audio editor remains a real full page below the navbar.
@@ -175,7 +181,7 @@ async function main() {
       throw new Error(`Audio editor page mismatch: ${JSON.stringify(editorState)}`);
     }
 
-    const state = { categoryState, advancedState, timeBefore, timeFirst, timeSecond, popularFirst, popularSecond, activePaletteState, editorState };
+    const state = { categoryState, advancedState, timeBefore, timeFirst, timeSecond, popularInactiveBg, popularFirst, popularSecond, activePaletteState, editorState };
     const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     await writeFile('/tmp/echostars-v169-filter-toolbar.png', Buffer.from(shot.data, 'base64'));
     await writeFile('/tmp/echostars-v169-filter-toolbar-state.json', JSON.stringify(state, null, 2));
