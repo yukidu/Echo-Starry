@@ -170,7 +170,7 @@ async function main() {
       probe.textContent = 'probe';
       probe.style.cssText = 'position:fixed;z-index:1;left:${Math.max(0, themePoint.x - 40)}px;top:${Math.max(70, themePoint.y - 22)}px;width:80px;height:44px;';
       probe.addEventListener('click', () => { window.__v164ProbeClicks += 1; });
-      document.body.appendChild(probe);
+      document.getElementById('root')?.appendChild(probe);
     })()`);
     await realClick(themePoint);
     await waitFor('!document.querySelector(".mobile-menu-panel")', 'menu close after normal action');
@@ -190,7 +190,7 @@ async function main() {
       probe.textContent = 'outside probe';
       probe.style.cssText = 'position:fixed;z-index:1;left:0;top:260px;width:32px;height:80px;';
       probe.addEventListener('click', () => { window.__v164OutsideProbeClicks += 1; });
-      document.body.appendChild(probe);
+      document.getElementById('root')?.appendChild(probe);
     })()`);
     await realClick({ x: 12, y: 300 });
     await waitFor('!document.querySelector(".mobile-menu-panel")', 'menu close after outside tap');
