@@ -59,8 +59,12 @@ let explicitPlaybackIntentUntil = 0;
 function isPlaybackControl(target: EventTarget | null) {
   const element = target instanceof Element ? target.closest('button') : null;
   if (!element) return false;
-  const label = `${element.getAttribute('aria-label') || ''} ${element.getAttribute('title') || ''}`;
-  return /(?:開始播放|繼續播放|暫停播放|照片播放|照片暫停)/.test(label);
+  const ariaLabel = element.getAttribute('aria-label') || '';
+  const title = element.getAttribute('title') || '';
+  const label = `${ariaLabel} ${title}`;
+  return /(?:開始播放|繼續播放|暫停播放|照片播放|照片暫停)/.test(label)
+    || title === '播放'
+    || title === '暫停';
 }
 
 function rememberPlaybackIntent(target: EventTarget | null) {
