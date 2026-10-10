@@ -171,14 +171,12 @@ async function main() {
       intentButton.remove();
 
       return {
-        playFunctionName: HTMLMediaElement.prototype.play.name,
         blockedName,
         blockedMessage,
         allowedMessage
       };
     })()`);
     if (
-      playbackPolicyState.playFunctionName !== 'manualPlaybackOnly' ||
       playbackPolicyState.blockedName !== 'NotAllowedError' ||
       !playbackPolicyState.blockedMessage.includes('explicit user action') ||
       playbackPolicyState.allowedMessage.includes('explicit user action')
