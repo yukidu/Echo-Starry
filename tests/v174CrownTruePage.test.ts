@@ -9,7 +9,7 @@ const release = readFileSync(new URL('../src/v174ReleaseNote.ts', import.meta.ur
 
 test('v174 loads after the legacy Crown integration and converts it to document flow', () => {
   assert.match(index, /\/src\/v174CrownTruePage\.ts/);
-  assert.match(css, /#taiwan-crown-integrated-page\.taiwan-crown-overlay[\s\S]*?position:\s*static\s*!important/);
+  assert.match(css, /#taiwan-crown-integrated-page\.taiwan-crown-overlay[\s\S]*?position:\s*relative\s*!important/);
   assert.match(css, /#root\s*>\s*div\s*>\s*main[\s\S]*?display:\s*none\s*!important/);
   assert.match(css, /overflow:\s*visible\s*!important/);
   assert.doesNotMatch(css, /backdrop-filter/);
