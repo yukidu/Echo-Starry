@@ -97,11 +97,10 @@ jobs:
             node scripts/verifyThemeMenuUi.mjs
           fi
 
-          # v167 intentionally replaces the old category dropdown with a full-page selector.
-          # Keep the old checker only as a fallback for branches that do not contain v167.
+          # v169 keeps category filtering as a direct dropdown and verifies repeated real selections.
           if [ -f scripts/verifyV167CategoryFilterUi.mjs ]; then
             if ! node scripts/verifyV167CategoryFilterUi.mjs; then
-              echo "v167 category browser UI check startup failed once; retrying one final time."
+              echo "Category dropdown browser UI check startup failed once; retrying one final time."
               sleep 2
               node scripts/verifyV167CategoryFilterUi.mjs
             fi
@@ -126,7 +125,7 @@ jobs:
           fi
 
           if ! node scripts/verifyV167PageNavigation.mjs; then
-            echo "v167 page-navigation browser check startup failed once; retrying one final time."
+            echo "v169 filter behavior/browser editor check startup failed once; retrying one final time."
             sleep 2
             node scripts/verifyV167PageNavigation.mjs
           fi
@@ -135,6 +134,12 @@ jobs:
             echo "v168 audio-edit save browser check startup failed once; retrying one final time."
             sleep 2
             node scripts/verifyV168AudioEditSave.mjs
+          fi
+
+          if ! node scripts/verifyV169UploadTabs.mjs; then
+            echo "v169 upload-tab browser check startup failed once; retrying one final time."
+            sleep 2
+            node scripts/verifyV169UploadTabs.mjs
           fi
 
       - name: Upload browser UI evidence
@@ -149,5 +154,6 @@ jobs:
             /tmp/echostars-v163-*
             /tmp/echostars-v167-*
             /tmp/echostars-v168-*
+            /tmp/echostars-v169-*
           if-no-files-found: ignore
           retention-days: 7
