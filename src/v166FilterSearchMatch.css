@@ -1,0 +1,37 @@
+/* v166: the four home filter/sort buttons use the same neutral card treatment
+   as the text search field instead of filling with the current theme primary. */
+html.echostars-v141-home .v145-filter-button {
+  background: color-mix(in srgb,var(--color-primary,#c06c84) 10%, var(--theme-card-bg,#fff)) !important;
+  color: var(--theme-text-primary,#0f172a) !important;
+  border-color: color-mix(in srgb,var(--color-primary,#c06c84) 32%,transparent) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 8px 22px rgba(15,23,42,.06) !important;
+  filter: none !important;
+}
+
+html.echostars-v141-home .v145-filter-button:hover,
+html.echostars-v141-home .v145-filter-button[data-open="true"],
+html.echostars-v141-home .v145-filter-button[data-active="true"] {
+  background: color-mix(in srgb,var(--color-primary,#c06c84) 14%, var(--theme-card-bg,#fff)) !important;
+  color: var(--theme-text-primary,#0f172a) !important;
+  border-color: color-mix(in srgb,var(--color-primary,#c06c84) 42%,transparent) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.62), 0 8px 22px rgba(15,23,42,.07) !important;
+  filter: none !important;
+}
+
+html.echostars-v141-home .v145-filter-chevron {
+  color: color-mix(in srgb,var(--theme-text-secondary,#475569) 76%,transparent) !important;
+}
+
+html.dark.echostars-v141-home .v145-filter-button,
+html.dark.echostars-v141-home .v145-filter-button:hover,
+html.dark.echostars-v141-home .v145-filter-button[data-open="true"],
+html.dark.echostars-v141-home .v145-filter-button[data-active="true"] {
+  background: rgba(18,25,40,.96) !important;
+  color: #f8fafc !important;
+  border-color: color-mix(in srgb,var(--color-primary,#c06c84) 42%,#334155) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 10px 24px rgba(0,0,0,.24) !important;
+}
+
+html.dark.echostars-v141-home .v145-filter-chevron {
+  color: #94a3b8 !important;
+}
