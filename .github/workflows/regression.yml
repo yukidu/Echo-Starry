@@ -142,6 +142,12 @@ jobs:
             node scripts/verifyV169UploadTabs.mjs
           fi
 
+          if ! node scripts/verifyV174CrownTruePage.mjs; then
+            echo "v174 Crown true-page browser check startup failed once; retrying one final time."
+            sleep 2
+            node scripts/verifyV174CrownTruePage.mjs
+          fi
+
       - name: Upload browser UI evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -155,5 +161,6 @@ jobs:
             /tmp/echostars-v167-*
             /tmp/echostars-v168-*
             /tmp/echostars-v169-*
+            /tmp/echostars-v174-*
           if-no-files-found: ignore
           retention-days: 7
