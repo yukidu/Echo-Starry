@@ -163,9 +163,13 @@ async function main() {
     await send('Page.navigate', { url: APP_URL });
     await waitFor('document.readyState === "complete" && !!document.querySelector("button[data-main-menu=\\"hamburger\\"]")', 'navbar hamburger');
 
-    await evaluate(`document.querySelector('button[data-main-menu="hamburger"]')?.click()`);
-    await waitFor('!!document.querySelector(".mobile-menu-panel")', 'hamburger menu');
-    await delay(200);
+    const openMenu = async () => {
+      await evaluate(`document.querySelector('button[data-main-menu="hamburger"]')?.click()`);
+      await waitFor('!!document.querySelector(".mobile-menu-panel")', 'hamburger menu');
+      await delay(200);
+    };
+
+    await openMenu();
 
     const readThemeState = async () => evaluate(`(() => {
       const panel = document.querySelector('.mobile-menu-panel');
@@ -227,8 +231,10 @@ async function main() {
       const icon = document.querySelector('.mobile-menu-panel svg.lucide-moon, .mobile-menu-panel svg.lucide-sun');
       icon?.closest('button')?.click();
     })()`);
-    await delay(300);
+    await waitFor('!document.querySelector(".mobile-menu-panel")', 'hamburger menu to close after theme action');
+    await delay(150);
 
+    await openMenu();
     const after = await readThemeState();
     await capture(SCREENSHOT_AFTER);
     const afterCrop = await captureThemeRowBase64();
@@ -239,8 +245,8 @@ async function main() {
       throw new Error(`Theme toggle did not change action state. before=${JSON.stringify(before)} after=${JSON.stringify(after)}`);
     }
 
-    await writeFile(DEBUG_JSON, JSON.stringify({ before, after }, null, 2), 'utf8');
-    console.log(`Browser UI verified: ${before.kind} -> ${before.text}; ${after.kind} -> ${after.text}`);
+    await writeFile(DEBUG_JSON, JSON.stringify({ before, after, menuClosedAfterToggle: true }, null, 2), 'utf8');
+    console.log(`Browser UI verified: ${before.kind} -> ${before.text}; menu closed; reopened -> ${after.kind} -> ${after.text}`);
     console.log(`Screenshots: ${SCREENSHOT_BEFORE}, ${SCREENSHOT_AFTER}`);
 
     socket.close();
