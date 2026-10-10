@@ -115,6 +115,12 @@ jobs:
             node scripts/verifyV163RootUi.mjs
           fi
 
+          if ! node scripts/verifyV167PageNavigation.mjs; then
+            echo "v167 page-navigation browser check startup failed once; retrying one final time."
+            sleep 2
+            node scripts/verifyV167PageNavigation.mjs
+          fi
+
       - name: Upload browser UI evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -125,5 +131,6 @@ jobs:
             /tmp/echostars-category-*
             /tmp/echostars-v156-*
             /tmp/echostars-v163-*
+            /tmp/echostars-v167-*
           if-no-files-found: ignore
           retention-days: 7
