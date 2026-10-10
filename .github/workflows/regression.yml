@@ -148,6 +148,12 @@ jobs:
             node scripts/verifyV174CrownTruePage.mjs
           fi
 
+          if ! node scripts/verifyV176CrownStoryInPage.mjs; then
+            echo "v176 Crown in-page story browser check failed once; retrying one final time."
+            sleep 2
+            node scripts/verifyV176CrownStoryInPage.mjs
+          fi
+
       - name: Upload browser UI evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -162,5 +168,6 @@ jobs:
             /tmp/echostars-v168-*
             /tmp/echostars-v169-*
             /tmp/echostars-v174-*
+            /tmp/echostars-v176-*
           if-no-files-found: ignore
           retention-days: 7
