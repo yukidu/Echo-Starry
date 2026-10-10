@@ -92,14 +92,30 @@ async function main() {
       const buttons = Array.from(document.querySelectorAll('.v145-filter-button'));
       const first = buttons[0];
       const style = first ? getComputedStyle(first) : null;
+      const search = document.querySelector('.v141-home-search-row input');
+      const searchStyle = search ? getComputedStyle(search) : null;
       return {
         count: buttons.length,
         height: style?.height || '',
         fontSize: style?.fontSize || '',
-        advancedIconCount: document.querySelectorAll('[data-v145-button="advanced"] .v145-filter-sliders').length
+        advancedIconCount: document.querySelectorAll('[data-v145-button="advanced"] .v145-filter-sliders').length,
+        backgroundColor: style?.backgroundColor || '',
+        color: style?.color || '',
+        borderTopColor: style?.borderTopColor || '',
+        searchBackgroundColor: searchStyle?.backgroundColor || '',
+        searchColor: searchStyle?.color || '',
+        searchBorderTopColor: searchStyle?.borderTopColor || ''
       };
     })()`);
-    if (filterState.count !== 4 || filterState.height !== '40px' || filterState.fontSize !== '14px' || filterState.advancedIconCount !== 0) {
+    if (
+      filterState.count !== 4 ||
+      filterState.height !== '40px' ||
+      filterState.fontSize !== '14px' ||
+      filterState.advancedIconCount !== 0 ||
+      filterState.backgroundColor !== filterState.searchBackgroundColor ||
+      filterState.color !== filterState.searchColor ||
+      filterState.borderTopColor !== filterState.searchBorderTopColor
+    ) {
       throw new Error(`Filter visual mismatch: ${JSON.stringify(filterState)}`);
     }
 
