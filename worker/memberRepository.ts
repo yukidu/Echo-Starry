@@ -4,14 +4,14 @@ export type VerifiedGoogleIdentity = { email: string; subject: string; name: str
 export class MemberIdentityError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
-export const MEMBER_SCHEMA_VERSION = 'member-profile-v157';
+export const MEMBER_SCHEMA_VERSION = 'member-profile-v172-motto';
 const ready = new WeakMap<object, Promise<void>>();
 export const userColumns: Record<string, string> = {
   auditedBy: 'TEXT', auditedAt: 'TEXT', residence: 'TEXT', birthday: 'TEXT',
   approvedRank: 'TEXT', rankAuditType: 'TEXT', canUpload: 'INTEGER DEFAULT 0',
   playCount: 'INTEGER DEFAULT 0', googleAvatar: 'TEXT', avatarUploadCount: 'INTEGER DEFAULT 0',
   avatarUploadMonth: 'TEXT', profileEditCount: 'INTEGER DEFAULT 0', profileEditMonth: 'TEXT',
-  zodiac: 'TEXT', talentNumber: 'INTEGER', lifeNumber: 'INTEGER'
+  zodiac: 'TEXT', talentNumber: 'INTEGER', lifeNumber: 'INTEGER', motto: 'TEXT'
 };
 export function normalizeMember(row: any) {
   const { googleSubject: _subject, __sessionExpiresAt: _expiry, ...fields } = row;
@@ -90,7 +90,7 @@ export async function syncVerifiedMember(db: NonNullable<Env['DB']>, identity: V
     rank: owner ? '鑽石' : '無', approvedRank: owner ? '鑽石' : '無', rankApproved: owner ? 1 : 0,
     rankAuditStatus: owner ? 'approved' : 'pending', isAdminUser: owner ? 1 : 0,
     isContributor: owner ? 1 : 0, canUpload: owner ? 1 : 0,
-    registerDate: now, lastActive: now, birthday: '', residence: '', center: ''
+    registerDate: now, lastActive: now, birthday: '', residence: '', center: '', motto: ''
   };
   const columns = Object.keys(member);
   try {

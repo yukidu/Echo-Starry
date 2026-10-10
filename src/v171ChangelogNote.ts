@@ -1,4 +1,4 @@
-const NOTE_ATTR = 'data-v171-release-note';
+const NOTE_ATTR = 'data-v172-release-note';
 
 function buildReleaseNote() {
   const note = document.createElement('div');
@@ -6,14 +6,15 @@ function buildReleaseNote() {
   note.className = 'mx-3 mt-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 text-xs shadow-sm';
   note.innerHTML = `
     <div class="flex items-center gap-2 mb-1.5">
-      <span aria-hidden="true">👑</span>
-      <strong class="text-sm text-slate-900 dark:text-slate-100">v171 最新改版｜臺灣皇冠大使</strong>
+      <span aria-hidden="true">♕</span>
+      <strong class="text-sm text-slate-900 dark:text-slate-100">v172 最新改版｜臺灣皇冠大使整合</strong>
     </div>
     <div class="space-y-1 text-slate-600 dark:text-slate-300 leading-relaxed">
-      <p>新增漢堡選單「臺灣皇冠大使」，訪客與會員都可直接開啟。</p>
-      <p>整合原 amway_crown 的 13 位皇冠大使成功故事、照片、語錄與官方連結。</p>
-      <p>姓名不再手動輸入：登入會員自動使用會員姓名；未登入時自動使用目前訪客暱稱。</p>
-      <p>皇冠頁主色與深／淺色模式會跟隨繁星回聲目前的視覺設定。</p>
+      <p>臺灣皇冠大使改為繁星回聲站內頁，保留置頂導覽、漢堡選單與浮動播放器，切換頁面不會中斷播放。</p>
+      <p>漢堡選單改用與其他功能一致的單色線條皇冠圖示；會員可勾選是否顯示在置頂主選單。</p>
+      <p>訪客只顯示 13 位皇冠大使故事；會員自己的照片直接同步個人基本資料，不再於皇冠頁修改。</p>
+      <p>新增會員基本資料「座右銘」欄位，與皇冠大使本人資訊卡雙向共用同一份資料。</p>
+      <p>皇冠頁同步支援繁星回聲字體放大縮小與目前主題配色，並移除登入身分提示、個人化設定與重設功能。</p>
     </div>`;
   return note;
 }
