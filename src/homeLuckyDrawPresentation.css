@@ -1,0 +1,109 @@
+/* v163: Home summon action keeps its original 46px height while becoming
+   visually prominent. The sparkle layer is decorative and never intercepts taps. */
+button[title="從目前條件下可播放的音檔中召喚繁星解答"] {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  height: 46px !important;
+  min-height: 46px !important;
+  max-height: 46px !important;
+  padding-inline: 0.95rem !important;
+  gap: 0.35rem !important;
+  font-size: clamp(1.15rem, 4.6vw, 1.48rem) !important;
+  line-height: 1 !important;
+  letter-spacing: 0.025em;
+  box-shadow:
+    0 4px 14px color-mix(in srgb, var(--color-primary, #c06c84) 30%, transparent),
+    inset 0 0 0 1px rgb(255 255 255 / 0.22);
+}
+
+button[title="從目前條件下可播放的音檔中召喚繁星解答"]::before {
+  content: "✦";
+  position: relative;
+  z-index: 2;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  font-size: 1.15em;
+  line-height: 1;
+  color: #fff7c2;
+  text-shadow: 0 0 5px rgb(255 255 255 / 0.95), 0 0 12px rgb(255 231 122 / 0.9);
+  animation: echostars-summon-icon 1.45s ease-in-out infinite;
+}
+
+button[title="從目前條件下可播放的音檔中召喚繁星解答"]::after {
+  content: "";
+  position: absolute;
+  inset: -45% -20%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 14% 42%, rgb(255 255 255 / 0.95) 0 1px, transparent 2px),
+    radial-gradient(circle at 35% 72%, rgb(255 244 180 / 0.9) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 62% 28%, rgb(255 255 255 / 0.9) 0 1px, transparent 2px),
+    radial-gradient(circle at 82% 60%, rgb(255 236 150 / 0.95) 0 1.5px, transparent 2.5px),
+    linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.28) 48%, transparent 66%);
+  transform: translateX(-18%) rotate(-4deg);
+  animation: echostars-summon-stars 2.25s ease-in-out infinite;
+}
+
+button[title="從目前條件下可播放的音檔中召喚繁星解答"] > span {
+  position: relative;
+  z-index: 2;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.22), 0 0 10px rgb(255 255 255 / 0.24);
+}
+
+@keyframes echostars-summon-icon {
+  0%, 100% { transform: rotate(-10deg) scale(0.86); opacity: 0.72; }
+  48% { transform: rotate(12deg) scale(1.24); opacity: 1; }
+}
+
+@keyframes echostars-summon-stars {
+  0% { opacity: 0.34; transform: translateX(-18%) rotate(-4deg); }
+  50% { opacity: 0.92; transform: translateX(8%) rotate(2deg); }
+  100% { opacity: 0.42; transform: translateX(22%) rotate(5deg); }
+}
+
+/* The bonus-sticker answer protrudes above the winning card. Raise the entire
+   winning stacking context, not only the label, so neighbouring audio cards
+   can never paint over the result on one- or two-column layouts. */
+.audio-card-grid.lucky-win-active > .lucky-card {
+  position: relative;
+  z-index: 1;
+}
+
+.audio-card-grid.lucky-win-active > .lucky-card[data-lucky-winner="true"] {
+  z-index: 90 !important;
+  isolation: isolate;
+  overflow: visible !important;
+}
+
+.audio-card-grid.lucky-win-active > .lucky-card[data-lucky-winner="true"] > .audio-card {
+  position: relative;
+  z-index: 1;
+}
+
+.audio-card-grid.lucky-win-active > .lucky-card[data-lucky-winner="true"] > .lucky-answer-notice {
+  position: absolute !important;
+  z-index: 140 !important;
+}
+
+.audio-card-grid.lucky-win-active > .lucky-card[data-lucky-winner="true"] > .lucky-winner-badge {
+  z-index: 130 !important;
+}
+
+@media (max-width: 380px) {
+  button[title="從目前條件下可播放的音檔中召喚繁星解答"] {
+    padding-inline: 0.65rem !important;
+    font-size: 1.08rem !important;
+    letter-spacing: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button[title="從目前條件下可播放的音檔中召喚繁星解答"]::before,
+  button[title="從目前條件下可播放的音檔中召喚繁星解答"]::after {
+    animation: none !important;
+  }
+}
