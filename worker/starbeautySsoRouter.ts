@@ -71,6 +71,52 @@ async function issueTicket(request: Request, env: Env) {
   return json({ code, redirect: `${STARBEAUTY_URL}/auth/callback?code=${encodeURIComponent(code)}` });
 }
 
+function starBeautyProfile(row: any) {
+  // 只同步「繁星回聲基本資料」與必要會員狀態；美力之星自己的老師/管理員角色不由這裡覆蓋。
+  // profileJson 在 StarBeauty 端保存，因此未來擴充基本資料欄位時，不需要改 StarBeauty D1 表結構。
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    avatar: row.avatar,
+    googleAvatar: row.googleAvatar,
+    amwayId: row.amwayId,
+    phone: row.phone,
+    residence: row.residence,
+    center: row.center,
+    rank: row.rank,
+    approvedRank: row.approvedRank,
+    rankApproved: Boolean(row.rankApproved),
+    rankAuditStatus: row.rankAuditStatus,
+    rankAuditType: row.rankAuditType,
+    rankUpdatedAt: row.rankUpdatedAt,
+    role: row.role,
+    joinReason: row.joinReason,
+    stayReason: row.stayReason,
+    sponsor: row.sponsor,
+    platinumUpline: row.platinumUpline,
+    diamondUpline: row.diamondUpline,
+    birthday: row.birthday || row.birthDate || '',
+    birthDate: row.birthDate,
+    zodiac: row.zodiac,
+    talentNumber: row.talentNumber,
+    lifeNumber: row.lifeNumber,
+    registerDate: row.registerDate,
+    auditedBy: row.auditedBy,
+    auditedAt: row.auditedAt,
+    isContributor: Boolean(row.isContributor),
+    isAdminUser: Boolean(row.isAdminUser),
+    canUpload: Boolean(row.canUpload),
+    isBlocked: Boolean(row.isBlocked),
+    avatarUploadCount: Number(row.avatarUploadCount || 0),
+    avatarUploadMonth: row.avatarUploadMonth,
+    profileEditCount: Number(row.profileEditCount || 0),
+    profileEditMonth: row.profileEditMonth,
+    playCount: Number(row.playCount || 0),
+    lastActive: row.lastActive
+  };
+}
+
 async function exchangeTicket(request: Request, env: Env) {
   await ensureTicketSchema(env);
   const body: any = await request.clone().json().catch(() => ({}));
@@ -83,12 +129,24 @@ async function exchangeTicket(request: Request, env: Env) {
     RETURNING userId
   `).bind(codeHash, Date.now()).first();
   if (!row?.userId) return json({ error: '授權碼無效或已過期' }, 401);
-  const user: any = await env.DB.prepare(`
-    SELECT id,email,name,avatar,role,rank,approvedRank,rankApproved,center
-    FROM users WHERE id = ? AND COALESCE(isBlocked,0) = 0 LIMIT 1
-  `).bind(String(row.userId)).first();
-  if (!user) return json({ error: '會員不存在或已停權' }, 401);
-  return json({ user });
+
+  const user: any = await env.DB.prepare('SELECT * FROM users WHERE id = ? LIMIT 1').bind(String(row.userId)).first();
+  if (!user || Number(user.isBlocked || 0) !== 0) return json({ error: '會員不存在或已停權' }, 401);
+
+  const profile = starBeautyProfile(user);
+  const profileHash = await hash(JSON.stringify(profile));
+  const profileUpdatedAt = String(user.rankUpdatedAt || user.auditedAt || user.registerDate || '');
+  return json({
+    user: {
+      id: String(user.id),
+      email: String(user.email || ''),
+      name: String(user.name || user.email || ''),
+      avatar: String(user.avatar || user.googleAvatar || '')
+    },
+    profile,
+    profileHash,
+    profileUpdatedAt
+  });
 }
 
 function loginPage() {
