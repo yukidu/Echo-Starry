@@ -1,6 +1,0 @@
-/* v162: the editor opened from track management/detail is rendered in a body portal.
-   Keep that editor above page content but below the sticky navbar (z-40), so the
-   hamburger menu always remains usable and visually on top. */
-.v161-track-editor-overlay {
-  z-index: 30 !important;
-}
