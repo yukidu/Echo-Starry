@@ -1,4 +1,4 @@
-import appWorker from './privacyCrawlerRouter';
+import sessionWorker from './sessionCookieRouter';
 import type { Env } from './index';
 
 const STARBEAUTY_URL = 'https://starbeauty.yukidu.workers.dev';
@@ -50,7 +50,7 @@ async function verifiedSession(request: Request, env: Env) {
     headers: request.headers,
     redirect: 'manual'
   });
-  const response = await appWorker.fetch(probe, env);
+  const response = await sessionWorker.fetch(probe, env);
   if (!response.ok) return null;
   const data: any = await response.json().catch(() => null);
   return data?.authenticated && data?.user?.id ? data.user : null;
@@ -72,8 +72,9 @@ async function issueTicket(request: Request, env: Env) {
 }
 
 function starBeautyProfile(row: any) {
-  // 只同步「繁星回聲基本資料」與必要會員狀態；美力之星自己的老師/管理員角色不由這裡覆蓋。
-  // profileJson 在 StarBeauty 端保存，因此未來擴充基本資料欄位時，不需要改 StarBeauty D1 表結構。
+  // 繁星回聲是會員主資料庫；這裡輸出「基本資料頁」完整快照與必要會員狀態。
+  // StarBeauty 將快照存成 JSON，所以往後新增基本資料欄位，不需要重做 StarBeauty D1 表結構。
+  // StarBeauty 自己的 student / teacher / admin / superadmin 權限不由這個 profile 覆蓋。
   return {
     id: row.id,
     email: row.email,
@@ -162,12 +163,12 @@ btn.onclick=go;go().catch(()=>renderGoogle());
   return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer' } });
 }
 
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-    if (url.pathname === '/auth/starbeauty' && request.method === 'GET') return loginPage();
-    if (url.pathname === '/api/auth/starbeauty-ticket' && request.method === 'POST') return issueTicket(request, env);
-    if (url.pathname === '/api/auth/starbeauty-exchange' && request.method === 'POST') return exchangeTicket(request, env);
-    return appWorker.fetch(request, env);
-  }
-};
+export async function handleStarbeautySso(request: Request, env: Env): Promise<Response | null> {
+  const url = new URL(request.url);
+  if (url.pathname === '/auth/starbeauty' && request.method === 'GET') return loginPage();
+  if (url.pathname === '/api/auth/starbeauty-ticket' && request.method === 'POST') return issueTicket(request, env);
+  if (url.pathname === '/api/auth/starbeauty-exchange' && request.method === 'POST') return exchangeTicket(request, env);
+  return null;
+}
+
+export default { handleStarbeautySso };
