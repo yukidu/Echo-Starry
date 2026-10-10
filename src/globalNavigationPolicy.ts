@@ -247,8 +247,24 @@ function installUniversalMainMenuDismissal() {
     const target = event.target instanceof Element ? event.target : null;
     if (!target || target.closest(MENU_BUTTON_SELECTOR)) return;
 
+    if (panel.contains(target)) {
+      // Keep the full press→release gesture owned by the menu action even if
+      // React redraws the row during the gesture. Without capture, mobile
+      // browsers can retarget pointerup/click to the page underneath.
+      const action = target.closest<HTMLElement>(MENU_ACTION_SELECTOR);
+      if (action && panel.contains(action)) {
+        try {
+          action.setPointerCapture(event.pointerId);
+        } catch {
+          // Some synthetic/legacy pointer sources cannot be captured. The
+          // existing shield still protects outside taps in that case.
+        }
+      }
+      return;
+    }
+
     // Outside taps land on the transparent menu shell, not on the page below.
-    if (!panel.contains(target)) closeOpenMainMenu();
+    closeOpenMainMenu();
   };
 
   const handleCompletedClick = (event: MouseEvent) => {
