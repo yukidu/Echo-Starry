@@ -1,0 +1,92 @@
+.taiwan-crown-avatar-ring {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(145deg,
+    #7c3aed,
+    var(--color-primary, #c06c84) 34%,
+    #facc15 66%,
+    #38bdf8);
+  box-shadow:
+    0 0 0.24em rgb(255 255 255 / 0.42),
+    0 0 1.2em color-mix(in srgb, var(--color-primary, #c06c84) 42%, transparent),
+    0 0 1.65em rgb(250 204 21 / 0.16);
+  animation: taiwanCrownRingGlow 2.8s ease-in-out infinite alternate;
+}
+
+.taiwan-crown-avatar-ring::before,
+.taiwan-crown-avatar-ring::after {
+  content: '';
+  position: absolute;
+  border-radius: inherit;
+  pointer-events: none;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+.taiwan-crown-avatar-ring::before {
+  inset: 0;
+  z-index: 0;
+  background: conic-gradient(from 0deg,
+    #7c3aed 0deg,
+    var(--color-primary, #c06c84) 52deg,
+    #ff3d81 104deg,
+    #facc15 158deg,
+    #fff7d6 184deg,
+    #5eead4 214deg,
+    #38bdf8 264deg,
+    #7c3aed 318deg,
+    var(--color-primary, #c06c84) 360deg);
+  animation: taiwanCrownRingRotate 5.4s linear infinite;
+}
+
+.taiwan-crown-avatar-ring::after {
+  inset: -0.08em;
+  z-index: 1;
+  background: conic-gradient(from 0deg,
+    transparent 0deg 300deg,
+    rgb(255 255 255 / 0.06) 316deg,
+    rgb(255 255 255 / 0.88) 338deg,
+    #fff 348deg,
+    rgb(255 255 255 / 0.18) 356deg,
+    transparent 360deg);
+  filter: blur(0.045em);
+  opacity: 0.98;
+  animation: taiwanCrownRingShine 3.6s linear infinite;
+}
+
+.taiwan-crown-avatar {
+  position: relative;
+  z-index: 2;
+}
+
+@keyframes taiwanCrownRingRotate {
+  to { transform: rotate(1turn); }
+}
+
+@keyframes taiwanCrownRingShine {
+  from { transform: rotate(0turn); }
+  to { transform: rotate(1turn); }
+}
+
+@keyframes taiwanCrownRingGlow {
+  from {
+    box-shadow:
+      0 0 0.2em rgb(255 255 255 / 0.32),
+      0 0 0.95em color-mix(in srgb, var(--color-primary, #c06c84) 34%, transparent),
+      0 0 1.35em rgb(56 189 248 / 0.1);
+  }
+  to {
+    box-shadow:
+      0 0 0.28em rgb(255 255 255 / 0.5),
+      0 0 1.35em color-mix(in srgb, var(--color-primary, #c06c84) 54%, transparent),
+      0 0 1.9em rgb(250 204 21 / 0.22);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .taiwan-crown-avatar-ring,
+  .taiwan-crown-avatar-ring::before,
+  .taiwan-crown-avatar-ring::after {
+    animation: none !important;
+  }
+}
