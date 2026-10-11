@@ -1,0 +1,48 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const client = readFileSync(new URL('../src/v181HomeToolbarDislike.ts', import.meta.url), 'utf8');
+const css = readFileSync(new URL('../src/v181HomeToolbarDislike.css', import.meta.url), 'utf8');
+const main = readFileSync(new URL('../src/main.tsx', import.meta.url), 'utf8');
+const router = readFileSync(new URL('../worker/hiddenTrackRouter.ts', import.meta.url), 'utf8');
+const favoriteRouter = readFileSync(new URL('../worker/favoriteRouter.ts', import.meta.url), 'utf8');
+
+test('v181 logo circular pulse is visible only while a real audio element is playing', () => {
+  assert.match(client, /querySelectorAll<HTMLAudioElement>\('audio'\)/);
+  assert.match(client, /!audio\.paused\s*&&\s*!audio\.ended/);
+  assert.match(client, /dataset\.echostarsAudioPlaying\s*=\s*playing\s*\?\s*'true'\s*:\s*'false'/);
+  assert.match(css, /\.brand-logo-glow > div > span\.animate-ping\s*\{[\s\S]*display:\s*none\s*!important/);
+  assert.match(css, /html\[data-echostars-audio-playing='true'\][\s\S]*span\.animate-ping[\s\S]*display:\s*block\s*!important/);
+});
+
+test('v181 hamburger keeps the three-line control but removes the rounded rectangle shell', () => {
+  assert.match(css, /button\[data-main-menu='hamburger'\][\s\S]*border-radius:\s*0\s*!important/);
+  assert.match(css, /button\[data-main-menu='hamburger'\][\s\S]*background:\s*transparent\s*!important/);
+  assert.match(css, /button\[data-main-menu='hamburger'\][\s\S]*box-shadow:\s*none\s*!important/);
+});
+
+test('v181 adds dislike with two confirmations whose copy never mentions hiding', () => {
+  assert.match(client, /label\.textContent\s*=\s*'不喜歡'/);
+  const confirmations = [...client.matchAll(/window\.confirm\(([^\n]+)\)/g)].map(match => match[1]);
+  assert.equal(confirmations.length, 2);
+  assert.ok(confirmations.every(text => !text.includes('隱藏')));
+  assert.match(client, /確定不喜歡/);
+  assert.match(client, /再確認一次，真的不喜歡這個音檔嗎？/);
+});
+
+test('v181 persists production dislikes per authenticated member in D1', () => {
+  assert.match(router, /CREATE TABLE IF NOT EXISTS user_hidden_tracks/);
+  assert.match(router, /PRIMARY KEY \(userId, trackId\)/);
+  assert.match(router, /FROM auth_sessions s[\s\S]*JOIN users u ON u\.id = s\.userId/);
+  assert.match(router, /INSERT OR IGNORE INTO user_hidden_tracks/);
+  assert.match(router, /SELECT trackId FROM user_hidden_tracks WHERE userId = \?/);
+  assert.match(favoriteRouter, /import appWorker from '\.\/hiddenTrackRouter'/);
+});
+
+test('v181 preview testing stays isolated from production D1', () => {
+  assert.match(client, /host !== PRODUCTION_HOST && host\.endsWith\('-echostars\.yukidu\.workers\.dev'\)/);
+  assert.match(client, /PREVIEW_STORAGE_PREFIX/);
+  assert.match(client, /if \(isPreviewHost\(\)\)[\s\S]*writePreviewHiddenIds/);
+  assert.match(main, /import '\.\/v181HomeToolbarDislike';/);
+});
