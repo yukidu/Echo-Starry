@@ -1,6 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/previewFastRouter.ts"
+main = "worker/privacyCrawlerRouter.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
@@ -30,8 +30,8 @@ command = "npm run build"
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# 所有請求先經過入口 Worker；Preview 入口會讓一般前端頁面直接走 Assets，
-# API / 分享 / robots 仍交由原 privacyCrawlerRouter 處理。
+# Preview 與正式站使用相同入口 Worker，避免前端模組／靜態資源傳送路徑產生差異。
+# Preview 的 D1 / R2 / KV 仍由 previews 綁定隔離。
 run_worker_first = ["/*"]
 
 # 1. Cloudflare D1 資料庫 (SQLite)
