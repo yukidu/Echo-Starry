@@ -16,13 +16,13 @@ type SparkSpec = {
 };
 
 const SPARKS: SparkSpec[] = [
-  { x: 12, y: 19, size: 0.34, duration: 5.7, delay: -1.1, min: 0.14, max: 0.98, scale: 1.52 },
-  { x: 43, y: 2, size: 0.28, duration: 8.6, delay: -5.3, min: 0.08, max: 0.72, scale: 1.38 },
-  { x: 81, y: 14, size: 0.4, duration: 6.9, delay: -2.8, min: 0.18, max: 0.9, scale: 1.46 },
-  { x: 99, y: 49, size: 0.31, duration: 9.7, delay: -7.4, min: 0.1, max: 0.68, scale: 1.34 },
-  { x: 80, y: 86, size: 0.43, duration: 7.8, delay: -4.6, min: 0.16, max: 1, scale: 1.58 },
-  { x: 42, y: 99, size: 0.3, duration: 6.3, delay: -0.7, min: 0.09, max: 0.76, scale: 1.4 },
-  { x: 4, y: 70, size: 0.36, duration: 10.4, delay: -6.1, min: 0.12, max: 0.84, scale: 1.44 }
+  { x: 12, y: 19, size: 0.22, duration: 5.7, delay: -1.1, min: 0.14, max: 0.98, scale: 1.38 },
+  { x: 43, y: 2, size: 0.18, duration: 8.6, delay: -5.3, min: 0.08, max: 0.72, scale: 1.3 },
+  { x: 81, y: 14, size: 0.26, duration: 6.9, delay: -2.8, min: 0.18, max: 0.9, scale: 1.36 },
+  { x: 99, y: 49, size: 0.2, duration: 9.7, delay: -7.4, min: 0.1, max: 0.68, scale: 1.28 },
+  { x: 80, y: 86, size: 0.28, duration: 7.8, delay: -4.6, min: 0.16, max: 1, scale: 1.4 },
+  { x: 42, y: 99, size: 0.19, duration: 6.3, delay: -0.7, min: 0.09, max: 0.76, scale: 1.3 },
+  { x: 4, y: 70, size: 0.23, duration: 10.4, delay: -6.1, min: 0.12, max: 0.84, scale: 1.34 }
 ];
 
 function addIndependentSparks(ring: HTMLElement, ringIndex: number) {
