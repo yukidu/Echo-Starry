@@ -1,4 +1,4 @@
-const CACHE_NAME = 'echostars-shell-v178';
+const CACHE_NAME = 'echostars-shell-v188';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-monochrome.svg', '/icon-192.png', '/icon-512.png'];
 const FORCE_STALE_CLIENT_REFRESH = true;
 
@@ -16,9 +16,9 @@ self.addEventListener('activate', event => {
     await Promise.all(oldShellKeys.map(key => caches.delete(key)));
     await self.clients.claim();
 
-    // v178: when a new shell replaces an older release, navigate existing tabs once.
-    // This prevents a successfully deployed Production build from looking stale merely
-    // because an already-open tab is still executing the previous in-memory bundle.
+    // v188: when a new shell replaces an older release, navigate existing tabs once.
+    // This prevents an installed PWA from continuing to execute an older upload-form
+    // layout after the corrected mobile permission controls have been deployed.
     if (FORCE_STALE_CLIENT_REFRESH && upgradingExistingClient) {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       await Promise.all(windows.map(async client => {
