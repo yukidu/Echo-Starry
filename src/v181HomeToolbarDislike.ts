@@ -1,8 +1,8 @@
 import './v181HomeToolbarDislike.css';
 
 const PRODUCTION_HOST = 'echostars.yukidu.workers.dev';
-const PREVIEW_STORAGE_PREFIX = 'preview-disliked-track-ids';
-const hiddenTrackIds = new Set<string>();
+const PREVIEW_STORAGE_PREFIX = 'preview-disliked-speakers';
+const hiddenSpeakers = new Set<string>();
 let lastMemberIdentity = '__initial__';
 let observer: MutationObserver | null = null;
 
@@ -26,18 +26,18 @@ function previewStorageKey() {
   return `${PREVIEW_STORAGE_PREFIX}:${readMemberIdentity() || 'preview-guest'}`;
 }
 
-function readPreviewHiddenIds() {
+function readPreviewHiddenSpeakers() {
   try {
     const parsed = JSON.parse(localStorage.getItem(previewStorageKey()) || '[]');
-    return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [];
+    return Array.isArray(parsed) ? parsed.map(String).map(name => name.trim()).filter(Boolean) : [];
   } catch {
     return [];
   }
 }
 
-function writePreviewHiddenIds() {
+function writePreviewHiddenSpeakers() {
   try {
-    localStorage.setItem(previewStorageKey(), JSON.stringify(Array.from(hiddenTrackIds)));
+    localStorage.setItem(previewStorageKey(), JSON.stringify(Array.from(hiddenSpeakers)));
   } catch {}
 }
 
@@ -51,11 +51,15 @@ function cardWrapper(card: HTMLElement) {
   return card.closest<HTMLElement>('.lucky-card') || card;
 }
 
+function speakerNameFromCard(card: HTMLElement) {
+  return String(card.querySelector<HTMLImageElement>('img[alt]')?.alt || '').trim();
+}
+
 function syncCardVisibility(card: HTMLElement) {
-  const trackId = String(card.dataset.trackId || '').trim();
-  if (!trackId) return;
+  const speakerName = speakerNameFromCard(card);
+  if (!speakerName) return;
   const wrapper = cardWrapper(card);
-  if (hiddenTrackIds.has(trackId)) {
+  if (hiddenSpeakers.has(speakerName)) {
     wrapper.style.display = 'none';
     wrapper.dataset.echostarsMemberHidden = 'true';
   } else if (wrapper.dataset.echostarsMemberHidden === 'true') {
@@ -173,14 +177,14 @@ function styledDislikeConfirm(message: string, title: string) {
   });
 }
 
-async function persistDislike(trackId: string) {
+async function persistDislike(speakerName: string) {
   if (isPreviewHost()) {
-    hiddenTrackIds.add(trackId);
-    writePreviewHiddenIds();
+    hiddenSpeakers.add(speakerName);
+    writePreviewHiddenSpeakers();
     return;
   }
 
-  const response = await fetch(`/api/member-hidden-tracks/${encodeURIComponent(trackId)}`, {
+  const response = await fetch(`/api/member-hidden-speakers/${encodeURIComponent(speakerName)}`, {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' }
@@ -188,30 +192,29 @@ async function persistDislike(trackId: string) {
   const data = await response.json().catch(() => ({}));
   if (response.status === 401) throw new Error('請先登入會員後再使用「不喜歡」。');
   if (!response.ok) throw new Error(data?.error || '設定失敗，請稍後再試。');
-  hiddenTrackIds.add(trackId);
+  hiddenSpeakers.add(speakerName);
 }
 
 async function handleDislike(card: HTMLElement, button: HTMLButtonElement) {
-  const trackId = String(card.dataset.trackId || '').trim();
-  if (!trackId || button.disabled) return;
+  const speakerName = speakerNameFromCard(card);
+  if (!speakerName || button.disabled) return;
 
   if (!isPreviewHost() && !readMemberIdentity()) {
     window.alert('請先登入會員後再使用「不喜歡」。');
     return;
   }
 
-  const title = card.querySelector('h3')?.textContent?.trim() || '這個音檔';
-  if (!await styledDislikeConfirm(`確定不喜歡「${title}」嗎？`, '不喜歡確認')) return;
-  if (!await styledDislikeConfirm('再確認一次，真的不喜歡這個音檔嗎？', '再次確認')) return;
+  if (!await styledDislikeConfirm(`確定不喜歡「${speakerName}」嗎？`, '不喜歡確認')) return;
+  if (!await styledDislikeConfirm(`再確認一次，真的不喜歡「${speakerName}」嗎？`, '再次確認')) return;
 
   button.disabled = true;
   const label = button.querySelector('span');
   if (label) label.textContent = '處理中…';
   try {
-    await persistDislike(trackId);
+    await persistDislike(speakerName);
     syncAllCards();
-    window.dispatchEvent(new CustomEvent('echostars:member-hidden-tracks-changed', {
-      detail: { trackId }
+    window.dispatchEvent(new CustomEvent('echostars:member-hidden-speakers-changed', {
+      detail: { speakerName }
     }));
   } catch (error) {
     window.alert(error instanceof Error ? error.message : '設定失敗，請稍後再試。');
@@ -258,11 +261,11 @@ function syncAllCards() {
   });
 }
 
-async function loadMemberHiddenTracks() {
-  hiddenTrackIds.clear();
+async function loadMemberHiddenSpeakers() {
+  hiddenSpeakers.clear();
 
   if (isPreviewHost()) {
-    readPreviewHiddenIds().forEach(id => hiddenTrackIds.add(id));
+    readPreviewHiddenSpeakers().forEach(name => hiddenSpeakers.add(name));
     syncAllCards();
     return;
   }
@@ -273,7 +276,7 @@ async function loadMemberHiddenTracks() {
   }
 
   try {
-    const response = await fetch('/api/member-hidden-tracks', {
+    const response = await fetch('/api/member-hidden-speakers', {
       method: 'GET',
       credentials: 'same-origin',
       cache: 'no-store'
@@ -282,12 +285,12 @@ async function loadMemberHiddenTracks() {
       syncAllCards();
       return;
     }
-    if (!response.ok) throw new Error(`hidden tracks: ${response.status}`);
+    if (!response.ok) throw new Error(`hidden speakers: ${response.status}`);
     const data = await response.json().catch(() => ({}));
-    const ids = Array.isArray(data?.trackIds) ? data.trackIds : [];
-    ids.map(String).filter(Boolean).forEach((id: string) => hiddenTrackIds.add(id));
+    const speakers = Array.isArray(data?.speakers) ? data.speakers : [];
+    speakers.map(String).map((name: string) => name.trim()).filter(Boolean).forEach((name: string) => hiddenSpeakers.add(name));
   } catch (error) {
-    console.warn('Failed to load member disliked tracks:', error);
+    console.warn('Failed to load member disliked speakers:', error);
   }
   syncAllCards();
 }
@@ -297,7 +300,7 @@ function syncMemberIdentity() {
   const effectiveIdentity = isPreviewHost() ? (identity || 'preview-guest') : identity;
   if (effectiveIdentity === lastMemberIdentity) return;
   lastMemberIdentity = effectiveIdentity;
-  void loadMemberHiddenTracks();
+  void loadMemberHiddenSpeakers();
 }
 
 function startV181HomeControls() {
