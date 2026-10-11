@@ -1,5 +1,6 @@
 import './v181HomeToolbarDislike.css';
 import './v183DislikeFavoritesPolish';
+import { speakerMatchesAnyHiddenEntry } from './v184SpeakerRelationship';
 
 const PRODUCTION_HOST = 'echostars.yukidu.workers.dev';
 const PREVIEW_STORAGE_PREFIX = 'preview-disliked-speakers-v2';
@@ -100,7 +101,7 @@ function syncCardVisibility(card: HTMLElement) {
   const speakerName = speakerNameFromCard(card);
   if (!speakerName) return;
   const wrapper = cardWrapper(card);
-  if (hiddenSpeakers.has(speakerName)) {
+  if (speakerMatchesAnyHiddenEntry(speakerName, hiddenSpeakers)) {
     wrapper.style.display = 'none';
     wrapper.dataset.echostarsMemberHidden = 'true';
   } else if (wrapper.dataset.echostarsMemberHidden === 'true') {
