@@ -1,0 +1,26 @@
+name: v188 Mobile Select Verify
+
+on:
+  push:
+    branches:
+      - safe/v188-mobile-permission-dropdown
+    paths:
+      - .github/workflows/v188-mobile-select-verify.yml
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --package-lock=false --no-audit --no-fund
+      - name: Regression
+        run: npm test
+      - name: TypeScript
+        run: npm run lint
+      - name: Production build
+        run: npm run build
