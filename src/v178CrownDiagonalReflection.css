@@ -1,0 +1,67 @@
+.taiwan-crown-avatar-ring::before {
+  animation: none;
+  transform: none;
+}
+
+.taiwan-crown-avatar-ring::after {
+  inset: -0.06em;
+  background:
+    linear-gradient(45deg,
+      transparent 0% 14%,
+      rgb(255 255 255 / 0.08) 16%,
+      rgb(255 255 255 / 0.28) 18%,
+      rgb(255 255 255 / 0.08) 20%,
+      transparent 22% 43%,
+      rgb(255 255 255 / 0.06) 45%,
+      rgb(255 255 255 / 0.22) 47%,
+      rgb(255 255 255 / 0.06) 49%,
+      transparent 51% 70%,
+      rgb(255 255 255 / 0.05) 72%,
+      rgb(255 255 255 / 0.18) 74%,
+      rgb(255 255 255 / 0.05) 76%,
+      transparent 78% 100%);
+  background-size: 145% 145%;
+  background-position: 44% 56%;
+  filter: blur(0.035em);
+  opacity: 0.26;
+  animation: taiwanCrownDiagonalShimmer 3.8s ease-in-out infinite alternate;
+}
+
+.taiwan-crown-card-name {
+  font-size: 1.18em;
+  line-height: 1.28;
+}
+
+.taiwan-crown-card-quote {
+  font-size: 0.9em;
+  line-height: 1.6;
+}
+
+@keyframes taiwanCrownDiagonalShimmer {
+  from {
+    opacity: 0.2;
+    background-position: 42% 58%;
+  }
+  to {
+    opacity: 0.38;
+    background-position: 58% 42%;
+  }
+}
+
+@media (max-width: 420px) {
+  .taiwan-crown-card-name {
+    font-size: 1.08em;
+  }
+
+  .taiwan-crown-card-quote {
+    font-size: 0.84em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .taiwan-crown-avatar-ring::after {
+    animation: none !important;
+    opacity: 0.28;
+    background-position: 50% 50%;
+  }
+}
