@@ -7,6 +7,7 @@ import './v166FilterSearchMatch.css';
 import './taiwanCrownMenuLink';
 import './v181PreviewProductionReadBridge';
 import './v181HomeToolbarDislike';
+import './v185MultiSpeakerUi';
 
 // Old long VIP links (?vipToken=...&trackId=...) are retired. Strip those
 // named parameters before React starts, including when somebody appends them
@@ -112,16 +113,45 @@ HTMLMediaElement.prototype.play = function manualPlaybackOnly() {
   return Promise.reject(new DOMException('Playback requires an explicit user action.', 'NotAllowedError'));
 };
 
+const isStablePreviewHost = window.location.hostname === 'stable-preview-echostars.yukidu.workers.dev';
+
 if ('serviceWorker' in navigator) {
-  // PWA updates are intentionally silent:
-  // the browser downloads/activates the newest worker in the background,
-  // and the new app version is picked up on the user's next natural reload/reopen.
-  // Never interrupt playback or browsing with an update confirmation dialog.
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(error => {
-      console.warn('Service worker registration failed:', error);
+  if (isStablePreviewHost) {
+    // Preview deployments change frequently. Never let an old PWA shell keep a
+    // stale lazy-loaded Vite chunk alive after the branch deploys a new build.
+    window.addEventListener('load', () => {
+      void (async () => {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        const hadController = Boolean(navigator.serviceWorker.controller);
+        await Promise.all(registrations.map(registration => registration.unregister()));
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(
+            keys
+              .filter(key => key.startsWith('echostars-shell-'))
+              .map(key => caches.delete(key))
+          );
+        }
+        const resetKey = 'echostars_preview_sw_reset_v1';
+        if ((hadController || registrations.length > 0) && sessionStorage.getItem(resetKey) !== '1') {
+          sessionStorage.setItem(resetKey, '1');
+          window.location.reload();
+        }
+      })().catch(error => {
+        console.warn('Preview service worker cleanup failed:', error);
+      });
     });
-  });
+  } else {
+    // PWA updates are intentionally silent:
+    // the browser downloads/activates the newest worker in the background,
+    // and the new app version is picked up on the user's next natural reload/reopen.
+    // Never interrupt playback or browsing with an update confirmation dialog.
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(error => {
+        console.warn('Service worker registration failed:', error);
+      });
+    });
+  }
 }
 
 createRoot(document.getElementById('root')!).render(
