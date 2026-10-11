@@ -61,10 +61,47 @@ export const DARK_THEME: ThemePalette = {
   borderSubtle: '#23293b'
 };
 
+const LIGHT_PALETTE_STORAGE_KEY = 'sq_light_palette_v1';
+const DEFAULT_LIGHT_PALETTE_ID = 'rose';
+
+function readStoredLightPalette(): ThemePalette | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const storedId = window.localStorage.getItem(LIGHT_PALETTE_STORAGE_KEY);
+    if (!storedId) return null;
+    return LIGHT_PALETTES.find(palette => palette.id === storedId) || null;
+  } catch {
+    return null;
+  }
+}
+
+function storeLightPalette(palette: ThemePalette) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(LIGHT_PALETTE_STORAGE_KEY, palette.id);
+  } catch {
+    // Storage can be unavailable in privacy modes; theme selection still works for this session.
+  }
+}
+
 export function getRandomLightPalette(excludeId?: string): ThemePalette {
-  const filtered = excludeId ? LIGHT_PALETTES.filter(p => p.id !== excludeId) : LIGHT_PALETTES;
+  // Initial page load reuses the visitor's last chosen palette. If no saved choice
+  // exists yet, use one deterministic default so Preview and Production start from
+  // the same color even though they are different origins with separate storage.
+  if (!excludeId) {
+    const stored = readStoredLightPalette();
+    if (stored) return stored;
+    const fallback = LIGHT_PALETTES.find(palette => palette.id === DEFAULT_LIGHT_PALETTE_ID) || LIGHT_PALETTES[0];
+    storeLightPalette(fallback);
+    return fallback;
+  }
+
+  // Passing excludeId means the user explicitly asked for another palette.
+  const filtered = LIGHT_PALETTES.filter(p => p.id !== excludeId);
   const pool = filtered.length > 0 ? filtered : LIGHT_PALETTES;
-  return pool[Math.floor(Math.random() * pool.length)];
+  const selected = pool[Math.floor(Math.random() * pool.length)];
+  storeLightPalette(selected);
+  return selected;
 }
 
 /**
