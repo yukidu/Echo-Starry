@@ -191,7 +191,7 @@ async function loadTrackSpeakers(force = false) {
   }
 }
 
-async function fetchHiddenSpeakerNames() {
+async function fetchHiddenSpeakerNames(): Promise<string[]> {
   if (isPreviewHost()) return readPreviewSpeakers();
   if (!readMemberIdentity()) return [];
   try {
