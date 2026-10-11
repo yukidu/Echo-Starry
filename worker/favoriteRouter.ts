@@ -1,4 +1,4 @@
-import appWorker from './hiddenTrackRouter';
+import appWorker from './adminUserDeleteRouter';
 import type { Env } from './index';
 
 const HEADERS = {
