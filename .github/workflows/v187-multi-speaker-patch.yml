@@ -1,0 +1,139 @@
+name: v187 Multi Speaker Patch
+
+on:
+  push:
+    branches:
+      - safe/v187-multi-speaker-5
+    paths:
+      - .github/workflows/v187-multi-speaker-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: safe/v187-multi-speaker-5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Apply direct React and schema changes
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def must_replace(path: str, old: str, new: str, count: int = 1):
+              p = Path(path)
+              text = p.read_text()
+              found = text.count(old)
+              if found != count:
+                  raise SystemExit(f"{path}: expected {count} occurrence(s), found {found}: {old[:90]!r}")
+              p.write_text(text.replace(old, new, count))
+
+          upload = 'src/components/UploadModal.tsx'
+
+          must_replace(
+              upload,
+              "import { parseID3Tags } from '../utils/id3Parser';\n",
+              "import { parseID3Tags } from '../utils/id3Parser';\nimport { MAX_TRACK_SPEAKERS, normalizeTrackSpeakers, parseSpeakerInput, speakerDisplay } from '../../shared/speakers';\n"
+          )
+
+          must_replace(
+              upload,
+              "  const [speaker, setSpeaker] = useState('');\n",
+              "  const [speaker, setSpeaker] = useState('');\n  const [coSpeakers, setCoSpeakers] = useState<string[]>([]);\n"
+          )
+
+          must_replace(
+              upload,
+              "      setTitle(trackToEdit.title || '');\n      setSpeaker(trackToEdit.speaker || '');\n",
+              "      setTitle(trackToEdit.title || '');\n      const existingSpeakers = normalizeTrackSpeakers(\n        Array.isArray(trackToEdit.speakers) && trackToEdit.speakers.length > 0\n          ? trackToEdit.speakers\n          : trackToEdit.speaker\n      );\n      setSpeaker(existingSpeakers[0] || '');\n      setCoSpeakers(existingSpeakers.slice(1, MAX_TRACK_SPEAKERS));\n"
+          )
+
+          must_replace(
+              upload,
+              "      setTitle('');\n      setSpeaker('');\n      setBaseSpeakerRank('無');\n",
+              "      setTitle('');\n      setSpeaker('');\n      setCoSpeakers([]);\n      setBaseSpeakerRank('無');\n"
+          )
+
+          must_replace(
+              upload,
+              "      if (id3.artist && !speaker) setSpeaker(id3.artist);\n",
+              "      if (id3.artist && !speaker) {\n        const id3Speakers = normalizeTrackSpeakers(id3.artist);\n        setSpeaker(id3Speakers[0] || id3.artist);\n        setCoSpeakers(id3Speakers.slice(1, MAX_TRACK_SPEAKERS));\n      }\n"
+          )
+
+          must_replace(
+              upload,
+              "    if (!title.trim()) {\n      setErrorMessage('請填寫演講主題！');\n      return;\n    }\n\n    setIsUploading(true);\n    setErrorMessage(null);\n    setUploadStatusText('準備上傳中...');\n    const resolvedSpeaker = speaker.trim() || '特邀講師';\n",
+              "    if (!title.trim()) {\n      setErrorMessage('請填寫演講主題！');\n      return;\n    }\n\n    const parsedSpeakers = parseSpeakerInput([speaker, ...coSpeakers]);\n    if (parsedSpeakers.length > MAX_TRACK_SPEAKERS) {\n      setErrorMessage(`一部音檔最多只能設定 ${MAX_TRACK_SPEAKERS} 位演講者！`);\n      return;\n    }\n    const resolvedSpeakers = normalizeTrackSpeakers(parsedSpeakers.length > 0 ? parsedSpeakers : ['特邀講師']);\n    const resolvedSpeaker = speakerDisplay(resolvedSpeakers);\n\n    setIsUploading(true);\n    setErrorMessage(null);\n    setUploadStatusText('準備上傳中...');\n"
+          )
+
+          must_replace(
+              upload,
+              "        speaker: resolvedSpeaker,\n        speakerRank: speakerRank.trim() || '無',\n",
+              "        speaker: resolvedSpeaker,\n        speakers: resolvedSpeakers,\n        speakerRank: speakerRank.trim() || '無',\n"
+          )
+
+          must_replace(
+              upload,
+              "        socialLinks: Array.isArray(trackObj?.socialLinks) ? trackObj.socialLinks : cleanSocialLinks\n",
+              "        socialLinks: Array.isArray(trackObj?.socialLinks) ? trackObj.socialLinks : cleanSocialLinks,\n        speakers: Array.isArray(trackObj?.speakers) ? trackObj.speakers : resolvedSpeakers,\n        speaker: speakerDisplay(Array.isArray(trackObj?.speakers) ? trackObj.speakers : resolvedSpeakers) || resolvedSpeaker\n"
+          )
+
+          old_speaker_ui = '''            <div>\n              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">\n                演講人 (TPE1)\n              </label>\n              <input\n                type="text"\n                value={speaker}\n                onChange={e => setSpeaker(e.target.value)}\n                placeholder="例：陳志豪"\n                className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-hidden focus:border-rose-400"\n              />\n            </div>'''
+          new_speaker_ui = '''            <div className="space-y-1.5">\n              <div className="flex items-center justify-between gap-2">\n                <label className="block font-bold text-slate-700 dark:text-slate-300">\n                  演講人姓名 (TPE1)\n                </label>\n                <button\n                  type="button"\n                  onClick={() => setCoSpeakers(prev => prev.length >= MAX_TRACK_SPEAKERS - 1 ? prev : [...prev, ''])}\n                  disabled={coSpeakers.length >= MAX_TRACK_SPEAKERS - 1}\n                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-300 font-bold disabled:opacity-40 disabled:cursor-not-allowed"\n                  title="增加共同演講者"\n                >\n                  <Plus className="w-3.5 h-3.5" />\n                  增加共同演講者\n                </button>\n              </div>\n              <input\n                type="text"\n                value={speaker}\n                onChange={e => setSpeaker(e.target.value)}\n                placeholder="主要演講者，例如：陳志豪"\n                className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-hidden focus:border-rose-400"\n              />\n              {coSpeakers.map((coSpeaker, index) => (\n                <div key={`co-speaker-${index}`} className="flex items-center gap-1.5">\n                  <input\n                    type="text"\n                    value={coSpeaker}\n                    onChange={e => setCoSpeakers(prev => prev.map((value, itemIndex) => itemIndex === index ? e.target.value : value))}\n                    placeholder={`共同演講者 ${index + 2}`}\n                    aria-label={`共同演講者 ${index + 2}`}\n                    className="min-w-0 flex-1 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-hidden focus:border-rose-400"\n                  />\n                  <button\n                    type="button"\n                    onClick={() => setCoSpeakers(prev => prev.filter((_, itemIndex) => itemIndex !== index))}\n                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-rose-600 hover:border-rose-300"\n                    title={`移除共同演講者 ${index + 2}`}\n                    aria-label={`移除共同演講者 ${index + 2}`}\n                  >\n                    <Trash2 className="w-3.5 h-3.5" />\n                  </button>\n                </div>\n              ))}\n              <p className="text-[10px] text-slate-400">最多可增加 4 位共同演講者（總共 5 位）；前台姓名會以「&」相連且不留空格。</p>\n            </div>'''
+          must_replace(upload, old_speaker_ui, new_speaker_ui)
+
+          must_replace(
+              'src/types.ts',
+              "  speaker: string;\n  speakerRank: string;\n",
+              "  speaker: string;\n  speakers?: string[]; // ordered: primary speaker first, followed by up to four co-speakers\n  speakerRank: string;\n"
+          )
+
+          must_replace(
+              'schema.sql',
+              "CREATE UNIQUE INDEX IF NOT EXISTS tracks_share_slug_unique\n  ON tracks(shareSlug)\n  WHERE shareSlug IS NOT NULL AND shareSlug <> '';\n\n-- 2.1 私秘 VIP 短網址密碼\n",
+              "CREATE UNIQUE INDEX IF NOT EXISTS tracks_share_slug_unique\n  ON tracks(shareSlug)\n  WHERE shareSlug IS NOT NULL AND shareSlug <> '';\n\n-- 2.1 一個音檔可對應 1 位主要演講者 + 最多 4 位共同演講者。\n-- tracks.speaker 保留作為舊介面相容的 A&B 顯示字串。\nCREATE TABLE IF NOT EXISTS track_speakers (\n  trackId TEXT NOT NULL,\n  speakerName TEXT NOT NULL,\n  position INTEGER NOT NULL CHECK(position >= 0 AND position < 5),\n  PRIMARY KEY (trackId, position),\n  UNIQUE (trackId, speakerName)\n);\nCREATE INDEX IF NOT EXISTS track_speakers_name ON track_speakers(speakerName);\n\n-- 2.2 私秘 VIP 短網址密碼\n"
+          )
+
+          must_replace(
+              'tests/v187MultiSpeaker.test.ts',
+              "  assert.match(router, /speaker: speakerDisplay\\(names\\)/);\n",
+              "  assert.match(router, /speakerDisplay\\(names\\)/);\n"
+          )
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Regression
+        run: npm test
+
+      - name: TypeScript
+        run: npm run lint
+
+      - name: Production build
+        run: npm run build
+
+      - name: Commit verified product changes
+        shell: bash
+        run: |
+          git status --short
+          git diff --check
+          git config user.name "EchoStars Preview Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/components/UploadModal.tsx src/types.ts schema.sql tests/v187MultiSpeaker.test.ts
+          if git diff --cached --quiet; then
+            echo "No product changes to commit"
+            exit 0
+          fi
+          git commit -m "v187: multi-speaker upload edit UI"
+          git push origin HEAD:safe/v187-multi-speaker-5
