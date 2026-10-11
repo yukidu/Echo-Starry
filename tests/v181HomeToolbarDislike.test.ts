@@ -22,12 +22,20 @@ test('v181 hamburger keeps the three-line control but removes the rounded rectan
   assert.match(css, /button\[data-main-menu='hamburger'\][\s\S]*box-shadow:\s*none\s*!important/);
 });
 
-test('v181 dislike uses the speaker name, styled confirmation twice, and never mentions hiding', () => {
+test('v182 dislike resolves exact track.speaker from the tracks API, never from title or DOM copy', () => {
+  assert.match(client, /fetch\('\/api\/tracks'/);
+  assert.match(client, /const speaker = String\(track\?\.speaker \|\| ''\)\.trim\(\)/);
+  assert.match(client, /trackSpeakerById\.set\(id, speaker\)/);
+  assert.match(client, /resolveSpeakerNameFromCard/);
+  assert.doesNotMatch(client, /querySelector\('h3'\)/);
+  assert.doesNotMatch(client, /img\[alt\]/);
+  assert.match(client, /確定不喜歡演講者「\$\{speakerName\}」嗎？/);
+  assert.match(client, /真的不喜歡演講者「\$\{speakerName\}」嗎？/);
+});
+
+test('v181 dislike uses the site styled confirmation twice and never mentions hiding', () => {
   assert.match(client, /label\.textContent\s*=\s*'不喜歡'/);
   assert.doesNotMatch(client, /window\.confirm/);
-  assert.match(client, /speakerNameFromCard[\s\S]*img\[alt\]/);
-  assert.match(client, /styledDislikeConfirm\(`確定不喜歡「\$\{speakerName\}」嗎？`, '不喜歡確認'\)/);
-  assert.match(client, /styledDislikeConfirm\(`再確認一次，真的不喜歡「\$\{speakerName\}」嗎？`, '再次確認'\)/);
   assert.match(client, /v181-confirm-card/);
   assert.match(client, /shieldAlertIcon/);
   assert.doesNotMatch(client, /確定不喜歡[^\n]*隱藏|再次確認[^\n]*隱藏/);
