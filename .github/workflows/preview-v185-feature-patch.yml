@@ -1,0 +1,301 @@
+name: Preview v185 feature patch
+
+on:
+  push:
+    branches: [preview-v185-access-profile-social]
+    paths:
+      - '.github/workflows/preview-v185-feature-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: preview-v185-access-profile-social
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply preview feature changes
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def read(path):
+              return Path(path).read_text()
+          def write(path, text):
+              Path(path).write_text(text)
+          def once(path, old, new):
+              s = read(path)
+              if old not in s:
+                  raise SystemExit(f'Pattern not found in {path}: {old[:120]!r}')
+              write(path, s.replace(old, new, 1))
+          def remove_between(path, start, end):
+              s = read(path)
+              a = s.find(start)
+              if a < 0: raise SystemExit(f'Start marker missing in {path}: {start}')
+              b = s.find(end, a)
+              if b < 0: raise SystemExit(f'End marker missing in {path}: {end}')
+              write(path, s[:a] + s[b:])
+
+          # ---------- shared types ----------
+          once('src/types.ts',
+          "export interface ExternalLinkItem {\n  name: string;\n  url: string;\n}\n",
+          "export interface ExternalLinkItem {\n  name: string;\n  url: string;\n}\n\nexport type SocialPlatform = 'IG' | 'FB' | 'Youtube' | 'Threads(脆)' | '抖音' | '自訂文字';\nexport interface SocialLinkItem {\n  platform: SocialPlatform;\n  name: string;\n  url: string;\n}\n")
+          once('src/types.ts',
+          "  guestVisible?: boolean; // Only adds this recording to the guest home list; never grants playback permission.\n",
+          "  guestVisible?: boolean; // Only adds this recording to the guest home list; never grants playback permission.\n  authorizedOnlyVisible?: boolean; // Hide completely unless the signed-in member meets browse permission.\n")
+          once('src/types.ts',
+          "  externalFiles?: ExternalLinkItem[];\n",
+          "  externalFiles?: ExternalLinkItem[];\n  socialLinks?: SocialLinkItem[];\n")
+
+          # ---------- profile completion: phone/email never gate reward ----------
+          once('shared/profileCompletion.ts',
+          "export const PROFILE_REQUIRED_FIELDS = ['name','avatar','amwayId','phone','residence','center','rank','joinReason','stayReason','sponsor','platinumUpline','diamondUpline','birthday'] as const;",
+          "export const PROFILE_REQUIRED_FIELDS = ['name','avatar','amwayId','residence','center','rank','joinReason','stayReason','sponsor','platinumUpline','diamondUpline','birthday'] as const;")
+
+          # ---------- visitor/member visibility policy ----------
+          once('src/visitorTrackPolicy.ts',
+          "  guestVisible?: boolean | number;\n  stickerUnlockCost?: number | null;",
+          "  guestVisible?: boolean | number;\n  authorizedOnlyVisible?: boolean | number;\n  stickerUnlockCost?: number | null;")
+          once('src/visitorTrackPolicy.ts',
+          "  return isPublicRecording(track) && !track.isPrivateVip && isFreeForGuest(track);",
+          "  return !Boolean(track.authorizedOnlyVisible) && isPublicRecording(track) && !track.isPrivateVip && isFreeForGuest(track);")
+          once('src/visitorTrackPolicy.ts',
+          "  return isGuest && isSharedDetail && isPublicRecording(track) && !track.isPrivateVip;",
+          "  return isGuest && isSharedDetail && !Boolean(track.authorizedOnlyVisible) && isPublicRecording(track) && !track.isPrivateVip;")
+
+          Path('src/trackVisibilityPolicy.ts').write_text("""type PermissionVisibilityTrack = { authorizedOnlyVisible?: boolean | number };
+
+export function canAppearInHomeForViewer(
+  track: PermissionVisibilityTrack,
+  isLoggedIn: boolean,
+  canAccess: boolean
+): boolean {
+  if (!Boolean(track.authorizedOnlyVisible)) return true;
+  return isLoggedIn && canAccess;
+}
+""")
+
+          # ---------- App home filtering + direct detail guard ----------
+          once('src/App.tsx',
+          "import { isVisibleOnGuestHome, canGuestPlayPublicShare } from './visitorTrackPolicy';\n",
+          "import { isVisibleOnGuestHome, canGuestPlayPublicShare } from './visitorTrackPolicy';\nimport { canAppearInHomeForViewer } from './trackVisibilityPolicy';\n")
+          once('src/App.tsx',
+          "      ...(track.externalPpts || []).flatMap(file => [file.name, file.url])\n",
+          "      ...(track.externalPpts || []).flatMap(file => [file.name, file.url]),\n      ...(track.socialLinks || []).flatMap(link => [link.platform, link.name, link.url])\n")
+          once('src/App.tsx',
+          "              if (found) {\n                visitorShareTrackId.current = found.id;",
+          "              if (found && canAppearInHomeForViewer(found, Boolean(currentUser), checkCanAccess(found))) {\n                visitorShareTrackId.current = found.id;")
+          once('src/App.tsx',
+          "    const filtered = trackList.filter(t => {\n      if (!currentUser && !isVisibleOnGuestHome(t)) return false;",
+          "    const filtered = trackList.filter(t => {\n      if (!canAppearInHomeForViewer(t, Boolean(currentUser), checkCanAccess(t))) return false;\n      if (!currentUser && !isVisibleOnGuestHome(t)) return false;")
+
+          # ---------- D1 schema migration wrapper ----------
+          once('worker/favoriteRouter.ts',
+          "      if (!columns.has('favoriteCount')) {\n        try { await db.prepare('ALTER TABLE tracks ADD COLUMN favoriteCount INTEGER DEFAULT 0').run(); }\n        catch (error) {\n          const check = await db.prepare('PRAGMA table_info(tracks)').all();\n          if (!check.results.some((row: any) => row.name === 'favoriteCount')) throw error;\n        }\n      }",
+          "      if (!columns.has('favoriteCount')) {\n        try { await db.prepare('ALTER TABLE tracks ADD COLUMN favoriteCount INTEGER DEFAULT 0').run(); }\n        catch (error) {\n          const check = await db.prepare('PRAGMA table_info(tracks)').all();\n          if (!check.results.some((row: any) => row.name === 'favoriteCount')) throw error;\n        }\n      }\n      if (!columns.has('authorizedOnlyVisible')) {\n        try { await db.prepare('ALTER TABLE tracks ADD COLUMN authorizedOnlyVisible INTEGER DEFAULT 0').run(); }\n        catch (error) {\n          const check = await db.prepare('PRAGMA table_info(tracks)').all();\n          if (!check.results.some((row: any) => row.name === 'authorizedOnlyVisible')) throw error;\n        }\n      }\n      if (!columns.has('socialLinks')) {\n        try { await db.prepare(\"ALTER TABLE tracks ADD COLUMN socialLinks TEXT DEFAULT '[]'\").run(); }\n        catch (error) {\n          const check = await db.prepare('PRAGMA table_info(tracks)').all();\n          if (!check.results.some((row: any) => row.name === 'socialLinks')) throw error;\n        }\n      }")
+          once('worker/favoriteRouter.ts',
+          "    const favoriteAction = url.pathname.match(/^\\/api\\/tracks\\/([^/]+)\\/favorite$/);\n    const trackList = url.pathname === '/api/tracks' && method === 'GET';\n\n    if (!favoriteAction && !trackList) return appWorker.fetch(request, env);",
+          "    const favoriteAction = url.pathname.match(/^\\/api\\/tracks\\/([^/]+)\\/favorite$/);\n    const trackRoute = url.pathname === '/api/tracks' || url.pathname.startsWith('/api/tracks/');\n\n    if (!favoriteAction && !trackRoute) return appWorker.fetch(request, env);")
+          once('worker/favoriteRouter.ts',
+          "    if (trackList) return appWorker.fetch(request, env);\n",
+          "    if (!favoriteAction) return appWorker.fetch(request, env);\n")
+
+          # ---------- Worker track persistence ----------
+          once('worker/index.ts',
+          "                  externalFiles: t.externalFiles ? JSON.parse(t.externalFiles) : [],\n                  likedBy: t.likedBy ? JSON.parse(t.likedBy) : [],",
+          "                  externalFiles: t.externalFiles ? JSON.parse(t.externalFiles) : [],\n                  socialLinks: t.socialLinks ? JSON.parse(t.socialLinks) : [],\n                  likedBy: t.likedBy ? JSON.parse(t.likedBy) : [],")
+          once('worker/index.ts',
+          "                  guestVisible: Boolean(t.guestVisible),\n                  isPrivateVip: Boolean(t.isPrivateVip)",
+          "                  guestVisible: Boolean(t.guestVisible),\n                  authorizedOnlyVisible: Boolean(t.authorizedOnlyVisible),\n                  isPrivateVip: Boolean(t.isPrivateVip)")
+          once('worker/index.ts',
+          "          if (body.guestVisible !== undefined && typeof body.guestVisible !== 'boolean') return errorResponse('訪客可見格式錯誤', 400);",
+          "          if (body.guestVisible !== undefined && typeof body.guestVisible !== 'boolean') return errorResponse('訪客可見格式錯誤', 400);\n          if (body.authorizedOnlyVisible !== undefined && typeof body.authorizedOnlyVisible !== 'boolean') return errorResponse('只對有權限者顯示格式錯誤', 400);")
+          once('worker/index.ts',
+          "          const cleanFiles = Array.isArray(body.externalFiles) ? body.externalFiles : [];\n",
+          "          const cleanFiles = Array.isArray(body.externalFiles) ? body.externalFiles : [];\n          const cleanSocialLinks = Array.isArray(body.socialLinks) ? body.socialLinks : [];\n")
+          once('worker/index.ts',
+          "            ...body,\n            guestVisible: body.guestVisible === true,",
+          "            ...body,\n            authorizedOnlyVisible: body.authorizedOnlyVisible === true,\n            guestVisible: body.authorizedOnlyVisible === true ? false : body.guestVisible === true,")
+          once('worker/index.ts',
+          "            externalFiles: cleanFiles,\n            likedBy: cleanLikedBy,",
+          "            externalFiles: cleanFiles,\n            socialLinks: cleanSocialLinks,\n            likedBy: cleanLikedBy,")
+          once('worker/index.ts',
+          "                  externalVideos, externalPpts, externalFiles, likedBy, ratings, vipToken, vipExpiresAt, vipDurationDays, keywordMeta, guestVisible\n                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          "                  externalVideos, externalPpts, externalFiles, likedBy, ratings, vipToken, vipExpiresAt, vipDurationDays, keywordMeta, guestVisible, socialLinks, authorizedOnlyVisible\n                ) VALUES (${Array(36).fill('?').join(', ')})")
+          once('worker/index.ts',
+          "                JSON.stringify(newTrack.externalPpts), JSON.stringify(newTrack.externalFiles),\n                JSON.stringify(newTrack.likedBy), JSON.stringify(newTrack.ratings), newTrack.vipToken, newTrack.vipExpiresAt, newTrack.vipDurationDays, JSON.stringify(newTrack.keywordMeta), newTrack.guestVisible ? 1 : 0\n",
+          "                JSON.stringify(newTrack.externalPpts), JSON.stringify(newTrack.externalFiles),\n                JSON.stringify(newTrack.likedBy), JSON.stringify(newTrack.ratings), newTrack.vipToken, newTrack.vipExpiresAt, newTrack.vipDurationDays, JSON.stringify(newTrack.keywordMeta), newTrack.guestVisible ? 1 : 0, JSON.stringify(newTrack.socialLinks), newTrack.authorizedOnlyVisible ? 1 : 0\n")
+          once('worker/index.ts',
+          "            if (has('guestVisible')) {\n              if (typeof body.guestVisible !== 'boolean') return errorResponse('訪客可見格式錯誤', 400);\n              add('guestVisible', body.guestVisible ? 1 : 0);\n            }",
+          "            if (has('authorizedOnlyVisible') && typeof body.authorizedOnlyVisible !== 'boolean') return errorResponse('只對有權限者顯示格式錯誤', 400);\n            const nextAuthorizedOnlyVisible = has('authorizedOnlyVisible') ? body.authorizedOnlyVisible === true : Boolean(existing.authorizedOnlyVisible);\n            if (has('authorizedOnlyVisible')) add('authorizedOnlyVisible', nextAuthorizedOnlyVisible ? 1 : 0);\n            if (has('guestVisible')) {\n              if (typeof body.guestVisible !== 'boolean') return errorResponse('訪客可見格式錯誤', 400);\n              add('guestVisible', nextAuthorizedOnlyVisible ? 0 : (body.guestVisible ? 1 : 0));\n            } else if (nextAuthorizedOnlyVisible && Boolean(existing.guestVisible)) {\n              add('guestVisible', 0);\n            }")
+          once('worker/index.ts',
+          "            for (const field of ['externalVideos', 'externalPpts', 'externalFiles'] as const) {",
+          "            for (const field of ['externalVideos', 'externalPpts', 'externalFiles', 'socialLinks'] as const) {")
+          once('worker/index.ts',
+          "              externalFiles: parseArray(row.externalFiles),\n              likedBy: parseArray(row.likedBy),",
+          "              externalFiles: parseArray(row.externalFiles),\n              socialLinks: parseArray(row.socialLinks),\n              likedBy: parseArray(row.likedBy),")
+          once('worker/index.ts',
+          "              ratings: parseObject(row.ratings),\n              isPrivateVip: Boolean(row.isPrivateVip)",
+          "              ratings: parseObject(row.ratings),\n              guestVisible: Boolean(row.guestVisible),\n              authorizedOnlyVisible: Boolean(row.authorizedOnlyVisible),\n              isPrivateVip: Boolean(row.isPrivateVip)")
+
+          # ---------- Upload/Edit modal ----------
+          once('src/components/UploadModal.tsx',
+          "import { Track, CategoryType, AmwayRank, RANK_ORDER, ExternalLinkItem, UserProfile, SPEAKER_RANK_OPTIONS, GAR_ELIGIBLE_RANKS } from '../types';",
+          "import { Track, CategoryType, AmwayRank, RANK_ORDER, ExternalLinkItem, SocialLinkItem, SocialPlatform, UserProfile, SPEAKER_RANK_OPTIONS, GAR_ELIGIBLE_RANKS } from '../types';")
+          once('src/components/UploadModal.tsx',
+          "const COVER_LIBRARY_CACHE_KEY = 'echostars_cover_library_v3_6';\n",
+          "const COVER_LIBRARY_CACHE_KEY = 'echostars_cover_library_v3_6';\nconst SOCIAL_PLATFORM_OPTIONS: SocialPlatform[] = ['IG', 'FB', 'Youtube', 'Threads(脆)', '抖音', '自訂文字'];\n")
+          once('src/components/UploadModal.tsx',
+          "  const [guestVisible, setGuestVisible] = useState(false);\n  const [requiredRank, setRequiredRank] = useState<AmwayRank>('無');",
+          "  const [guestVisible, setGuestVisible] = useState(false);\n  const [authorizedOnlyVisible, setAuthorizedOnlyVisible] = useState(false);\n  const [requiredRank, setRequiredRank] = useState<AmwayRank>('無');")
+          once('src/components/UploadModal.tsx',
+          "  const [externalFiles, setExternalFiles] = useState<ExternalLinkItem[]>([\n    { name: '', url: '' }\n  ]);",
+          "  const [externalFiles, setExternalFiles] = useState<ExternalLinkItem[]>([\n    { name: '', url: '' }\n  ]);\n  const [socialLinks, setSocialLinks] = useState<SocialLinkItem[]>([\n    { platform: 'IG', name: 'IG', url: '' }\n  ]);")
+          # Keep existing keyword state only to preserve old data on edit; stop loading/rendering it here.
+          once('src/components/UploadModal.tsx', "      loadDbKeywords();\n", "")
+          once('src/components/UploadModal.tsx',
+          "      setGuestVisible(Boolean(trackToEdit.guestVisible));\n",
+          "      setAuthorizedOnlyVisible(Boolean(trackToEdit.authorizedOnlyVisible));\n      setGuestVisible(Boolean(trackToEdit.guestVisible) && !Boolean(trackToEdit.authorizedOnlyVisible));\n")
+          once('src/components/UploadModal.tsx',
+          "      setExternalFiles(trackToEdit.externalFiles && trackToEdit.externalFiles.length > 0 ? trackToEdit.externalFiles : [{ name: '', url: '' }]);\n",
+          "      setExternalFiles(trackToEdit.externalFiles && trackToEdit.externalFiles.length > 0 ? trackToEdit.externalFiles : [{ name: '', url: '' }]);\n      setSocialLinks(trackToEdit.socialLinks && trackToEdit.socialLinks.length > 0 ? trackToEdit.socialLinks.map(link => ({ ...link })) : [{ platform: 'IG', name: 'IG', url: '' }]);\n")
+          once('src/components/UploadModal.tsx',
+          "      setGuestVisible(false);\n      setStickerUnlockCost(0);",
+          "      setGuestVisible(false);\n      setAuthorizedOnlyVisible(false);\n      setStickerUnlockCost(0);")
+          once('src/components/UploadModal.tsx',
+          "      setExternalFiles([{ name: '', url: '' }]);\n      setAudioFile(null);",
+          "      setExternalFiles([{ name: '', url: '' }]);\n      setSocialLinks([{ platform: 'IG', name: 'IG', url: '' }]);\n      setAudioFile(null);")
+          once('src/components/UploadModal.tsx',
+          "      const cleanFiles = externalFiles.filter(f => f.url.trim());\n",
+          "      const cleanFiles = externalFiles.filter(f => f.url.trim());\n      const cleanSocialLinks = socialLinks\n        .filter(link => link.url.trim())\n        .map(link => ({\n          platform: link.platform,\n          name: link.platform === '自訂文字' ? (link.name.trim() || '自訂連結') : link.platform,\n          url: link.url.trim()\n        }));\n")
+          once('src/components/UploadModal.tsx',
+          "        requiredRank,\n        guestVisible,",
+          "        requiredRank,\n        authorizedOnlyVisible,\n        guestVisible: authorizedOnlyVisible ? false : guestVisible,")
+          once('src/components/UploadModal.tsx',
+          "        externalFiles: cleanFiles,\n        duration: resolvedDurationLabel,",
+          "        externalFiles: cleanFiles,\n        socialLinks: cleanSocialLinks,\n        duration: resolvedDurationLabel,")
+          once('src/components/UploadModal.tsx',
+          "        commentStickerReward: Number(trackObj?.commentStickerReward ?? commentStickerReward ?? 0)\n",
+          "        commentStickerReward: Number(trackObj?.commentStickerReward ?? commentStickerReward ?? 0),\n        authorizedOnlyVisible: Boolean(trackObj?.authorizedOnlyVisible ?? authorizedOnlyVisible),\n        guestVisible: Boolean(trackObj?.guestVisible ?? (authorizedOnlyVisible ? false : guestVisible)),\n        socialLinks: Array.isArray(trackObj?.socialLinks) ? trackObj.socialLinks : cleanSocialLinks\n")
+          remove_between('src/components/UploadModal.tsx',
+                         '          {/* 3.5 網友關鍵字',
+                         '          {/* 4. Text Fields Grid */}')
+          once('src/components/UploadModal.tsx',
+          "            {/* 新需求: 獎銜＝閱讀瀏覽權限 */}\n            <div data-upload-guest-visibility=\"true\">\n              <label className=\"flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300\">\n                <input type=\"checkbox\" checked={guestVisible} onChange={event => setGuestVisible(event.target.checked)} />\n                訪客可見\n              </label>\n              <p className=\"mt-1 text-xs text-slate-500\">讓訪客在首頁看到此音檔；播放仍依權限與貼紙設定判斷。公開音檔預設可見，分享連結可開啟詳細頁。</p>\n            </div>\n",
+          "            {/* 瀏覽清單可見性 */}\n            <div data-upload-guest-visibility=\"true\" className=\"sm:col-span-2 rounded-xl border border-slate-200 dark:border-slate-700 p-3\">\n              <div className=\"flex flex-wrap items-center gap-x-5 gap-y-2\">\n                <label className={`flex items-center gap-2 font-bold ${authorizedOnlyVisible ? 'text-slate-400 cursor-not-allowed' : 'text-slate-700 dark:text-slate-300'}`}>\n                  <input type=\"checkbox\" checked={guestVisible} disabled={authorizedOnlyVisible} onChange={event => setGuestVisible(event.target.checked)} />\n                  訪客可見\n                </label>\n                <label className=\"flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300 cursor-pointer\">\n                  <input type=\"checkbox\" checked={authorizedOnlyVisible} onChange={event => { const checked = event.target.checked; setAuthorizedOnlyVisible(checked); if (checked) setGuestVisible(false); }} />\n                  只對有權限者顯示\n                </label>\n              </div>\n              <p className=\"mt-1 text-xs text-slate-500\">勾選「只對有權限者顯示」後，未達瀏覽權限的會員與所有訪客都不會在首頁看到此音檔；「訪客可見」會自動取消並鎖定。</p>\n            </div>\n")
+          social_ui = '''          {/* 社群連結（可多個） */}\n          <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">\n            <div className="flex items-center justify-between gap-2">\n              <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1"><Link className="w-3.5 h-3.5"/><span>社群連結（可新增多個網址）</span></label>\n              <button type="button" onClick={() => setSocialLinks([...socialLinks, { platform: 'IG', name: 'IG', url: '' }])} className="text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-0.5 text-[11px]"><Plus className="w-3 h-3"/>新增社群連結</button>\n            </div>\n            {socialLinks.map((link, i) => (\n              <div key={i} className="grid grid-cols-[8rem_1fr_auto] gap-2 items-center">\n                <ThemedSelect value={link.platform} onChange={e => { const platform=e.target.value as SocialPlatform; setSocialLinks(prev => prev.map((item,idx)=>idx===i?{...item,platform,name:platform==='自訂文字'?'':platform}:item)); }} className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">\n                  {SOCIAL_PLATFORM_OPTIONS.map(platform => <option key={platform} value={platform}>{platform}</option>)}\n                </ThemedSelect>\n                <div className="min-w-0 flex gap-2">\n                  {link.platform === '自訂文字' && <input type="text" value={link.name} onChange={e=>setSocialLinks(prev=>prev.map((item,idx)=>idx===i?{...item,name:e.target.value}:item))} placeholder="自訂顯示名稱" className="w-1/3 min-w-24 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"/>}\n                  <input type="url" value={link.url} onChange={e=>setSocialLinks(prev=>prev.map((item,idx)=>idx===i?{...item,url:e.target.value}:item))} placeholder="https://..." className="flex-1 min-w-0 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"/>\n                </div>\n                <button type="button" onClick={()=>setSocialLinks(prev=>prev.length===1?[{ platform: 'IG', name: 'IG', url: '' }]:prev.filter((_,idx)=>idx!==i))} className="p-1 text-slate-400 hover:text-rose-600" title="刪除此社群連結"><Trash2 className="w-3.5 h-3.5"/></button>\n              </div>\n            ))}\n          </div>\n\n'''
+          once('src/components/UploadModal.tsx',
+          "          {/* 5. 外部影片連結（可多個，自訂名稱） */}\n",
+          social_ui + "          {/* 5. 外部影片連結（可多個，自訂名稱） */}\n")
+          once('src/components/UploadModal.tsx',
+          "              rows={2}\n              placeholder=\"輸入演講重點與摘要...\"\n              className=\"w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-hidden resize-none\"",
+          "              rows={5}\n              placeholder=\"輸入演講重點與摘要...\"\n              className=\"w-full min-h-32 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-hidden resize-y\"")
+
+          # ---------- Profile: show email, remove phone UI and phone from save ----------
+          once('src/components/ProfileModal.tsx', "      phone: phone.trim(),\n", "")
+          old_view_phone = '''                        <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700">\n                          <div className="flex items-center justify-between mb-0.5">\n                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">手機號碼</span>\n                            <span className="text-[9px] text-amber-600 dark:text-amber-400 font-medium">隱私不公開</span>\n                          </div>\n                          <span className="font-semibold text-slate-800 dark:text-slate-200">\n                            {currentUser.phone || '未填寫'}\n                          </span>\n                        </div>'''
+          new_view_email = '''                        <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700">\n                          <div className="flex items-center justify-between mb-0.5">\n                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Email</span>\n                            <span className="text-[9px] text-slate-400 font-medium">不列入完善獎勵判定</span>\n                          </div>\n                          <span className="font-semibold text-slate-800 dark:text-slate-200 break-all">\n                            {currentUser.email || '未填寫'}\n                          </span>\n                        </div>'''
+          once('src/components/ProfileModal.tsx', old_view_phone, new_view_email)
+          old_edit_phone = '''                        <div>\n                          <label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">\n                            手機 <span className="text-[10px] text-amber-600 dark:text-amber-400 font-normal">(隱私不公開)</span>\n                          </label>\n                          <input\n                            type="text"\n                            value={phone}\n                            onChange={e => setPhone(e.target.value)}\n                            placeholder="0912-345-678"\n                            className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-hidden"\n                          />\n                        </div>'''
+          new_edit_email = '''                        <div>\n                          <label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">Email <span className="text-[10px] text-slate-400 font-normal">（不列入完善獎勵判定）</span></label>\n                          <input type="email" value={currentUser?.email || ''} disabled placeholder="未填寫" className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/60 text-slate-500 cursor-not-allowed"/>\n                        </div>'''
+          once('src/components/ProfileModal.tsx', old_edit_phone, new_edit_email)
+
+          # ---------- Stickers: the existing adjustable profile reward lives under renamed '其他' ----------
+          once('src/components/StickersModal.tsx', "{id:'rules',label:'其他規則',Icon:SlidersHorizontal}", "{id:'rules',label:'其他',Icon:SlidersHorizontal}")
+
+          # ---------- Social links frontend ----------
+          Path('src/components/SocialLinkList.tsx').write_text("""import React from 'react';
+import { AtSign, Facebook, Instagram, Link, Music2, Youtube } from 'lucide-react';
+import type { SocialLinkItem, SocialPlatform } from '../types';
+
+function PlatformIcon({ platform }: { platform: SocialPlatform }) {
+  const cls = 'w-4 h-4 shrink-0';
+  if (platform === 'IG') return <Instagram className={cls}/>;
+  if (platform === 'FB') return <Facebook className={cls}/>;
+  if (platform === 'Youtube') return <Youtube className={cls}/>;
+  if (platform === 'Threads(脆)') return <AtSign className={cls}/>;
+  if (platform === '抖音') return <Music2 className={cls}/>;
+  return <Link className={cls}/>;
+}
+
+export const SocialLinkList: React.FC<{ links?: SocialLinkItem[] }> = ({ links = [] }) => {
+  const valid = links.filter(link => String(link?.url || '').trim());
+  if (!valid.length) return null;
+  return <div className="bg-white/80 dark:bg-slate-900/80 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2 text-xs">
+    <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-1.5"><Link className="w-4 h-4"/>社群連結</h3>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+      {valid.map((link,index)=><a key={`${link.platform}-${index}`} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-[var(--color-primary,#c06c84)] transition-colors text-slate-700 dark:text-slate-200 font-semibold">
+        <PlatformIcon platform={link.platform}/><span className="truncate">{link.name || link.platform}</span>
+      </a>)}
+    </div>
+  </div>;
+};
+""")
+          once('src/components/DetailView.tsx',
+          "import { CommentsSection } from './CommentsSection';\n",
+          "import { CommentsSection } from './CommentsSection';\nimport { SocialLinkList } from './SocialLinkList';\n")
+          once('src/components/DetailView.tsx',
+          "      {/* Requirement 5.5: 區塊標題改為「參考資料」，放在「演講資訊與備註」的上面 */}\n",
+          "      <SocialLinkList links={track.socialLinks} />\n\n      {/* Requirement 5.5: 區塊標題改為「參考資料」，放在「演講資訊與備註」的上面 */}\n")
+
+          # ---------- Regression coverage ----------
+          Path('tests/v185PermissionProfileSocial.test.ts').write_text("""import test from 'node:test';
+import assert from 'node:assert/strict';
+import { canAppearInHomeForViewer } from '../src/trackVisibilityPolicy';
+import { canGuestPlayPublicShare, isVisibleOnGuestHome } from '../src/visitorTrackPolicy';
+import { missingProfileFields } from '../shared/profileCompletion';
+
+const restricted = { requiredRank: '白金', authorizedOnlyVisible: true, stickerUnlockCost: 0 };
+
+test('只對有權限者顯示：訪客與無權限會員完全隱藏', () => {
+  assert.equal(canAppearInHomeForViewer(restricted, false, false), false);
+  assert.equal(canAppearInHomeForViewer(restricted, true, false), false);
+  assert.equal(canAppearInHomeForViewer(restricted, true, true), true);
+  assert.equal(isVisibleOnGuestHome({ requiredRank: '無', authorizedOnlyVisible: true, stickerUnlockCost: 0 }), false);
+  assert.equal(canGuestPlayPublicShare({ requiredRank: '無', authorizedOnlyVisible: true }, true, true), false);
+});
+
+test('個人資料完善：phone 與 email 都不是獎勵必要欄位', () => {
+  const profile = {
+    name: '測試會員', avatar: 'x', amwayId: '123', residence: '臺北', center: '無', rank: '3%',
+    joinReason: '事業', stayReason: '事業', sponsor: 'A', platinumUpline: 'B', diamondUpline: 'C', birthday: '1990-01-01',
+    phone: '', email: ''
+  };
+  assert.deepEqual(missingProfileFields(profile), []);
+});
+
+test('舊音檔未設定新旗標時維持原本顯示行為', () => {
+  assert.equal(canAppearInHomeForViewer({}, false, false), true);
+});
+""")
+          PY
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run regression tests
+        run: npm test
+      - name: TypeScript diagnostic
+        run: npm run lint
+      - name: Production build
+        run: npm run build
+      - name: Commit tested feature changes
+        shell: bash
+        run: |
+          git config user.name "EchoStars Preview Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src worker shared tests
+          if git diff --cached --quiet; then
+            echo "No feature changes to commit"
+            exit 1
+          fi
+          git commit -m "v185-preview: permission-only visibility, profile email and social links"
+          git push origin HEAD:preview-v185-access-profile-social
