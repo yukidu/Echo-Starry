@@ -1,5 +1,6 @@
 .taiwan-crown-avatar-ring::before {
-  animation: taiwanCrownRingRotate 14s linear infinite;
+  animation: taiwanCrownRingRotate 14s linear infinite !important;
+  animation-play-state: running !important;
 }
 
 .taiwan-crown-avatar-ring::after {
@@ -31,21 +32,22 @@
       transparent 6.7%);
   opacity: 0.26;
   filter: blur(0.035em) brightness(0.84);
-  transform: scale(0.994);
-  animation: taiwanCrownMultiPointBreath 6.2s ease-in-out infinite;
+  transform: translate3d(-2.8%, 1.4%, 0) rotate(-8deg) scale(0.994);
+  animation: taiwanCrownMultiPointBreath 7.2s ease-in-out infinite !important;
+  animation-play-state: running !important;
   will-change: opacity, filter, transform;
 }
 
 .taiwan-crown-card:nth-child(3n + 1) .taiwan-crown-avatar-ring::after {
-  animation-delay: -1.3s;
+  animation-delay: -1.3s !important;
 }
 
 .taiwan-crown-card:nth-child(3n + 2) .taiwan-crown-avatar-ring::after {
-  animation-delay: -3.4s;
+  animation-delay: -3.4s !important;
 }
 
 .taiwan-crown-card:nth-child(3n) .taiwan-crown-avatar-ring::after {
-  animation-delay: -4.8s;
+  animation-delay: -5.1s !important;
 }
 
 .taiwan-crown-card {
@@ -64,43 +66,67 @@
 }
 
 .taiwan-crown-card-arrow {
+  position: relative;
   display: grid;
   width: 2.3em;
   height: 2.3em;
   place-items: center;
   justify-self: center;
+  overflow: hidden;
   background: transparent;
   color: var(--color-primary, #c06c84);
   box-shadow: none;
-  font-size: 0;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  text-indent: -9999px;
+  white-space: nowrap;
   opacity: 0.98;
   transition: transform 180ms ease, opacity 180ms ease;
 }
 
 .taiwan-crown-card-arrow::before {
   content: '';
+  position: absolute;
+  inset: 50% auto auto 50%;
   display: block;
   width: 1.55em;
   height: 1.55em;
-  background: currentColor;
+  background: var(--color-primary, #c06c84);
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 3h6v6'/%3E%3Cpath d='M10 14 21 3'/%3E%3Cpath d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 3h6v6'/%3E%3Cpath d='M10 14 21 3'/%3E%3Cpath d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/%3E%3C/svg%3E") center / contain no-repeat;
+  text-indent: 0;
+  transform: translate(-50%, -50%);
+}
+
+.taiwan-crown-card-arrow::after {
+  content: none !important;
+  display: none !important;
 }
 
 .taiwan-crown-card:hover .taiwan-crown-card-arrow {
   transform: translate(1px, -1px) scale(1.08);
 }
 
+.taiwan-crown-member-card .taiwan-crown-card-arrow {
+  overflow: visible;
+  color: var(--color-primary, #c06c84);
+  text-indent: -9999px;
+}
+
 .taiwan-crown-member-card .taiwan-crown-card-arrow::before {
   content: '✎';
+  position: static;
   width: auto;
   height: auto;
   background: none;
   -webkit-mask: none;
   mask: none;
+  color: var(--color-primary, #c06c84);
   font-size: 1.35rem;
   font-weight: 800;
   line-height: 1;
+  text-indent: 0;
+  transform: none;
 }
 
 .taiwan-crown-member-card {
@@ -114,29 +140,29 @@
 
 @keyframes taiwanCrownMultiPointBreath {
   0%, 100% {
-    opacity: 0.22;
+    opacity: 0.2;
     filter: blur(0.05em) brightness(0.78);
-    transform: scale(0.993);
+    transform: translate3d(-2.8%, 1.4%, 0) rotate(-8deg) scale(0.992);
   }
-  18% {
-    opacity: 0.78;
-    filter: blur(0.038em) brightness(1.1);
-    transform: scale(1.001);
+  20% {
+    opacity: 0.86;
+    filter: blur(0.038em) brightness(1.14);
+    transform: translate3d(2.4%, -2.2%, 0) rotate(4deg) scale(1.004);
   }
-  38% {
-    opacity: 0.34;
+  43% {
+    opacity: 0.36;
     filter: blur(0.052em) brightness(0.88);
-    transform: scale(0.997);
+    transform: translate3d(3.2%, 1.8%, 0) rotate(11deg) scale(0.998);
   }
-  63% {
+  67% {
     opacity: 1;
-    filter: blur(0.03em) brightness(1.26);
-    transform: scale(1.004);
+    filter: blur(0.03em) brightness(1.28);
+    transform: translate3d(-1.8%, 2.6%, 0) rotate(2deg) scale(1.006);
   }
-  82% {
+  84% {
     opacity: 0.48;
     filter: blur(0.045em) brightness(0.96);
-    transform: scale(0.999);
+    transform: translate3d(-3.2%, -1.2%, 0) rotate(-11deg) scale(0.997);
   }
 }
 
@@ -163,14 +189,21 @@
     width: 1.45em;
     height: 1.45em;
   }
+
+  .taiwan-crown-member-card .taiwan-crown-card-arrow::before {
+    width: auto;
+    height: auto;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .taiwan-crown-avatar-ring::before {
     animation: taiwanCrownRingRotate 28s linear infinite !important;
+    animation-play-state: running !important;
   }
 
   .taiwan-crown-avatar-ring::after {
-    animation: taiwanCrownMultiPointBreath 10s ease-in-out infinite !important;
+    animation: taiwanCrownMultiPointBreath 12s ease-in-out infinite !important;
+    animation-play-state: running !important;
   }
 }
