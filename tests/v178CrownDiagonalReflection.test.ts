@@ -11,18 +11,23 @@ test('v178 keeps the palette gradient rotating slowly while reflection itself do
   assert.doesNotMatch(css, /taiwanCrownRingShine/);
 });
 
-test('v178 uses multiple obvious diagonal reflections around 45 degrees', () => {
+test('v178 sends multiple obvious 45-degree reflections left to right in a loop', () => {
   assert.match(css, /linear-gradient\(45deg/);
-  assert.match(css, /rgb\(255 255 255 \/ 0\.95\)/);
-  assert.match(css, /rgb\(255 255 255 \/ 0\.88\)/);
-  assert.match(css, /rgb\(255 255 255 \/ 0\.78\)/);
-  assert.match(css, /taiwanCrownDiagonalShimmer/);
+  assert.match(css, /animation:\s*taiwanCrownDiagonalShimmer\s+2\.8s\s+linear\s+infinite/);
+  assert.match(css, /background-position:\s*-160%\s+50%/);
+  assert.match(css, /background-position:\s*240%\s+50%/);
+  assert.doesNotMatch(css, /infinite\s+alternate/);
 });
 
-test('v178 enlarges crown card name and quote text including mobile', () => {
-  assert.match(css, /\.taiwan-crown-card-name\s*\{[\s\S]*font-size:\s*1\.18em/);
-  assert.match(css, /\.taiwan-crown-card-quote\s*\{[\s\S]*font-size:\s*0\.9em/);
-  assert.match(css, /@media \(max-width: 420px\)[\s\S]*font-size:\s*1\.08em[\s\S]*font-size:\s*0\.84em/);
+test('v178 enlarges crown card text and forces inspirational quotes to normal weight', () => {
+  assert.match(css, /\.taiwan-crown-card-name\s*\{[\s\S]*font-size:\s*1\.3em/);
+  assert.match(css, /\.taiwan-crown-card-quote\s*\{[\s\S]*font-size:\s*1\.02em[\s\S]*font-weight:\s*400\s*!important/);
+  assert.match(css, /@media \(max-width: 420px\)[\s\S]*font-size:\s*1\.18em[\s\S]*font-size:\s*0\.96em/);
+});
+
+test('v178 makes the link affordance more prominent and normalizes own-card border', () => {
+  assert.match(css, /\.taiwan-crown-card-arrow::before\s*\{[\s\S]*content:\s*'→'/);
+  assert.match(css, /\.taiwan-crown-member-card\s*\{[\s\S]*border-width:\s*1px[\s\S]*border-color:\s*var\(--theme-border-subtle/);
 });
 
 test('v178 layer loads after v177 and changelog records both effects', () => {
