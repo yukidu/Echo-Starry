@@ -1,0 +1,48 @@
+name: v187 Preview Migration Verify
+
+on:
+  push:
+    branches:
+      - preview/v187-multi-speaker-5
+    paths:
+      - .github/workflows/v187-preview-migration-verify.yml
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger fixed Preview track migration and verify response shape
+        shell: bash
+        run: |
+          node <<'NODE'
+          const url = 'https://stable-preview-echostars.yukidu.workers.dev/api/tracks';
+          const response = await fetch(url, { headers: { 'user-agent': 'EchoStars-v187-migration-verifier' } });
+          console.log(`HTTP_STATUS=${response.status}`);
+          if (!response.ok) throw new Error(`Preview API returned ${response.status}`);
+          const tracks = await response.json();
+          if (!Array.isArray(tracks)) throw new Error('Preview /api/tracks did not return an array');
+
+          let withSpeakers = 0;
+          let multiSpeaker = 0;
+          let inconsistent = 0;
+          let overLimit = 0;
+          for (const track of tracks) {
+            if (!Array.isArray(track?.speakers)) continue;
+            withSpeakers += 1;
+            if (track.speakers.length > 1) multiSpeaker += 1;
+            if (track.speakers.length > 5) overLimit += 1;
+            const canonical = track.speakers.join('&');
+            if (track.speakers.length > 0 && String(track.speaker || '') !== canonical) inconsistent += 1;
+          }
+
+          console.log(`TRACK_COUNT=${tracks.length}`);
+          console.log(`TRACKS_WITH_SPEAKERS=${withSpeakers}`);
+          console.log(`MULTI_SPEAKER_TRACKS=${multiSpeaker}`);
+          console.log(`INCONSISTENT_DISPLAY=${inconsistent}`);
+          console.log(`OVER_LIMIT=${overLimit}`);
+
+          if (withSpeakers !== tracks.length) throw new Error('Some tracks are missing the ordered speakers array');
+          if (inconsistent !== 0) throw new Error('Some speaker display strings do not match ordered speaker rows');
+          if (overLimit !== 0) throw new Error('A track contains more than five speakers');
+          NODE
