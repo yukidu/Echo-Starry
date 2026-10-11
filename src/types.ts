@@ -163,6 +163,7 @@ export interface Track {
   id: string;
   title: string;
   speaker: string;
+  speakers?: string[]; // ordered: primary speaker first, followed by up to four co-speakers
   speakerRank: string;
   speakerAvatar: string;
   category?: string; // primary or fallback category

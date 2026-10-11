@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Track, CategoryType, AmwayRank, RANK_ORDER, ExternalLinkItem, SocialLinkItem, SocialPlatform, UserProfile, SPEAKER_RANK_OPTIONS, GAR_ELIGIBLE_RANKS } from '../types';
 import { parseID3Tags } from '../utils/id3Parser';
+import { MAX_TRACK_SPEAKERS, normalizeTrackSpeakers, parseSpeakerInput, speakerDisplay } from '../../shared/speakers';
 
 interface CoverLibraryItem {
   key: string;
@@ -93,6 +94,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
   const [title, setTitle] = useState('');
   const [speaker, setSpeaker] = useState('');
+  const [coSpeakers, setCoSpeakers] = useState<string[]>([]);
   const [baseSpeakerRank, setBaseSpeakerRank] = useState<string>('無');
   const [isGarRank, setIsGarRank] = useState(false);
 
@@ -379,7 +381,13 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   React.useEffect(() => {
     if (trackToEdit) {
       setTitle(trackToEdit.title || '');
-      setSpeaker(trackToEdit.speaker || '');
+      const existingSpeakers = normalizeTrackSpeakers(
+        Array.isArray(trackToEdit.speakers) && trackToEdit.speakers.length > 0
+          ? trackToEdit.speakers
+          : trackToEdit.speaker
+      );
+      setSpeaker(existingSpeakers[0] || '');
+      setCoSpeakers(existingSpeakers.slice(1, MAX_TRACK_SPEAKERS));
       const rawRank = (trackToEdit.speakerRank || '無').trim();
       const hasGar = rawRank.startsWith('GAR');
       const cleanRank = hasGar ? rawRank.replace(/^GAR/, '').trim() : rawRank;
@@ -411,6 +419,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     } else {
       setTitle('');
       setSpeaker('');
+      setCoSpeakers([]);
       setBaseSpeakerRank('無');
       setIsGarRank(false);
       setSelectedCategories(['事業']);
@@ -521,7 +530,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     try {
       const id3 = await parseID3Tags(file);
       if (id3.title && !title) setTitle(id3.title);
-      if (id3.artist && !speaker) setSpeaker(id3.artist);
+      if (id3.artist && !speaker) {
+        const id3Speakers = normalizeTrackSpeakers(id3.artist);
+        setSpeaker(id3Speakers[0] || id3.artist);
+        setCoSpeakers(id3Speakers.slice(1, MAX_TRACK_SPEAKERS));
+      }
       if (id3.album && !series) setSeries(id3.album);
       if (id3.year && !speechDate) setSpeechDate(id3.year);
       if (id3.track && !seriesOrder) setSeriesOrder(`第 ${id3.track} 集`);
@@ -590,10 +603,17 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       return;
     }
 
+    const parsedSpeakers = parseSpeakerInput([speaker, ...coSpeakers]);
+    if (parsedSpeakers.length > MAX_TRACK_SPEAKERS) {
+      setErrorMessage(`一部音檔最多只能設定 ${MAX_TRACK_SPEAKERS} 位演講者！`);
+      return;
+    }
+    const resolvedSpeakers = normalizeTrackSpeakers(parsedSpeakers.length > 0 ? parsedSpeakers : ['特邀講師']);
+    const resolvedSpeaker = speakerDisplay(resolvedSpeakers);
+
     setIsUploading(true);
     setErrorMessage(null);
     setUploadStatusText('準備上傳中...');
-    const resolvedSpeaker = speaker.trim() || '特邀講師';
 
     try {
       if (isPrivateVip && !trackToEdit?.isPrivateVip && currentUser) {
@@ -702,6 +722,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       const payload = {
         title: title.trim(),
         speaker: resolvedSpeaker,
+        speakers: resolvedSpeakers,
         speakerRank: speakerRank.trim() || '無',
         speakerAvatar: finalCoverUrl,
         categories: selectedCategories.slice(0, 3),
@@ -764,7 +785,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         commentStickerReward: Number(trackObj?.commentStickerReward ?? commentStickerReward ?? 0),
         authorizedOnlyVisible: Boolean(trackObj?.authorizedOnlyVisible ?? authorizedOnlyVisible),
         guestVisible: Boolean(trackObj?.guestVisible ?? (authorizedOnlyVisible ? false : guestVisible)),
-        socialLinks: Array.isArray(trackObj?.socialLinks) ? trackObj.socialLinks : cleanSocialLinks
+        socialLinks: Array.isArray(trackObj?.socialLinks) ? trackObj.socialLinks : cleanSocialLinks,
+        speakers: Array.isArray(trackObj?.speakers) ? trackObj.speakers : resolvedSpeakers,
+        speaker: speakerDisplay(Array.isArray(trackObj?.speakers) ? trackObj.speakers : resolvedSpeakers) || resolvedSpeaker
       };
       if (!trackObj?.id || (trackToEdit && trackObj.id !== trackToEdit.id)) {
         throw new Error('伺服器未回傳已儲存的音檔，請重試。');
@@ -1157,17 +1180,51 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               />
             </div>
 
-            <div>
-              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                演講人 (TPE1)
-              </label>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <label className="block font-bold text-slate-700 dark:text-slate-300">
+                  演講人姓名 (TPE1)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setCoSpeakers(prev => prev.length >= MAX_TRACK_SPEAKERS - 1 ? prev : [...prev, ''])}
+                  disabled={coSpeakers.length >= MAX_TRACK_SPEAKERS - 1}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-300 font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="增加共同演講者"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  增加共同演講者
+                </button>
+              </div>
               <input
                 type="text"
                 value={speaker}
                 onChange={e => setSpeaker(e.target.value)}
-                placeholder="例：陳志豪"
+                placeholder="主要演講者，例如：陳志豪"
                 className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-hidden focus:border-rose-400"
               />
+              {coSpeakers.map((coSpeaker, index) => (
+                <div key={`co-speaker-${index}`} className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={coSpeaker}
+                    onChange={e => setCoSpeakers(prev => prev.map((value, itemIndex) => itemIndex === index ? e.target.value : value))}
+                    placeholder={`共同演講者 ${index + 2}`}
+                    aria-label={`共同演講者 ${index + 2}`}
+                    className="min-w-0 flex-1 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-hidden focus:border-rose-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setCoSpeakers(prev => prev.filter((_, itemIndex) => itemIndex !== index))}
+                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-rose-600 hover:border-rose-300"
+                    title={`移除共同演講者 ${index + 2}`}
+                    aria-label={`移除共同演講者 ${index + 2}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              <p className="text-[10px] text-slate-400">最多可增加 4 位共同演講者（總共 5 位）；前台姓名會以「&」相連且不留空格。</p>
             </div>
 
             <div>

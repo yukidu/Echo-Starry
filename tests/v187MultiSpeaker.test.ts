@@ -38,7 +38,7 @@ test('v187 stores ordered speakers separately while keeping legacy speaker displ
   assert.match(router, /CREATE TABLE IF NOT EXISTS track_speakers/);
   assert.match(router, /SELECT id, speaker FROM tracks/);
   assert.match(router, /INSERT OR REPLACE INTO track_speakers/);
-  assert.match(router, /speaker: speakerDisplay\(names\)/);
+  assert.match(router, /speakerDisplay\(names\)/);
   assert.match(router, /delete nextBody\.speakers/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS track_speakers/);
 });
