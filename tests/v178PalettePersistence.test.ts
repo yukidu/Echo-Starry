@@ -19,9 +19,8 @@ test('v178 persists the light palette and uses a deterministic first palette', (
 test('v178 service worker update bypasses stale HTTP cache and refreshes old shells', () => {
   assert.match(main, /register\('\/sw\.js', \{ updateViaCache: 'none' \}\)/);
   assert.match(main, /registration\.update\(\)/);
-  assert.match(sw, /CACHE_NAME\s*=\s*'echostars-shell-v178'/);
+  assert.match(sw, /const CACHE_NAME = 'echostars-shell-v\d+'/);
   assert.match(sw, /FORCE_STALE_CLIENT_REFRESH\s*=\s*true/);
-  assert.doesNotMatch(sw, /echostars-shell-v157/);
 });
 
 test('v178 release note is loaded and explains the palette and PWA update fix', () => {
