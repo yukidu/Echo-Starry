@@ -11,6 +11,16 @@ export default defineConfig(() => {
         '@': path.resolve(import.meta.dirname, '.'),
       },
     },
+    // stable-preview is a fixed, frequently redeployed test URL. Keep dynamic
+    // imports inside the main frontend bundle so an edit/admin modal can never
+    // be stranded waiting for an old or unavailable hashed chunk.
+    build: {
+      rollupOptions: {
+        output: {
+          inlineDynamicImports: true,
+        },
+      },
+    },
     server: {
       host: '0.0.0.0',
       port: 3000,
