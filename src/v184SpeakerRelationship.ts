@@ -1,41 +1,31 @@
-const COMBINED_SPEAKER_SEPARATOR = /\s*(?:&|＆|、|\/|／|\+|＋|,|，|\||｜|與|及)\s*/g;
+import {
+  MAX_TRACK_SPEAKERS,
+  normalizeSpeakerName,
+  splitSpeakerNames,
+  parseSpeakerInput,
+  normalizeTrackSpeakers,
+  speakerDisplay,
+  isCombinedSpeakerName,
+  speakerMatchesHiddenEntry,
+  speakerMatchesAnyHiddenEntry
+} from '../shared/speakers';
 
-export function normalizeSpeakerName(value: string) {
-  return String(value || '')
-    .normalize('NFKC')
-    .replace(/\s+/g, '')
-    .trim();
-}
+export {
+  MAX_TRACK_SPEAKERS,
+  normalizeSpeakerName,
+  splitSpeakerNames,
+  parseSpeakerInput,
+  normalizeTrackSpeakers,
+  speakerDisplay,
+  isCombinedSpeakerName,
+  speakerMatchesHiddenEntry,
+  speakerMatchesAnyHiddenEntry
+};
 
-export function splitSpeakerNames(value: string) {
-  const raw = String(value || '').trim();
-  if (!raw) return [];
-  const parts = raw
-    .split(COMBINED_SPEAKER_SEPARATOR)
-    .map(normalizeSpeakerName)
-    .filter(name => name.length >= 2);
-  return Array.from(new Set(parts));
-}
-
-export function isCombinedSpeakerName(value: string) {
-  return splitSpeakerNames(value).length > 1;
-}
-
+// Retain this historical export for any older consumers while using the same
+// canonical parsing rules as the v187 multi-speaker model.
 export function hiddenSpeakerKeys(value: string) {
   const full = normalizeSpeakerName(value);
   const parts = splitSpeakerNames(value);
   return Array.from(new Set([full, ...parts].filter(name => name.length >= 2)));
-}
-
-export function speakerMatchesHiddenEntry(trackSpeaker: string, hiddenEntry: string) {
-  const track = normalizeSpeakerName(trackSpeaker);
-  if (!track) return false;
-  return hiddenSpeakerKeys(hiddenEntry).some(key => track.includes(key));
-}
-
-export function speakerMatchesAnyHiddenEntry(trackSpeaker: string, hiddenEntries: Iterable<string>) {
-  for (const hiddenEntry of hiddenEntries) {
-    if (speakerMatchesHiddenEntry(trackSpeaker, hiddenEntry)) return true;
-  }
-  return false;
 }
