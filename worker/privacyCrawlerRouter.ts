@@ -197,6 +197,17 @@ export default {
       });
     }
 
+    // Vite lazy chunks must never traverse the database/auth router chain.
+    // Preview deployments replace content-hashed chunk filenames frequently;
+    // serving /assets/ directly prevents Admin/Upload lazy imports from hanging.
+    if (
+      ['GET', 'HEAD'].includes(request.method) &&
+      url.pathname.startsWith('/assets/') &&
+      env.ASSETS
+    ) {
+      return withPrivacyHeaders(await env.ASSETS.fetch(request));
+    }
+
     // The default sticker league is server-ranked by cumulative spent stickers.
     // Searches continue through the existing authenticated sticker router so its
     // member-only search fields and permissions stay unchanged.
