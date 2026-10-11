@@ -1,0 +1,37 @@
+.taiwan-crown-avatar-ring {
+  background: linear-gradient(145deg,
+    color-mix(in srgb, var(--color-primary, #c06c84) 52%, #ffffff),
+    var(--color-primary, #c06c84) 34%,
+    color-mix(in srgb, var(--color-primary, #c06c84) 82%, #0f172a) 72%,
+    color-mix(in srgb, var(--color-primary, #c06c84) 68%, #ffffff));
+  box-shadow:
+    0 0 0.22em rgb(255 255 255 / 0.38),
+    0 0 1.15em color-mix(in srgb, var(--color-primary, #c06c84) 46%, transparent),
+    0 0 1.75em color-mix(in srgb, var(--color-primary, #c06c84) 24%, transparent);
+}
+
+.taiwan-crown-avatar-ring::before {
+  background: conic-gradient(from 0deg,
+    color-mix(in srgb, var(--color-primary, #c06c84) 48%, #ffffff) 0deg,
+    color-mix(in srgb, var(--color-primary, #c06c84) 74%, #ffffff) 56deg,
+    var(--color-primary, #c06c84) 118deg,
+    color-mix(in srgb, var(--color-primary, #c06c84) 88%, #0f172a) 182deg,
+    color-mix(in srgb, var(--color-primary, #c06c84) 72%, #0f172a) 238deg,
+    var(--color-primary, #c06c84) 302deg,
+    color-mix(in srgb, var(--color-primary, #c06c84) 54%, #ffffff) 360deg);
+}
+
+@keyframes taiwanCrownRingGlow {
+  from {
+    box-shadow:
+      0 0 0.18em rgb(255 255 255 / 0.28),
+      0 0 0.9em color-mix(in srgb, var(--color-primary, #c06c84) 34%, transparent),
+      0 0 1.3em color-mix(in srgb, var(--color-primary, #c06c84) 16%, transparent);
+  }
+  to {
+    box-shadow:
+      0 0 0.26em rgb(255 255 255 / 0.46),
+      0 0 1.35em color-mix(in srgb, var(--color-primary, #c06c84) 58%, transparent),
+      0 0 1.95em color-mix(in srgb, var(--color-primary, #c06c84) 30%, transparent);
+  }
+}
