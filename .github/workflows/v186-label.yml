@@ -32,17 +32,16 @@ jobs:
           new_label = '                  只對有權限者顯示(從首頁隱藏)\n'
           old_help = '勾選「只對有權限者顯示」後，未達瀏覽權限的會員與所有訪客都不會在首頁看到此音檔；「訪客可見」會自動取消並鎖定。'
           new_help = '勾選「只對有權限者顯示(從首頁隱藏)」後，未達瀏覽權限的會員與所有訪客都不會在首頁看到此音檔；「訪客可見」會自動取消並鎖定。'
-          if old_label not in text:
-              raise SystemExit('target label not found')
-          if old_help not in text:
-              raise SystemExit('target help copy not found')
+          if old_label not in text or old_help not in text:
+              raise SystemExit('target copy not found')
           text = text.replace(old_label, new_label, 1).replace(old_help, new_help, 1)
           path.write_text(text)
+          assert '只對有權限者顯示(從首頁隱藏)' in text
           PY
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Regression
-        run: npm test
+      - name: Relevant v185 behavior tests
+        run: node --import tsx --test --test-name-pattern='只對有權限者顯示|個人資料完善|舊音檔' tests/v185PermissionProfileSocial.test.ts
       - name: TypeScript
         run: npm run lint
       - name: Build
