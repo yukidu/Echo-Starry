@@ -1,8 +1,10 @@
 import './v181HomeToolbarDislike.css';
 
 const PRODUCTION_HOST = 'echostars.yukidu.workers.dev';
-const PREVIEW_STORAGE_PREFIX = 'preview-disliked-speakers';
+const PREVIEW_STORAGE_PREFIX = 'preview-disliked-speakers-v2';
 const hiddenSpeakers = new Set<string>();
+const trackSpeakerById = new Map<string, string>();
+let trackSpeakerLoad: Promise<void> | null = null;
 let lastMemberIdentity = '__initial__';
 let observer: MutationObserver | null = null;
 
@@ -51,8 +53,46 @@ function cardWrapper(card: HTMLElement) {
   return card.closest<HTMLElement>('.lucky-card') || card;
 }
 
+function trackIdFromCard(card: HTMLElement) {
+  return String(card.dataset.trackId || '').trim();
+}
+
+async function loadTrackSpeakerMap(force = false) {
+  if (trackSpeakerLoad && !force) return trackSpeakerLoad;
+  trackSpeakerLoad = (async () => {
+    const response = await fetch('/api/tracks', {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store'
+    });
+    if (!response.ok) throw new Error(`tracks: ${response.status}`);
+    const tracks = await response.json().catch(() => []);
+    if (!Array.isArray(tracks)) throw new Error('tracks response is not an array');
+    trackSpeakerById.clear();
+    tracks.forEach((track: any) => {
+      const id = String(track?.id || '').trim();
+      const speaker = String(track?.speaker || '').trim();
+      if (id && speaker) trackSpeakerById.set(id, speaker);
+    });
+  })();
+  try {
+    await trackSpeakerLoad;
+  } finally {
+    trackSpeakerLoad = null;
+  }
+}
+
 function speakerNameFromCard(card: HTMLElement) {
-  return String(card.querySelector<HTMLImageElement>('img[alt]')?.alt || '').trim();
+  const trackId = trackIdFromCard(card);
+  return trackId ? String(trackSpeakerById.get(trackId) || '').trim() : '';
+}
+
+async function resolveSpeakerNameFromCard(card: HTMLElement) {
+  let speakerName = speakerNameFromCard(card);
+  if (speakerName) return speakerName;
+  await loadTrackSpeakerMap(true);
+  speakerName = speakerNameFromCard(card);
+  return speakerName;
 }
 
 function syncCardVisibility(card: HTMLElement) {
@@ -196,16 +236,26 @@ async function persistDislike(speakerName: string) {
 }
 
 async function handleDislike(card: HTMLElement, button: HTMLButtonElement) {
-  const speakerName = speakerNameFromCard(card);
-  if (!speakerName || button.disabled) return;
+  if (button.disabled) return;
 
   if (!isPreviewHost() && !readMemberIdentity()) {
     window.alert('請先登入會員後再使用「不喜歡」。');
     return;
   }
 
-  if (!await styledDislikeConfirm(`確定不喜歡「${speakerName}」嗎？`, '不喜歡確認')) return;
-  if (!await styledDislikeConfirm(`再確認一次，真的不喜歡「${speakerName}」嗎？`, '再次確認')) return;
+  let speakerName = '';
+  try {
+    speakerName = await resolveSpeakerNameFromCard(card);
+  } catch (error) {
+    console.warn('Failed to resolve speaker name:', error);
+  }
+  if (!speakerName) {
+    window.alert('目前無法取得演講者姓名，請稍後再試。');
+    return;
+  }
+
+  if (!await styledDislikeConfirm(`確定不喜歡演講者「${speakerName}」嗎？`, '不喜歡確認')) return;
+  if (!await styledDislikeConfirm(`再確認一次，真的不喜歡演講者「${speakerName}」嗎？`, '再次確認')) return;
 
   button.disabled = true;
   const label = button.querySelector('span');
@@ -307,6 +357,9 @@ function startV181HomeControls() {
   syncAudioPlayingState();
   syncMemberIdentity();
   syncAllCards();
+  void loadTrackSpeakerMap().then(syncAllCards).catch(error => {
+    console.warn('Failed to preload track speakers:', error);
+  });
 
   document.addEventListener('play', syncAudioPlayingState, true);
   document.addEventListener('pause', syncAudioPlayingState, true);
