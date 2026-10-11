@@ -28,11 +28,22 @@ test('舊音檔未設定新旗標時維持原本顯示行為', () => {
   assert.equal(canAppearInHomeForViewer({}, false, false), true);
 });
 
-test('main 的一般 PR Preview 保持與正式 D1/R2/KV 隔離', () => {
+test('Preview storage 綁定依環境分流：一般 PR 隔離、固定 Preview 共用正式資料', () => {
   const wrangler = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
-  assert.match(wrangler, /previews\s*=\s*\{\s*\}/);
-  assert.doesNotMatch(wrangler, /\[previews\.vars\]/);
-  assert.equal((wrangler.match(/database_id = "e0a696a9-0233-4186-be4d-229435b19a27"/g) || []).length, 1);
-  assert.equal((wrangler.match(/bucket_name = "echoes-audio-bucket"/g) || []).length, 1);
-  assert.equal((wrangler.match(/id = "a2e345e244cb40b4a804be3f89584b90"/g) || []).length, 1);
+  const isFixedPreview = /\[previews\.vars\]/.test(wrangler);
+  const productionDbCount = (wrangler.match(/database_id = "e0a696a9-0233-4186-be4d-229435b19a27"/g) || []).length;
+  const productionR2Count = (wrangler.match(/bucket_name = "echoes-audio-bucket"/g) || []).length;
+  const productionKvCount = (wrangler.match(/id = "a2e345e244cb40b4a804be3f89584b90"/g) || []).length;
+
+  if (isFixedPreview) {
+    assert.match(wrangler, /\[previews\.vars\][\s\S]*ENVIRONMENT\s*=\s*"preview"/);
+    assert.equal(productionDbCount, 2);
+    assert.equal(productionR2Count, 2);
+    assert.equal(productionKvCount, 2);
+  } else {
+    assert.match(wrangler, /previews\s*=\s*\{\s*\}/);
+    assert.equal(productionDbCount, 1);
+    assert.equal(productionR2Count, 1);
+    assert.equal(productionKvCount, 1);
+  }
 });
