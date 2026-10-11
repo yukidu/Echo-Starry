@@ -1,6 +1,6 @@
-const CACHE_NAME = 'echostars-shell-v157';
+const CACHE_NAME = 'echostars-shell-v178';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-monochrome.svg', '/icon-192.png', '/icon-512.png'];
-const FORCE_STALE_CLIENT_REFRESH = CACHE_NAME === 'echostars-shell-v157';
+const FORCE_STALE_CLIENT_REFRESH = true;
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
@@ -16,10 +16,10 @@ self.addEventListener('activate', event => {
     await Promise.all(oldShellKeys.map(key => caches.delete(key)));
     await self.clients.claim();
 
-    // v154 recovery: production screenshots proved that a tab can keep running an
-    // older React bundle even after a successful deployment. Cookies are unrelated
-    // to that in-memory app state. Existing clients are therefore navigated once
-    // when this worker replaces an older shell. New visitors are not reloaded.
+    // v178: when a new worker replaces an older shell, refresh existing tabs
+    // exactly once. This avoids a successful Production deploy appearing stale
+    // until users manually clear site data, without creating a reload loop for
+    // new visitors or tabs that already use the current worker.
     if (FORCE_STALE_CLIENT_REFRESH && upgradingExistingClient) {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       await Promise.all(windows.map(async client => {
@@ -27,7 +27,7 @@ self.addEventListener('activate', event => {
         try {
           await client.navigate(client.url);
         } catch {
-          // A closed/navigating tab is harmless; the next normal open gets v154.
+          // A closed/navigating tab is harmless; the next normal open gets v178.
         }
       }));
     }
