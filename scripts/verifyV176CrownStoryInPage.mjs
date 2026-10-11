@@ -146,25 +146,50 @@ async function main() {
     const pageUrl = await evaluate('location.href');
     const targetsBefore = await pageTargetCount();
     const testAudioSrc = makeSilentWavDataUri();
-    const audioSetup = await evaluate(`(async () => {
+    const audioPrepared = await evaluate(`(() => {
       const audio = document.querySelector('audio');
       if (!audio) return { ok: false, reason: 'audio element missing' };
       window.__v176AudioNode = audio;
       window.__v176AudioSrc = ${JSON.stringify(testAudioSrc)};
+      window.__v176AudioStartResult = null;
       audio.pause();
       audio.src = window.__v176AudioSrc;
       audio.loop = true;
       audio.volume = 0.01;
       audio.currentTime = 0;
       audio.load();
-      try {
-        await audio.play();
-        return { ok: true, paused: audio.paused, currentTime: audio.currentTime, currentSrc: audio.currentSrc };
-      } catch (error) {
-        return { ok: false, reason: String(error?.message || error), paused: audio.paused, currentTime: audio.currentTime };
-      }
+
+      const button = document.createElement('button');
+      button.id = 'v176-real-playback-start';
+      button.type = 'button';
+      button.setAttribute('aria-label', '開始播放');
+      button.textContent = '開始播放';
+      Object.assign(button.style, {
+        position: 'fixed', left: '8px', top: '8px', width: '120px', height: '48px',
+        zIndex: '2147483647', opacity: '0.01', pointerEvents: 'auto'
+      });
+      button.addEventListener('click', async () => {
+        try {
+          await audio.play();
+          window.__v176AudioStartResult = { ok: true, paused: audio.paused, currentTime: audio.currentTime, currentSrc: audio.currentSrc };
+        } catch (error) {
+          window.__v176AudioStartResult = { ok: false, reason: String(error?.message || error), paused: audio.paused, currentTime: audio.currentTime };
+        } finally {
+          button.remove();
+        }
+      }, { once: true });
+      document.body.append(button);
+      return { ok: true };
     })()`);
-    if (!audioSetup?.ok) throw new Error(`Could not start the shared audio element for continuity verification: ${JSON.stringify(audioSetup)}`);
+    if (!audioPrepared?.ok) throw new Error(`Could not prepare shared audio continuity verification: ${JSON.stringify(audioPrepared)}`);
+
+    // Use trusted browser input so the site's manual-playback guard is preserved and exercised.
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 40, y: 28 });
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: 40, y: 28, button: 'left', clickCount: 1 });
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 40, y: 28, button: 'left', clickCount: 1 });
+    await waitFor(`window.__v176AudioStartResult !== null`, 'explicit user playback start');
+    const audioSetup = await evaluate('window.__v176AudioStartResult');
+    if (!audioSetup?.ok) throw new Error(`Could not start the shared audio element through explicit user action: ${JSON.stringify(audioSetup)}`);
     await waitFor(`(() => { const audio = document.querySelector('audio'); return audio === window.__v176AudioNode && !audio.paused && audio.currentTime > 0.08; })()`, 'shared audio playback');
 
     let previousTime = -1;
