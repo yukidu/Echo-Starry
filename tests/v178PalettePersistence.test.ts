@@ -23,7 +23,7 @@ test('v178 keeps explicit palette cycling while persisting the new choice', () =
 });
 
 test('v178 service worker invalidates the old app shell and refreshes existing tabs once', () => {
-  assert.match(swSource, /echostars-shell-v178/);
+  assert.match(swSource, /const CACHE_NAME = 'echostars-shell-v\d+'/);
   assert.match(swSource, /oldShellKeys/);
   assert.match(swSource, /client\.navigate\(client\.url\)/);
 });

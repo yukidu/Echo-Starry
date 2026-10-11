@@ -7,8 +7,8 @@ const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url),
 const wrangler = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
 const workflow = readFileSync(new URL('../.github/workflows/regression.yml', import.meta.url), 'utf8');
 
-test('v157 is the single current PWA cache version', () => {
-  assert.match(sw, /const CACHE_NAME = 'echostars-shell-v157'/);
+test('v178 is the single current PWA cache version', () => {
+  assert.match(sw, /const CACHE_NAME = 'echostars-shell-v178'/);
   const testsDir = new URL('./', import.meta.url);
   for (const file of readdirSync(testsDir).filter(name => name.endsWith('.test.ts') && name !== 'releaseIntegrity.test.ts')) {
     const source = readFileSync(new URL(file, testsDir), 'utf8');
