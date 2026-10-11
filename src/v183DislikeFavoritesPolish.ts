@@ -1,9 +1,13 @@
+import { isCombinedSpeakerName, speakerMatchesHiddenEntry, speakerMatchesAnyHiddenEntry } from './v184SpeakerRelationship';
+
 const PRODUCTION_HOST = 'echostars.yukidu.workers.dev';
 const PREVIEW_STORAGE_PREFIX = 'preview-disliked-speakers-v2';
 const REOPEN_FAVORITES_KEY = 'v183-reopen-favorites';
 const hiddenSpeakers = new Set<string>();
+const trackSpeakersById = new Map<string, string>();
 let loadToken = 0;
 let renderQueued = false;
+let trackLoad: Promise<void> | null = null;
 
 function isPreviewHost() {
   const host = window.location.hostname;
@@ -71,22 +75,34 @@ function installStyles() {
       padding-top: .8rem;
       border-top: 1px solid color-mix(in srgb,var(--color-primary,#c06c84) 22%,transparent);
     }
-    .v183-hidden-speakers-heading {
+    .v183-hidden-speakers-heading,
+    .v184-hidden-speaker-group-heading {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: .75rem;
-      margin-bottom: .55rem;
       color: var(--theme-text-primary,#0f172a);
-      font-size: .96rem;
       font-weight: 950;
     }
-    .v183-hidden-speakers-count {
+    .v183-hidden-speakers-heading {
+      margin-bottom: .65rem;
+      font-size: .96rem;
+    }
+    .v184-hidden-speaker-group-heading {
+      margin: .68rem 0 .42rem;
+      padding-top: .15rem;
+      font-size: .82rem;
+      color: var(--theme-text-secondary,#64748b);
+    }
+    .v183-hidden-speakers-count,
+    .v184-hidden-speaker-group-count {
       color: var(--color-primary,#c06c84);
       font-size: .8rem;
       font-weight: 900;
+      white-space: nowrap;
     }
-    .v183-hidden-speakers-empty {
+    .v183-hidden-speakers-empty,
+    .v184-hidden-speaker-group-empty {
       margin: 0;
       color: var(--theme-text-secondary,#64748b);
       text-align: center;
@@ -108,6 +124,13 @@ function installStyles() {
       border-radius: 13px;
       background: color-mix(in srgb,var(--theme-card-bg,#fff) 88%,var(--color-primary,#c06c84) 12%);
     }
+    .v183-hidden-speaker-name-wrap {
+      min-width: 0;
+      display: flex;
+      align-items: baseline;
+      gap: .22rem;
+      overflow: hidden;
+    }
     .v183-hidden-speaker-name {
       min-width: 0;
       overflow: hidden;
@@ -116,6 +139,13 @@ function installStyles() {
       color: var(--theme-text-primary,#0f172a);
       font-size: .9rem;
       font-weight: 850;
+    }
+    .v184-hidden-track-count {
+      flex: none;
+      color: var(--color-primary,#c06c84);
+      font-size: .84rem;
+      font-weight: 950;
+      white-space: nowrap;
     }
     .v183-unhide-button {
       flex: none;
@@ -137,27 +167,57 @@ function installStyles() {
   document.head.appendChild(style);
 }
 
+async function loadTrackSpeakers(force = false) {
+  if (trackLoad && !force) return trackLoad;
+  trackLoad = (async () => {
+    const response = await fetch('/api/tracks', {
+      credentials: 'same-origin',
+      cache: 'no-store'
+    });
+    if (!response.ok) throw new Error(`tracks: ${response.status}`);
+    const tracks = await response.json().catch(() => []);
+    if (!Array.isArray(tracks)) throw new Error('tracks response is not an array');
+    trackSpeakersById.clear();
+    tracks.forEach((track: any) => {
+      const id = String(track?.id || '').trim();
+      const speaker = String(track?.speaker || '').trim();
+      if (id && speaker) trackSpeakersById.set(id, speaker);
+    });
+  })();
+  try {
+    await trackLoad;
+  } finally {
+    trackLoad = null;
+  }
+}
+
+async function fetchHiddenSpeakerNames() {
+  if (isPreviewHost()) return readPreviewSpeakers();
+  if (!readMemberIdentity()) return [];
+  try {
+    const response = await fetch('/api/member-hidden-speakers', {
+      credentials: 'same-origin',
+      cache: 'no-store'
+    });
+    if (!response.ok) return [];
+    const data = await response.json().catch(() => ({}));
+    return Array.isArray(data?.speakers)
+      ? data.speakers.map(String).map((name: string) => name.trim()).filter(Boolean)
+      : [];
+  } catch (error) {
+    console.warn('Failed to load hidden speakers for favorites page:', error);
+    return [];
+  }
+}
+
 async function loadHiddenSpeakers() {
   const token = ++loadToken;
-  let names: string[] = [];
-  if (isPreviewHost()) {
-    names = readPreviewSpeakers();
-  } else if (readMemberIdentity()) {
-    try {
-      const response = await fetch('/api/member-hidden-speakers', {
-        credentials: 'same-origin',
-        cache: 'no-store'
-      });
-      if (response.ok) {
-        const data = await response.json().catch(() => ({}));
-        names = Array.isArray(data?.speakers)
-          ? data.speakers.map(String).map((name: string) => name.trim()).filter(Boolean)
-          : [];
-      }
-    } catch (error) {
-      console.warn('Failed to load hidden speakers for favorites page:', error);
-    }
-  }
+  const [names] = await Promise.all([
+    fetchHiddenSpeakerNames(),
+    loadTrackSpeakers().catch(error => {
+      console.warn('Failed to load speakers for hidden-track counts:', error);
+    })
+  ]);
   if (token !== loadToken) return;
   hiddenSpeakers.clear();
   names.forEach(name => hiddenSpeakers.add(name));
@@ -180,12 +240,94 @@ async function removeHiddenSpeaker(speakerName: string) {
   hiddenSpeakers.delete(speakerName);
 }
 
+function hiddenTrackCount(speakerName: string) {
+  let count = 0;
+  trackSpeakersById.forEach(trackSpeaker => {
+    if (speakerMatchesHiddenEntry(trackSpeaker, speakerName)) count += 1;
+  });
+  return count;
+}
+
+function totalHiddenTrackCount() {
+  let count = 0;
+  trackSpeakersById.forEach(trackSpeaker => {
+    if (speakerMatchesAnyHiddenEntry(trackSpeaker, hiddenSpeakers)) count += 1;
+  });
+  return count;
+}
+
+function createSpeakerRow(speakerName: string) {
+  const row = document.createElement('div');
+  row.className = 'v183-hidden-speaker-row';
+
+  const nameWrap = document.createElement('div');
+  nameWrap.className = 'v183-hidden-speaker-name-wrap';
+  const name = document.createElement('span');
+  name.className = 'v183-hidden-speaker-name';
+  name.textContent = speakerName;
+  const hiddenCount = document.createElement('span');
+  hiddenCount.className = 'v184-hidden-track-count';
+  hiddenCount.textContent = `（${hiddenTrackCount(speakerName)}）`;
+  hiddenCount.title = `此項目目前共隱藏 ${hiddenTrackCount(speakerName)} 部音檔`;
+  nameWrap.append(name, hiddenCount);
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'v183-unhide-button';
+  button.textContent = '取消隱藏';
+  button.addEventListener('click', async () => {
+    if (button.disabled) return;
+    button.disabled = true;
+    button.textContent = '處理中…';
+    try {
+      await removeHiddenSpeaker(speakerName);
+      sessionStorage.setItem(REOPEN_FAVORITES_KEY, '1');
+      window.location.reload();
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = '取消隱藏';
+      window.alert(error instanceof Error ? error.message : '取消隱藏失敗，請稍後再試。');
+    }
+  });
+
+  row.append(nameWrap, button);
+  return row;
+}
+
+function appendSpeakerGroup(section: HTMLElement, titleText: string, names: string[], countLabel: string) {
+  const heading = document.createElement('div');
+  heading.className = 'v184-hidden-speaker-group-heading';
+  const title = document.createElement('span');
+  title.textContent = titleText;
+  const count = document.createElement('span');
+  count.className = 'v184-hidden-speaker-group-count';
+  count.textContent = `${names.length} ${countLabel}`;
+  heading.append(title, count);
+  section.append(heading);
+
+  if (!names.length) {
+    const empty = document.createElement('p');
+    empty.className = 'v184-hidden-speaker-group-empty';
+    empty.textContent = '目前沒有項目';
+    section.append(empty);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'v183-hidden-speakers-list';
+  names.forEach(speakerName => list.append(createSpeakerRow(speakerName)));
+  section.append(list);
+}
+
 function renderHiddenSpeakerSection() {
   const header = document.querySelector<HTMLElement>('.v142-favorites-header');
   if (!header) return;
 
   const names = Array.from(hiddenSpeakers).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
-  const signature = names.join('\u0001');
+  const combinedNames = names.filter(isCombinedSpeakerName);
+  const singleNames = names.filter(name => !isCombinedSpeakerName(name));
+  const countSignature = names.map(name => `${name}:${hiddenTrackCount(name)}`).join('\u0001');
+  const signature = `${countSignature}\u0002${totalHiddenTrackCount()}`;
   let section = header.querySelector<HTMLElement>('[data-v183-hidden-speakers]');
   if (section?.dataset.signature === signature) return;
   section?.remove();
@@ -201,7 +343,7 @@ function renderHiddenSpeakerSection() {
   title.textContent = '不喜歡的演講者';
   const count = document.createElement('span');
   count.className = 'v183-hidden-speakers-count';
-  count.textContent = `${names.length} 位`;
+  count.textContent = `${names.length} 項・${totalHiddenTrackCount()} 部音檔`;
   heading.append(title, count);
   section.append(heading);
 
@@ -211,36 +353,8 @@ function renderHiddenSpeakerSection() {
     empty.textContent = '目前沒有隱藏的演講者';
     section.append(empty);
   } else {
-    const list = document.createElement('div');
-    list.className = 'v183-hidden-speakers-list';
-    names.forEach(speakerName => {
-      const row = document.createElement('div');
-      row.className = 'v183-hidden-speaker-row';
-      const name = document.createElement('span');
-      name.className = 'v183-hidden-speaker-name';
-      name.textContent = speakerName;
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'v183-unhide-button';
-      button.textContent = '取消隱藏';
-      button.addEventListener('click', async () => {
-        if (button.disabled) return;
-        button.disabled = true;
-        button.textContent = '處理中…';
-        try {
-          await removeHiddenSpeaker(speakerName);
-          sessionStorage.setItem(REOPEN_FAVORITES_KEY, '1');
-          window.location.reload();
-        } catch (error) {
-          button.disabled = false;
-          button.textContent = '取消隱藏';
-          window.alert(error instanceof Error ? error.message : '取消隱藏失敗，請稍後再試。');
-        }
-      });
-      row.append(name, button);
-      list.append(row);
-    });
-    section.append(list);
+    appendSpeakerGroup(section, '夫妻／合併姓名', combinedNames, '組');
+    appendSpeakerGroup(section, '單人姓名', singleNames, '位');
   }
 
   header.append(section);
