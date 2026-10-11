@@ -2,6 +2,7 @@ import './v174CrownTruePage.css';
 import './v176CrownAvatarShine';
 import './v177CrownPaletteRing';
 import './v178CrownDiagonalReflection';
+import './v179CrownPolish';
 
 const PAGE_ID = 'taiwan-crown-integrated-page';
 let crownWasOpen = false;
