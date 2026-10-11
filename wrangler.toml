@@ -1,6 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/privacyCrawlerRouter.ts"
+main = "worker/previewFastRouter.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
@@ -30,8 +30,8 @@ command = "npm run build"
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# 所有請求先經過 privacyCrawlerRouter，才能對首頁、分享頁、靜態資源與 API
-# 一致套用 X-Robots-Tag，並阻擋已知搜尋引擎／AI crawler。
+# 所有請求先經過入口 Worker；Preview 入口會讓一般前端頁面直接走 Assets，
+# API / 分享 / robots 仍交由原 privacyCrawlerRouter 處理。
 run_worker_first = ["/*"]
 
 # 1. Cloudflare D1 資料庫 (SQLite)
