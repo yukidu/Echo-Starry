@@ -7,6 +7,7 @@ const css = readFileSync(new URL('../src/v181HomeToolbarDislike.css', import.met
 const main = readFileSync(new URL('../src/main.tsx', import.meta.url), 'utf8');
 const router = readFileSync(new URL('../worker/hiddenTrackRouter.ts', import.meta.url), 'utf8');
 const favoriteRouter = readFileSync(new URL('../worker/favoriteRouter.ts', import.meta.url), 'utf8');
+const privacyRouter = readFileSync(new URL('../worker/privacyCrawlerRouter.ts', import.meta.url), 'utf8');
 
 test('v181 logo circular pulse is visible only while a real audio element is playing', () => {
   assert.match(client, /querySelectorAll<HTMLAudioElement>\('audio'\)/);
@@ -45,21 +46,25 @@ test('v182 dislike uses one site-styled confirmation and never mentions hiding',
   assert.match(css, /\.v181-confirm-icon[\s\S]*color:\s*rgb\(217 119 6\)/);
 });
 
-test('v181 hides every card for the same disliked speaker', () => {
+test('v184 relationship matching hides every card related to the disliked speaker', () => {
   assert.match(client, /const hiddenSpeakers = new Set<string>\(\)/);
-  assert.match(client, /hiddenSpeakers\.has\(speakerName\)/);
+  assert.match(client, /speakerMatchesAnyHiddenEntry\(speakerName, hiddenSpeakers\)/);
+  assert.doesNotMatch(client, /hiddenSpeakers\.has\(speakerName\)/);
   assert.match(client, /document\.querySelectorAll<HTMLElement>\('\.audio-card\[data-track-id\]'\)/);
   assert.match(client, /hiddenSpeakers\.add\(speakerName\)/);
 });
 
-test('v181 persists production dislikes per authenticated member and speaker in D1', () => {
+test('v181 production dislikes persist per authenticated member while preserving the legacy worker chain', () => {
   assert.match(router, /CREATE TABLE IF NOT EXISTS user_hidden_speakers/);
   assert.match(router, /PRIMARY KEY \(userId, speakerName\)/);
   assert.match(router, /FROM auth_sessions s[\s\S]*JOIN users u ON u\.id = s\.userId/);
   assert.match(router, /INSERT OR IGNORE INTO user_hidden_speakers/);
   assert.match(router, /SELECT speakerName FROM user_hidden_speakers WHERE userId = \?/);
   assert.match(client, /\/api\/member-hidden-speakers/);
-  assert.match(favoriteRouter, /import appWorker from '\.\/hiddenTrackRouter'/);
+  assert.match(privacyRouter, /import hiddenTrackWorker from '\.\/hiddenTrackRouter'/);
+  assert.match(privacyRouter, /url\.pathname === '\/api\/member-hidden-speakers'/);
+  assert.match(privacyRouter, /hiddenTrackWorker\.fetch\(request, env\)/);
+  assert.match(favoriteRouter, /import appWorker from '\.\/adminUserDeleteRouter'/);
 });
 
 test('v181 preview testing stays isolated from production D1', () => {
