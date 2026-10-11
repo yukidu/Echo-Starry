@@ -57,7 +57,34 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Run regression tests
-        run: npm test
+        id: regression
+        shell: bash
+        run: |
+          set +e
+          npm test > test-output.txt 2>&1
+          code=$?
+          cat test-output.txt
+          if [ "$code" -ne 0 ]; then
+            {
+              echo "Regression failed (exit $code)"
+              echo
+              echo "--- matching failure lines ---"
+              grep -n -E 'not ok|AssertionError|ERR_ASSERTION|Expected|actual|error|fail' test-output.txt | tail -n 160 || true
+              echo
+              echo "--- final output ---"
+              tail -n 180 test-output.txt
+            } > ci-failure-summary.txt
+            exit "$code"
+          fi
+      - name: Commit regression failure summary
+        if: failure() && steps.regression.outcome == 'failure'
+        shell: bash
+        run: |
+          git config user.name "EchoStars Preview Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add ci-failure-summary.txt
+          git commit -m "chore: capture preview regression failure" || true
+          git push origin HEAD:preview-v185-access-profile-social
       - name: TypeScript diagnostic
         run: npm run lint
       - name: Production build
