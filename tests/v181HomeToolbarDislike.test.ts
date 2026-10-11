@@ -22,11 +22,12 @@ test('v181 hamburger keeps the three-line control but removes the rounded rectan
   assert.match(css, /button\[data-main-menu='hamburger'\][\s\S]*box-shadow:\s*none\s*!important/);
 });
 
-test('v181 dislike uses the site styled confirmation twice and never mentions hiding', () => {
+test('v181 dislike uses the speaker name, styled confirmation twice, and never mentions hiding', () => {
   assert.match(client, /label\.textContent\s*=\s*'不喜歡'/);
   assert.doesNotMatch(client, /window\.confirm/);
-  assert.match(client, /styledDislikeConfirm\(`確定不喜歡「\$\{title\}」嗎？`, '不喜歡確認'\)/);
-  assert.match(client, /styledDislikeConfirm\('再確認一次，真的不喜歡這個音檔嗎？', '再次確認'\)/);
+  assert.match(client, /speakerNameFromCard[\s\S]*img\[alt\]/);
+  assert.match(client, /styledDislikeConfirm\(`確定不喜歡「\$\{speakerName\}」嗎？`, '不喜歡確認'\)/);
+  assert.match(client, /styledDislikeConfirm\(`再確認一次，真的不喜歡「\$\{speakerName\}」嗎？`, '再次確認'\)/);
   assert.match(client, /v181-confirm-card/);
   assert.match(client, /shieldAlertIcon/);
   assert.doesNotMatch(client, /確定不喜歡[^\n]*隱藏|再次確認[^\n]*隱藏/);
@@ -35,18 +36,26 @@ test('v181 dislike uses the site styled confirmation twice and never mentions hi
   assert.match(css, /\.v181-confirm-icon[\s\S]*color:\s*rgb\(217 119 6\)/);
 });
 
-test('v181 persists production dislikes per authenticated member in D1', () => {
-  assert.match(router, /CREATE TABLE IF NOT EXISTS user_hidden_tracks/);
-  assert.match(router, /PRIMARY KEY \(userId, trackId\)/);
+test('v181 hides every card for the same disliked speaker', () => {
+  assert.match(client, /const hiddenSpeakers = new Set<string>\(\)/);
+  assert.match(client, /hiddenSpeakers\.has\(speakerName\)/);
+  assert.match(client, /document\.querySelectorAll<HTMLElement>\('\.audio-card\[data-track-id\]'\)/);
+  assert.match(client, /hiddenSpeakers\.add\(speakerName\)/);
+});
+
+test('v181 persists production dislikes per authenticated member and speaker in D1', () => {
+  assert.match(router, /CREATE TABLE IF NOT EXISTS user_hidden_speakers/);
+  assert.match(router, /PRIMARY KEY \(userId, speakerName\)/);
   assert.match(router, /FROM auth_sessions s[\s\S]*JOIN users u ON u\.id = s\.userId/);
-  assert.match(router, /INSERT OR IGNORE INTO user_hidden_tracks/);
-  assert.match(router, /SELECT trackId FROM user_hidden_tracks WHERE userId = \?/);
+  assert.match(router, /INSERT OR IGNORE INTO user_hidden_speakers/);
+  assert.match(router, /SELECT speakerName FROM user_hidden_speakers WHERE userId = \?/);
+  assert.match(client, /\/api\/member-hidden-speakers/);
   assert.match(favoriteRouter, /import appWorker from '\.\/hiddenTrackRouter'/);
 });
 
 test('v181 preview testing stays isolated from production D1', () => {
   assert.match(client, /host !== PRODUCTION_HOST && host\.endsWith\('-echostars\.yukidu\.workers\.dev'\)/);
   assert.match(client, /PREVIEW_STORAGE_PREFIX/);
-  assert.match(client, /if \(isPreviewHost\(\)\)[\s\S]*writePreviewHiddenIds/);
+  assert.match(client, /if \(isPreviewHost\(\)\)[\s\S]*writePreviewHiddenSpeakers/);
   assert.match(main, /import '\.\/v181HomeToolbarDislike';/);
 });
