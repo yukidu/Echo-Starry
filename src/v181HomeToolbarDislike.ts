@@ -79,6 +79,100 @@ function dislikeIcon() {
   return svg;
 }
 
+function shieldAlertIcon() {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.classList.add('v181-confirm-icon');
+  const shield = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  shield.setAttribute('d', 'M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3v8Z');
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  line.setAttribute('d', 'M12 8v4');
+  const dot = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  dot.setAttribute('d', 'M12 16h.01');
+  svg.append(shield, line, dot);
+  return svg;
+}
+
+function styledDislikeConfirm(message: string, title: string) {
+  return new Promise<boolean>(resolve => {
+    document.querySelector('[data-v181-confirm-layer]')?.remove();
+
+    const layer = document.createElement('div');
+    layer.className = 'v181-confirm-layer';
+    layer.dataset.v181ConfirmLayer = 'true';
+    layer.setAttribute('role', 'presentation');
+
+    const card = document.createElement('div');
+    card.className = 'v181-confirm-card';
+    card.setAttribute('role', 'alertdialog');
+    card.setAttribute('aria-modal', 'true');
+    card.setAttribute('aria-labelledby', 'v181-confirm-title');
+    card.setAttribute('aria-describedby', 'v181-confirm-message');
+
+    const icon = shieldAlertIcon();
+    const body = document.createElement('div');
+    body.className = 'v181-confirm-body';
+
+    const heading = document.createElement('p');
+    heading.id = 'v181-confirm-title';
+    heading.className = 'v181-confirm-title';
+    heading.textContent = title;
+
+    const copy = document.createElement('p');
+    copy.id = 'v181-confirm-message';
+    copy.className = 'v181-confirm-message';
+    copy.textContent = message;
+
+    const actions = document.createElement('div');
+    actions.className = 'v181-confirm-actions';
+
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'v181-confirm-button v181-confirm-cancel';
+    cancel.textContent = '取消';
+
+    const confirm = document.createElement('button');
+    confirm.type = 'button';
+    confirm.className = 'v181-confirm-button v181-confirm-ok';
+    confirm.textContent = '確定';
+
+    let settled = false;
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      document.removeEventListener('keydown', onKeydown, true);
+      layer.remove();
+      resolve(value);
+    };
+    const onKeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        finish(false);
+      }
+    };
+
+    cancel.addEventListener('click', () => finish(false));
+    confirm.addEventListener('click', () => finish(true));
+    layer.addEventListener('click', event => {
+      if (event.target === layer) finish(false);
+    });
+    document.addEventListener('keydown', onKeydown, true);
+
+    actions.append(cancel, confirm);
+    body.append(heading, copy, actions);
+    card.append(icon, body);
+    layer.append(card);
+    document.body.append(layer);
+    window.setTimeout(() => confirm.focus(), 0);
+  });
+}
+
 async function persistDislike(trackId: string) {
   if (isPreviewHost()) {
     hiddenTrackIds.add(trackId);
@@ -107,8 +201,8 @@ async function handleDislike(card: HTMLElement, button: HTMLButtonElement) {
   }
 
   const title = card.querySelector('h3')?.textContent?.trim() || '這個音檔';
-  if (!window.confirm(`確定不喜歡「${title}」嗎？`)) return;
-  if (!window.confirm('再確認一次，真的不喜歡這個音檔嗎？')) return;
+  if (!await styledDislikeConfirm(`確定不喜歡「${title}」嗎？`, '不喜歡確認')) return;
+  if (!await styledDislikeConfirm('再確認一次，真的不喜歡這個音檔嗎？', '再次確認')) return;
 
   button.disabled = true;
   const label = button.querySelector('span');
