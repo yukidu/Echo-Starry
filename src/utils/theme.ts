@@ -61,10 +61,43 @@ export const DARK_THEME: ThemePalette = {
   borderSubtle: '#23293b'
 };
 
+const LIGHT_PALETTE_STORAGE_KEY = 'sq_light_palette_v1';
+
+function readStoredLightPalette(): ThemePalette | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const storedId = window.localStorage.getItem(LIGHT_PALETTE_STORAGE_KEY);
+    if (!storedId) return null;
+    return LIGHT_PALETTES.find(palette => palette.id === storedId) || null;
+  } catch {
+    return null;
+  }
+}
+
+function storeLightPalette(palette: ThemePalette) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(LIGHT_PALETTE_STORAGE_KEY, palette.id);
+  } catch {
+    // Storage can be unavailable in privacy modes; theme selection still works for this session.
+  }
+}
+
 export function getRandomLightPalette(excludeId?: string): ThemePalette {
+  // Initial page load reuses the visitor's last chosen palette so Preview/Production
+  // and normal reloads do not appear to change visual versions merely because a new
+  // random color was selected. Passing excludeId means the user explicitly asked for
+  // another palette, so choose a different one and remember it.
+  if (!excludeId) {
+    const stored = readStoredLightPalette();
+    if (stored) return stored;
+  }
+
   const filtered = excludeId ? LIGHT_PALETTES.filter(p => p.id !== excludeId) : LIGHT_PALETTES;
   const pool = filtered.length > 0 ? filtered : LIGHT_PALETTES;
-  return pool[Math.floor(Math.random() * pool.length)];
+  const selected = pool[Math.floor(Math.random() * pool.length)];
+  storeLightPalette(selected);
+  return selected;
 }
 
 /**
