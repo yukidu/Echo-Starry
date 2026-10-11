@@ -6,9 +6,10 @@ const css = readFileSync(new URL('../src/v179CrownPolish.css', import.meta.url),
 const ts = readFileSync(new URL('../src/v179CrownPolish.ts', import.meta.url), 'utf8');
 const entry = readFileSync(new URL('../src/v174CrownTruePage.ts', import.meta.url), 'utf8');
 
-test('v179 slightly reduces quote text with specificity above the v178 runtime style', () => {
-  assert.match(css, /\.taiwan-crown-overlay \.taiwan-crown-card \.taiwan-crown-card-quote[\s\S]*font-size:\s*1\.16em\s*!important/);
-  assert.match(css, /@media \(max-width: 420px\)[\s\S]*font-size:\s*1\.08em\s*!important/);
+test('v179 keeps the approved smaller quote size with mobile override', () => {
+  assert.match(css, /\.taiwan-crown-overlay \.taiwan-crown-card \.taiwan-crown-card-quote[\s\S]*font-size:\s*1\.04em\s*!important/);
+  assert.match(css, /@media \(max-width: 420px\)[\s\S]*font-size:\s*0\.96em\s*!important/);
+  assert.match(css, /font-weight:\s*400\s*!important/);
 });
 
 test('v179 uses independent spark nodes with different durations, delays and brightness', () => {
