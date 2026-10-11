@@ -1,4 +1,5 @@
 import appWorker from './favoriteRouter';
+import hiddenTrackWorker from './hiddenTrackRouter';
 import sessionWorker from './sessionCookieRouter';
 import iosGoogleRedirectWorker from './iosGoogleRedirectRouter';
 import { handleStarbeautySso } from './starbeautySsoRouter';
@@ -208,6 +209,14 @@ export default {
     // short-lived one-time code for the member's current basic-profile snapshot.
     const starBeautyResponse = await handleStarbeautySso(request, env);
     if (starBeautyResponse) return withPrivacyHeaders(starBeautyResponse);
+
+    // Member dislike endpoints are routed explicitly here so the long-standing
+    // favorite/admin/category/organization/session/playback/auth wrapper chain
+    // remains unchanged while these member-only preferences stay under the same
+    // privacy and cross-site-write boundary.
+    if (url.pathname === '/api/member-hidden-speakers' || url.pathname.startsWith('/api/member-hidden-speakers/')) {
+      return withPrivacyHeaders(await hiddenTrackWorker.fetch(request, env));
+    }
 
     // Authentication must not wait for unrelated sticker/catalog migrations.
     if (url.pathname === '/api/users/google-sync' || url.pathname.startsWith('/api/auth/')) {
