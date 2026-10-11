@@ -14,13 +14,14 @@ const V178_RELEASE: ChangelogEntry = {
   version: 'v178',
   date: '2026/10/11',
   isLatest: true,
-  summary: '調整皇冠大使頭像反光方向與名片文字大小。',
+  summary: '調整皇冠大使頭像反光方向、外圈旋轉與名片文字大小。',
   added: [],
   modified: [
-    '頭像外圈反光改成約 45 度的多道淡淡斜向亮帶，不再呈現 360 度旋轉感。',
+    '頭像外圈反光改成約 45 度的多道明顯斜向亮帶，反光本身不再繞圈旋轉。',
+    '外圈同色系漸層保留緩慢旋轉效果。',
     '放大皇冠大使名片內的姓名與文字內容，提升手機閱讀性。'
   ],
-  removed: ['移除頭像外圈持續繞圈的反光旋轉效果。']
+  removed: ['移除反光本身持續 360 度繞圈的效果。']
 };
 
 const runtime = window as Window & typeof globalThis & {
