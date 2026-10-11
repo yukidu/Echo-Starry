@@ -51,25 +51,25 @@
 }
 
 .taiwan-crown-card {
-  grid-template-columns: 5.2em minmax(0, 1fr) 2.35em;
+  grid-template-columns: 5.2em minmax(0, 1fr) 2.8em;
 }
 
 .taiwan-crown-card-name {
-  font-size: 1.42em;
-  line-height: 1.2;
+  font-size: 1.56em;
+  line-height: 1.18;
 }
 
 .taiwan-crown-card-quote {
-  font-size: 1.12em;
+  font-size: 1.22em;
   font-weight: 400 !important;
-  line-height: 1.52;
+  line-height: 1.56;
 }
 
 .taiwan-crown-card-arrow {
   position: relative;
   display: grid;
-  width: 2.3em;
-  height: 2.3em;
+  width: 2.65em;
+  height: 2.65em;
   place-items: center;
   justify-self: center;
   overflow: hidden;
@@ -80,7 +80,7 @@
   line-height: 0 !important;
   text-indent: -9999px;
   white-space: nowrap;
-  opacity: 0.98;
+  opacity: 1;
   transition: transform 180ms ease, opacity 180ms ease;
 }
 
@@ -89,8 +89,8 @@
   position: absolute;
   inset: 50% auto auto 50%;
   display: block;
-  width: 1.55em;
-  height: 1.55em;
+  width: 1.85em;
+  height: 1.85em;
   background: var(--color-primary, #c06c84);
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 3h6v6'/%3E%3Cpath d='M10 14 21 3'/%3E%3Cpath d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 3h6v6'/%3E%3Cpath d='M10 14 21 3'/%3E%3Cpath d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/%3E%3C/svg%3E") center / contain no-repeat;
@@ -122,7 +122,7 @@
   -webkit-mask: none;
   mask: none;
   color: var(--color-primary, #c06c84);
-  font-size: 1.35rem;
+  font-size: 1.48rem;
   font-weight: 800;
   line-height: 1;
   text-indent: 0;
@@ -168,26 +168,28 @@
 
 @media (max-width: 420px) {
   .taiwan-crown-card {
-    grid-template-columns: 4.55em minmax(0, 1fr) 2.2em;
+    grid-template-columns: 4.55em minmax(0, 1fr) 2.55em;
   }
 
   .taiwan-crown-card-name {
-    font-size: 1.3em;
+    font-size: 1.44em;
+    line-height: 1.18;
   }
 
   .taiwan-crown-card-quote {
-    font-size: 1.05em;
+    font-size: 1.16em;
     font-weight: 400 !important;
+    line-height: 1.56;
   }
 
   .taiwan-crown-card-arrow {
-    width: 2.1em;
-    height: 2.1em;
+    width: 2.45em;
+    height: 2.45em;
   }
 
   .taiwan-crown-card-arrow::before {
-    width: 1.45em;
-    height: 1.45em;
+    width: 1.72em;
+    height: 1.72em;
   }
 
   .taiwan-crown-member-card .taiwan-crown-card-arrow::before {
