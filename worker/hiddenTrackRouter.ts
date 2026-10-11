@@ -57,11 +57,11 @@ async function ensureTable(db: any) {
   const key = db as object;
   if (!tableReady.has(key)) {
     const task = db.prepare(`
-      CREATE TABLE IF NOT EXISTS user_hidden_tracks (
+      CREATE TABLE IF NOT EXISTS user_hidden_speakers (
         userId TEXT NOT NULL,
-        trackId TEXT NOT NULL,
+        speakerName TEXT NOT NULL,
         createdAt INTEGER NOT NULL,
-        PRIMARY KEY (userId, trackId)
+        PRIMARY KEY (userId, speakerName)
       )
     `).run().then(() => undefined);
     tableReady.set(key, task);
@@ -74,8 +74,8 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const method = request.method.toUpperCase();
-    const listRoute = url.pathname === '/api/member-hidden-tracks';
-    const itemRoute = url.pathname.match(/^\/api\/member-hidden-tracks\/([^/]+)$/);
+    const listRoute = url.pathname === '/api/member-hidden-speakers';
+    const itemRoute = url.pathname.match(/^\/api\/member-hidden-speakers\/([^/]+)$/);
 
     if (!listRoute && !itemRoute) return appWorker.fetch(request, env);
     if (!env.DB) return json({ error: '會員偏好資料庫尚未連線' }, 503);
@@ -87,20 +87,20 @@ export default {
 
     if (listRoute && method === 'GET') {
       const result = await env.DB.prepare(
-        'SELECT trackId FROM user_hidden_tracks WHERE userId = ? ORDER BY createdAt ASC'
+        'SELECT speakerName FROM user_hidden_speakers WHERE userId = ? ORDER BY createdAt ASC'
       ).bind(userId).all();
-      return json({ trackIds: (result.results || []).map((row: any) => String(row.trackId || '')).filter(Boolean) });
+      return json({ speakers: (result.results || []).map((row: any) => String(row.speakerName || '').trim()).filter(Boolean) });
     }
 
     if (itemRoute && method === 'POST') {
-      const trackId = decodeURIComponent(itemRoute[1]).trim();
-      if (!trackId) return json({ error: '缺少音檔識別資料' }, 400);
-      const track = await env.DB.prepare('SELECT id FROM tracks WHERE id = ? LIMIT 1').bind(trackId).first();
-      if (!track) return json({ error: '找不到此音檔' }, 404);
+      const speakerName = decodeURIComponent(itemRoute[1]).trim();
+      if (!speakerName) return json({ error: '缺少演講人資料' }, 400);
+      const speaker = await env.DB.prepare('SELECT speaker FROM tracks WHERE TRIM(speaker) = ? LIMIT 1').bind(speakerName).first();
+      if (!speaker) return json({ error: '找不到此演講人' }, 404);
       await env.DB.prepare(
-        'INSERT OR IGNORE INTO user_hidden_tracks (userId, trackId, createdAt) VALUES (?, ?, ?)'
-      ).bind(userId, trackId, Date.now()).run();
-      return json({ success: true, trackId });
+        'INSERT OR IGNORE INTO user_hidden_speakers (userId, speakerName, createdAt) VALUES (?, ?, ?)'
+      ).bind(userId, speakerName, Date.now()).run();
+      return json({ success: true, speakerName });
     }
 
     return json({ error: 'Method not allowed' }, 405);
