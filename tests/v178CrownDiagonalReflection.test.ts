@@ -11,12 +11,14 @@ test('v178 keeps the palette gradient rotating slowly while reflection itself do
   assert.doesNotMatch(css, /taiwanCrownRingShine/);
 });
 
-test('v178 sends multiple obvious 45-degree reflections left to right in a loop', () => {
-  assert.match(css, /linear-gradient\(45deg/);
-  assert.match(css, /animation:\s*taiwanCrownDiagonalShimmer\s+2\.8s\s+linear\s+infinite/);
-  assert.match(css, /background-position:\s*-160%\s+50%/);
-  assert.match(css, /background-position:\s*240%\s+50%/);
-  assert.doesNotMatch(css, /infinite\s+alternate/);
+test('v178 uses slow multi-point breathing reflections instead of a sweeping shine', () => {
+  assert.match(css, /radial-gradient\(circle at 17% 14%/);
+  assert.match(css, /radial-gradient\(circle at 95% 48%/);
+  assert.match(css, /radial-gradient\(circle at 12% 74%/);
+  assert.match(css, /animation:\s*taiwanCrownMultiPointBreath\s+7\.8s\s+ease-in-out\s+infinite/);
+  assert.match(css, /@keyframes\s+taiwanCrownMultiPointBreath/);
+  assert.doesNotMatch(css, /background-position:\s*-160%\s+50%/);
+  assert.doesNotMatch(css, /linear-gradient\(45deg/);
 });
 
 test('v178 enlarges crown card text and forces inspirational quotes to normal weight', () => {
@@ -30,9 +32,10 @@ test('v178 makes the link affordance more prominent and normalizes own-card bord
   assert.match(css, /\.taiwan-crown-member-card\s*\{[\s\S]*border-width:\s*1px[\s\S]*border-color:\s*var\(--theme-border-subtle/);
 });
 
-test('v178 layer loads after v177 and changelog records both effects', () => {
+test('v178 layer loads after v177 and changelog records the final reflection behavior', () => {
   assert.match(crownEntry, /import '\.\/v177CrownPaletteRing';[\s\S]*import '\.\/v178CrownDiagonalReflection';/);
   assert.match(release, /version:\s*'v178'/);
-  assert.match(release, /45 度/);
+  assert.match(release, /呼吸燈/);
+  assert.match(release, /多點反光/);
   assert.match(release, /緩慢旋轉/);
 });
