@@ -2,8 +2,10 @@ import './v181HomeToolbarDislike.css';
 
 const PRODUCTION_HOST = 'echostars.yukidu.workers.dev';
 const PREVIEW_STORAGE_PREFIX = 'preview-disliked-speakers-v2';
+const FAVORITES_KEY = 'echostars_favorite_track_ids_v1';
 const hiddenSpeakers = new Set<string>();
 const trackSpeakerById = new Map<string, string>();
+const trackCatalogById = new Map<string, { id: string; title: string; speaker: string; speakerAvatar: string }>();
 let trackSpeakerLoad: Promise<void> | null = null;
 let lastMemberIdentity = '__initial__';
 let observer: MutationObserver | null = null;
@@ -43,6 +45,15 @@ function writePreviewHiddenSpeakers() {
   } catch {}
 }
 
+function readFavoriteIds() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
 function syncAudioPlayingState() {
   const playing = Array.from(document.querySelectorAll<HTMLAudioElement>('audio'))
     .some(audio => !audio.paused && !audio.ended && audio.currentSrc !== '');
@@ -69,10 +80,18 @@ async function loadTrackSpeakerMap(force = false) {
     const tracks = await response.json().catch(() => []);
     if (!Array.isArray(tracks)) throw new Error('tracks response is not an array');
     trackSpeakerById.clear();
+    trackCatalogById.clear();
     tracks.forEach((track: any) => {
       const id = String(track?.id || '').trim();
       const speaker = String(track?.speaker || '').trim();
-      if (id && speaker) trackSpeakerById.set(id, speaker);
+      if (!id) return;
+      if (speaker) trackSpeakerById.set(id, speaker);
+      trackCatalogById.set(id, {
+        id,
+        title: String(track?.title || '未命名音檔').trim(),
+        speaker,
+        speakerAvatar: String(track?.speakerAvatar || '').trim()
+      });
     });
   })();
   try {
@@ -123,6 +142,21 @@ function dislikeIcon() {
   return svg;
 }
 
+function bookmarkIcon() {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M6 3a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v19l-6-4-6 4Z');
+  svg.append(path);
+  return svg;
+}
+
 function shieldAlertIcon() {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 24 24');
@@ -143,7 +177,7 @@ function shieldAlertIcon() {
   return svg;
 }
 
-function styledDislikeConfirm(message: string, title: string) {
+function styledDislikeConfirm(message: string) {
   return new Promise<boolean>(resolve => {
     document.querySelector('[data-v181-confirm-layer]')?.remove();
 
@@ -156,17 +190,12 @@ function styledDislikeConfirm(message: string, title: string) {
     card.className = 'v181-confirm-card';
     card.setAttribute('role', 'alertdialog');
     card.setAttribute('aria-modal', 'true');
-    card.setAttribute('aria-labelledby', 'v181-confirm-title');
+    card.setAttribute('aria-label', '不喜歡確認');
     card.setAttribute('aria-describedby', 'v181-confirm-message');
 
     const icon = shieldAlertIcon();
     const body = document.createElement('div');
     body.className = 'v181-confirm-body';
-
-    const heading = document.createElement('p');
-    heading.id = 'v181-confirm-title';
-    heading.className = 'v181-confirm-title';
-    heading.textContent = title;
 
     const copy = document.createElement('p');
     copy.id = 'v181-confirm-message';
@@ -209,7 +238,7 @@ function styledDislikeConfirm(message: string, title: string) {
     document.addEventListener('keydown', onKeydown, true);
 
     actions.append(cancel, confirm);
-    body.append(heading, copy, actions);
+    body.append(copy, actions);
     card.append(icon, body);
     layer.append(card);
     document.body.append(layer);
@@ -235,6 +264,25 @@ async function persistDislike(speakerName: string) {
   hiddenSpeakers.add(speakerName);
 }
 
+async function cancelHiddenSpeaker(speakerName: string) {
+  if (isPreviewHost()) {
+    hiddenSpeakers.delete(speakerName);
+    writePreviewHiddenSpeakers();
+  } else {
+    const response = await fetch(`/api/member-hidden-speakers/${encodeURIComponent(speakerName)}`, {
+      method: 'DELETE',
+      credentials: 'same-origin'
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data?.error || '取消隱藏失敗');
+    hiddenSpeakers.delete(speakerName);
+  }
+  syncAllCards();
+  window.dispatchEvent(new CustomEvent('echostars:member-hidden-speakers-changed', {
+    detail: { speakerName, hidden: false }
+  }));
+}
+
 async function handleDislike(card: HTMLElement, button: HTMLButtonElement) {
   if (button.disabled) return;
 
@@ -254,7 +302,7 @@ async function handleDislike(card: HTMLElement, button: HTMLButtonElement) {
     return;
   }
 
-  if (!await styledDislikeConfirm(`確定不喜歡演講者「${speakerName}」嗎？`, '不喜歡確認')) return;
+  if (!await styledDislikeConfirm(`確定不喜歡演講者「${speakerName}」嗎？`)) return;
 
   button.disabled = true;
   const label = button.querySelector('span');
@@ -263,7 +311,7 @@ async function handleDislike(card: HTMLElement, button: HTMLButtonElement) {
     await persistDislike(speakerName);
     syncAllCards();
     window.dispatchEvent(new CustomEvent('echostars:member-hidden-speakers-changed', {
-      detail: { speakerName }
+      detail: { speakerName, hidden: true }
     }));
   } catch (error) {
     window.alert(error instanceof Error ? error.message : '設定失敗，請稍後再試。');
@@ -303,11 +351,182 @@ function installDislikeButton(card: HTMLElement) {
   menu.append(button);
 }
 
+function removeFavorite(trackId: string) {
+  try {
+    const next = readFavoriteIds().filter(id => id !== trackId);
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent('echostars-favorites-changed', {
+      detail: { trackId, favorite: false }
+    }));
+  } catch {}
+}
+
+function closeFavoritesPage() {
+  document.querySelector('[data-v183-favorites-page]')?.remove();
+  document.documentElement.classList.remove('v183-favorites-open');
+}
+
+function createSectionTitle(text: string) {
+  const title = document.createElement('h2');
+  title.className = 'v183-favorites-section-title';
+  title.textContent = text;
+  return title;
+}
+
+async function openFavoritesPage() {
+  closeFavoritesPage();
+  try {
+    await loadTrackSpeakerMap();
+    await loadMemberHiddenSpeakers();
+  } catch (error) {
+    console.warn('Failed to prepare favorites page:', error);
+  }
+
+  const layer = document.createElement('div');
+  layer.className = 'v183-favorites-page';
+  layer.dataset.v183FavoritesPage = 'true';
+
+  const header = document.createElement('div');
+  header.className = 'v183-favorites-header';
+  const title = document.createElement('h1');
+  title.textContent = '我的收藏';
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'v183-favorites-close';
+  close.setAttribute('aria-label', '關閉我的收藏');
+  close.textContent = '×';
+  close.addEventListener('click', closeFavoritesPage);
+  header.append(title, close);
+
+  const content = document.createElement('div');
+  content.className = 'v183-favorites-content';
+
+  const favoritesSection = document.createElement('section');
+  favoritesSection.className = 'v183-favorites-section';
+  favoritesSection.append(createSectionTitle('收藏音檔'));
+  const favoriteIds = readFavoriteIds();
+  const favoriteTracks = favoriteIds
+    .map(id => trackCatalogById.get(id))
+    .filter((track): track is { id: string; title: string; speaker: string; speakerAvatar: string } => Boolean(track));
+
+  if (favoriteTracks.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'v183-favorites-empty';
+    empty.textContent = '尚未收藏音檔';
+    favoritesSection.append(empty);
+  } else {
+    const list = document.createElement('div');
+    list.className = 'v183-favorites-list';
+    favoriteTracks.forEach(track => {
+      const row = document.createElement('div');
+      row.className = 'v183-favorite-row';
+      if (track.speakerAvatar) {
+        const avatar = document.createElement('img');
+        avatar.src = track.speakerAvatar;
+        avatar.alt = '';
+        row.append(avatar);
+      }
+      const copy = document.createElement('div');
+      copy.className = 'v183-favorite-copy';
+      const trackTitle = document.createElement('strong');
+      trackTitle.textContent = track.title;
+      const speaker = document.createElement('span');
+      speaker.textContent = track.speaker;
+      copy.append(trackTitle, speaker);
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'v183-favorites-action';
+      remove.textContent = '取消收藏';
+      remove.addEventListener('click', () => {
+        removeFavorite(track.id);
+        void openFavoritesPage();
+      });
+      row.append(copy, remove);
+      list.append(row);
+    });
+    favoritesSection.append(list);
+  }
+
+  const hiddenSection = document.createElement('section');
+  hiddenSection.className = 'v183-favorites-section';
+  hiddenSection.append(createSectionTitle('已隱藏的演講者'));
+  if (hiddenSpeakers.size === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'v183-favorites-empty';
+    empty.textContent = '目前沒有隱藏的演講者';
+    hiddenSection.append(empty);
+  } else {
+    const list = document.createElement('div');
+    list.className = 'v183-hidden-list';
+    Array.from(hiddenSpeakers).sort((a, b) => a.localeCompare(b, 'zh-Hant')).forEach(speakerName => {
+      const row = document.createElement('div');
+      row.className = 'v183-hidden-row';
+      const name = document.createElement('strong');
+      name.textContent = speakerName;
+      const restore = document.createElement('button');
+      restore.type = 'button';
+      restore.className = 'v183-favorites-action';
+      restore.textContent = '取消隱藏';
+      restore.addEventListener('click', async () => {
+        if (restore.disabled) return;
+        restore.disabled = true;
+        restore.textContent = '處理中…';
+        try {
+          await cancelHiddenSpeaker(speakerName);
+          await openFavoritesPage();
+        } catch (error) {
+          window.alert(error instanceof Error ? error.message : '取消隱藏失敗，請稍後再試。');
+          restore.disabled = false;
+          restore.textContent = '取消隱藏';
+        }
+      });
+      row.append(name, restore);
+      list.append(row);
+    });
+    hiddenSection.append(list);
+  }
+
+  content.append(favoritesSection, hiddenSection);
+  layer.append(header, content);
+  document.body.append(layer);
+  document.documentElement.classList.add('v183-favorites-open');
+}
+
+function installFavoritesMenuEntry() {
+  const panel = document.querySelector<HTMLElement>('.mobile-menu-panel[data-react-menu="true"]');
+  if (!panel || panel.querySelector('[data-v183-favorites-menu]')) return;
+
+  const row = document.createElement('div');
+  row.className = 'mobile-menu-row flex items-center gap-2 px-2.5 py-2 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap v183-favorites-menu-row';
+  row.dataset.v183FavoritesMenu = 'true';
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'flex min-w-0 flex-1 items-center gap-3 text-left py-0.5';
+  const icon = bookmarkIcon();
+  icon.classList.add('v183-favorites-menu-icon');
+  const label = document.createElement('span');
+  label.textContent = '我的收藏';
+  button.append(icon, label);
+  button.addEventListener('click', () => {
+    document.querySelector<HTMLButtonElement>('button[data-main-menu="hamburger"]')?.click();
+    window.setTimeout(() => void openFavoritesPage(), 0);
+  });
+  row.append(button);
+
+  const stickerButton = Array.from(panel.querySelectorAll<HTMLButtonElement>('button'))
+    .find(candidate => candidate.textContent?.includes('我的貼紙'));
+  const stickerRow = stickerButton?.closest<HTMLElement>('.mobile-menu-row');
+  if (stickerRow?.parentElement === panel) stickerRow.insertAdjacentElement('afterend', row);
+  else panel.append(row);
+}
+
 function syncAllCards() {
   document.querySelectorAll<HTMLElement>('.audio-card[data-track-id]').forEach(card => {
     syncCardVisibility(card);
     installDislikeButton(card);
   });
+  installFavoritesMenuEntry();
 }
 
 async function loadMemberHiddenSpeakers() {
@@ -372,6 +591,8 @@ function startV181HomeControls() {
   });
   observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-expanded'] });
 
+  const reloadHiddenSpeakers = () => void loadMemberHiddenSpeakers();
+  window.addEventListener('echostars:member-hidden-speakers-changed', reloadHiddenSpeakers as EventListener);
   window.addEventListener('focus', syncMemberIdentity);
   window.addEventListener('storage', syncMemberIdentity);
 }
