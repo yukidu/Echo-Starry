@@ -203,33 +203,38 @@ function findActiveUploadForm() {
   return document.querySelector<HTMLFormElement>('form#track-upload-form');
 }
 
-const originalFetch = window.fetch.bind(window);
-window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-  try {
-    const url = typeof input === 'string' ? new URL(input, window.location.origin) :
-      input instanceof URL ? input : new URL(input.url, window.location.origin);
-    const method = String(init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
-    const isTrackWrite = url.origin === window.location.origin &&
-      ((url.pathname === '/api/tracks' && method === 'POST') || (/^\/api\/tracks\/[^/]+$/.test(url.pathname) && method === 'PUT'));
-    const form = isTrackWrite ? findActiveUploadForm() : null;
-    if (form && typeof init?.body === 'string') {
-      const body = JSON.parse(init.body);
-      if (body && typeof body === 'object' && !Array.isArray(body)) {
-        const names = normalizeCurrentForm(form);
-        if (names.length) {
-          body.speakers = names;
-          body.speaker = speakerDisplay(names);
-          init = { ...init, body: JSON.stringify(body) };
+function installFetchBridge() {
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    try {
+      const url = typeof input === 'string' ? new URL(input, window.location.origin) :
+        input instanceof URL ? input : new URL(input.url, window.location.origin);
+      const method = String(init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
+      const isTrackWrite = url.origin === window.location.origin &&
+        ((url.pathname === '/api/tracks' && method === 'POST') || (/^\/api\/tracks\/[^/]+$/.test(url.pathname) && method === 'PUT'));
+      const form = isTrackWrite ? findActiveUploadForm() : null;
+      if (form && typeof init?.body === 'string') {
+        const body = JSON.parse(init.body);
+        if (body && typeof body === 'object' && !Array.isArray(body)) {
+          const names = normalizeCurrentForm(form);
+          if (names.length) {
+            body.speakers = names;
+            body.speaker = speakerDisplay(names);
+            init = { ...init, body: JSON.stringify(body) };
+          }
         }
       }
+    } catch {
+      // Preserve the original request if it is not one of the JSON track writes.
     }
-  } catch {
-    // Preserve the original request if it is not one of the JSON track writes.
-  }
-  return originalFetch(input, init);
-};
+    return originalFetch(input, init);
+  };
+}
 
-installStyles();
-enhanceForms();
-const observer = new MutationObserver(enhanceForms);
-observer.observe(document.documentElement, { childList: true, subtree: true });
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  installFetchBridge();
+  installStyles();
+  enhanceForms();
+  const observer = new MutationObserver(enhanceForms);
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+}
