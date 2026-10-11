@@ -11,7 +11,19 @@ test('upload permission selector and guest visibility block keep their existing 
   assert.match(upload, /data-upload-guest-visibility="true"/);
   assert.match(upload, /瀏覽權限最低門檻獎銜/);
   assert.match(upload, /<ThemedSelect[\s\S]*value=\{requiredRank\}/);
+});
+
+test('v188 uses a real native select on mobile while retaining the desktop themed listbox', () => {
+  assert.match(themedSelect, /matchMedia\('\(max-width: 767px\)'\)/);
+  assert.match(themedSelect, /if \(useNativeMobile\) \{[\s\S]*return <select/);
+  assert.match(themedSelect, /touchAction:'manipulation'/);
   assert.match(themedSelect, /sr-only pointer-events-none/);
+  assert.match(themedSelect, /createPortal/);
+});
+
+test('v188 mobile native select forwards the selected value to React state', () => {
+  assert.match(themedSelect, /setLocal\(event\.target\.value\)/);
+  assert.match(themedSelect, /onChange\?\.\(event\)/);
 });
 
 test('v188 separates permission, guest visibility, VIP and cover library rows on mobile', () => {
