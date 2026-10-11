@@ -1262,10 +1262,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 </label>
                 <label className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
                   <input type="checkbox" checked={authorizedOnlyVisible} onChange={event => { const checked = event.target.checked; setAuthorizedOnlyVisible(checked); if (checked) setGuestVisible(false); }} />
-                  只對有權限者顯示
+                  只對有權限者顯示(從首頁隱藏)
                 </label>
               </div>
-              <p className="mt-1 text-xs text-slate-500">勾選「只對有權限者顯示」後，未達瀏覽權限的會員與所有訪客都不會在首頁看到此音檔；「訪客可見」會自動取消並鎖定。</p>
+              <p className="mt-1 text-xs text-slate-500">勾選「只對有權限者顯示(從首頁隱藏)」後，未達瀏覽權限的會員與所有訪客都不會在首頁看到此音檔；「訪客可見」會自動取消並鎖定。</p>
             </div>
             <div>
               <label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">
