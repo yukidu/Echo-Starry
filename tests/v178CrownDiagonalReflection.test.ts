@@ -11,24 +11,29 @@ test('v178 keeps the palette gradient rotating slowly while reflection itself do
   assert.doesNotMatch(css, /taiwanCrownRingShine/);
 });
 
-test('v178 uses slow multi-point breathing reflections instead of a sweeping shine', () => {
-  assert.match(css, /radial-gradient\(circle at 17% 14%/);
-  assert.match(css, /radial-gradient\(circle at 95% 48%/);
-  assert.match(css, /radial-gradient\(circle at 12% 74%/);
-  assert.match(css, /animation:\s*taiwanCrownMultiPointBreath\s+7\.8s\s+ease-in-out\s+infinite/);
+test('v178 keeps slow multi-point breathing reflections moving on every motion setting', () => {
+  assert.match(css, /radial-gradient\(circle at 14% 18%/);
+  assert.match(css, /radial-gradient\(circle at 97% 53%/);
+  assert.match(css, /radial-gradient\(circle at 12% 78%/);
+  assert.match(css, /animation:\s*taiwanCrownMultiPointBreath\s+6\.2s\s+ease-in-out\s+infinite/);
   assert.match(css, /@keyframes\s+taiwanCrownMultiPointBreath/);
-  assert.doesNotMatch(css, /background-position:\s*-160%\s+50%/);
-  assert.doesNotMatch(css, /linear-gradient\(45deg/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*taiwanCrownRingRotate\s+28s[\s\S]*taiwanCrownMultiPointBreath\s+10s/);
+  assert.doesNotMatch(css, /animation:\s*none\s*!important/);
+  assert.match(css, /animation-delay:\s*-1\.3s/);
+  assert.match(css, /animation-delay:\s*-3\.4s/);
 });
 
 test('v178 enlarges crown card text and forces inspirational quotes to normal weight', () => {
-  assert.match(css, /\.taiwan-crown-card-name\s*\{[\s\S]*font-size:\s*1\.3em/);
-  assert.match(css, /\.taiwan-crown-card-quote\s*\{[\s\S]*font-size:\s*1\.02em[\s\S]*font-weight:\s*400\s*!important/);
-  assert.match(css, /@media \(max-width: 420px\)[\s\S]*font-size:\s*1\.18em[\s\S]*font-size:\s*0\.96em/);
+  assert.match(css, /\.taiwan-crown-card-name\s*\{[\s\S]*font-size:\s*1\.42em/);
+  assert.match(css, /\.taiwan-crown-card-quote\s*\{[\s\S]*font-size:\s*1\.12em[\s\S]*font-weight:\s*400\s*!important/);
+  assert.match(css, /@media \(max-width: 420px\)[\s\S]*font-size:\s*1\.3em[\s\S]*font-size:\s*1\.05em/);
 });
 
-test('v178 makes the link affordance more prominent and normalizes own-card border', () => {
-  assert.match(css, /\.taiwan-crown-card-arrow::before\s*\{[\s\S]*content:\s*'→'/);
+test('v178 uses the audio-detail style external-link icon and normalizes own-card border', () => {
+  assert.match(css, /\.taiwan-crown-card-arrow\s*\{[\s\S]*background:\s*transparent/);
+  assert.match(css, /M15 3h6v6/);
+  assert.match(css, /M10 14 21 3/);
+  assert.match(css, /\.taiwan-crown-member-card \.taiwan-crown-card-arrow::before\s*\{[\s\S]*content:\s*'✎'/);
   assert.match(css, /\.taiwan-crown-member-card\s*\{[\s\S]*border-width:\s*1px[\s\S]*border-color:\s*var\(--theme-border-subtle/);
 });
 
@@ -36,6 +41,6 @@ test('v178 layer loads after v177 and changelog records the final reflection beh
   assert.match(crownEntry, /import '\.\/v177CrownPaletteRing';[\s\S]*import '\.\/v178CrownDiagonalReflection';/);
   assert.match(release, /version:\s*'v178'/);
   assert.match(release, /呼吸燈/);
-  assert.match(release, /多點反光/);
+  assert.match(release, /外部連結圖示/);
   assert.match(release, /緩慢旋轉/);
 });
