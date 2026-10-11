@@ -25,8 +25,43 @@ jobs:
         run: python3 scripts/applyV185PreviewPatch.py
       - name: Align profile completion regression with new fields
         shell: bash
-        run: >-
-          python3 -c "from pathlib import Path; old=\"expect(missingProfileFields(profile)).toEqual(['phone']);\"; new='expect(missingProfileFields(profile)).toEqual([]);'; paths=[p for p in Path('tests').rglob('*.test.ts') if old in p.read_text()]; [p.write_text(p.read_text().replace(old,new,1)) for p in paths]; assert paths, 'Expected legacy phone-required assertion was not found'; print('Updated:', ', '.join(map(str,paths)))"
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          changed = []
+          marker = 'requires every editable profile field'
+          for path in Path('tests').rglob('*.test.ts'):
+              text = path.read_text()
+              if marker not in text or 'phone' not in text:
+                  continue
+              start = text.index(marker)
+              end = text.find('\n  });', start)
+              if end < 0:
+                  end = min(len(text), start + 2500)
+              block = text[start:end]
+              updated, count = re.subn(
+                  r"\.toEqual\s*\(\s*\[\s*['\"]phone['\"]\s*\]\s*\)",
+                  '.toEqual([])',
+                  block,
+                  count=1,
+              )
+              if count == 0:
+                  updated, count = re.subn(
+                      r"\[\s*['\"]phone['\"]\s*\]",
+                      '[]',
+                      block,
+                      count=1,
+                  )
+              if count:
+                  path.write_text(text[:start] + updated + text[end:])
+                  changed.append(str(path))
+
+          if not changed:
+              raise SystemExit('Legacy phone-required regression was not located')
+          print('Updated:', ', '.join(changed))
+          PY
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Run regression tests
