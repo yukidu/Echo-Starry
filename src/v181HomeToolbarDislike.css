@@ -1,0 +1,59 @@
+/* v181: keep the logo pulse truthful, simplify the hamburger, and style the dislike menu item. */
+.brand-logo-glow > div > span.animate-ping {
+  display: none !important;
+}
+
+html[data-echostars-audio-playing='true'] .brand-logo-glow > div > span.animate-ping {
+  display: block !important;
+}
+
+button[data-main-menu='hamburger'] {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+button[data-main-menu='hamburger']:hover,
+button[data-main-menu='hamburger']:active {
+  background: transparent !important;
+}
+
+.v181-dislike-menu-item {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  border: 0;
+  background: transparent;
+  color: rgb(51 65 85);
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.v181-dislike-menu-item:hover {
+  background: var(--color-light-pill, #fae8ed);
+}
+
+.v181-dislike-menu-item:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.v181-dislike-menu-item svg {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+  color: var(--color-primary, #c06c84);
+}
+
+.dark .v181-dislike-menu-item {
+  color: rgb(226 232 240);
+}
+
+.dark .v181-dislike-menu-item:hover {
+  background: rgb(30 41 59);
+}
