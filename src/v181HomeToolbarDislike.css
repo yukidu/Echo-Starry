@@ -57,3 +57,130 @@ button[data-main-menu='hamburger']:active {
 .dark .v181-dislike-menu-item:hover {
   background: rgb(30 41 59);
 }
+
+/* Match the site's existing "權限不足提示" visual language instead of using the browser confirm dialog. */
+.v181-confirm-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: max(5rem, env(safe-area-inset-top)) 0.5rem 1rem;
+  background: rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(1.5px);
+  -webkit-backdrop-filter: blur(1.5px);
+  animation: v181-confirm-fade 140ms ease-out both;
+}
+
+.v181-confirm-card {
+  width: min(24rem, calc(100vw - 1rem));
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid rgb(252 211 77);
+  border-radius: 1rem;
+  background: rgb(255 251 235);
+  color: rgb(120 53 15);
+  box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.18), 0 8px 10px -6px rgba(15, 23, 42, 0.12);
+  animation: v181-confirm-zoom 160ms ease-out both;
+}
+
+.v181-confirm-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+  margin-top: 0.125rem;
+  color: rgb(217 119 6);
+}
+
+.v181-confirm-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.v181-confirm-title {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 800;
+}
+
+.v181-confirm-message {
+  margin: 0.125rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.45rem;
+  font-weight: 500;
+}
+
+.v181-confirm-actions {
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.v181-confirm-button {
+  min-width: 4.25rem;
+  min-height: 2.25rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.v181-confirm-cancel {
+  border: 1px solid rgb(252 211 77);
+  background: rgba(255, 255, 255, 0.72);
+  color: rgb(146 64 14);
+}
+
+.v181-confirm-ok {
+  border: 1px solid rgb(217 119 6);
+  background: rgb(217 119 6);
+  color: white;
+}
+
+.v181-confirm-button:focus-visible {
+  outline: 3px solid rgba(245, 158, 11, 0.35);
+  outline-offset: 2px;
+}
+
+.dark .v181-confirm-layer {
+  background: rgba(2, 6, 23, 0.48);
+}
+
+.dark .v181-confirm-card {
+  border-color: rgb(146 64 14);
+  background: rgb(69 26 3);
+  color: rgb(253 230 138);
+}
+
+.dark .v181-confirm-icon {
+  color: rgb(251 191 36);
+}
+
+.dark .v181-confirm-cancel {
+  border-color: rgb(146 64 14);
+  background: rgb(120 53 15);
+  color: rgb(254 243 199);
+}
+
+.dark .v181-confirm-ok {
+  border-color: rgb(245 158 11);
+  background: rgb(245 158 11);
+  color: rgb(69 26 3);
+}
+
+@keyframes v181-confirm-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes v181-confirm-zoom {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
