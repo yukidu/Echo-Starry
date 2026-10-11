@@ -1,7 +1,7 @@
 import './v181HomeToolbarDislike.css';
 
 const PRODUCTION_HOST = 'echostars.yukidu.workers.dev';
-const PREVIEW_STORAGE_PREFIX = 'echostars_preview_disliked_track_ids_v1';
+const PREVIEW_STORAGE_PREFIX = 'preview-disliked-track-ids';
 const hiddenTrackIds = new Set<string>();
 let lastMemberIdentity = '__initial__';
 let observer: MutationObserver | null = null;
