@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useId, useRef, useState } from 'reac
 import { createPortal } from 'react-dom';
 
 type Props = React.SelectHTMLAttributes<HTMLSelectElement>;
+
 export function ThemedSelect({children,value,defaultValue,onChange,className,disabled,...props}:Props) {
   const select = useRef<HTMLSelectElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -9,18 +10,48 @@ export function ThemedSelect({children,value,defaultValue,onChange,className,dis
   const [open,setOpen] = useState(false);
   const [local,setLocal] = useState(defaultValue);
   const [box,setBox] = useState({left:0,top:0,width:180,height:280});
+  const [useNativeMobile,setUseNativeMobile] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+  );
   const id=useId();
   const selected=value ?? local;
+
   useEffect(()=>{
-    if(!open)return;
+    const media = window.matchMedia('(max-width: 767px)');
+    const sync = () => {
+      setUseNativeMobile(media.matches);
+      if (media.matches) setOpen(false);
+    };
+    sync();
+    media.addEventListener?.('change',sync);
+    return ()=>media.removeEventListener?.('change',sync);
+  },[]);
+
+  useEffect(()=>{
+    if(!open || useNativeMobile)return;
     const place=()=>{const r=button.current!.getBoundingClientRect();const height=Math.min(280,window.innerHeight-24);setBox({left:Math.max(8,Math.min(r.left,window.innerWidth-Math.max(r.width,180)-8)),top:Math.max(8,Math.min(r.bottom+4,window.innerHeight-height-8)),width:Math.min(Math.max(r.width,180),window.innerWidth-16),height});};
     const close=(e:Event)=>{if(!button.current?.contains(e.target as Node)&&!menu.current?.contains(e.target as Node))setOpen(false);};
     place();window.addEventListener('resize',place);window.addEventListener('scroll',place,true);document.addEventListener('pointerdown',close);
     requestAnimationFrame(()=>menu.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus());
     return ()=>{window.removeEventListener('resize',place);window.removeEventListener('scroll',place,true);document.removeEventListener('pointerdown',close);};
-  },[open]);
+  },[open,useNativeMobile]);
+
   const [options,setOptions]=useState<HTMLOptionElement[]>([]);
-  useLayoutEffect(()=>setOptions(Array.from(select.current?.options||[])),[children]);
+  useLayoutEffect(()=>setOptions(Array.from(select.current?.options||[])),[children,useNativeMobile]);
+
+  if (useNativeMobile) {
+    const controlledProps = value !== undefined ? { value } : { defaultValue };
+    return <select
+      {...props}
+      {...controlledProps}
+      ref={select}
+      disabled={disabled}
+      className={className}
+      style={{...props.style,borderColor:'var(--color-primary)',minHeight:44,width:'100%',touchAction:'manipulation'}}
+      onChange={event=>{setLocal(event.target.value);onChange?.(event);}}
+    >{children}</select>;
+  }
+
   return <span className={`relative inline-block max-w-full ${className?.includes("w-full") ? "w-full" : ""}`}>
     <select {...props} ref={select} value={value} defaultValue={defaultValue} disabled={disabled} tabIndex={-1} aria-hidden="true" className="sr-only pointer-events-none" onChange={onChange}>{children}</select>
     <button ref={button} type="button" disabled={disabled} className={className} style={{...props.style,borderColor:'var(--color-primary)',minHeight:36,width:'100%'}}
