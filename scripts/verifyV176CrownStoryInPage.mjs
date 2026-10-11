@@ -37,13 +37,6 @@ async function waitJson(url) {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
-function flattenFrames(tree, output = []) {
-  if (!tree) return output;
-  if (tree.frame) output.push(tree.frame);
-  for (const child of tree.childFrames || []) flattenFrames(child, output);
-  return output;
-}
-
 async function main() {
   const port = await freePort();
   const chrome = spawn(chromeBinary(), [
@@ -88,15 +81,9 @@ async function main() {
       }
       throw new Error(`Timed out waiting for ${label}`);
     };
-    const waitForFrame = async memberId => {
-      for (let i = 0; i < 120; i += 1) {
-        const tree = await send('Page.getFrameTree');
-        const frame = flattenFrames(tree.frameTree).find(candidate => String(candidate.url || '').includes(`/wechat/aep/member/member${memberId}.html`));
-        if (frame) return frame;
-        await delay(125);
-      }
-      const tree = await send('Page.getFrameTree');
-      throw new Error(`Official story frame member${memberId} did not load. Frames: ${JSON.stringify(flattenFrames(tree.frameTree).map(frame => frame.url))}`);
+    const pageTargetCount = async () => {
+      const result = await send('Target.getTargets');
+      return (result.targetInfos || []).filter(info => info.type === 'page').length;
     };
 
     await send('Page.enable');
@@ -104,71 +91,69 @@ async function main() {
     await send('Page.navigate', { url: APP_URL });
     await waitFor(`document.readyState === 'complete' && !!document.querySelector('button[data-main-menu="hamburger"]') && !!document.querySelector('audio')`, 'home UI');
 
-    await evaluate(`document.querySelector('audio').dataset.v176Continuity = 'same-audio-node'`);
+    await evaluate(`window.__v176AudioNode = document.querySelector('audio')`);
+    const targetsBefore = await pageTargetCount();
+
     await evaluate(`document.querySelector('button[data-main-menu="hamburger"]')?.click()`);
     await waitFor(`!!document.querySelector('[data-taiwan-crown-menu] button[aria-label="臺灣皇冠大使"]')`, 'Crown menu row');
     await evaluate(`document.querySelector('[data-taiwan-crown-menu] button[aria-label="臺灣皇冠大使"]')?.click()`);
     await waitFor(`document.body.dataset.taiwanCrownOpen === 'true' && document.querySelectorAll('#taiwan-crown-integrated-page a.taiwan-crown-card[href]').length === 13`, 'Crown list');
 
     await evaluate(`document.querySelector('#taiwan-crown-integrated-page a.taiwan-crown-card[href]')?.click()`);
-    await waitFor(`document.body.hasAttribute('data-taiwan-crown-story-open') && !!document.querySelector('[data-v176-crown-story-frame]')`, 'in-page story viewer');
+    await waitFor(`document.body.hasAttribute('data-taiwan-crown-story-open') && !!document.querySelector('[data-v176-crown-story-content]')`, 'local in-page story viewer');
 
-    const firstFrame = await waitForFrame('2');
-    const isolated = await send('Page.createIsolatedWorld', { frameId: firstFrame.id, worldName: 'v176-story-check', grantUniveralAccess: false });
-    const frameDoc = await send('Runtime.evaluate', {
-      contextId: isolated.executionContextId,
-      expression: `({ href: location.href, title: document.title, childCount: document.body?.children?.length || 0, height: document.documentElement?.scrollHeight || 0, text: (document.body?.innerText || '').slice(0, 300) })`,
-      returnByValue: true
-    });
-    const officialState = frameDoc.result?.value;
-    if (!officialState || !String(officialState.href || '').includes('/wechat/aep/member/member2.html') || officialState.childCount < 1 || officialState.height < 100) {
-      throw new Error(`Official Amway story did not render inside frame: ${JSON.stringify(officialState)}`);
-    }
-
-    const appState = await evaluate(`(() => ({
+    const targetsAfterOpen = await pageTargetCount();
+    const firstState = await evaluate(`(() => ({
       storyOpen: document.body.hasAttribute('data-taiwan-crown-story-open'),
-      storyFrameSrc: document.querySelector('[data-v176-crown-story-frame]')?.getAttribute('src') || '',
       listHidden: Boolean(document.querySelector('#taiwan-crown-integrated-page .taiwan-crown-page-shell')?.hidden),
       hamburgerExists: Boolean(document.querySelector('button[data-main-menu="hamburger"]')),
-      audioSame: document.querySelector('audio')?.dataset.v176Continuity === 'same-audio-node',
+      audioSame: document.querySelector('audio') === window.__v176AudioNode,
+      iframeCount: document.querySelectorAll('[data-v176-crown-story-view] iframe').length,
+      title: document.querySelector('.v176-crown-story-name')?.textContent || '',
+      quote: document.querySelector('.v176-crown-story-quote')?.textContent || '',
+      source: document.querySelector('[data-v176-crown-story-content]')?.getAttribute('data-source-url') || '',
+      portrait: document.querySelector('.v176-crown-story-portrait')?.getAttribute('src') || '',
       backExists: Boolean(document.querySelector('[data-v176-crown-story-view] button[aria-label="返回臺灣皇冠大使清單"]')),
       nextExists: Boolean(document.querySelector('[data-v176-crown-story-view] button[aria-label="下一位皇冠大使"]'))
     }))()`);
-    if (!appState.storyOpen || !appState.storyFrameSrc.includes('member2.html') || !appState.listHidden || !appState.hamburgerExists || !appState.audioSame || !appState.backExists || !appState.nextExists) {
-      throw new Error(`v176 in-page shell mismatch: ${JSON.stringify(appState)}`);
+    if (targetsAfterOpen !== targetsBefore || !firstState.storyOpen || !firstState.listHidden || !firstState.hamburgerExists || !firstState.audioSame || firstState.iframeCount !== 0 || firstState.title !== '陳婉芬 嵇龍生' || !firstState.quote || !firstState.source.includes('member2.html') || !firstState.portrait || !firstState.backExists || !firstState.nextExists) {
+      throw new Error(`v176 local story mismatch: targets ${targetsBefore}->${targetsAfterOpen}; state=${JSON.stringify(firstState)}`);
     }
 
     const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     await writeFile('/tmp/echostars-v176-crown-story-inpage.png', Buffer.from(shot.data, 'base64'));
 
     await evaluate(`document.querySelector('[data-v176-crown-story-view] button[aria-label="下一位皇冠大使"]')?.click()`);
-    await waitFor(`document.querySelector('[data-v176-crown-story-frame]')?.getAttribute('src')?.includes('member3.html')`, 'next Crown story');
-    await waitForFrame('3');
+    await waitFor(`document.querySelector('.v176-crown-story-name')?.textContent === '傅後堅'`, 'next Crown story');
 
     const nextState = await evaluate(`({
-      audioSame: document.querySelector('audio')?.dataset.v176Continuity === 'same-audio-node',
-      title: document.querySelector('.v176-crown-story-heading strong')?.textContent || '',
-      counter: document.querySelector('.v176-crown-story-heading span')?.textContent || ''
+      audioSame: document.querySelector('audio') === window.__v176AudioNode,
+      hamburgerExists: Boolean(document.querySelector('button[data-main-menu="hamburger"]')),
+      title: document.querySelector('.v176-crown-story-name')?.textContent || '',
+      toolbarTitle: document.querySelector('.v176-crown-story-heading strong')?.textContent || '',
+      counter: document.querySelector('.v176-crown-story-heading span')?.textContent || '',
+      source: document.querySelector('[data-v176-crown-story-content]')?.getAttribute('data-source-url') || ''
     })`);
-    if (!nextState.audioSame || nextState.title !== '傅後堅' || nextState.counter !== '2 / 13') {
+    if (!nextState.audioSame || !nextState.hamburgerExists || nextState.title !== '傅後堅' || nextState.toolbarTitle !== '傅後堅' || nextState.counter !== '2 / 13' || !nextState.source.includes('member3.html')) {
       throw new Error(`v176 next-story mismatch: ${JSON.stringify(nextState)}`);
     }
 
     await evaluate(`document.querySelector('[data-v176-crown-story-view] button[aria-label="返回臺灣皇冠大使清單"]')?.click()`);
     await waitFor(`!document.body.hasAttribute('data-taiwan-crown-story-open') && !document.querySelector('[data-v176-crown-story-view]') && !document.querySelector('#taiwan-crown-integrated-page .taiwan-crown-page-shell')?.hidden`, 'return to Crown list');
 
+    const targetsFinal = await pageTargetCount();
     const finalState = await evaluate(`({
-      audioSame: document.querySelector('audio')?.dataset.v176Continuity === 'same-audio-node',
+      audioSame: document.querySelector('audio') === window.__v176AudioNode,
       hamburgerExists: Boolean(document.querySelector('button[data-main-menu="hamburger"]')),
       cardCount: document.querySelectorAll('#taiwan-crown-integrated-page a.taiwan-crown-card[href]').length
     })`);
-    if (!finalState.audioSame || !finalState.hamburgerExists || finalState.cardCount !== 13) {
-      throw new Error(`v176 return-state mismatch: ${JSON.stringify(finalState)}`);
+    if (targetsFinal !== targetsBefore || !finalState.audioSame || !finalState.hamburgerExists || finalState.cardCount !== 13) {
+      throw new Error(`v176 return-state mismatch: targets ${targetsBefore}->${targetsFinal}; state=${JSON.stringify(finalState)}`);
     }
 
-    const state = { officialState, appState, nextState, finalState };
+    const state = { targetsBefore, targetsAfterOpen, targetsFinal, firstState, nextState, finalState };
     await writeFile('/tmp/echostars-v176-crown-story-inpage-state.json', JSON.stringify(state, null, 2));
-    console.log('v176 Crown in-page story verified:', JSON.stringify(state));
+    console.log('v176 Crown local in-page story verified:', JSON.stringify(state));
     socket.close();
   } finally {
     chrome.kill('SIGTERM');
