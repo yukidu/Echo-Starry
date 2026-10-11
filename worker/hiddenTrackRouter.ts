@@ -103,6 +103,15 @@ export default {
       return json({ success: true, speakerName });
     }
 
+    if (itemRoute && method === 'DELETE') {
+      const speakerName = decodeURIComponent(itemRoute[1]).trim();
+      if (!speakerName) return json({ error: '缺少演講人資料' }, 400);
+      await env.DB.prepare(
+        'DELETE FROM user_hidden_speakers WHERE userId = ? AND speakerName = ?'
+      ).bind(userId, speakerName).run();
+      return json({ success: true, speakerName });
+    }
+
     return json({ error: 'Method not allowed' }, 405);
   }
 };
