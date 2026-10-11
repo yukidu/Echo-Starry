@@ -255,7 +255,6 @@ async function handleDislike(card: HTMLElement, button: HTMLButtonElement) {
   }
 
   if (!await styledDislikeConfirm(`確定不喜歡演講者「${speakerName}」嗎？`, '不喜歡確認')) return;
-  if (!await styledDislikeConfirm(`再確認一次，真的不喜歡演講者「${speakerName}」嗎？`, '再次確認')) return;
 
   button.disabled = true;
   const label = button.querySelector('span');
