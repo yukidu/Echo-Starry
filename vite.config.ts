@@ -14,10 +14,13 @@ export default defineConfig(() => {
     // stable-preview is a fixed, frequently redeployed test URL. Vite 8 uses
     // Rolldown; disable code splitting there so edit/admin modals are bundled
     // with the main frontend instead of depending on a separately fetched chunk.
+    // Preserve source execution order as well; Rolldown documents this as the
+    // safety switch when inlining modules that may have order-sensitive side effects.
     build: {
       rolldownOptions: {
         output: {
           codeSplitting: false,
+          strictExecutionOrder: true,
         },
       },
     },
