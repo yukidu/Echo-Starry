@@ -32,7 +32,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    if (canServePreviewAssetDirectly(request, env, url)) {
+    if (canServePreviewAssetDirectly(request, env, url) && env.ASSETS) {
       return withPrivacyHeaders(await env.ASSETS.fetch(request));
     }
 
