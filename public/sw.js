@@ -1,6 +1,6 @@
-const CACHE_NAME = 'echostars-shell-v157';
+const CACHE_NAME = 'echostars-shell-v178';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-monochrome.svg', '/icon-192.png', '/icon-512.png'];
-const FORCE_STALE_CLIENT_REFRESH = CACHE_NAME === 'echostars-shell-v157';
+const FORCE_STALE_CLIENT_REFRESH = true;
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
@@ -16,10 +16,6 @@ self.addEventListener('activate', event => {
     await Promise.all(oldShellKeys.map(key => caches.delete(key)));
     await self.clients.claim();
 
-    // v154 recovery: production screenshots proved that a tab can keep running an
-    // older React bundle even after a successful deployment. Cookies are unrelated
-    // to that in-memory app state. Existing clients are therefore navigated once
-    // when this worker replaces an older shell. New visitors are not reloaded.
     if (FORCE_STALE_CLIENT_REFRESH && upgradingExistingClient) {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       await Promise.all(windows.map(async client => {
@@ -27,7 +23,7 @@ self.addEventListener('activate', event => {
         try {
           await client.navigate(client.url);
         } catch {
-          // A closed/navigating tab is harmless; the next normal open gets v154.
+          // A closed/navigating tab is harmless; the next normal open gets the latest bundle.
         }
       }));
     }
@@ -51,15 +47,11 @@ self.addEventListener('fetch', event => {
 
   event.respondWith((async () => {
     try {
-      // Vite filenames contain a content hash; identical files do not need a revalidation.
-      // HTML and API data still use the network so updates and private state stay fresh.
       if (url.pathname.startsWith('/assets/') && /-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/i.test(url.pathname)) {
         const cached = await (await caches.open(CACHE_NAME)).match(event.request);
         if (cached) return cached;
       }
       const response = await fetch(event.request);
-      // Never store a personalized /share/* HTML response as the generic app
-      // shell. Doing so can reopen the wrong recording on a later offline load.
       const cacheableNavigation = navigation && (url.pathname === '/' || url.pathname === '/index.html');
       if (response.ok && (!navigation || cacheableNavigation)) {
         const cache = await caches.open(CACHE_NAME);
