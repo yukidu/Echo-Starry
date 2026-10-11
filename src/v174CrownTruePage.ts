@@ -1,4 +1,5 @@
 import './v174CrownTruePage.css';
+import './v176CrownAvatarShine';
 
 const PAGE_ID = 'taiwan-crown-integrated-page';
 let crownWasOpen = false;
