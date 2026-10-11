@@ -1,30 +1,32 @@
 .taiwan-crown-avatar-ring::before {
-  animation: none;
-  transform: none;
+  animation: taiwanCrownRingRotate 14s linear infinite;
 }
 
 .taiwan-crown-avatar-ring::after {
-  inset: -0.06em;
+  inset: -0.08em;
   background:
     linear-gradient(45deg,
-      transparent 0% 14%,
-      rgb(255 255 255 / 0.08) 16%,
-      rgb(255 255 255 / 0.28) 18%,
-      rgb(255 255 255 / 0.08) 20%,
-      transparent 22% 43%,
-      rgb(255 255 255 / 0.06) 45%,
-      rgb(255 255 255 / 0.22) 47%,
-      rgb(255 255 255 / 0.06) 49%,
-      transparent 51% 70%,
-      rgb(255 255 255 / 0.05) 72%,
-      rgb(255 255 255 / 0.18) 74%,
-      rgb(255 255 255 / 0.05) 76%,
-      transparent 78% 100%);
-  background-size: 145% 145%;
-  background-position: 44% 56%;
-  filter: blur(0.035em);
-  opacity: 0.26;
-  animation: taiwanCrownDiagonalShimmer 3.8s ease-in-out infinite alternate;
+      transparent 0% 10%,
+      rgb(255 255 255 / 0.12) 11%,
+      rgb(255 255 255 / 0.72) 13%,
+      rgb(255 255 255 / 0.95) 14.5%,
+      rgb(255 255 255 / 0.4) 16%,
+      transparent 18% 37%,
+      rgb(255 255 255 / 0.1) 39%,
+      rgb(255 255 255 / 0.62) 41%,
+      rgb(255 255 255 / 0.88) 42.5%,
+      rgb(255 255 255 / 0.35) 44%,
+      transparent 46% 65%,
+      rgb(255 255 255 / 0.1) 67%,
+      rgb(255 255 255 / 0.55) 69%,
+      rgb(255 255 255 / 0.78) 70.5%,
+      rgb(255 255 255 / 0.28) 72%,
+      transparent 74% 100%);
+  background-size: 180% 180%;
+  background-position: 34% 66%;
+  filter: blur(0.025em);
+  opacity: 0.88;
+  animation: taiwanCrownDiagonalShimmer 3.2s ease-in-out infinite alternate;
 }
 
 .taiwan-crown-card-name {
@@ -39,12 +41,12 @@
 
 @keyframes taiwanCrownDiagonalShimmer {
   from {
-    opacity: 0.2;
-    background-position: 42% 58%;
+    opacity: 0.72;
+    background-position: 34% 66%;
   }
   to {
-    opacity: 0.38;
-    background-position: 58% 42%;
+    opacity: 0.98;
+    background-position: 64% 36%;
   }
 }
 
@@ -59,9 +61,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .taiwan-crown-avatar-ring::before,
   .taiwan-crown-avatar-ring::after {
     animation: none !important;
-    opacity: 0.28;
+  }
+
+  .taiwan-crown-avatar-ring::after {
+    opacity: 0.88;
     background-position: 50% 50%;
   }
 }
