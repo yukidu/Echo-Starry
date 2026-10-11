@@ -38,6 +38,49 @@ function errorResponse(message: string, status = 400) {
   });
 }
 
+
+const V185_TRACK_META_NAME = '__ECHOSTARS_V185_META__';
+
+function decodeTrackExtras(value: any) {
+  let items: any[] = [];
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    items = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    items = [];
+  }
+
+  const metaItem = items.find(item => item && typeof item === 'object' && item.name === V185_TRACK_META_NAME);
+  let meta: any = {};
+  if (metaItem) {
+    try {
+      meta = JSON.parse(String(metaItem.url || '{}'));
+    } catch {
+      meta = {};
+    }
+  }
+
+  return {
+    externalFiles: items.filter(item => !(item && typeof item === 'object' && item.name === V185_TRACK_META_NAME)),
+    socialLinks: Array.isArray(meta.socialLinks) ? meta.socialLinks : [],
+    authorizedOnlyVisible: Boolean(meta.authorizedOnlyVisible)
+  };
+}
+
+function encodeTrackExtras(externalFiles: any[], socialLinks: any[], authorizedOnlyVisible: boolean) {
+  const visibleFiles = (Array.isArray(externalFiles) ? externalFiles : [])
+    .filter(item => !(item && typeof item === 'object' && item.name === V185_TRACK_META_NAME));
+  const links = Array.isArray(socialLinks) ? socialLinks : [];
+  if (!authorizedOnlyVisible && links.length === 0) return visibleFiles;
+  return [
+    ...visibleFiles,
+    {
+      name: V185_TRACK_META_NAME,
+      url: JSON.stringify({ authorizedOnlyVisible: Boolean(authorizedOnlyVisible), socialLinks: links })
+    }
+  ];
+}
+
 // 預設示範音檔清單 (D1 初次為空時之完整保底資料)
 const DEFAULT_TRACKS: any[] = [];
 
@@ -489,7 +532,7 @@ export default {
                   keywords: t.keywords ? JSON.parse(t.keywords) : [],
                   externalVideos: t.externalVideos ? JSON.parse(t.externalVideos) : [],
                   externalPpts: t.externalPpts ? JSON.parse(t.externalPpts) : [],
-                  externalFiles: t.externalFiles ? JSON.parse(t.externalFiles) : [],
+                  ...decodeTrackExtras(t.externalFiles),
                   likedBy: t.likedBy ? JSON.parse(t.likedBy) : [],
                   ratings: t.ratings ? JSON.parse(t.ratings) : {},
                   guestVisible: Boolean(t.guestVisible),
@@ -510,6 +553,7 @@ export default {
           const body: any = await request.json().catch(() => ({}));
           if (!String(body.title || '').trim() || !String(body.audioUrl || '').trim()) return errorResponse('標題與音檔為必填項目', 400);
           if (body.guestVisible !== undefined && typeof body.guestVisible !== 'boolean') return errorResponse('訪客可見格式錯誤', 400);
+          if (body.authorizedOnlyVisible !== undefined && typeof body.authorizedOnlyVisible !== 'boolean') return errorResponse('只對有權限者顯示格式錯誤', 400);
           const vipDays = Number(body.vipDurationDays ?? 0);
           if (!Number.isSafeInteger(vipDays) || vipDays < 0 || vipDays > 36500) return errorResponse('VIP 有效天數格式錯誤', 400);
           const id = body.id || `t-${Date.now()}`;
@@ -521,6 +565,7 @@ export default {
           const cleanVideos = Array.isArray(body.externalVideos) ? body.externalVideos : [];
           const cleanPpts = Array.isArray(body.externalPpts) ? body.externalPpts : [];
           const cleanFiles = Array.isArray(body.externalFiles) ? body.externalFiles : [];
+          const cleanSocialLinks = Array.isArray(body.socialLinks) ? body.socialLinks : [];
           const cleanLikedBy = Array.isArray(body.likedBy) ? body.likedBy : [];
           const cleanRatings = typeof body.ratings === 'object' && body.ratings !== null ? body.ratings : {};
 
@@ -537,7 +582,8 @@ export default {
 
           const newTrack = {
             ...body,
-            guestVisible: body.guestVisible === true,
+            authorizedOnlyVisible: body.authorizedOnlyVisible === true,
+            guestVisible: body.authorizedOnlyVisible === true ? false : body.guestVisible === true,
             id,
             vipDurationDays: body.isPrivateVip ? vipDays : 0,
             vipToken: body.isPrivateVip ? `vip_${crypto.randomUUID()}` : null,
@@ -556,6 +602,7 @@ export default {
             externalVideos: cleanVideos,
             externalPpts: cleanPpts,
             externalFiles: cleanFiles,
+            socialLinks: cleanSocialLinks,
             likedBy: cleanLikedBy,
             ratings: cleanRatings
           };
@@ -578,7 +625,7 @@ export default {
                 newTrack.series || '', newTrack.speechDate || '', newTrack.requiredRank || '無', newTrack.seriesOrder || '',
                 newTrack.uploadDate, newTrack.description || '', newTrack.uploaderId || '', newTrack.uploaderEmail || '',
                 newTrack.playCount, newTrack.isPrivateVip ? 1 : 0, JSON.stringify(newTrack.externalVideos),
-                JSON.stringify(newTrack.externalPpts), JSON.stringify(newTrack.externalFiles),
+                JSON.stringify(newTrack.externalPpts), JSON.stringify(encodeTrackExtras(newTrack.externalFiles, newTrack.socialLinks, newTrack.authorizedOnlyVisible)),
                 JSON.stringify(newTrack.likedBy), JSON.stringify(newTrack.ratings), newTrack.vipToken, newTrack.vipExpiresAt, newTrack.vipDurationDays, JSON.stringify(newTrack.keywordMeta), newTrack.guestVisible ? 1 : 0
               );
               await env.DB.batch([insert, ...(env.stickerTrackWriteStatements || []), ...newTrack.keywords.map((name: string) => env.DB.prepare('INSERT OR IGNORE INTO keyword_catalog(name,createdAt) VALUES (?,?)').bind(name,newTrack.keywordMeta[name]?.createdAt || Date.now()))]);
@@ -659,9 +706,21 @@ export default {
             }
             if (has('series')) add('series', String(body.series || ''));
             if (has('speechDate')) add('speechDate', String(body.speechDate || ''));
+            if (has('authorizedOnlyVisible') && typeof body.authorizedOnlyVisible !== 'boolean') return errorResponse('只對有權限者顯示格式錯誤', 400);
+            if (has('socialLinks') && !Array.isArray(body.socialLinks)) return errorResponse('socialLinks 格式錯誤', 400);
+            const existingExtras = decodeTrackExtras(existing.externalFiles);
+            const nextAuthorizedOnlyVisible = has('authorizedOnlyVisible') ? body.authorizedOnlyVisible === true : existingExtras.authorizedOnlyVisible;
+            const nextSocialLinks = has('socialLinks') ? body.socialLinks : existingExtras.socialLinks;
             if (has('guestVisible')) {
               if (typeof body.guestVisible !== 'boolean') return errorResponse('訪客可見格式錯誤', 400);
-              add('guestVisible', body.guestVisible ? 1 : 0);
+              add('guestVisible', nextAuthorizedOnlyVisible ? 0 : (body.guestVisible ? 1 : 0));
+            } else if (nextAuthorizedOnlyVisible && Boolean(existing.guestVisible)) {
+              add('guestVisible', 0);
+            }
+            if (has('authorizedOnlyVisible') || has('socialLinks') || has('externalFiles')) {
+              const nextExternalFiles = has('externalFiles') ? body.externalFiles : existingExtras.externalFiles;
+              if (!Array.isArray(nextExternalFiles)) return errorResponse('externalFiles 格式錯誤', 400);
+              add('externalFiles', JSON.stringify(encodeTrackExtras(nextExternalFiles, nextSocialLinks, nextAuthorizedOnlyVisible)));
             }
             if (has('requiredRank')) add('requiredRank', String(body.requiredRank || '無'));
             if (has('seriesOrder')) add('seriesOrder', String(body.seriesOrder || ''));
@@ -680,7 +739,7 @@ export default {
               add('vipExpiresAt', !enabled || days === 0 ? null : (changed ? Date.now() + days * 86400000 : existing.vipExpiresAt));
             }
 
-            for (const field of ['externalVideos', 'externalPpts', 'externalFiles'] as const) {
+            for (const field of ['externalVideos', 'externalPpts'] as const) {
               if (has(field)) {
                 if (!Array.isArray(body[field])) return errorResponse(`${field} 格式錯誤`, 400);
                 add(field, JSON.stringify(body[field]));
@@ -719,9 +778,10 @@ export default {
               keywordMeta: JSON.parse(row.keywordMeta || '{}'),
               externalVideos: parseArray(row.externalVideos),
               externalPpts: parseArray(row.externalPpts),
-              externalFiles: parseArray(row.externalFiles),
+              ...decodeTrackExtras(row.externalFiles),
               likedBy: parseArray(row.likedBy),
               ratings: parseObject(row.ratings),
+              guestVisible: Boolean(row.guestVisible),
               isPrivateVip: Boolean(row.isPrivateVip)
             };
 

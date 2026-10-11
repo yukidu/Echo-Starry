@@ -21,7 +21,6 @@ const originalFetch = window.fetch.bind(window);
 const REQUIRED_PROFILE_FIELDS = [
   'name',
   'amwayId',
-  'phone',
   'residence',
   'center',
   'rank',

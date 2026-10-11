@@ -152,6 +152,13 @@ export interface ExternalLinkItem {
   url: string;
 }
 
+export type SocialPlatform = 'IG' | 'FB' | 'Youtube' | 'Threads(脆)' | '抖音' | '自訂文字';
+export interface SocialLinkItem {
+  platform: SocialPlatform;
+  name: string;
+  url: string;
+}
+
 export interface Track {
   id: string;
   title: string;
@@ -172,6 +179,7 @@ export interface Track {
   series: string;
   speechDate: string;
   guestVisible?: boolean; // Only adds this recording to the guest home list; never grants playback permission.
+  authorizedOnlyVisible?: boolean; // Hide completely unless the signed-in member meets browse permission.
   requiredRank: AmwayRank; // Rank = reading permission
   permission?: string; // fallback string
   seriesOrder: string;
@@ -183,6 +191,7 @@ export interface Track {
   externalVideos?: ExternalLinkItem[];
   externalPpts?: ExternalLinkItem[];
   externalFiles?: ExternalLinkItem[];
+  socialLinks?: SocialLinkItem[];
   likedBy: string[];
   ratings: Record<string, number>;
   // Requirement 7 (v2.2): 私秘 VIP 音檔專屬欄位
