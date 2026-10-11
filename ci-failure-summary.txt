@@ -1,0 +1,326 @@
+Regression failed (exit 1)
+
+--- matching failure lines ---
+56:# Google login failed {
+69:# Google login failed {
+82:# Google login failed {
+89:# Google login failed {
+96:# Google login failed {
+109:# Google login failed {
+116:# Subtest: database outages return a retryable service error, not a false credential rejection
+117:ok 12 - database outages return a retryable service error, not a false credential rejection
+146:# Subtest: session policy keeps transient errors and newer sessions and preserves tokens only for the same member
+147:ok 17 - session policy keeps transient errors and newer sessions and preserves tokens only for the same member
+152:# Subtest: both browser login entry points share one exchange, reject a second account, and recover after failure
+153:ok 18 - both browser login entry points share one exchange, reject a second account, and recover after failure
+158:# Google login failed {
+165:# Google login failed {
+172:# Google login failed {
+353:# D1 insert track error: Error: table tracks has no column named socialLinks
+363:#   errstr: 'SQL logic error'
+365:# D1 insert track error: Error: table tracks has no column named socialLinks
+375:#   errstr: 'SQL logic error'
+421:# Subtest: track metadata partial edits preserve unrelated fields and honestly fail for missing records
+422:not ok 55 - track metadata partial edits preserve unrelated fields and honestly fail for missing records
+427:  failureType: 'testCodeFailure'
+428:  error: |-
+429:    Expected values to be strictly equal:
+433:  code: 'ERR_ASSERTION'
+434:  name: 'AssertionError'
+436:  actual: 500
+444:not ok 56 - VIP metadata persists through duration changes and token reset
+449:  failureType: 'testCodeFailure'
+450:  error: |-
+451:    Expected values to be strictly equal:
+455:  code: 'ERR_ASSERTION'
+456:  name: 'AssertionError'
+458:  actual: 500
+597:# Subtest: success and verification failures retain their original outcome
+598:ok 79 - success and verification failures retain their original outcome
+723:# Subtest: sticker sorting keeps actual purchases first and switches between cost ascending and reward descending
+724:ok 100 - sticker sorting keeps actual purchases first and switches between cost ascending and reward descending
+783:# Subtest: share-card modal releases preview URLs and surfaces generation failures
+784:ok 110 - share-card modal releases preview URLs and surfaces generation failures
+1248:not ok 187 - preview configuration stays isolated from production storage bindings
+1253:  failureType: 'testCodeFailure'
+1254:  error: |-
+1311:  code: 'ERR_ASSERTION'
+1312:  name: 'AssertionError'
+1314:  actual: |-
+1460:not ok 201 - 主選單與貼紙專區保留訪客會員界線及超管分頁
+1465:  failureType: 'testCodeFailure'
+1466:  error: |-
+1503:      "  if (!response.ok) throw new Error(data.error || '操作失敗，請稍後再試');\n" +
+1514:      "  const [error,setError] = useState(''); const [busy,setBusy] = useState(false); const [loading,setLoading] = useState(true);\n" +
+1614:  code: 'ERR_ASSERTION'
+1615:  name: 'AssertionError'
+1617:  actual: |-
+1652:      if (!response.ok) throw new Error(data.error || '操作失敗，請稍後再試');
+1663:      const [error,setError] = useState(''); const [busy,setBusy] = useState(false); const [loading,setLoading] = useState(true);
+1838:              {error && <div role="alert" className="p-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs">{error}</div>}
+1935:# Subtest: failed requests can retry and account changes reset cached private data
+1936:ok 209 - failed requests can retry and account changes reset cached private data
+2045:# D1 insert track error: Error: table tracks has no column named socialLinks
+2058:#   errstr: 'SQL logic error'
+2060:# Subtest: VIP save, sticker fields and charge commit together; failed save and normal VIP edits never charge
+2061:not ok 227 - VIP save, sticker fields and charge commit together; failed save and normal VIP edits never charge
+2066:  failureType: 'testCodeFailure'
+2067:  error: |-
+2068:    {"error":"音檔資訊儲存失敗，請保留表單並重試"}
+2072:  code: 'ERR_ASSERTION'
+2073:  name: 'AssertionError'
+2075:  actual: 500
+2088:# D1 insert track error: Error: table tracks has no column named socialLinks
+2101:#   errstr: 'SQL logic error'
+2103:# D1 insert track error: Error: table tracks has no column named socialLinks
+2116:#   errstr: 'SQL logic error'
+2119:not ok 229 - parallel VIP creations with one remaining fee commit exactly one recording
+2124:  failureType: 'testCodeFailure'
+2125:  error: |-
+2126:    Expected values to be strictly deep-equal:
+2127:    + actual - expected
+2136:  code: 'ERR_ASSERTION'
+2137:  name: 'AssertionError'
+2141:  actual:
+2150:# D1 insert track error: Error: table tracks has no column named socialLinks
+2163:#   errstr: 'SQL logic error'
+2165:# Subtest: a failed VIP batch rolls back the track when the charge statement fails
+2166:ok 230 - a failed VIP batch rolls back the track when the charge statement fails
+2255:# D1 insert track error: Error: table tracks has no column named socialLinks
+2268:#   errstr: 'SQL logic error'
+2271:not ok 245 - guest visibility migrates old data, persists through partial edits and cannot be changed anonymously
+2276:  failureType: 'testCodeFailure'
+2277:  error: |-
+2278:    Expected values to be strictly equal:
+2282:  code: 'ERR_ASSERTION'
+2283:  name: 'AssertionError'
+2285:  actual: 500
+2456:# Subtest: sticker correction is visible as system error fix but excluded from earned/spent/toast
+2457:ok 273 - sticker correction is visible as system error fix but excluded from earned/spent/toast
+2774:# Subtest: pinned toolbar still aligns after the actual brand title and before hamburger
+2775:ok 326 - pinned toolbar still aligns after the actual brand title and before hamburger
+2912:# Subtest: guest visibility is grouped with permission and follows actual guest-home eligibility
+2913:ok 349 - guest visibility is grouped with permission and follows actual guest-home eligibility
+3069:not ok 375 - favorite counts piggyback on the existing tracks response instead of adding a homepage count GET
+3074:  failureType: 'testCodeFailure'
+3075:  error: |-
+3096:      '        catch (error) {\n' +
+3098:      "          if (!check.results.some((row: any) => row.name === 'favoritedBy')) throw error;\n" +
+3103:      '        catch (error) {\n' +
+3105:      "          if (!check.results.some((row: any) => row.name === 'favoriteCount')) throw error;\n" +
+3110:      '        catch (error) {\n' +
+3112:      "          if (!check.results.some((row: any) => row.name === 'authorizedOnlyVisible')) throw error;\n" +
+3117:      '        catch (error) {\n' +
+3119:      "          if (!check.results.some((row: any) => row.name === 'socialLinks')) throw error;\n" +
+3159:      "      if (favoriteAction) return json({ error: '收藏統計資料庫尚未連線' }, 503);\n" +
+3165:      '    } catch (error) {\n' +
+3166:      "      console.warn('Favorite schema setup failed:', error);\n" +
+3167:      "      if (favoriteAction) return json({ error: '收藏統計暫時無法使用' }, 500);\n" +
+3172:      "    if (!favoriteAction || method !== 'POST') return json({ error: 'Method not allowed' }, 405);\n" +
+3176:      "    if (typeof body.favorite !== 'boolean') return json({ error: '收藏狀態格式錯誤' }, 400);\n" +
+3179:      "    if (!identifier) return json({ error: '缺少收藏者識別資料' }, 400);\n" +
+3183:      "      if (!row) return json({ error: '找不到此音檔' }, 404);\n" +
+3206:      "    return json({ error: '同時收藏操作過多，請再試一次' }, 409);\n" +
+3210:  code: 'ERR_ASSERTION'
+3211:  name: 'AssertionError'
+3213:  actual: |-
+3232:            catch (error) {
+3234:              if (!check.results.some((row: any) => row.name === 'favoritedBy')) throw error;
+3239:            catch (error) {
+3241:              if (!check.results.some((row: any) => row.name === 'favoriteCount')) throw error;
+3246:            catch (error) {
+3248:              if (!check.results.some((row: any) => row.name === 'authorizedOnlyVisible')) throw error;
+3253:            catch (error) {
+3255:              if (!check.results.some((row: any) => row.name === 'socialLinks')) throw error;
+3295:          if (favoriteAction) return json({ error: '收藏統計資料庫尚未連線' }, 503);
+3301:        } catch (error) {
+3302:          console.warn('Favorite schema setup failed:', error);
+3303:          if (favoriteAction) return json({ error: '收藏統計暫時無法使用' }, 500);
+3308:        if (!favoriteAction || method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+3312:        if (typeof body.favorite !== 'boolean') return json({ error: '收藏狀態格式錯誤' }, 400);
+3315:        if (!identifier) return json({ error: '缺少收藏者識別資料' }, 400);
+3319:          if (!row) return json({ error: '找不到此音檔' }, 404);
+3342:        return json({ error: '同時收藏操作過多，請再試一次' }, 409);
+4008:# fail 8
+
+--- final output ---
+  duration_ms: 0.133821
+  type: 'test'
+  ...
+# Subtest: v180 maps crown member ids to the Success_Crown R2 folder on production origin
+ok 456 - v180 maps crown member ids to the Success_Crown R2 folder on production origin
+  ---
+  duration_ms: 0.734241
+  type: 'test'
+  ...
+# Subtest: v180 verifies several supported image extensions before replacing the working avatar
+ok 457 - v180 verifies several supported image extensions before replacing the working avatar
+  ---
+  duration_ms: 0.180812
+  type: 'test'
+  ...
+# Subtest: v180 adds a cache-busting query for replaced R2 objects
+ok 458 - v180 adds a cache-busting query for replaced R2 objects
+  ---
+  duration_ms: 0.090756
+  type: 'test'
+  ...
+# Subtest: v180 is loaded after v179
+ok 459 - v180 is loaded after v179
+  ---
+  duration_ms: 0.110416
+  type: 'test'
+  ...
+# Subtest: v181 logo circular pulse is visible only while a real audio element is playing
+ok 460 - v181 logo circular pulse is visible only while a real audio element is playing
+  ---
+  duration_ms: 0.837216
+  type: 'test'
+  ...
+# Subtest: v181 hamburger keeps the three-line control but removes the rounded rectangle shell
+ok 461 - v181 hamburger keeps the three-line control but removes the rounded rectangle shell
+  ---
+  duration_ms: 0.180641
+  type: 'test'
+  ...
+# Subtest: v182 dislike resolves exact track.speaker from the tracks API, never from title or DOM copy
+ok 462 - v182 dislike resolves exact track.speaker from the tracks API, never from title or DOM copy
+  ---
+  duration_ms: 0.165909
+  type: 'test'
+  ...
+# Subtest: v182 dislike uses one site-styled confirmation and never mentions hiding
+ok 463 - v182 dislike uses one site-styled confirmation and never mentions hiding
+  ---
+  duration_ms: 0.279128
+  type: 'test'
+  ...
+# Subtest: v184 relationship matching hides every card related to the disliked speaker
+ok 464 - v184 relationship matching hides every card related to the disliked speaker
+  ---
+  duration_ms: 0.112078
+  type: 'test'
+  ...
+# Subtest: v181 production dislikes persist per authenticated member while preserving the legacy worker chain
+ok 465 - v181 production dislikes persist per authenticated member while preserving the legacy worker chain
+  ---
+  duration_ms: 0.138418
+  type: 'test'
+  ...
+# Subtest: v181 preview testing stays isolated from production D1
+ok 466 - v181 preview testing stays isolated from production D1
+  ---
+  duration_ms: 0.173099
+  type: 'test'
+  ...
+# Subtest: v183 dislike dialog removes visible heading and enlarges centered actions
+ok 467 - v183 dislike dialog removes visible heading and enlarges centered actions
+  ---
+  duration_ms: 0.834131
+  type: 'test'
+  ...
+# Subtest: v183 keeps single speaker confirmation and mounts the favorites management module
+ok 468 - v183 keeps single speaker confirmation and mounts the favorites management module
+  ---
+  duration_ms: 0.179629
+  type: 'test'
+  ...
+# Subtest: v183 favorites page lists hidden speakers and offers restore
+ok 469 - v183 favorites page lists hidden speakers and offers restore
+  ---
+  duration_ms: 0.138147
+  type: 'test'
+  ...
+# Subtest: v183 production API supports removing one hidden speaker preference
+ok 470 - v183 production API supports removing one hidden speaker preference
+  ---
+  duration_ms: 0.112859
+  type: 'test'
+  ...
+# Subtest: v184 splits common combined speaker formats into individual names
+ok 471 - v184 splits common combined speaker formats into individual names
+  ---
+  duration_ms: 1.236554
+  type: 'test'
+  ...
+# Subtest: v184 single-name dislike hides combined speaker recordings containing that name
+ok 472 - v184 single-name dislike hides combined speaker recordings containing that name
+  ---
+  duration_ms: 0.161632
+  type: 'test'
+  ...
+# Subtest: v184 combined-name dislike expands to either person and hides all related recordings
+ok 473 - v184 combined-name dislike expands to either person and hides all related recordings
+  ---
+  duration_ms: 0.222594
+  type: 'test'
+  ...
+# Subtest: v184 home cards use relationship matching instead of exact speaker equality
+ok 474 - v184 home cards use relationship matching instead of exact speaker equality
+  ---
+  duration_ms: 0.155103
+  type: 'test'
+  ...
+# Subtest: v184 favorites separates combined and single names and shows related hidden track counts
+ok 475 - v184 favorites separates combined and single names and shows related hidden track counts
+  ---
+  duration_ms: 0.106089
+  type: 'test'
+  ...
+# Subtest: 只對有權限者顯示：訪客與無權限會員完全隱藏
+ok 476 - 只對有權限者顯示：訪客與無權限會員完全隱藏
+  ---
+  duration_ms: 0.818718
+  type: 'test'
+  ...
+# Subtest: 個人資料完善：phone 與 email 都不是獎勵必要欄位
+ok 477 - 個人資料完善：phone 與 email 都不是獎勵必要欄位
+  ---
+  duration_ms: 0.537286
+  type: 'test'
+  ...
+# Subtest: 舊音檔未設定新旗標時維持原本顯示行為
+ok 478 - 舊音檔未設定新旗標時維持原本顯示行為
+  ---
+  duration_ms: 0.0866
+  type: 'test'
+  ...
+# Subtest: entering VIP/shared detail pages never starts audio automatically
+ok 479 - entering VIP/shared detail pages never starts audio automatically
+  ---
+  duration_ms: 0.668172
+  type: 'test'
+  ...
+# Subtest: only an explicit playback control grants the next play call
+ok 480 - only an explicit playback control grants the next play call
+  ---
+  duration_ms: 0.12676
+  type: 'test'
+  ...
+# Subtest: blocked programmatic autoplay is rejected and fake playing UI is reset
+ok 481 - blocked programmatic autoplay is rejected and fake playing UI is reset
+  ---
+  duration_ms: 0.109745
+  type: 'test'
+  ...
+# Subtest: guest home only lists public zero-sticker recordings
+ok 482 - guest home only lists public zero-sticker recordings
+  ---
+  duration_ms: 0.623595
+  type: 'test'
+  ...
+# Subtest: guest public share playback remains separate from the guest home listing filter
+ok 483 - guest public share playback remains separate from the guest home listing filter
+  ---
+  duration_ms: 0.12645
+  type: 'test'
+  ...
+1..483
+# tests 483
+# suites 0
+# pass 475
+# fail 8
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 20335.380454
