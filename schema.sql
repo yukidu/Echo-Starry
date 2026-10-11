@@ -90,7 +90,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS tracks_share_slug_unique
   ON tracks(shareSlug)
   WHERE shareSlug IS NOT NULL AND shareSlug <> '';
 
--- 2.1 私秘 VIP 短網址密碼
+-- 2.1 一個音檔可對應 1 位主要演講者 + 最多 4 位共同演講者。
+-- tracks.speaker 保留作為舊介面相容的 A&B 顯示字串。
+CREATE TABLE IF NOT EXISTS track_speakers (
+  trackId TEXT NOT NULL,
+  speakerName TEXT NOT NULL,
+  position INTEGER NOT NULL CHECK(position >= 0 AND position < 5),
+  PRIMARY KEY (trackId, position),
+  UNIQUE (trackId, speakerName)
+);
+CREATE INDEX IF NOT EXISTS track_speakers_name ON track_speakers(speakerName);
+
+-- 2.2 私秘 VIP 短網址密碼
 CREATE TABLE IF NOT EXISTS vip_share_access (
   trackId TEXT PRIMARY KEY,
   password TEXT NOT NULL,
