@@ -1,6 +1,7 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
+import { UploadModal as PreviewEagerUploadModal } from './components/UploadModal';
 import './index.css';
 import './mobileMenuHalfLayout.css';
 import './v166FilterSearchMatch.css';
@@ -8,6 +9,12 @@ import './taiwanCrownMenuLink';
 import './v181PreviewProductionReadBridge';
 import './v181HomeToolbarDislike';
 import './v185MultiSpeakerUi';
+
+// stable-preview frequently changes build hashes. Keep the audio edit module in
+// the initial application graph so Detail -> Edit never depends on a late lazy
+// chunk request that can be stale/missing in the preview channel.
+(window as typeof window & { __ECHOSTARS_PRELOADED_UPLOAD_MODAL__?: unknown })
+  .__ECHOSTARS_PRELOADED_UPLOAD_MODAL__ = PreviewEagerUploadModal;
 
 // Old long VIP links (?vipToken=...&trackId=...) are retired. Strip those
 // named parameters before React starts, including when somebody appends them
