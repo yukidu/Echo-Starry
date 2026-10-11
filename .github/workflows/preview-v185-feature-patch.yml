@@ -23,6 +23,8 @@ jobs:
           node-version: 22
       - name: Apply preview feature changes
         run: python3 scripts/applyV185PreviewPatch.py
+      - name: Apply D1 compatibility fixes
+        run: python3 scripts/fixV185PreviewPatchCompatibility.py
       - name: Align profile completion runtime and regression
         shell: bash
         run: |
@@ -69,10 +71,20 @@ jobs:
               echo "Regression failed (exit $code)"
               echo
               echo "--- matching failure lines ---"
-              grep -n -E 'not ok|AssertionError|ERR_ASSERTION|Expected|actual|error|fail' test-output.txt | tail -n 160 || true
+              grep -n -E 'not ok|AssertionError|ERR_ASSERTION|Expected|actual|error|fail' test-output.txt | tail -n 200 || true
+              echo
+              echo "--- failed test source locations ---"
+              grep -R -n -F "track metadata partial edits preserve unrelated fields" tests shared src worker || true
+              grep -R -n -F "VIP metadata persists through duration changes and token reset" tests shared src worker || true
+              grep -R -n -F "preview configuration stays isolated from production storage bindings" tests shared src worker || true
+              grep -R -n -F "主選單與貼紙專區保留訪客會員界線及超管分頁" tests shared src worker || true
+              grep -R -n -F "VIP save, sticker fields and charge commit together" tests shared src worker || true
+              grep -R -n -F "parallel VIP creations with one remaining fee" tests shared src worker || true
+              grep -R -n -F "guest visibility migrates old data" tests shared src worker || true
+              grep -R -n -F "favorite counts piggyback on the existing tracks response" tests shared src worker || true
               echo
               echo "--- final output ---"
-              tail -n 180 test-output.txt
+              tail -n 220 test-output.txt
             } > ci-failure-summary.txt
             exit "$code"
           fi
