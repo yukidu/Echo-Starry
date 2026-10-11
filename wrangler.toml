@@ -4,9 +4,23 @@ main = "worker/privacyCrawlerRouter.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
-# Pull request previews are intentionally isolated from production resources.
-# Storage bindings are omitted here so preview branches cannot read/write production D1, KV or R2.
-previews = { }
+# Fixed Preview channel: same application/runtime configuration as production,
+# but all mutable storage is isolated in Preview-only resources.
+[previews.vars]
+ENVIRONMENT = "preview"
+
+[[previews.d1_databases]]
+binding = "DB"
+database_name = "preview-db"
+database_id = "2bfa1862-025a-4e0a-9011-1d42162d7dd1"
+
+[[previews.r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "preview-audio"
+
+[[previews.kv_namespaces]]
+binding = "KV"
+id = "cce48dd354e74a7abfdd9d10894c76c5"
 
 # 保留原本 Cloudflare 建置流程；回歸測試由 GitHub Actions 額外把關。
 [build]
@@ -17,22 +31,19 @@ command = "npm run build"
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# 所有請求先經過 privacyCrawlerRouter，才能對首頁、分享頁、靜態資源與 API
-# 一致套用 X-Robots-Tag，並阻擋已知搜尋引擎／AI crawler。
+# Preview 與正式站使用完全相同的 Worker 入口與資源處理流程。
 run_worker_first = ["/*"]
 
-# 1. Cloudflare D1 資料庫 (SQLite)
+# Production resources: only used by Production deployment.
 [[d1_databases]]
 binding = "DB"
 database_name = "echoes_db"
 database_id = "e0a696a9-0233-4186-be4d-229435b19a27"
 
-# 2. Cloudflare R2 物件儲存桶 (音檔與圖檔直傳)
 [[r2_buckets]]
 binding = "R2_BUCKET"
 bucket_name = "echoes-audio-bucket"
 
-# 3. Cloudflare KV 快取與連線狀態儲存庫
 [[kv_namespaces]]
 binding = "KV"
 id = "a2e345e244cb40b4a804be3f89584b90"
