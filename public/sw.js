@@ -1,4 +1,4 @@
-const CACHE_NAME = 'echostars-shell-v180';
+const CACHE_NAME = 'echostars-shell-v181';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-monochrome.svg', '/icon-192.png', '/icon-512.png'];
 const FORCE_STALE_CLIENT_REFRESH = true;
 
