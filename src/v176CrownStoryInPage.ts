@@ -6,7 +6,9 @@ const AMWAY_STORY_RE = /^https:\/\/www\.amway\.com\.tw\/wechat\/aep\/member\/mem
 
 type StoryItem = {
   name: string;
-  url: string;
+  quote: string;
+  imageUrl: string;
+  sourceUrl: string;
 };
 
 let listScrollY = 0;
@@ -21,15 +23,23 @@ function crownListShell() {
   return crownPage()?.querySelector<HTMLElement>('.taiwan-crown-page-shell') || null;
 }
 
+function cleanQuote(value: string) {
+  return value.trim().replace(/^[“\"']\s*/, '').replace(/\s*[”\"']$/, '').trim();
+}
+
 function readStories(): StoryItem[] {
   const shell = crownListShell();
   if (!shell) return [];
   return Array.from(shell.querySelectorAll<HTMLAnchorElement>('a.taiwan-crown-card[href]'))
     .map(anchor => ({
-      name: anchor.querySelector<HTMLElement>('.taiwan-crown-card-name')?.textContent?.trim() || anchor.getAttribute('aria-label')?.replace(/^開啟|皇冠大使成功故事$/g, '').trim() || '皇冠大使',
-      url: anchor.href
+      name: anchor.querySelector<HTMLElement>('.taiwan-crown-card-name')?.textContent?.trim()
+        || anchor.getAttribute('aria-label')?.replace(/^開啟|皇冠大使成功故事$/g, '').trim()
+        || '皇冠大使',
+      quote: cleanQuote(anchor.querySelector<HTMLElement>('.taiwan-crown-card-quote')?.textContent || ''),
+      imageUrl: anchor.querySelector<HTMLImageElement>('.taiwan-crown-avatar img')?.src || '',
+      sourceUrl: anchor.href
     }))
-    .filter(item => AMWAY_STORY_RE.test(item.url));
+    .filter(item => AMWAY_STORY_RE.test(item.sourceUrl));
 }
 
 function removeStoryView() {
@@ -55,6 +65,53 @@ function makeButton(label: string, className: string, onClick: () => void) {
   button.textContent = label;
   button.addEventListener('click', onClick);
   return button;
+}
+
+function createLocalStoryContent(item: StoryItem) {
+  const article = document.createElement('article');
+  article.className = 'v176-crown-story-content';
+  article.setAttribute('data-v176-crown-story-content', 'true');
+  article.setAttribute('data-source-url', item.sourceUrl);
+
+  const portraitWrap = document.createElement('div');
+  portraitWrap.className = 'v176-crown-story-portrait-wrap';
+  if (item.imageUrl) {
+    const portrait = document.createElement('img');
+    portrait.className = 'v176-crown-story-portrait';
+    portrait.src = item.imageUrl;
+    portrait.alt = `${item.name} 皇冠大使`;
+    portrait.loading = 'eager';
+    portraitWrap.append(portrait);
+  } else {
+    const fallback = document.createElement('div');
+    fallback.className = 'v176-crown-story-portrait v176-crown-story-portrait-fallback';
+    fallback.textContent = '👑';
+    fallback.setAttribute('aria-label', `${item.name} 皇冠大使`);
+    portraitWrap.append(fallback);
+  }
+
+  const eyebrow = document.createElement('p');
+  eyebrow.className = 'v176-crown-story-eyebrow';
+  eyebrow.textContent = '臺灣皇冠大使・成功分享';
+
+  const name = document.createElement('h1');
+  name.className = 'v176-crown-story-name';
+  name.textContent = item.name;
+
+  const quoteLabel = document.createElement('p');
+  quoteLabel.className = 'v176-crown-story-quote-label';
+  quoteLabel.textContent = '成功語錄';
+
+  const quote = document.createElement('blockquote');
+  quote.className = 'v176-crown-story-quote';
+  quote.textContent = item.quote || '每一步累積，都在寫下自己的成功故事。';
+
+  const source = document.createElement('p');
+  source.className = 'v176-crown-story-source';
+  source.textContent = '資料來源：安麗臺灣皇冠大使成功故事';
+
+  article.append(portraitWrap, eyebrow, name, quoteLabel, quote, source);
+  return article;
 }
 
 function showStoryAt(index: number) {
@@ -100,24 +157,7 @@ function showStoryAt(index: number) {
   paging.append(previous, next);
   toolbar.append(back, heading, paging);
 
-  const frameWrap = document.createElement('div');
-  frameWrap.className = 'v176-crown-story-frame-wrap';
-  const loading = document.createElement('div');
-  loading.className = 'v176-crown-story-loading';
-  loading.textContent = '成功故事載入中…';
-
-  const frame = document.createElement('iframe');
-  frame.className = 'v176-crown-story-frame';
-  frame.src = item.url;
-  frame.title = `${item.name}｜安麗官方成功故事`;
-  frame.loading = 'eager';
-  frame.referrerPolicy = 'strict-origin-when-cross-origin';
-  frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox');
-  frame.setAttribute('data-v176-crown-story-frame', 'true');
-  frame.addEventListener('load', () => loading.remove(), { once: true });
-  frameWrap.append(loading, frame);
-
-  view.append(toolbar, frameWrap);
+  view.append(toolbar, createLocalStoryContent(item));
   const modal = page.querySelector('[data-crown-motto-modal]');
   page.insertBefore(view, modal || null);
   window.scrollTo({ top: 0, behavior: 'auto' });
@@ -126,7 +166,7 @@ function showStoryAt(index: number) {
 function openStoryFromAnchor(anchor: HTMLAnchorElement) {
   if (!AMWAY_STORY_RE.test(anchor.href)) return;
   storyItems = readStories();
-  const index = storyItems.findIndex(item => item.url === anchor.href);
+  const index = storyItems.findIndex(item => item.sourceUrl === anchor.href);
   if (index < 0) return;
   listScrollY = window.scrollY;
   showStoryAt(index);
@@ -141,9 +181,9 @@ document.addEventListener('click', event => {
   openStoryFromAnchor(anchor);
 }, true);
 
-// v175 intentionally removed the page-level "return to playlist" button. v176
-// only adds a local back control while a story is open, so list/story switching
-// never remounts the React app or the shared audio element.
+// Keep the Crown list/detail switch entirely inside the existing app shell.
+// The React tree, top navigation, hamburger menu and shared audio element are
+// never replaced or remounted, so playback continues while browsing stories.
 const bodyObserver = new MutationObserver(() => {
   if (document.body.dataset.taiwanCrownOpen !== 'true' && document.body.hasAttribute('data-taiwan-crown-story-open')) {
     closeStoryView({ restoreScroll: false });
