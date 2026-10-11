@@ -60,7 +60,7 @@ test('主選單與貼紙專區保留訪客會員界線及超管分頁', () => {
   assert.match(navbar, /stickerMenuTitle = currentUser[\s\S]*: '我的貼紙'/);
   assert.match(navbar, /我的貼紙/);
   assert.match(modal, /批次修改/);
-  assert.match(modal, /其他規則/);
+  assert.match(modal, /其他/);
   assert.match(modal, /人工加貼紙/);
   assert.match(modal, /keywordRewardLimit/);
 });

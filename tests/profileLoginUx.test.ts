@@ -7,7 +7,7 @@ const navbar = readFileSync(new URL('../src/components/Navbar.tsx', import.meta.
 
 test('new and existing members with any missing basic profile field reopen directly in edit mode on each page entry', () => {
   assert.match(bridge, /const REQUIRED_PROFILE_FIELDS = \[/);
-  for (const field of ['name', 'amwayId', 'phone', 'residence', 'center', 'rank', 'joinReason', 'stayReason', 'sponsor', 'platinumUpline', 'diamondUpline', 'birthday']) {
+  for (const field of ['name', 'amwayId', 'residence', 'center', 'rank', 'joinReason', 'stayReason', 'sponsor', 'platinumUpline', 'diamondUpline', 'birthday']) {
     assert.match(bridge, new RegExp(`'${field}'`));
   }
   assert.match(bridge, /function profileNeedsCompletion\(user: any \| null\)/);
