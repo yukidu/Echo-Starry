@@ -88,32 +88,96 @@ body[data-taiwan-crown-story-open="true"] #taiwan-crown-integrated-page {
   cursor: default;
 }
 
-.v176-crown-story-frame-wrap {
-  position: relative;
-  flex: 1 1 auto;
-  min-height: calc(100dvh - 114px);
-  background: #fff;
+.v176-crown-story-content {
+  width: min(100% - 28px, 720px);
+  margin: 0 auto;
+  padding: clamp(24px, 5vw, 48px) 0 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
-.v176-crown-story-frame {
-  display: block;
+.v176-crown-story-portrait-wrap {
+  width: clamp(148px, 42vw, 220px);
+  aspect-ratio: 1;
+  padding: 4px;
+  border-radius: 999px;
+  background: linear-gradient(145deg,
+    color-mix(in srgb, var(--color-primary, #c06c84) 76%, #f8df9a 24%),
+    color-mix(in srgb, var(--color-primary, #c06c84) 28%, #fff 72%),
+    color-mix(in srgb, var(--color-primary, #c06c84) 84%, #8b5e18 16%));
+  box-shadow: 0 14px 40px color-mix(in srgb, var(--color-primary, #c06c84) 20%, transparent);
+}
+
+.v176-crown-story-portrait {
   width: 100%;
-  height: calc(100dvh - 114px);
-  min-height: 720px;
-  border: 0;
-  background: #fff;
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  object-fit: cover;
+  background: color-mix(in srgb, var(--theme-surface, #fff) 90%, var(--color-primary, #c06c84) 10%);
 }
 
-.v176-crown-story-loading {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
+.v176-crown-story-portrait-fallback {
   display: grid;
   place-items: center;
-  padding: 24px;
-  background: var(--theme-gradient-bg, #fff);
+  font-size: 64px;
+}
+
+.v176-crown-story-eyebrow {
+  margin: 24px 0 6px;
   color: var(--color-primary, #b23a79);
+  font-size: calc(12px * var(--taiwan-crown-font-zoom, 1));
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+
+.v176-crown-story-name {
+  margin: 0;
+  font-size: calc(clamp(26px, 7vw, 38px) * var(--taiwan-crown-font-zoom, 1));
+  line-height: 1.25;
+  font-weight: 950;
+  color: var(--color-text, #1f2937);
+}
+
+.v176-crown-story-quote-label {
+  margin: 30px 0 10px;
+  color: color-mix(in srgb, var(--color-text, #1f2937) 62%, transparent);
+  font-size: calc(12px * var(--taiwan-crown-font-zoom, 1));
   font-weight: 800;
+  letter-spacing: .18em;
+}
+
+.v176-crown-story-quote {
+  position: relative;
+  width: 100%;
+  margin: 0;
+  padding: clamp(24px, 7vw, 42px) clamp(20px, 6vw, 42px);
+  border: 1px solid color-mix(in srgb, var(--color-primary, #c06c84) 18%, transparent);
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--theme-surface, #fff) 91%, var(--color-primary, #c06c84) 9%);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .07);
+  color: var(--color-text, #1f2937);
+  font-size: calc(clamp(20px, 5.3vw, 28px) * var(--taiwan-crown-font-zoom, 1));
+  font-weight: 800;
+  line-height: 1.65;
+}
+
+.v176-crown-story-quote::before {
+  content: '“';
+  position: absolute;
+  top: -10px;
+  left: 16px;
+  color: color-mix(in srgb, var(--color-primary, #c06c84) 45%, transparent);
+  font: 900 64px/1 serif;
+}
+
+.v176-crown-story-source {
+  margin: 18px 0 0;
+  color: color-mix(in srgb, var(--color-text, #1f2937) 50%, transparent);
+  font-size: calc(11px * var(--taiwan-crown-font-zoom, 1));
+  line-height: 1.5;
 }
 
 @media (max-width: 520px) {
@@ -130,18 +194,12 @@ body[data-taiwan-crown-story-open="true"] #taiwan-crown-integrated-page {
   .v176-crown-story-paging { grid-area: paging; justify-self: end; }
   .v176-crown-story-heading { grid-area: heading; }
 
-  .v176-crown-story-frame-wrap {
-    min-height: calc(100dvh - 150px);
-  }
-
-  .v176-crown-story-frame {
-    height: calc(100dvh - 150px);
-    min-height: 640px;
+  .v176-crown-story-content {
+    width: min(100% - 24px, 720px);
+    padding-top: 22px;
   }
 }
 
 @supports not (height: 100dvh) {
   .v176-crown-story-view { min-height: calc(100vh - 56px); }
-  .v176-crown-story-frame-wrap { min-height: calc(100vh - 114px); }
-  .v176-crown-story-frame { height: calc(100vh - 114px); }
 }
