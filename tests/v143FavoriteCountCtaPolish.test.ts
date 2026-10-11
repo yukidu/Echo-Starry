@@ -35,9 +35,9 @@ test('favorite count is shown beside the card favorite action and persisted with
   assert.match(favoriteRouter, /UPDATE tracks SET favoritedBy = \?, favoriteCount = \?/);
 });
 
-test('favorite counts piggyback on the existing tracks response instead of adding a homepage count GET', () => {
+test('favorite counts stay on the existing tracks response while v185 augments the same response with speakers', () => {
   assert.match(favoriteRouter, /const trackList = url\.pathname === '\/api\/tracks' && method === 'GET'/);
-  assert.match(favoriteRouter, /if \(trackList\) return appWorker\.fetch\(request, env\)/);
+  assert.match(favoriteRouter, /return augmentTrackList\(await appWorker\.fetch\(request, env\), env\.DB\)/);
   assert.doesNotMatch(polish, /fetch\(['"`]\/api\/favorites\/counts/);
 });
 
