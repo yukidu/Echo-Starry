@@ -3,6 +3,7 @@ import hiddenTrackWorker from './hiddenTrackRouter';
 import sessionWorker from './sessionCookieRouter';
 import iosGoogleRedirectWorker from './iosGoogleRedirectRouter';
 import { handleStarbeautySso } from './starbeautySsoRouter';
+import { ensurePreviewBootstrap } from './previewBootstrap';
 import type { Env } from './index';
 import { unitsToStickers } from '../shared/stickers';
 
@@ -154,6 +155,7 @@ async function spentStickerLeaderboard(env: Env): Promise<Response | null> {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    await ensurePreviewBootstrap(env);
     const url = new URL(request.url);
 
     // Browser cookie writes must originate here. Future external apps require
