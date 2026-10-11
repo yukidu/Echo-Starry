@@ -111,14 +111,15 @@ HTMLMediaElement.prototype.play = function manualPlaybackOnly() {
 };
 
 if ('serviceWorker' in navigator) {
-  // PWA updates are intentionally silent:
-  // the browser downloads/activates the newest worker in the background,
-  // and the new app version is picked up on the user's next natural reload/reopen.
-  // Never interrupt playback or browsing with an update confirmation dialog.
+  // v178: never let an HTTP cache hide a newer service worker script. Keep the
+  // update silent, but explicitly check on each normal page load so Production
+  // switches to the latest app shell without asking users to clear browser data.
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(error => {
-      console.warn('Service worker registration failed:', error);
-    });
+    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+      .then(registration => registration.update())
+      .catch(error => {
+        console.warn('Service worker registration failed:', error);
+      });
   });
 }
 

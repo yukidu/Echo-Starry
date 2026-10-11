@@ -61,10 +61,45 @@ export const DARK_THEME: ThemePalette = {
   borderSubtle: '#23293b'
 };
 
+const LIGHT_PALETTE_STORAGE_KEY = 'sq_light_palette_id_v1';
+
+function readStoredLightPalette(): ThemePalette | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const storedId = window.localStorage.getItem(LIGHT_PALETTE_STORAGE_KEY);
+    return LIGHT_PALETTES.find(palette => palette.id === storedId) || null;
+  } catch {
+    return null;
+  }
+}
+
+function storeLightPalette(palette: ThemePalette) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(LIGHT_PALETTE_STORAGE_KEY, palette.id);
+  } catch {
+    // Private browsing/storage quota failures should never block theme rendering.
+  }
+}
+
 export function getRandomLightPalette(excludeId?: string): ThemePalette {
-  const filtered = excludeId ? LIGHT_PALETTES.filter(p => p.id !== excludeId) : LIGHT_PALETTES;
+  // v178: a normal reload must keep the exact same palette. Preview and
+  // production also begin from the same deterministic palette when no choice
+  // has been stored yet, so visual verification is no longer affected by a
+  // different random color on each origin/load.
+  if (!excludeId) {
+    const stored = readStoredLightPalette();
+    if (stored) return stored;
+    const initial = LIGHT_PALETTES[0];
+    storeLightPalette(initial);
+    return initial;
+  }
+
+  const filtered = LIGHT_PALETTES.filter(p => p.id !== excludeId);
   const pool = filtered.length > 0 ? filtered : LIGHT_PALETTES;
-  return pool[Math.floor(Math.random() * pool.length)];
+  const next = pool[Math.floor(Math.random() * pool.length)];
+  storeLightPalette(next);
+  return next;
 }
 
 /**
