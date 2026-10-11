@@ -12,6 +12,11 @@ test('v178 remembers the selected light palette across reloads', () => {
   assert.match(themeSource, /if \(!excludeId\)[\s\S]*readStoredLightPalette\(\)/);
 });
 
+test('v178 uses the same deterministic first palette on Preview and Production', () => {
+  assert.match(themeSource, /DEFAULT_LIGHT_PALETTE_ID = 'rose'/);
+  assert.match(themeSource, /LIGHT_PALETTES\.find\(palette => palette\.id === DEFAULT_LIGHT_PALETTE_ID\)/);
+});
+
 test('v178 keeps explicit palette cycling while persisting the new choice', () => {
   assert.match(themeSource, /LIGHT_PALETTES\.filter\(p => p\.id !== excludeId\)/);
   assert.match(themeSource, /storeLightPalette\(selected\)/);

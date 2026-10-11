@@ -62,6 +62,7 @@ export const DARK_THEME: ThemePalette = {
 };
 
 const LIGHT_PALETTE_STORAGE_KEY = 'sq_light_palette_v1';
+const DEFAULT_LIGHT_PALETTE_ID = 'rose';
 
 function readStoredLightPalette(): ThemePalette | null {
   if (typeof window === 'undefined') return null;
@@ -84,16 +85,19 @@ function storeLightPalette(palette: ThemePalette) {
 }
 
 export function getRandomLightPalette(excludeId?: string): ThemePalette {
-  // Initial page load reuses the visitor's last chosen palette so Preview/Production
-  // and normal reloads do not appear to change visual versions merely because a new
-  // random color was selected. Passing excludeId means the user explicitly asked for
-  // another palette, so choose a different one and remember it.
+  // Initial page load reuses the visitor's last chosen palette. If no saved choice
+  // exists yet, use one deterministic default so Preview and Production start from
+  // the same color even though they are different origins with separate storage.
   if (!excludeId) {
     const stored = readStoredLightPalette();
     if (stored) return stored;
+    const fallback = LIGHT_PALETTES.find(palette => palette.id === DEFAULT_LIGHT_PALETTE_ID) || LIGHT_PALETTES[0];
+    storeLightPalette(fallback);
+    return fallback;
   }
 
-  const filtered = excludeId ? LIGHT_PALETTES.filter(p => p.id !== excludeId) : LIGHT_PALETTES;
+  // Passing excludeId means the user explicitly asked for another palette.
+  const filtered = LIGHT_PALETTES.filter(p => p.id !== excludeId);
   const pool = filtered.length > 0 ? filtered : LIGHT_PALETTES;
   const selected = pool[Math.floor(Math.random() * pool.length)];
   storeLightPalette(selected);
