@@ -1,0 +1,147 @@
+name: Deploy stable preview with isolated Cloudflare resources
+
+on:
+  push:
+    branches: [stable-preview]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  PREVIEW_NAME: stable-preview
+  PREVIEW_D1_NAME: echostars-preview-db
+  PREVIEW_R2_NAME: echostars-preview-audio
+  PREVIEW_KV_NAME: echostars-preview-kv
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Verify Cloudflare credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${CLOUDFLARE_API_TOKEN:-}"
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
+
+      - name: Provision isolated Preview D1
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler d1 list --json > /tmp/echostars-preview-d1.json
+          D1_ID=$(node - <<'NODE'
+          const fs=require('fs');
+          const name=process.env.PREVIEW_D1_NAME;
+          const raw=JSON.parse(fs.readFileSync('/tmp/echostars-preview-d1.json','utf8'));
+          const rows=Array.isArray(raw)?raw:(raw.result||[]);
+          const row=rows.find(v=>v.name===name);
+          process.stdout.write(row?.uuid||row?.id||'');
+          NODE
+          )
+          if [ -z "$D1_ID" ]; then
+            npx wrangler d1 create "$PREVIEW_D1_NAME" >/tmp/echostars-preview-d1-create.log 2>&1
+            npx wrangler d1 list --json > /tmp/echostars-preview-d1.json
+            D1_ID=$(node - <<'NODE'
+          const fs=require('fs');
+          const name=process.env.PREVIEW_D1_NAME;
+          const raw=JSON.parse(fs.readFileSync('/tmp/echostars-preview-d1.json','utf8'));
+          const rows=Array.isArray(raw)?raw:(raw.result||[]);
+          const row=rows.find(v=>v.name===name);
+          process.stdout.write(row?.uuid||row?.id||'');
+          NODE
+            )
+          fi
+          test -n "$D1_ID"
+          echo "PREVIEW_D1_ID=$D1_ID" >> "$GITHUB_ENV"
+
+      - name: Provision isolated Preview R2
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler r2 bucket create "$PREVIEW_R2_NAME" >/tmp/echostars-preview-r2-create.log 2>&1 || true
+
+      - name: Provision isolated Preview KV
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler kv namespace list > /tmp/echostars-preview-kv.json
+          KV_ID=$(node - <<'NODE'
+          const fs=require('fs');
+          const name=process.env.PREVIEW_KV_NAME;
+          const raw=JSON.parse(fs.readFileSync('/tmp/echostars-preview-kv.json','utf8'));
+          const rows=Array.isArray(raw)?raw:(raw.result||[]);
+          const row=rows.find(v=>v.title===name || String(v.title||'').endsWith(name));
+          process.stdout.write(row?.id||'');
+          NODE
+          )
+          if [ -z "$KV_ID" ]; then
+            npx wrangler kv namespace create "$PREVIEW_KV_NAME" >/tmp/echostars-preview-kv-create.log 2>&1
+            npx wrangler kv namespace list > /tmp/echostars-preview-kv.json
+            KV_ID=$(node - <<'NODE'
+          const fs=require('fs');
+          const name=process.env.PREVIEW_KV_NAME;
+          const raw=JSON.parse(fs.readFileSync('/tmp/echostars-preview-kv.json','utf8'));
+          const rows=Array.isArray(raw)?raw:(raw.result||[]);
+          const row=rows.find(v=>v.title===name || String(v.title||'').endsWith(name));
+          process.stdout.write(row?.id||'');
+          NODE
+            )
+          fi
+          test -n "$KV_ID"
+          echo "PREVIEW_KV_ID=$KV_ID" >> "$GITHUB_ENV"
+
+      - name: Initialize Preview D1 schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute "$PREVIEW_D1_NAME" --remote --file=./schema.sql
+          npx wrangler d1 execute "$PREVIEW_D1_NAME" --remote --file=./migrations/v185_track_speakers.sql
+          npx wrangler d1 execute "$PREVIEW_D1_NAME" --remote --command="INSERT OR IGNORE INTO categories(name,createdAt) VALUES ('事業',0),('心態思維',0),('營養',0),('安麗產品',0),('影集',0),('未分類',0);"
+
+      - name: Generate Preview-safe Wrangler config
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs');
+          let text=fs.readFileSync('wrangler.toml','utf8');
+          text=text.replace(/^previews\s*=\s*\{\s*\}\s*$/m,'').trimEnd();
+          const block=`\n\n[previews.vars]\nENVIRONMENT = "preview"\n\n[[previews.d1_databases]]\nbinding = "DB"\ndatabase_name = "${process.env.PREVIEW_D1_NAME}"\ndatabase_id = "${process.env.PREVIEW_D1_ID}"\n\n[[previews.r2_buckets]]\nbinding = "R2_BUCKET"\nbucket_name = "${process.env.PREVIEW_R2_NAME}"\n\n[[previews.kv_namespaces]]\nbinding = "KV"\nid = "${process.env.PREVIEW_KV_ID}"\n`;
+          fs.writeFileSync('wrangler.stable-preview.generated.toml', text + block);
+          NODE
+
+      - name: Deploy fixed stable Preview
+        run: npx wrangler preview --name "$PREVIEW_NAME" --config wrangler.stable-preview.generated.toml
+
+      - name: Verify Preview bindings
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://stable-preview-echostars.yukidu.workers.dev/api/cloudflare/status"
+          ok=0
+          for attempt in $(seq 1 20); do
+            if curl -fsS "$URL" >/tmp/echostars-preview-status.json; then
+              if node - <<'NODE'
+          const fs=require('fs');
+          const x=JSON.parse(fs.readFileSync('/tmp/echostars-preview-status.json','utf8'));
+          if (x.environment !== 'preview' || x.d1 !== 'connected' || x.r2 !== 'connected' || x.kv !== 'connected') process.exit(1);
+          NODE
+              then ok=1; break; fi
+            fi
+            sleep 3
+          done
+          cat /tmp/echostars-preview-status.json 2>/dev/null || true
+          test "$ok" -eq 1
