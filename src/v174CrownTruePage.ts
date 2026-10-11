@@ -3,6 +3,7 @@ import './v176CrownAvatarShine';
 import './v177CrownPaletteRing';
 import './v178CrownDiagonalReflection';
 import './v179CrownPolish';
+import './v180CrownR2Avatars';
 
 const PAGE_ID = 'taiwan-crown-integrated-page';
 let crownWasOpen = false;
