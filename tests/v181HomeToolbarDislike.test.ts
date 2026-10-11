@@ -33,16 +33,25 @@ test('v182 dislike resolves exact track.speaker from the tracks API, never from 
   assert.doesNotMatch(client, /再次確認|真的不喜歡演講者/);
 });
 
-test('v182 dislike uses one site-styled confirmation and never mentions hiding', () => {
+test('v183 dislike uses one larger site-styled confirmation without visible heading', () => {
   assert.match(client, /label\.textContent\s*=\s*'不喜歡'/);
   assert.doesNotMatch(client, /window\.confirm/);
-  assert.equal((client.match(/styledDislikeConfirm\(/g) || []).length, 2);
-  assert.match(client, /v181-confirm-card/);
-  assert.match(client, /shieldAlertIcon/);
-  assert.doesNotMatch(client, /確定不喜歡[^\n]*隱藏|再次確認[^\n]*隱藏/);
-  assert.match(css, /\.v181-confirm-card[\s\S]*background:\s*rgb\(255 251 235\)/);
-  assert.match(css, /\.v181-confirm-card[\s\S]*border:\s*1px solid rgb\(252 211 77\)/);
-  assert.match(css, /\.v181-confirm-icon[\s\S]*color:\s*rgb\(217 119 6\)/);
+  assert.equal((client.match(/await styledDislikeConfirm\(/g) || []).length, 1);
+  assert.doesNotMatch(client, /v181-confirm-title/);
+  assert.doesNotMatch(client, /heading\.textContent/);
+  assert.match(css, /\.v181-confirm-message[\s\S]*font-size:\s*1\.08rem/);
+  assert.match(css, /\.v181-confirm-actions[\s\S]*justify-content:\s*center/);
+  assert.match(css, /\.v181-confirm-button[\s\S]*min-width:\s*6\.4rem/);
+  assert.doesNotMatch(client, /確定不喜歡[^\n]*隱藏/);
+});
+
+test('v183 hamburger menu exposes my favorites and hidden speaker management', () => {
+  assert.match(client, /label\.textContent = '我的收藏'/);
+  assert.match(client, /data-v183-favorites-page/);
+  assert.match(client, /已隱藏的演講者/);
+  assert.match(client, /取消隱藏/);
+  assert.match(client, /FAVORITES_KEY = 'echostars_favorite_track_ids_v1'/);
+  assert.match(css, /\.v183-favorites-page/);
 });
 
 test('v181 hides every card for the same disliked speaker', () => {
@@ -52,12 +61,14 @@ test('v181 hides every card for the same disliked speaker', () => {
   assert.match(client, /hiddenSpeakers\.add\(speakerName\)/);
 });
 
-test('v181 persists production dislikes per authenticated member and speaker in D1', () => {
+test('v183 persists and can cancel production hidden speakers per authenticated member in D1', () => {
   assert.match(router, /CREATE TABLE IF NOT EXISTS user_hidden_speakers/);
   assert.match(router, /PRIMARY KEY \(userId, speakerName\)/);
   assert.match(router, /FROM auth_sessions s[\s\S]*JOIN users u ON u\.id = s\.userId/);
   assert.match(router, /INSERT OR IGNORE INTO user_hidden_speakers/);
   assert.match(router, /SELECT speakerName FROM user_hidden_speakers WHERE userId = \?/);
+  assert.match(router, /method === 'DELETE'/);
+  assert.match(router, /DELETE FROM user_hidden_speakers WHERE userId = \? AND speakerName = \?/);
   assert.match(client, /\/api\/member-hidden-speakers/);
   assert.match(favoriteRouter, /import appWorker from '\.\/hiddenTrackRouter'/);
 });
