@@ -4,23 +4,24 @@ main = "worker/privacyCrawlerRouter.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
-# Fixed Preview channel: same application/runtime configuration as production,
-# but all mutable storage is isolated in Preview-only resources.
+# Fixed Preview channel: application/runtime matches production and intentionally
+# shares the same mutable D1 / R2 / KV resources for true production-data testing.
+# WARNING: writes/deletes from stable-preview affect production data immediately.
 [previews.vars]
 ENVIRONMENT = "preview"
 
 [[previews.d1_databases]]
 binding = "DB"
-database_name = "preview-db"
-database_id = "2bfa1862-025a-4e0a-9011-1d42162d7dd1"
+database_name = "echoes_db"
+database_id = "e0a696a9-0233-4186-be4d-229435b19a27"
 
 [[previews.r2_buckets]]
 binding = "R2_BUCKET"
-bucket_name = "preview-audio"
+bucket_name = "echoes-audio-bucket"
 
 [[previews.kv_namespaces]]
 binding = "KV"
-id = "cce48dd354e74a7abfdd9d10894c76c5"
+id = "a2e345e244cb40b4a804be3f89584b90"
 
 # 保留原本 Cloudflare 建置流程；回歸測試由 GitHub Actions 額外把關。
 [build]
@@ -34,7 +35,7 @@ not_found_handling = "single-page-application"
 # Preview 與正式站使用完全相同的 Worker 入口與資源處理流程。
 run_worker_first = ["/*"]
 
-# Production resources: only used by Production deployment.
+# Production resources.
 [[d1_databases]]
 binding = "DB"
 database_name = "echoes_db"
