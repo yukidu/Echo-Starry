@@ -30,6 +30,7 @@ import { formatTime, formatRemainingTime, AudioMemory } from '../utils/audio';
 import { VisitorIdentity } from '../utils/visitor';
 import { exportTrackFullCardImage, shareOrDownloadImage } from '../utils/canvasExport';
 import { CommentsSection } from './CommentsSection';
+import { SocialLinkList } from './SocialLinkList';
 import { TwinklingStars } from './TwinklingStars';
 
 interface DetailViewProps {
@@ -917,6 +918,8 @@ export const DetailView: React.FC<DetailViewProps> = ({
           ))}
         </div>
       </div>
+
+      <SocialLinkList links={track.socialLinks} />
 
       {/* Requirement 5.5: 區塊標題改為「參考資料」，放在「演講資訊與備註」的上面 */}
       {hasExternalResources && (

@@ -2,6 +2,7 @@ type VisitorTrack = {
   requiredRank?: string;
   isPrivateVip?: boolean;
   guestVisible?: boolean | number;
+  authorizedOnlyVisible?: boolean | number;
   stickerUnlockCost?: number | null;
 };
 
@@ -14,9 +15,9 @@ export function isFreeForGuest(track: VisitorTrack): boolean {
 }
 
 export function isVisibleOnGuestHome(track: VisitorTrack): boolean {
-  return isPublicRecording(track) && !track.isPrivateVip && isFreeForGuest(track);
+  return !Boolean(track.authorizedOnlyVisible) && isPublicRecording(track) && !track.isPrivateVip && isFreeForGuest(track);
 }
 
 export function canGuestPlayPublicShare(track: VisitorTrack, isGuest: boolean, isSharedDetail: boolean): boolean {
-  return isGuest && isSharedDetail && isPublicRecording(track) && !track.isPrivateVip;
+  return isGuest && isSharedDetail && !Boolean(track.authorizedOnlyVisible) && isPublicRecording(track) && !track.isPrivateVip;
 }

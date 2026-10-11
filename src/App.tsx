@@ -1,5 +1,6 @@
 import { mergeMemberSession } from './authSessionPolicy';
 import { isVisibleOnGuestHome, canGuestPlayPublicShare } from './visitorTrackPolicy';
+import { canAppearInHomeForViewer } from './trackVisibilityPolicy';
 import { createStickerSummaryClient, STICKER_POLL_MS } from './stickerSummaryClient';
 import { sortStickerTracks } from './homePlaylistPolicy';
 import { StickerFeedback, showStickerDelta, showStickerNotice, setFeedbackRules, getFeedbackRules } from './components/StickerFeedback';
@@ -175,7 +176,8 @@ function trackMatchesHomeSearch(track: Track, rawQuery: string) {
       track.duration,
       ...(track.externalFiles || []).flatMap(file => [file.name, file.url]),
       ...(track.externalVideos || []).flatMap(file => [file.name, file.url]),
-      ...(track.externalPpts || []).flatMap(file => [file.name, file.url])
+      ...(track.externalPpts || []).flatMap(file => [file.name, file.url]),
+      ...(track.socialLinks || []).flatMap(link => [link.platform, link.name, link.url])
     ].some(value => value?.toLowerCase().includes(token)) ||
     allKeywords.some(keyword => keyword.includes(token))
   ));
@@ -1034,7 +1036,7 @@ export default function App() {
 
             if (requestedTrackId) {
               const found = tData.find((t: Track) => t.id === requestedTrackId);
-              if (found) {
+              if (found && canAppearInHomeForViewer(found, Boolean(currentUser), checkCanAccess(found))) {
                 visitorShareTrackId.current = found.id;
                 openTrackDetail(found);
                 void handlePlayTrack(found, 'expanded', null, true);
@@ -2036,6 +2038,7 @@ export default function App() {
   const filteredTracks = useMemo(() => {
     const trackList = Array.isArray(tracks) ? tracks : [];
     const filtered = trackList.filter(t => {
+      if (!canAppearInHomeForViewer(t, Boolean(currentUser), checkCanAccess(t))) return false;
       if (!currentUser && !isVisibleOnGuestHome(t)) return false;
       if (!trackMatchesHomeBaseFilters(t, selectedCategory, selectedSpeakerRank, searchQuery)) return false;
       if (selectedKeywords.length > 0 && !selectedKeywords.every(keyword => trackMatchesHomeKeyword(t, keyword))) return false;

@@ -209,7 +209,7 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
       <strong className={`text-2xl font-normal tabular-nums leading-none shrink-0 ${tx.delta >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>{tx.delta>=0?'+':''}{formatStickerAmount(tx.delta)}<span className="text-xs">張貼紙</span></strong>
     </div>)}
   </div>;
-  const tabs = [{id:'history',label:'貼紙紀錄',Icon:History},...(canGrant?[{id:'grant',label:'人工加貼紙',Icon:PlusCircle}]:[]),...(superAdmin?[{id:'batch',label:'批次修改',Icon:ListChecks}]:[]),...(canManageRules?[{id:'rules',label:'其他規則',Icon:SlidersHorizontal}]:[])] as const;
+  const tabs = [{id:'history',label:'貼紙紀錄',Icon:History},...(canGrant?[{id:'grant',label:'人工加貼紙',Icon:PlusCircle}]:[]),...(superAdmin?[{id:'batch',label:'批次修改',Icon:ListChecks}]:[]),...(canManageRules?[{id:'rules',label:'其他',Icon:SlidersHorizontal}]:[])] as const;
   return <div className="sticker-page w-full min-h-[70dvh]">
     <div role="region" aria-labelledby="sticker-book-title" className="w-full overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex flex-col">
       <div className="px-4 py-3 flex items-center justify-between text-white shrink-0" style={primary}><h2 id="sticker-book-title" className="font-black text-lg flex items-center gap-2"><Trophy className="w-5 h-5"/>我的貼紙簿</h2><button type="button" onClick={onClose} className="p-2 rounded-xl hover:bg-white/20" aria-label="關閉"><X className="w-5 h-5"/></button></div>

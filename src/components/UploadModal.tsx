@@ -20,7 +20,7 @@ import {
   Search,
   RefreshCw
 } from 'lucide-react';
-import { Track, CategoryType, AmwayRank, RANK_ORDER, ExternalLinkItem, UserProfile, SPEAKER_RANK_OPTIONS, GAR_ELIGIBLE_RANKS } from '../types';
+import { Track, CategoryType, AmwayRank, RANK_ORDER, ExternalLinkItem, SocialLinkItem, SocialPlatform, UserProfile, SPEAKER_RANK_OPTIONS, GAR_ELIGIBLE_RANKS } from '../types';
 import { parseID3Tags } from '../utils/id3Parser';
 
 interface CoverLibraryItem {
@@ -59,6 +59,7 @@ const SUPPORTED_AUDIO_ACCEPT = [
 ].join(',');
 
 const COVER_LIBRARY_CACHE_KEY = 'echostars_cover_library_v3_6';
+const SOCIAL_PLATFORM_OPTIONS: SocialPlatform[] = ['IG', 'FB', 'Youtube', 'Threads(脆)', '抖音', '自訂文字'];
 
 const saveCoverLibraryCache = (covers: CoverLibraryItem[]) => {
   if (typeof sessionStorage === 'undefined') return;
@@ -114,6 +115,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const [speechDate, setSpeechDate] = useState(new Date().toISOString().split('T')[0].replace(/-/g, '/'));
   const [seriesOrder, setSeriesOrder] = useState('第 1 集');
   const [guestVisible, setGuestVisible] = useState(false);
+  const [authorizedOnlyVisible, setAuthorizedOnlyVisible] = useState(false);
   const [requiredRank, setRequiredRank] = useState<AmwayRank>('無');
   const [stickerUnlockCost, setStickerUnlockCost] = useState(0);
   const [commentStickerReward, setCommentStickerReward] = useState(0);
@@ -131,6 +133,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   ]);
   const [externalFiles, setExternalFiles] = useState<ExternalLinkItem[]>([
     { name: '', url: '' }
+  ]);
+  const [socialLinks, setSocialLinks] = useState<SocialLinkItem[]>([
+    { platform: 'IG', name: 'IG', url: '' }
   ]);
 
   const [isParsingId3, setIsParsingId3] = useState(false);
@@ -255,7 +260,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   React.useEffect(() => {
     if (isOpen) {
       loadCategories();
-      loadDbKeywords();
       loadCoverLibrary();
     }
   }, [isOpen]);
@@ -388,7 +392,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setSpeechDate(trackToEdit.speechDate || '');
       setSeriesOrder(trackToEdit.seriesOrder ?? '');
       setRequiredRank(trackToEdit.requiredRank || '無');
-      setGuestVisible(Boolean(trackToEdit.guestVisible));
+      setAuthorizedOnlyVisible(Boolean(trackToEdit.authorizedOnlyVisible));
+      setGuestVisible(Boolean(trackToEdit.guestVisible) && !Boolean(trackToEdit.authorizedOnlyVisible));
       setStickerUnlockCost(Math.max(0, Number(trackToEdit.stickerUnlockCost || 0)));
       setCommentStickerReward(Math.max(0, Number(trackToEdit.commentStickerReward || 0)));
       setDescription(trackToEdit.description || '');
@@ -400,6 +405,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setExternalVideos(trackToEdit.externalVideos && trackToEdit.externalVideos.length > 0 ? trackToEdit.externalVideos : [{ name: '', url: '' }]);
       setExternalPpts(trackToEdit.externalPpts && trackToEdit.externalPpts.length > 0 ? trackToEdit.externalPpts : [{ name: '', url: '' }]);
       setExternalFiles(trackToEdit.externalFiles && trackToEdit.externalFiles.length > 0 ? trackToEdit.externalFiles : [{ name: '', url: '' }]);
+      setSocialLinks(trackToEdit.socialLinks && trackToEdit.socialLinks.length > 0 ? trackToEdit.socialLinks.map(link => ({ ...link })) : [{ platform: 'IG', name: 'IG', url: '' }]);
       setAudioFile(null);
       setAudioDurationSeconds(null);
     } else {
@@ -414,6 +420,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setSeriesOrder('第 1 集');
       setRequiredRank('無');
       setGuestVisible(false);
+      setAuthorizedOnlyVisible(false);
       setStickerUnlockCost(0);
       setCommentStickerReward(0);
       setDescription('');
@@ -425,6 +432,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setExternalVideos([{ name: '', url: '' }]);
       setExternalPpts([{ name: '', url: '' }]);
       setExternalFiles([{ name: '', url: '' }]);
+      setSocialLinks([{ platform: 'IG', name: 'IG', url: '' }]);
       setAudioFile(null);
       setAudioDurationSeconds(null);
     }
@@ -675,6 +683,13 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       const cleanVideos = externalVideos.filter(v => v.url.trim());
       const cleanPpts = externalPpts.filter(p => p.url.trim());
       const cleanFiles = externalFiles.filter(f => f.url.trim());
+      const cleanSocialLinks = socialLinks
+        .filter(link => link.url.trim())
+        .map(link => ({
+          platform: link.platform,
+          name: link.platform === '自訂文字' ? (link.name.trim() || '自訂連結') : link.platform,
+          url: link.url.trim()
+        }));
 
       let resolvedDurationSeconds = trackToEdit?.durationSeconds || 0;
       if (audioFile) {
@@ -694,7 +709,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         series: series.trim(),
         speechDate: speechDate.trim(),
         requiredRank,
-        guestVisible,
+        authorizedOnlyVisible,
+        guestVisible: authorizedOnlyVisible ? false : guestVisible,
         stickerUnlockCost,
         commentStickerReward,
         stickerOperationId: crypto.randomUUID(),
@@ -707,6 +723,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         externalVideos: cleanVideos,
         externalPpts: cleanPpts,
         externalFiles: cleanFiles,
+        socialLinks: cleanSocialLinks,
         duration: resolvedDurationLabel,
         durationSeconds: resolvedDurationSeconds,
         isPrivateVip,
@@ -744,7 +761,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         likes: typeof trackObj?.likes === 'number' ? trackObj.likes : 0,
         playCount: typeof trackObj?.playCount === 'number' ? trackObj.playCount : 0,
         stickerUnlockCost: Number(trackObj?.stickerUnlockCost ?? stickerUnlockCost ?? 0),
-        commentStickerReward: Number(trackObj?.commentStickerReward ?? commentStickerReward ?? 0)
+        commentStickerReward: Number(trackObj?.commentStickerReward ?? commentStickerReward ?? 0),
+        authorizedOnlyVisible: Boolean(trackObj?.authorizedOnlyVisible ?? authorizedOnlyVisible),
+        guestVisible: Boolean(trackObj?.guestVisible ?? (authorizedOnlyVisible ? false : guestVisible)),
+        socialLinks: Array.isArray(trackObj?.socialLinks) ? trackObj.socialLinks : cleanSocialLinks
       };
       if (!trackObj?.id || (trackToEdit && trackObj.id !== trackToEdit.id)) {
         throw new Error('伺服器未回傳已儲存的音檔，請重試。');
@@ -1122,105 +1142,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             </div>
           </div>
 
-          {/* 3.5 網友關鍵字 (Requirement 1: 最多設定20個關鍵字，自動抓取資料庫紀錄供直接點選) */}
-          <div className="space-y-2 p-3 rounded-2xl bg-amber-50/60 dark:bg-slate-800/60 border border-amber-200/70 dark:border-slate-700">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Tag className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                <label className="font-bold text-slate-800 dark:text-slate-100">
-                  網友關鍵字 (已設 {keywords.length}/20)
-                </label>
-              </div>
-              <span className="text-[10px] text-slate-400">
-                每首音檔最多 20 組關鍵字
-              </span>
-            </div>
-
-            {/* Current Track Selected Keywords */}
-            <div className="flex flex-wrap gap-1.5 min-h-7 items-center">
-              {keywords.length === 0 ? (
-                <span className="text-slate-400 text-xs italic">尚未設定關鍵字，可從下方直接點選或自訂輸入新增</span>
-              ) : (
-                keywords.map((kw, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-200 font-bold text-xs border border-amber-300 dark:border-amber-800 shadow-2xs"
-                  >
-                    <span>#{kw}</span>
-                    <button
-                      type="button"
-                      disabled={!canRemoveKeyword(kw)}
-                      title={canRemoveKeyword(kw) ? '移除關鍵字' : '僅建立者或超級管理員可移除'}
-                      onClick={() => handleRemoveKeyword(kw)}
-                      className="p-0.5 rounded-full hover:bg-amber-200 dark:hover:bg-amber-800 text-amber-700 dark:text-amber-300"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))
-              )}
-            </div>
-
-            {/* Input to Add Custom Keyword */}
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="text"
-                value={newKeywordInput}
-                onChange={e => setNewKeywordInput(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    if (e.nativeEvent.isComposing || (e as any).isComposing || e.keyCode === 229) {
-                      return;
-                    }
-                    e.preventDefault();
-                    handleAddKeyword(newKeywordInput);
-                  }
-                }}
-                disabled={keywords.length >= 20}
-                placeholder={keywords.length >= 20 ? '已達 20 個關鍵字上限' : '輸入新關鍵字後按 Enter 或點新增...'}
-                className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 outline-hidden focus:border-amber-400 disabled:opacity-50"
-              />
-              <button
-                type="button"
-                disabled={!newKeywordInput.trim() || keywords.length >= 20}
-                onClick={() => handleAddKeyword(newKeywordInput)}
-                className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold disabled:opacity-50 flex items-center gap-1 shadow-2xs cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>加入關鍵字</span>
-              </button>
-            </div>
-
-            {/* Previously used keywords in Database for 1-click addition */}
-            {dbKeywords.length > 0 && (
-              <div className="pt-2 border-t border-amber-100 dark:border-slate-700">
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1 font-semibold">
-                  點選曾被使用的熱門關鍵字直接帶入：
-                </span>
-                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1">
-                  {dbKeywords.map((kw, i) => {
-                    const isAdded = keywords.includes(kw);
-                    return (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => isAdded ? handleRemoveKeyword(kw) : handleAddKeyword(kw)}
-                        disabled={!isAdded && keywords.length >= 20}
-                        className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
-                          isAdded
-                            ? 'bg-amber-500 text-white font-bold'
-                            : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 hover:border-amber-400 disabled:opacity-40'
-                        }`}
-                      >
-                        {isAdded ? `✓ #${kw}` : `+ #${kw}`}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* 4. Text Fields Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -1332,13 +1253,19 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               />
             </div>
 
-            {/* 新需求: 獎銜＝閱讀瀏覽權限 */}
-            <div data-upload-guest-visibility="true">
-              <label className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300">
-                <input type="checkbox" checked={guestVisible} onChange={event => setGuestVisible(event.target.checked)} />
-                訪客可見
-              </label>
-              <p className="mt-1 text-xs text-slate-500">讓訪客在首頁看到此音檔；播放仍依權限與貼紙設定判斷。公開音檔預設可見，分享連結可開啟詳細頁。</p>
+            {/* 瀏覽清單可見性 */}
+            <div data-upload-guest-visibility="true" className="sm:col-span-2 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                <label className={`flex items-center gap-2 font-bold ${authorizedOnlyVisible ? 'text-slate-400 cursor-not-allowed' : 'text-slate-700 dark:text-slate-300'}`}>
+                  <input type="checkbox" checked={guestVisible} disabled={authorizedOnlyVisible} onChange={event => setGuestVisible(event.target.checked)} />
+                  訪客可見
+                </label>
+                <label className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                  <input type="checkbox" checked={authorizedOnlyVisible} onChange={event => { const checked = event.target.checked; setAuthorizedOnlyVisible(checked); if (checked) setGuestVisible(false); }} />
+                  只對有權限者顯示
+                </label>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">勾選「只對有權限者顯示」後，未達瀏覽權限的會員與所有訪客都不會在首頁看到此音檔；「訪客可見」會自動取消並鎖定。</p>
             </div>
             <div>
               <label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">
@@ -1433,6 +1360,26 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-slate-400 cursor-not-allowed"
               />
             </div>
+          </div>
+
+          {/* 社群連結（可多個） */}
+          <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between gap-2">
+              <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1"><Link className="w-3.5 h-3.5"/><span>社群連結（可新增多個網址）</span></label>
+              <button type="button" onClick={() => setSocialLinks([...socialLinks, { platform: 'IG', name: 'IG', url: '' }])} className="text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-0.5 text-[11px]"><Plus className="w-3 h-3"/>新增社群連結</button>
+            </div>
+            {socialLinks.map((link, i) => (
+              <div key={i} className="grid grid-cols-[8rem_1fr_auto] gap-2 items-center">
+                <ThemedSelect value={link.platform} onChange={e => { const platform=e.target.value as SocialPlatform; setSocialLinks(prev => prev.map((item,idx)=>idx===i?{...item,platform,name:platform==='自訂文字'?'':platform}:item)); }} className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                  {SOCIAL_PLATFORM_OPTIONS.map(platform => <option key={platform} value={platform}>{platform}</option>)}
+                </ThemedSelect>
+                <div className="min-w-0 flex gap-2">
+                  {link.platform === '自訂文字' && <input type="text" value={link.name} onChange={e=>setSocialLinks(prev=>prev.map((item,idx)=>idx===i?{...item,name:e.target.value}:item))} placeholder="自訂顯示名稱" className="w-1/3 min-w-24 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"/>}
+                  <input type="url" value={link.url} onChange={e=>setSocialLinks(prev=>prev.map((item,idx)=>idx===i?{...item,url:e.target.value}:item))} placeholder="https://..." className="flex-1 min-w-0 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"/>
+                </div>
+                <button type="button" onClick={()=>setSocialLinks(prev=>prev.length===1?[{ platform: 'IG', name: 'IG', url: '' }]:prev.filter((_,idx)=>idx!==i))} className="p-1 text-slate-400 hover:text-rose-600" title="刪除此社群連結"><Trash2 className="w-3.5 h-3.5"/></button>
+              </div>
+            ))}
           </div>
 
           {/* 5. 外部影片連結（可多個，自訂名稱） */}
@@ -1547,9 +1494,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
-              rows={2}
+              rows={5}
               placeholder="輸入演講重點與摘要..."
-              className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-hidden resize-none"
+              className="w-full min-h-32 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-hidden resize-y"
             />
           </div>
 

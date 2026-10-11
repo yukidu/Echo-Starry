@@ -350,7 +350,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     const payload: Partial<UserProfile> = {
       name: name.trim(),
       amwayId: amwayId.trim(),
-      phone: phone.trim(),
       residence,
       center,
       rank,
@@ -669,11 +668,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       <div className="grid grid-cols-2 gap-2">
                         <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700">
                           <div className="flex items-center justify-between mb-0.5">
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">手機號碼</span>
-                            <span className="text-[9px] text-amber-600 dark:text-amber-400 font-medium">隱私不公開</span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Email</span>
+                            <span className="text-[9px] text-slate-400 font-medium">不列入完善獎勵判定</span>
                           </div>
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">
-                            {currentUser.phone || '未填寫'}
+                          <span className="font-semibold text-slate-800 dark:text-slate-200 break-all">
+                            {currentUser.email || '未填寫'}
                           </span>
                         </div>
                         <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700">
@@ -770,16 +769,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         </div>
 
                         <div>
-                          <label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                            手機 <span className="text-[10px] text-amber-600 dark:text-amber-400 font-normal">(隱私不公開)</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={phone}
-                            onChange={e => setPhone(e.target.value)}
-                            placeholder="0912-345-678"
-                            className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-hidden"
-                          />
+                          <label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">Email <span className="text-[10px] text-slate-400 font-normal">（不列入完善獎勵判定）</span></label>
+                          <input type="email" value={currentUser?.email || ''} disabled placeholder="未填寫" className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/60 text-slate-500 cursor-not-allowed"/>
                         </div>
 
                         <div>
