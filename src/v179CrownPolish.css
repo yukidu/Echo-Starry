@@ -1,0 +1,125 @@
+.taiwan-crown-avatar {
+  position: relative;
+  overflow: hidden;
+}
+
+.taiwan-crown-avatar::before,
+.taiwan-crown-avatar::after,
+.taiwan-crown-avatar-ring::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+.taiwan-crown-avatar-ring::after {
+  inset: -0.12em;
+  background:
+    radial-gradient(circle at 14% 18%, rgb(255 255 255 / 0.96) 0 1.4%, rgb(255 255 255 / 0.48) 2.6%, transparent 5.8%),
+    radial-gradient(circle at 79% 20%, rgb(255 255 255 / 0.82) 0 1.2%, rgb(255 255 255 / 0.32) 2.2%, transparent 5.2%);
+  opacity: 0.18;
+  filter: blur(0.045em) brightness(0.9);
+  transform: translate3d(-1.8%, 0.8%, 0) scale(0.996);
+  animation: taiwanCrownSparkPulseA 7.4s ease-in-out infinite !important;
+  animation-play-state: running !important;
+  will-change: opacity, filter, transform;
+}
+
+.taiwan-crown-avatar::before {
+  inset: -0.34em;
+  background:
+    radial-gradient(circle at 31% 6%, rgb(255 255 255 / 0.92) 0 1.25%, rgb(255 255 255 / 0.38) 2.4%, transparent 5.5%),
+    radial-gradient(circle at 95% 55%, rgb(255 255 255 / 0.88) 0 1.35%, rgb(255 255 255 / 0.3) 2.5%, transparent 5.8%);
+  opacity: 0.12;
+  filter: blur(0.04em) brightness(0.84);
+  transform: translate3d(1.6%, -1.6%, 0) scale(0.998);
+  animation: taiwanCrownSparkPulseB 9.1s ease-in-out infinite !important;
+  animation-play-state: running !important;
+  will-change: opacity, filter, transform;
+}
+
+.taiwan-crown-avatar::after {
+  inset: -0.34em;
+  background:
+    radial-gradient(circle at 11% 73%, rgb(255 255 255 / 0.84) 0 1.15%, rgb(255 255 255 / 0.26) 2.1%, transparent 5%),
+    radial-gradient(circle at 67% 95%, rgb(255 255 255 / 0.96) 0 1.45%, rgb(255 255 255 / 0.36) 2.5%, transparent 5.7%),
+    radial-gradient(circle at 57% 9%, rgb(255 255 255 / 0.72) 0 1.05%, rgb(255 255 255 / 0.22) 2.1%, transparent 4.9%);
+  opacity: 0.1;
+  filter: blur(0.05em) brightness(0.86);
+  transform: translate3d(-1.2%, 1.9%, 0) scale(0.994);
+  animation: taiwanCrownSparkPulseC 6.6s ease-in-out infinite !important;
+  animation-play-state: running !important;
+  will-change: opacity, filter, transform;
+}
+
+.taiwan-crown-card:nth-child(4n + 1) .taiwan-crown-avatar-ring::after,
+.taiwan-crown-card:nth-child(4n + 1) .taiwan-crown-avatar::before,
+.taiwan-crown-card:nth-child(4n + 1) .taiwan-crown-avatar::after {
+  animation-delay: -0.8s !important;
+}
+
+.taiwan-crown-card:nth-child(4n + 2) .taiwan-crown-avatar-ring::after,
+.taiwan-crown-card:nth-child(4n + 2) .taiwan-crown-avatar::before,
+.taiwan-crown-card:nth-child(4n + 2) .taiwan-crown-avatar::after {
+  animation-delay: -2.6s !important;
+}
+
+.taiwan-crown-card:nth-child(4n + 3) .taiwan-crown-avatar-ring::after,
+.taiwan-crown-card:nth-child(4n + 3) .taiwan-crown-avatar::before,
+.taiwan-crown-card:nth-child(4n + 3) .taiwan-crown-avatar::after {
+  animation-delay: -4.2s !important;
+}
+
+.taiwan-crown-card:nth-child(4n) .taiwan-crown-avatar-ring::after,
+.taiwan-crown-card:nth-child(4n) .taiwan-crown-avatar::before,
+.taiwan-crown-card:nth-child(4n) .taiwan-crown-avatar::after {
+  animation-delay: -5.9s !important;
+}
+
+.taiwan-crown-card-quote {
+  font-size: 1.22em !important;
+  font-weight: 400 !important;
+  line-height: 1.54 !important;
+}
+
+@keyframes taiwanCrownSparkPulseA {
+  0%, 100% { opacity: 0.14; filter: blur(0.05em) brightness(0.84); transform: translate3d(-1.8%, 0.8%, 0) scale(0.996); }
+  19% { opacity: 0.48; filter: blur(0.04em) brightness(1.04); transform: translate3d(-0.6%, -1.2%, 0) scale(1.001); }
+  46% { opacity: 0.22; filter: blur(0.052em) brightness(0.9); transform: translate3d(1.6%, 0.5%, 0) scale(0.997); }
+  71% { opacity: 0.66; filter: blur(0.034em) brightness(1.18); transform: translate3d(0.2%, 1.5%, 0) scale(1.004); }
+}
+
+@keyframes taiwanCrownSparkPulseB {
+  0%, 100% { opacity: 0.08; filter: blur(0.048em) brightness(0.8); transform: translate3d(1.6%, -1.6%, 0) scale(0.998); }
+  16% { opacity: 0.42; filter: blur(0.038em) brightness(1.02); transform: translate3d(0.8%, -0.6%, 0) scale(1.002); }
+  37% { opacity: 0.16; filter: blur(0.05em) brightness(0.86); transform: translate3d(2.1%, 1.1%, 0) scale(0.996); }
+  63% { opacity: 0.58; filter: blur(0.034em) brightness(1.14); transform: translate3d(-1.1%, 1.6%, 0) scale(1.003); }
+  82% { opacity: 0.24; filter: blur(0.045em) brightness(0.92); transform: translate3d(-0.4%, -1.4%, 0) scale(0.999); }
+}
+
+@keyframes taiwanCrownSparkPulseC {
+  0%, 100% { opacity: 0.1; filter: blur(0.052em) brightness(0.82); transform: translate3d(-1.2%, 1.9%, 0) scale(0.994); }
+  14% { opacity: 0.36; filter: blur(0.04em) brightness(0.98); transform: translate3d(-0.1%, 0.6%, 0) scale(0.999); }
+  41% { opacity: 0.18; filter: blur(0.055em) brightness(0.88); transform: translate3d(1.4%, 1.2%, 0) scale(0.996); }
+  58% { opacity: 0.72; filter: blur(0.032em) brightness(1.22); transform: translate3d(-1.8%, -0.8%, 0) scale(1.005); }
+  79% { opacity: 0.28; filter: blur(0.046em) brightness(0.94); transform: translate3d(0.7%, -1.7%, 0) scale(0.998); }
+}
+
+@media (max-width: 420px) {
+  .taiwan-crown-card-quote {
+    font-size: 1.14em !important;
+    line-height: 1.54 !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .taiwan-crown-avatar-ring::after {
+    animation: taiwanCrownSparkPulseA 12s ease-in-out infinite !important;
+  }
+  .taiwan-crown-avatar::before {
+    animation: taiwanCrownSparkPulseB 14s ease-in-out infinite !important;
+  }
+  .taiwan-crown-avatar::after {
+    animation: taiwanCrownSparkPulseC 10s ease-in-out infinite !important;
+  }
+}
