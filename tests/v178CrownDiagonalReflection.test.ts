@@ -27,9 +27,9 @@ test('v178 keeps slow multi-point breathing reflections visibly moving on every 
 });
 
 test('v178 enlarges crown card text and forces inspirational quotes to normal weight', () => {
-  assert.match(css, /\.taiwan-crown-card-name\s*\{[\s\S]*font-size:\s*1\.42em/);
-  assert.match(css, /\.taiwan-crown-card-quote\s*\{[\s\S]*font-size:\s*1\.12em[\s\S]*font-weight:\s*400\s*!important/);
-  assert.match(css, /@media \(max-width: 420px\)[\s\S]*font-size:\s*1\.3em[\s\S]*font-size:\s*1\.05em/);
+  assert.match(css, /\.taiwan-crown-card-name\s*\{[\s\S]*font-size:\s*1\.56em/);
+  assert.match(css, /\.taiwan-crown-card-quote\s*\{[\s\S]*font-size:\s*1\.22em[\s\S]*font-weight:\s*400\s*!important/);
+  assert.match(css, /@media \(max-width: 420px\)[\s\S]*font-size:\s*1\.44em[\s\S]*font-size:\s*1\.16em/);
 });
 
 test('v178 keeps only the audio-detail style external-link icon and normalizes own-card border', () => {
