@@ -30,12 +30,13 @@ test('v182 dislike resolves exact track.speaker from the tracks API, never from 
   assert.doesNotMatch(client, /querySelector\('h3'\)/);
   assert.doesNotMatch(client, /img\[alt\]/);
   assert.match(client, /確定不喜歡演講者「\$\{speakerName\}」嗎？/);
-  assert.match(client, /真的不喜歡演講者「\$\{speakerName\}」嗎？/);
+  assert.doesNotMatch(client, /再次確認|真的不喜歡演講者/);
 });
 
-test('v181 dislike uses the site styled confirmation twice and never mentions hiding', () => {
+test('v182 dislike uses one site-styled confirmation and never mentions hiding', () => {
   assert.match(client, /label\.textContent\s*=\s*'不喜歡'/);
   assert.doesNotMatch(client, /window\.confirm/);
+  assert.equal((client.match(/styledDislikeConfirm\(/g) || []).length, 2);
   assert.match(client, /v181-confirm-card/);
   assert.match(client, /shieldAlertIcon/);
   assert.doesNotMatch(client, /確定不喜歡[^\n]*隱藏|再次確認[^\n]*隱藏/);
