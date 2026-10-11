@@ -155,8 +155,12 @@ async function spentStickerLeaderboard(env: Env): Promise<Response | null> {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    await ensurePreviewBootstrap(env);
     const url = new URL(request.url);
+    const needsPreviewData =
+      (url.pathname.startsWith('/api/') && url.pathname !== '/api/cloudflare/status') ||
+      url.pathname.startsWith('/share/') ||
+      (request.method === 'POST' && url.pathname === '/');
+    if (needsPreviewData) await ensurePreviewBootstrap(env);
 
     // Browser cookie writes must originate here. Future external apps require
     // their own scoped server credentials, not reuse of a member's site cookie.
