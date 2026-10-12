@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const router = readFileSync(new URL('../worker/v192TrackVisibilityRouter.ts', import.meta.url), 'utf8');
 const privacy = readFileSync(new URL('../worker/privacyCrawlerRouter.ts', import.meta.url), 'utf8');
+const auth = readFileSync(new URL('../worker/authRouter.ts', import.meta.url), 'utf8');
 const ui = readFileSync(new URL('../src/v192HiddenTrackUi.ts', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../src/v192HiddenTrackUi.css', import.meta.url), 'utf8');
 const upload = readFileSync(new URL('../src/components/UploadModal.tsx', import.meta.url), 'utf8');
@@ -38,19 +39,25 @@ test('v192 shows the eye-off hidden marker in home and detail positions', () => 
   assert.doesNotMatch(ui, /MutationObserver/);
 });
 
-test('v192 blocks hidden sharing by default and exposes a per-track admin switch', () => {
+test('v192 blocks hidden sharing by default and exposes a protected per-track admin switch', () => {
   assert.match(router, /hiddenShareAllowed INTEGER NOT NULL DEFAULT 0/);
   assert.match(router, /share-slug\|vip-share/);
   assert.match(router, /此音檔已被隱藏，目前禁止分享/);
   assert.match(router, /shareBlockedBySlug/);
+  assert.match(router, /const response = await next\(request, env\)/);
+  assert.match(router, /if \(!trackWrite \|\| !response\.ok/);
+  assert.match(auth, /\^\\\/api\\\/tracks\\\/\[\^\/\]\+\$\/\.test\(path\) && \(method === 'PUT' \|\| method === 'DELETE'\)/);
+  assert.match(auth, /只能修改自己上傳的音檔/);
   assert.match(ui, /隱藏音檔允許分享/);
   assert.match(ui, /role="switch"/);
   assert.match(ui, /hiddenShareAllowed:\s*next/);
   assert.match(ui, /setShareButtonsBlocked/);
 });
 
-test('v192 keeps privacy boundary, v189 fixes, and restored v190 rank badges together', () => {
-  assert.match(privacy, /import appWorker from '\.\/v192TrackVisibilityRouter'/);
+test('v192 keeps the original wrapper chain, v189 fixes, and restored v190 rank badges together', () => {
+  assert.match(privacy, /import appWorker from '\.\/favoriteRouter'/);
+  assert.match(privacy, /import \{ handleV192TrackVisibility \} from '\.\/v192TrackVisibilityRouter'/);
+  assert.match(privacy, /handleV192TrackVisibility/);
   assert.match(privacy, /NOOP_EDIT_MARKER = '__ECHOSTARS_NOOP_EDIT_SAVE__'/);
   assert.match(main, /import '\.\/v189PlaybackSwitchConfirm'/);
   assert.match(main, /import '\.\/v190RankBadge\.css'/);
