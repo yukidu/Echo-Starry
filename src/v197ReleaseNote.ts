@@ -81,3 +81,5 @@ if (!runtime.__ECHOSTARS_V197_RELEASE_PATCH__) {
     }
   }) as typeof window.fetch;
 }
+
+// Production deployment trigger only; no runtime behavior change.
