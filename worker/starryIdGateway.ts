@@ -112,7 +112,7 @@ async function handleStarryApi(request: Request, env: Env) {
 
   if (path === '/api/starry-id/session' && method === 'GET') {
     const session = await starrySessionUser(request, env);
-    if (!session) return json(request, { authenticated: false }, 401);
+    if (!session?.member) return json(request, { authenticated: false }, 401);
     return json(request, {
       authenticated: true,
       user: session.member,
@@ -123,13 +123,13 @@ async function handleStarryApi(request: Request, env: Env) {
 
   if (path === '/api/starry-id/profile' && method === 'GET') {
     const session = await starrySessionUser(request, env);
-    if (!session) return json(request, { error: '請先登入 Starry ID' }, 401);
+    if (!session?.member) return json(request, { error: '請先登入 Starry ID' }, 401);
     return json(request, { user: session.member });
   }
 
   if (path === '/api/starry-id/profile' && method === 'PUT') {
     const session = await starrySessionUser(request, env);
-    if (!session) return json(request, { error: '請先登入 Starry ID' }, 401);
+    if (!session?.member) return json(request, { error: '請先登入 Starry ID' }, 401);
     try {
       const changes = await body(request);
       const updated = await updateStarryProfile(env, session.member.id, session.member.id, session.appId, changes);
