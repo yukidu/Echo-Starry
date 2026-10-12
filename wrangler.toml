@@ -4,35 +4,45 @@ main = "worker/trackVisibilityPersistenceRouter.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
-# Pull request previews are intentionally isolated from production resources.
-# Storage bindings are omitted here so preview branches cannot read/write production D1, KV or R2.
-previews = { }
+# Fixed Preview channel: application/runtime matches the latest v188 code and intentionally
+# shares the same mutable D1 / R2 / KV resources for true production-data testing.
+# WARNING: writes/deletes from stable-preview affect production data immediately.
+[previews.vars]
+ENVIRONMENT = "preview"
 
-# 保留原本 Cloudflare 建置流程；回歸測試由 GitHub Actions 額外把關。
+[[previews.d1_databases]]
+binding = "DB"
+database_name = "echoes_db"
+database_id = "e0a696a9-0233-4186-be4d-229435b19a27"
+
+[[previews.r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "echoes-audio-bucket"
+
+[[previews.kv_namespaces]]
+binding = "KV"
+id = "a2e345e244cb40b4a804be3f89584b90"
+
 [build]
 command = "npm run build"
 
-# 靜態前端資源 (Vite build 產出之 dist 目錄)
 [assets]
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# 所有請求先經過 v188 顯示權限保存層，再完整進入 privacyCrawlerRouter，
-# 所以首頁、分享頁、靜態資源與 API 仍一致套用 X-Robots-Tag 與 crawler 阻擋。
+# All requests first pass through the v188 visibility-persistence layer, which then
+# delegates to privacyCrawlerRouter so crawler/privacy behavior remains intact.
 run_worker_first = ["/*"]
 
-# 1. Cloudflare D1 資料庫 (SQLite)
 [[d1_databases]]
 binding = "DB"
 database_name = "echoes_db"
 database_id = "e0a696a9-0233-4186-be4d-229435b19a27"
 
-# 2. Cloudflare R2 物件儲存桶 (音檔與圖檔直傳)
 [[r2_buckets]]
 binding = "R2_BUCKET"
 bucket_name = "echoes-audio-bucket"
 
-# 3. Cloudflare KV 快取與連線狀態儲存庫
 [[kv_namespaces]]
 binding = "KV"
 id = "a2e345e244cb40b4a804be3f89584b90"
