@@ -26,18 +26,21 @@ test('v190 maps every R2 Pin-Level medal filename to its exact speaker rank', ()
   assert.match(badge, /api\/r2\/file/);
 });
 
-test('v190 detail card shows a clickable medal to the right of the cover with sparkle animation', () => {
+test('v190 detail card shows a larger clickable medal with denser sparkle animation and no vertical bob', () => {
   assert.match(detail, /const rankBadge = speakerRankBadge\(track\.speakerRank/);
   assert.match(detail, /left: 'calc\(100% \+ 0\.55rem\)'/);
   assert.match(detail, /onSelectSpeakerRank\?\.\(rankBadge\.rank\)/);
   assert.match(detail, /v190-rank-badge-sparkle--one/);
   assert.match(detail, /v190-rank-badge-sparkle--two/);
   assert.match(detail, /v190-rank-badge-sparkle--three/);
-  assert.match(css, /@keyframes v190-rank-badge-bob/);
   assert.match(css, /@keyframes v190-rank-badge-sparkle/);
+  assert.match(css, /width:\s*125%/);
+  assert.match(css, /v190-rank-badge-motion::before/);
+  assert.match(css, /v190-rank-badge-motion::after/);
+  assert.doesNotMatch(css, /v190-rank-badge-bob/);
 });
 
-test('v190 medal click returns home and applies an exact medal-rank filter', () => {
+test('v190 medal click returns home, opens advanced filters, and applies an exact medal-rank filter', () => {
   assert.match(app, /selectedBadgeSpeakerRank/);
   assert.match(app, /normalizeSpeakerRankForBadge\(t\.speakerRank \|\| ''\) !== selectedBadgeSpeakerRank/);
   assert.match(app, /onSelectSpeakerRank=\{rank =>/);
@@ -45,8 +48,19 @@ test('v190 medal click returns home and applies an exact medal-rank filter', () 
   assert.match(app, /setSelectedSpeakerRank\('全部'\)/);
   assert.match(app, /setSelectedKeywords\(\[\]\)/);
   assert.match(app, /setSearchQuery\(''\)/);
+  assert.match(app, /setSelectedBadgeSpeakerRank\(rank\)/);
+  assert.match(app, /setShowKeywordsDrawer\(true\)/);
   assert.match(app, /setCurrentTab\('home'\)/);
-  assert.match(app, /獎章篩選：\{selectedBadgeSpeakerRank\}/);
+  assert.match(app, /進階篩選/);
+  assert.match(app, /<span className="font-bold">\{selectedBadgeSpeakerRank\}<\/span>/);
+  assert.doesNotMatch(app, /獎章篩選：\{selectedBadgeSpeakerRank\}/);
+});
+
+test('v190 home reset also clears the badge filter', () => {
+  const resetStart = app.indexOf('const handleReturnToHomePlaylist');
+  const resetEnd = app.indexOf('// 1. Fast home bootstrap', resetStart);
+  const resetBlock = app.slice(resetStart, resetEnd);
+  assert.match(resetBlock, /setSelectedBadgeSpeakerRank\(''\)/);
 });
 
 test('v190 release note is loaded and no DOM MutationObserver is introduced for the medal feature', () => {
