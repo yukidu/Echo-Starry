@@ -1,0 +1,101 @@
+/* v194: retain the v193 detail-page badge position. */
+button:has(> .v190-rank-badge-motion) {
+  top: .35rem !important;
+  left: calc(100% + .25rem) !important;
+  transform: translateY(0) !important;
+}
+
+button:has(> .v190-rank-badge-motion):hover {
+  transform: scale(1.1) !important;
+}
+
+button:has(> .v190-rank-badge-motion):active {
+  transform: scale(.95) !important;
+}
+
+.v190-rank-badge-motion {
+  overflow: visible;
+}
+
+/* v194 removes every legacy star sparkle from the detail badge. */
+.v190-rank-badge-sparkle {
+  display: none !important;
+  animation: none !important;
+}
+
+.v190-rank-badge-motion::before,
+.v190-rank-badge-motion::after {
+  content: none !important;
+  display: none !important;
+  animation: none !important;
+}
+
+/* Reuse the Crown Ambassador page's individual round-light visual language. */
+.v194-rank-badge-dot {
+  --spark-min: .18;
+  --spark-max: .92;
+  --spark-scale: 1.36;
+  position: absolute;
+  z-index: 4;
+  left: var(--spark-x);
+  top: var(--spark-y);
+  width: var(--spark-size);
+  height: var(--spark-size);
+  border-radius: 999px;
+  background: rgb(255 255 255 / .98);
+  box-shadow:
+    0 0 .14em rgb(255 255 255 / .95),
+    0 0 .34em rgb(255 255 255 / .88),
+    0 0 .55em color-mix(in srgb, var(--color-primary, #c06c84) 58%, transparent);
+  opacity: var(--spark-min);
+  transform: translate(-50%, -50%) scale(.72);
+  transform-origin: center;
+  pointer-events: none;
+  will-change: opacity, transform, filter;
+  animation: v194RankBadgeIndependentDot var(--spark-duration) ease-in-out var(--spark-delay) infinite;
+  animation-play-state: running !important;
+}
+
+@keyframes v194RankBadgeIndependentDot {
+  0%, 100% {
+    opacity: var(--spark-min);
+    filter: brightness(.92);
+    transform: translate(-50%, -50%) scale(.72);
+  }
+  17% {
+    opacity: calc(var(--spark-min) + .08);
+    filter: brightness(1);
+    transform: translate(-50%, -50%) scale(.84);
+  }
+  43% {
+    opacity: var(--spark-max);
+    filter: brightness(1.32);
+    transform: translate(-50%, -50%) scale(var(--spark-scale));
+  }
+  61% {
+    opacity: calc(var(--spark-max) * .56);
+    filter: brightness(1.08);
+    transform: translate(-50%, -50%) scale(.98);
+  }
+  79% {
+    opacity: calc(var(--spark-min) + .04);
+    filter: brightness(.96);
+    transform: translate(-50%, -50%) scale(.76);
+  }
+}
+
+@media (max-width: 420px) {
+  .v194-rank-badge-dot {
+    box-shadow:
+      0 0 .11em rgb(255 255 255 / .98),
+      0 0 .28em rgb(255 255 255 / .9),
+      0 0 .46em color-mix(in srgb, var(--color-primary, #c06c84) 62%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v194-rank-badge-dot {
+    animation-duration: calc(var(--spark-duration) * 1.6) !important;
+    animation-play-state: running !important;
+  }
+}
