@@ -3,7 +3,7 @@ import { setFeedbackRules } from './StickerFeedback';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Trophy, X, History, SlidersHorizontal, ListChecks, PlusCircle, Search, ArrowUpRight, Copy, Share2 } from 'lucide-react';
 import type { Track, UserProfile } from '../types';
-import { formatStickerAmount, isPlatinumOrAboveRank } from '../../shared/stickers';
+import { formatStickerAmount, isPlatinumToolsEligible } from '../../shared/stickers';
 import { ThemedSelect } from './ThemedSelect';
 import { StickerGuideTable } from './StickerGuideTable';
 
@@ -39,8 +39,8 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
   // Tabs are available from the signed-in profile immediately; every API still checks the live session.
   const superAdmin = currentUser?.email?.trim().toLowerCase() === 'yukidu@gmail.com' || currentUser?.role === '超級管理員';
   const canManageRules = superAdmin || Boolean(currentUser?.isAdminUser) || currentUser?.role === '管理員';
-  const canGrant = superAdmin || Boolean(currentUser?.rankApproved && isPlatinumOrAboveRank(currentUser.approvedRank || currentUser.rank));
-  const canCreateDownlineInvite = Boolean(currentUser?.rankApproved && isPlatinumOrAboveRank(currentUser.approvedRank || currentUser.rank));
+  const canGrant = superAdmin || isPlatinumToolsEligible(currentUser);
+  const canCreateDownlineInvite = isPlatinumToolsEligible(currentUser);
   const [summary,setSummary] = useState<StickerSummary | null>(initialSummary || null);
   const [tab,setTab] = useState<'history'|'grant'|'batch'|'rules'>('history');
   const [error,setError] = useState(''); const [busy,setBusy] = useState(false); const [loading,setLoading] = useState(true);
@@ -53,6 +53,7 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
   const [inviteInfo,setInviteInfo] = useState<{url:string;dealerId:string;displayName:string;kind:'platinum'|'diamond'} | null>(null);
   const [inviteBusy,setInviteBusy] = useState(false);
   const [inviteNotice,setInviteNotice] = useState('');
+  const [platinumAudit,setPlatinumAudit] = useState<{count:number;members:Array<{id:string;name:string;email:string;rank:string;approvedRank?:string;rankAuditStatus?:string}>} | null>(null);
   const [historyNext,setHistoryNext]=useState<string|null>(null);
   const [grantNext,setGrantNext]=useState<string|null>(null);
   const latestSummary=useRef(initialSummary);latestSummary.current=initialSummary;
@@ -114,6 +115,14 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
     }
     return()=>{active=false;requestSequence.current+=1;};
   },[isOpen,currentUser?.id]);
+  useEffect(()=>{
+    if(!isOpen || !superAdmin){setPlatinumAudit(null);return;}
+    let active=true;
+    void requestJson('/api/stickers/platinum-tools-audit')
+      .then(data=>{if(active)setPlatinumAudit({count:Number(data.count||0),members:Array.isArray(data.members)?data.members:[]});})
+      .catch(()=>{if(active)setPlatinumAudit(null);});
+    return()=>{active=false;};
+  },[isOpen,superAdmin]);
   useEffect(()=>{
     if(!initialSummary)return;
     setSummary(prev=>({...initialSummary,transactions:prev?.transactions}));
@@ -221,6 +230,7 @@ export const StickersModal: React.FC<StickersModalProps> = ({isOpen,onClose,curr
           {error && <div role="alert" className="p-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs">{error}</div>}
           {tab==='history' && <><StickerGuideTable currentUser={currentUser} tracks={tracks}/><div className="rounded-2xl p-3 text-white text-center" style={primary}><p className="text-xs">目前可用貼紙</p><p className="text-4xl font-black mt-1">{summary?formatStickerAmount(summary.balance):'—'} 張</p></div><h3 className="font-black">來源與消耗紀錄</h3>{transactions(summary?.transactions || [])}{historyNext && <button type="button" disabled={loading} onClick={()=>void loadHistory(false,true)} className="w-full py-2 rounded-xl border border-slate-200 dark:border-slate-700 disabled:opacity-50">載入更多紀錄</button>}</>}
           {tab==='grant' && canGrant && <div className="space-y-3">
+            {superAdmin && platinumAudit && <section aria-label="白金工具自動補開檢查" className="rounded-2xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30 p-3 text-xs leading-relaxed"><h3 className="font-black text-sm">白金以上功能補開檢查</h3><p className="mt-1">舊規則曾因缺少獎銜核准旗標而被擋住：<strong>{platinumAudit.count} 位</strong>。v201 已按既有正式／舊制獎銜規則自動補開。</p>{platinumAudit.members.length>0 && <p className="mt-1 break-words text-slate-600 dark:text-slate-300">{platinumAudit.members.map(member=>`${member.name}（${member.rank || member.approvedRank || '未標示'}）`).join('、')}</p>}</section>}
             {canCreateDownlineInvite && <section aria-label="綁定成為我下線" className="rounded-2xl border border-slate-200 dark:border-slate-700 p-3 space-y-2 bg-slate-50 dark:bg-slate-800/60">
               <div><h3 className="font-black">綁定成為我下線</h3><p className="text-xs text-slate-500 dark:text-slate-400 mt-1">分享您的專屬網址。已登入會員點開後，系統會依您或夫妻共同事業體的最高已審核獎銜，自動綁定上手白金或上手鑽石。</p></div>
               {currentUser?.amwayId?.trim() ? <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs break-all"><p className="font-bold">直銷商編號：{currentUser.amwayId.trim()}</p>{inviteInfo?.displayName && <p className="text-slate-500 mt-0.5">共同顯示：{inviteInfo.displayName}</p>}{inviteInfo?.url && <p className="text-slate-500 mt-1">{inviteInfo.url}</p>}</div> : <button type="button" onClick={onRequireProfileEdit} className="w-full rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs font-bold text-amber-700 dark:text-amber-300">請先填寫基本資料的「直銷商編號」</button>}

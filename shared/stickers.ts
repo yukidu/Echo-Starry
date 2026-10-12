@@ -39,6 +39,18 @@ export function isPlatinumOrAboveRank(value: unknown): boolean {
   return index >= platinumIndex && platinumIndex >= 0;
 }
 
+export function isPlatinumToolsEligible(member: any): boolean {
+  if (!member) return false;
+  const rankApproved = Boolean(member.rankApproved);
+  const auditStatus = String(member.rankAuditStatus || '').trim().toLowerCase();
+  if (rankApproved) return isPlatinumOrAboveRank(member.approvedRank || member.rank);
+  // A newly requested / changed rank that is explicitly waiting for approval must
+  // not unlock privileged sticker/upline tools. Legacy imported members often have
+  // no audit status; their stored Platinum+ rank is treated as the established rank.
+  if (auditStatus === 'pending') return false;
+  return isPlatinumOrAboveRank(member.approvedRank || member.rank);
+}
+
 export function vipPasswordForTrack(trackId: string): string {
   if (typeof window === 'undefined') return '';
   try {

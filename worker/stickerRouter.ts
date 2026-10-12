@@ -8,6 +8,7 @@ import {
   INITIAL_STICKER_UNITS,
   formatStickerAmount,
   isPlatinumOrAboveRank,
+  isPlatinumToolsEligible,
   normalizeMemberName,
   stickersToUnits,
   unitsToStickers
@@ -78,7 +79,7 @@ async function verifiedActor(request: Request, env: Env) {
   if (!TOKEN_PATTERN.test(token)) return null;
   const tokenHash = await hashToken(token);
   const actor: any = await env.DB.prepare(`
-    SELECT u.id, u.email, u.name, u.role, u.rank, u.approvedRank, u.rankApproved,
+    SELECT u.id, u.email, u.name, u.role, u.rank, u.approvedRank, u.rankApproved, u.rankAuditStatus,
            u.isAdminUser, u.isBlocked, u.canUpload, u.isContributor, u.platinumUpline, u.diamondUpline, s.expiresAt
     FROM auth_sessions s
     JOIN users u ON u.id = s.userId
@@ -99,7 +100,7 @@ function effectiveRank(actor: any) {
 }
 
 function canGrantStickers(actor: any) {
-  return isSuperAdmin(actor) || (Boolean(actor?.rankApproved) && isPlatinumOrAboveRank(effectiveRank(actor)));
+  return isSuperAdmin(actor) || isPlatinumToolsEligible(actor);
 }
 
 function isDownlineOf(target: any, actor: any) {
@@ -1018,6 +1019,20 @@ async function handleStickerApi(request: Request, env: Env, actor: any): Promise
     return json({ success: true, unlocked: true, charged: costStickers, balance: unitsToStickers(balanceUnits) });
   }
 
+
+  if (path === '/api/stickers/platinum-tools-audit' && method === 'GET') {
+    if (!isSuperAdmin(actor)) return json({ error: '只有超級管理員可查看此檢查' }, 403);
+    const { results } = await db.prepare(`SELECT id,name,email,rank,approvedRank,rankApproved,rankAuditStatus
+      FROM users WHERE COALESCE(isBlocked,0)=0 ORDER BY name`).all();
+    const members = (results || []).filter((member: any) => {
+      const oldAllowed = Boolean(member.rankApproved) && isPlatinumOrAboveRank(member.approvedRank || member.rank);
+      return isPlatinumToolsEligible(member) && !oldAllowed;
+    }).map((member: any) => ({
+      id: member.id, name: member.name, email: member.email, rank: member.rank,
+      approvedRank: member.approvedRank, rankApproved: Boolean(member.rankApproved), rankAuditStatus: member.rankAuditStatus
+    }));
+    return json({ count: members.length, members });
+  }
 
   if (path === '/api/stickers/grant-targets' && method === 'GET') {
     if (!canGrantStickers(actor)) return json({ error: '目前獎銜沒有加貼紙權限' }, 403);

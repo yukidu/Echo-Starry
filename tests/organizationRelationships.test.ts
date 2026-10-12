@@ -23,6 +23,7 @@ function database() {
       rank TEXT,
       approvedRank TEXT,
       rankApproved INTEGER DEFAULT 0,
+      rankAuditStatus TEXT,
       role TEXT DEFAULT '一般夥伴',
       isBlocked INTEGER DEFAULT 0,
       registerDate TEXT,
@@ -32,6 +33,7 @@ function database() {
     CREATE TABLE auth_sessions (tokenHash TEXT PRIMARY KEY, userId TEXT, expiresAt INTEGER, createdAt INTEGER);
     CREATE TABLE sticker_transactions (id TEXT PRIMARY KEY,userId TEXT,deltaUnits INTEGER);
     CREATE TABLE upline_owners (kind TEXT NOT NULL,name TEXT NOT NULL,userId TEXT NOT NULL,PRIMARY KEY(kind,name));
+    CREATE TABLE upline_names (kind TEXT NOT NULL,name TEXT NOT NULL,PRIMARY KEY(kind,name));
   `);
   const db:any = {
     sqlite,
@@ -189,4 +191,12 @@ test('organization API supports one-party couple confirmation, dealer-id invite,
   // A member cannot use the shared invite to become their own downline.
   const self=await call(db,ownerToken,'/api/organization/invite-accept','POST',{dealerId:'D500'});
   assert.equal(self.status,400);
+
+  // Platinum+ members can never be bound as downlines, even if an invite is valid.
+  db.sqlite.prepare(`INSERT INTO users(id,name,email,amwayId,rank,approvedRank,rankApproved,rankAuditStatus,registerDate,platinumUpline,diamondUpline)
+    VALUES ('platinumTarget','白金目標','pt@example.com','PT1','白金','白金',1,'approved','2025-05-01','','')`).run();
+  const platinumToken=await session(db,'platinumTarget');
+  const rejected=await call(db,platinumToken,'/api/organization/invite-accept','POST',{dealerId:'D500'});
+  assert.equal(rejected.status,409);
+  assert.match(rejected.data.error,/白金或白金以上/);
 });

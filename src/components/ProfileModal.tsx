@@ -159,6 +159,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [organizationDisplayName,setOrganizationDisplayName] = useState('');
+  const [uplineDirectory,setUplineDirectory] = useState<{platinum:string[];diamond:string[]}>({platinum:[],diamond:[]});
 
   const refreshOrganizationDisplay = async () => {
     if (!currentUser?.id || !currentUser.amwayId?.trim()) { setOrganizationDisplayName(''); return; }
@@ -169,6 +170,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     } catch { /* display falls back to the member's own name */ }
   };
   useEffect(()=>{ if(isOpen && currentUser) void refreshOrganizationDisplay(); },[isOpen,currentUser?.id,currentUser?.name,currentUser?.amwayId]);
+  useEffect(()=>{
+    if(!isOpen || !currentUser){setUplineDirectory({platinum:[],diamond:[]});return;}
+    let active=true;
+    void fetch('/api/organization/upline-suggestions',{credentials:'same-origin',cache:'no-store'})
+      .then(async response=>response.ok ? response.json() : Promise.reject(new Error('upline suggestions unavailable')))
+      .then(data=>{if(active)setUplineDirectory({
+        platinum:Array.isArray(data?.platinum)?data.platinum.map(String).map((name:string)=>name.trim()).filter(Boolean):[],
+        diamond:Array.isArray(data?.diamond)?data.diamond.map(String).map((name:string)=>name.trim()).filter(Boolean):[]
+      });})
+      .catch(()=>{if(active)setUplineDirectory({platinum:[],diamond:[]});});
+    return()=>{active=false;};
+  },[isOpen,currentUser?.id]);
   useEffect(()=>{
     if(!isOpen || !forceEdit || !currentUser)return;
     setName(currentUser.name || '');setAmwayId(currentUser.amwayId || '');setPhone(currentUser.phone || '');setResidence(currentUser.residence || '臺北');setCenter(currentUser.center || '無');setRank(currentUser.rank || '無');setJoinReason(currentUser.joinReason || '事業');setStayReason(currentUser.stayReason || '未填寫');setSponsor(currentUser.sponsor || '');setPlatinumUpline(currentUser.platinumUpline || '');setDiamondUpline(currentUser.diamondUpline || '');setBirthday(currentUser.birthday || '');setAvatar(currentUser.avatar || '');setIsEditing(true);onForceEditHandled?.();
@@ -230,30 +243,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [activeSuggestField, setActiveSuggestField] = useState<'platinum' | 'diamond' | null>(null);
 
   const platinumSuggestions = useMemo(() => {
-    const set = new Set<string>();
-    allUsers.forEach(u => {
-      const rank = effectiveMemberRank(u, '');
-      if (rank && (rank.includes('白金') || rank.includes('翡翠') || rank.includes('鑽石') || rank.includes('皇冠') || rank.includes('大使'))) {
-        set.add(u.name);
-      }
-      if (u.platinumUpline) set.add(u.platinumUpline);
-    });
-
-    return Array.from(set).filter(n => n.toLowerCase().includes((platinumUpline || '').toLowerCase()));
-  }, [allUsers, platinumUpline]);
+    const query=(platinumUpline || '').trim().toLocaleLowerCase('zh-Hant');
+    return uplineDirectory.platinum.filter(name => name.toLocaleLowerCase('zh-Hant').includes(query));
+  }, [uplineDirectory.platinum, platinumUpline]);
 
   const diamondSuggestions = useMemo(() => {
-    const set = new Set<string>();
-    allUsers.forEach(u => {
-      const rank = effectiveMemberRank(u, '');
-      if (rank && (rank.includes('鑽石') || rank.includes('皇冠') || rank.includes('大使'))) {
-        set.add(u.name);
-      }
-      if (u.diamondUpline) set.add(u.diamondUpline);
-    });
-
-    return Array.from(set).filter(n => n.toLowerCase().includes((diamondUpline || '').toLowerCase()));
-  }, [allUsers, diamondUpline]);
+    const query=(diamondUpline || '').trim().toLocaleLowerCase('zh-Hant');
+    return uplineDirectory.diamond.filter(name => name.toLocaleLowerCase('zh-Hant').includes(query));
+  }, [uplineDirectory.diamond, diamondUpline]);
 
   const handleExportCard = async () => {
     if (!currentUser || isExportingCard) return;

@@ -29,6 +29,7 @@ button[data-main-menu='hamburger']:active {
   background: transparent;
   color: rgb(51 65 85);
   font-size: 0.875rem;
+  line-height: 1.25rem;
   font-weight: 700;
   text-align: left;
   cursor: pointer;
