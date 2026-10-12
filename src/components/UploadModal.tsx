@@ -1310,39 +1310,42 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               />
             </div>
 
-            {/* 瀏覽清單可見性 */}
-            <div data-upload-guest-visibility="true" className="sm:col-span-2 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                <label className={`flex items-center gap-2 font-bold ${authorizedOnlyVisible ? 'text-slate-400 cursor-not-allowed' : 'text-slate-700 dark:text-slate-300'}`}>
-                  <input type="checkbox" checked={guestVisible} disabled={authorizedOnlyVisible} onChange={event => setGuestVisible(event.target.checked)} />
-                  訪客可見
+            {/* 瀏覽權限與首頁可見性：同一個 React 容器內自然垂直排列，避免 CSS grid 疊位 */}
+            <div data-upload-permission="1" className="sm:col-span-2 rounded-xl border border-slate-200 dark:border-slate-700 p-3 space-y-4">
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  瀏覽權限最低門檻獎銜（含該獎銜以上皆可收聽）
                 </label>
-                <label className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
-                  <input type="checkbox" checked={authorizedOnlyVisible} onChange={event => { const checked = event.target.checked; setAuthorizedOnlyVisible(checked); if (checked) setGuestVisible(false); }} />
-                  只對有權限者顯示(從首頁隱藏)
-                </label>
+                <ThemedSelect
+                  value={requiredRank}
+                  onChange={e => setRequiredRank(e.target.value as AmwayRank)}
+                  className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-hidden focus:border-rose-400"
+                >
+                  {!['無', '3%', '9%', '15%', '銀章', '白金', '翡翠', '鑽石級以上'].includes(requiredRank) && <option value={requiredRank}>{requiredRank}</option>}
+                  <option value="無">公開</option>
+                  <option value="3%">3%</option>
+                  <option value="9%">9%</option>
+                  <option value="15%">15%</option>
+                  <option value="銀章">銀章</option>
+                  <option value="白金">白金級</option>
+                  <option value="翡翠">翡翠級</option>
+                  <option value="鑽石級以上">鑽石級</option>
+                </ThemedSelect>
               </div>
-              <p className="mt-1 text-xs text-slate-500">勾選「只對有權限者顯示(從首頁隱藏)」後，未達瀏覽權限的會員與所有訪客都不會在首頁看到此音檔；「訪客可見」會自動取消並鎖定。</p>
-            </div>
-            <div>
-              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                瀏覽權限最低門檻獎銜（含該獎銜以上皆可收聽）
-              </label>
-              <ThemedSelect
-                value={requiredRank}
-                onChange={e => setRequiredRank(e.target.value as AmwayRank)}
-                className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-hidden focus:border-rose-400"
-              >
-                {!['無', '3%', '9%', '15%', '銀章', '白金', '翡翠', '鑽石級以上'].includes(requiredRank) && <option value={requiredRank}>{requiredRank}</option>}
-                <option value="無">公開</option>
-                <option value="3%">3%</option>
-                <option value="9%">9%</option>
-                <option value="15%">15%</option>
-                <option value="銀章">銀章</option>
-                <option value="白金">白金級</option>
-                <option value="翡翠">翡翠級</option>
-                <option value="鑽石級以上">鑽石級</option>
-              </ThemedSelect>
+
+              <div data-upload-guest-visibility="true" className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                <div className="grid grid-cols-1 gap-3">
+                  <label className={`flex items-center gap-2 font-bold ${authorizedOnlyVisible ? 'text-slate-400 cursor-not-allowed' : 'text-slate-700 dark:text-slate-300 cursor-pointer'}`}>
+                    <input type="checkbox" checked={guestVisible} disabled={authorizedOnlyVisible} onChange={event => setGuestVisible(event.target.checked)} />
+                    訪客可見
+                  </label>
+                  <label className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                    <input type="checkbox" checked={authorizedOnlyVisible} onChange={event => { const checked = event.target.checked; setAuthorizedOnlyVisible(checked); if (checked) setGuestVisible(false); }} />
+                    只對有權限者顯示(從首頁隱藏)
+                  </label>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">勾選「只對有權限者顯示(從首頁隱藏)」後，未達瀏覽權限的會員與所有訪客都不會在首頁看到此音檔；「訪客可見」會自動取消並鎖定。</p>
+              </div>
             </div>
 
             {/* Requirement 6: 私秘VIP 獨立選項 */}
