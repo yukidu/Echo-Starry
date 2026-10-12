@@ -1,8 +1,9 @@
-import appWorker from './v192TrackVisibilityRouter';
+import appWorker from './favoriteRouter';
 import hiddenTrackWorker from './hiddenTrackRouter';
 import sessionWorker from './sessionCookieRouter';
 import iosGoogleRedirectWorker from './iosGoogleRedirectRouter';
 import { handleStarbeautySso } from './starbeautySsoRouter';
+import { handleV192TrackVisibility } from './v192TrackVisibilityRouter';
 import type { Env } from './index';
 import { unitsToStickers } from '../shared/stickers';
 
@@ -243,6 +244,11 @@ export default {
     }
 
     const appRequest = await rewriteNoopTrackEditRequest(request);
-    return withPrivacyHeaders(await appWorker.fetch(appRequest, env));
+    const response = await handleV192TrackVisibility(
+      appRequest,
+      env,
+      (nextRequest, nextEnv) => appWorker.fetch(nextRequest, nextEnv)
+    );
+    return withPrivacyHeaders(response);
   }
 };
