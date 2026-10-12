@@ -26,6 +26,7 @@ jobs:
           echo $? > diagnostics/lint.exit
           npm run build > diagnostics/build.txt 2>&1
           echo $? > diagnostics/build.exit
+          shopt -s nullglob
           for test_file in tests/*.mjs; do
             test_name="$(basename "$test_file" .mjs)"
             node "$test_file" > "diagnostics/${test_name}.txt" 2>&1
