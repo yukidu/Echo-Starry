@@ -34,8 +34,8 @@ test('v182 dislike resolves exact track.speaker from the tracks API, never from 
   assert.doesNotMatch(client, /再次確認|真的不喜歡演講者/);
 });
 
-test('v182 dislike uses one site-styled confirmation and never mentions hiding', () => {
-  assert.match(client, /label\.textContent\s*=\s*'不喜歡'/);
+test('v201 dislike uses requested 「不喜歡他」 copy, one site-styled confirmation and never mentions hiding', () => {
+  assert.match(client, /label\.textContent\s*=\s*'不喜歡他'/);
   assert.doesNotMatch(client, /window\.confirm/);
   assert.equal((client.match(/styledDislikeConfirm\(/g) || []).length, 2);
   assert.match(client, /v181-confirm-card/);
