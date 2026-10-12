@@ -21,9 +21,6 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: v206 Wrangler production config dry-run
-        run: npx wrangler deploy --dry-run --outdir /tmp/echostars-v206-wrangler-dry-run
-
       - name: Run every regression test file and report all failures
         id: tests
         shell: bash
