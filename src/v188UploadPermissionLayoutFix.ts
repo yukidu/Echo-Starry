@@ -1,10 +1,12 @@
 const LEGACY_STYLE_ID = 'echostars-v188-upload-permission-layout-fix';
 const PREVIOUS_STYLE_ID = 'echostars-v188b-upload-permission-layout-fix';
-const STYLE_ID = 'echostars-v188c-upload-permission-layout-fix';
+const PREVIOUS_STYLE_ID_C = 'echostars-v188c-upload-permission-layout-fix';
+const STYLE_ID = 'echostars-v188d-upload-permission-layout-fix';
 
 // Remove older v188 attempts if an already-open PWA tab still has them in memory.
 document.getElementById(LEGACY_STYLE_ID)?.remove();
 document.getElementById(PREVIOUS_STYLE_ID)?.remove();
+document.getElementById(PREVIOUS_STYLE_ID_C)?.remove();
 
 let style = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
 if (!style) {
@@ -15,10 +17,10 @@ if (!style) {
 
 style.textContent = `
   /*
-   * v188c: 瀏覽權限與兩個可見性勾選功能必須是彼此獨立的版面區域。
+   * v188d: 瀏覽權限與兩個可見性勾選功能必須是彼此獨立的版面區域。
    * 舊 presentation policy 會把欄位 grid 攤平；這裡明確指定各自的 grid row，
-   * 並把勾選區內部改成直向排列。手機版額外加入實際垂直留白，
-   * 確保第一個 checkbox 不會再侵入 select 的邊框／點擊範圍。
+   * 並把勾選區內部改成直向排列。手機版額外用真正的 margin 分隔兩個 grid item，
+   * 不只是在 select 內加 padding，確保第一個 checkbox 不會侵入 select 邊框。
    */
   #track-upload-form[data-upload-presentation="1"] [data-upload-permission="1"] {
     grid-column: 5 / 7 !important;
@@ -116,7 +118,7 @@ style.textContent = `
       grid-column: 1 / -1 !important;
       grid-row: 5 !important;
       width: 100% !important;
-      padding-bottom: .9rem !important;
+      padding-bottom: 0 !important;
       box-sizing: border-box !important;
     }
 
@@ -124,7 +126,8 @@ style.textContent = `
       grid-column: 1 / -1 !important;
       grid-row: 6 !important;
       width: 100% !important;
-      padding-top: .35rem !important;
+      margin-top: 1.25rem !important;
+      padding-top: 0 !important;
       box-sizing: border-box !important;
     }
 
