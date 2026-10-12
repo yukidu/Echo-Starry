@@ -271,7 +271,7 @@ async function handleDislike(card: HTMLElement, button: HTMLButtonElement) {
     window.alert(error instanceof Error ? error.message : '設定失敗，請稍後再試。');
   } finally {
     button.disabled = false;
-    if (label) label.textContent = '不喜歡';
+    if (label) label.textContent = '不喜歡他';
   }
 }
 
@@ -295,7 +295,7 @@ function installDislikeButton(card: HTMLElement) {
   button.dataset.v181Dislike = 'true';
   button.append(dislikeIcon());
   const label = document.createElement('span');
-  label.textContent = '不喜歡';
+  label.textContent = '不喜歡他';
   button.append(label);
   button.addEventListener('click', event => {
     event.preventDefault();

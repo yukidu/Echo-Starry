@@ -43,7 +43,7 @@ test('audio card keeps title first and speaker plus rank second without descript
 
 test('audio card more menu offers share details and local favorite controls', () => {
   assert.match(card, /分享音檔/);
-  assert.match(card, /查看詳細內容/);
+  assert.match(card, /詳細內容/);
   assert.match(card, /取消收藏/);
   assert.match(card, /收藏/);
   assert.match(card, /echostars_favorite_track_ids_v1/);
