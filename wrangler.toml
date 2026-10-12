@@ -1,6 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/privacyCrawlerRouter.ts"
+main = "worker/audioEditSaveGuardRouter.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
@@ -17,8 +17,8 @@ command = "npm run build"
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# 所有請求先經過 privacyCrawlerRouter，才能對首頁、分享頁、靜態資源與 API
-# 一致套用 X-Robots-Tag，並阻擋已知搜尋引擎／AI crawler。
+# 所有請求先經過 audioEditSaveGuardRouter，再轉入 privacyCrawlerRouter；
+# 因此首頁、分享頁、靜態資源與 API 仍一致套用 X-Robots-Tag 與 crawler 阻擋。
 run_worker_first = ["/*"]
 
 # 1. Cloudflare D1 資料庫 (SQLite)
