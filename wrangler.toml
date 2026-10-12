@@ -4,9 +4,20 @@ main = "worker/privacyCrawlerRouter.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
+# 保留原本 workers.dev 正式備援入口與 PR Preview URL。
+# Wrangler 在設定 routes 後可能關閉 workers.dev，因此這裡明確保持開啟。
+workers_dev = true
+preview_urls = true
+
 # Pull request previews are intentionally isolated from production resources.
 # Storage bindings are omitted here so preview branches cannot read/write production D1, KV or R2.
 previews = { }
+
+# 正式自訂網域：Cloudflare Workers Custom Domain。
+# Cloudflare 會自動建立 DNS 與 SSL 憑證。
+[[routes]]
+pattern = "echo.starry.phd"
+custom_domain = true
 
 # 保留原本 Cloudflare 建置流程；回歸測試由 GitHub Actions 額外把關。
 [build]
