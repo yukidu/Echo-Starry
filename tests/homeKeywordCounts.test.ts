@@ -4,20 +4,22 @@ import { readFileSync } from 'node:fs';
 
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 
-test('home keyword drawer explains multi-select and uses larger keyword text', () => {
+test('advanced filter drawer explains keyword multi-select and uses readable keyword text', () => {
+  assert.match(app, /進階篩選/);
   assert.match(app, /網友關鍵字/);
   assert.match(app, /\(可複選多個\)/);
-  assert.match(app, /text-\[9px\]/);
+  assert.match(app, /text-\[11px\]/);
   assert.match(app, /px-2 py-1 rounded-lg text-sm font-normal/);
   assert.match(app, /\{kw\}\(\{keywordMatchCounts\[kw\] \?\? 0\}\)/);
 });
 
-test('keyword counts are computed from the same home filters and update with selected intersections', () => {
+test('keyword counts are computed from the same home filters, badge filter, and selected intersections', () => {
   assert.match(app, /const keywordMatchCounts = useMemo/);
+  assert.match(app, /normalizeSpeakerRankForBadge\(track\.speakerRank \|\| ''\) === selectedBadgeSpeakerRank/);
   assert.match(app, /trackMatchesHomeBaseFilters\(track, selectedCategory, selectedSpeakerRank, searchQuery\)/);
   assert.match(app, /selectedKeywords\.includes\(keyword\)/);
   assert.match(app, /activeKeywords\.every\(activeKeyword => trackMatchesHomeKeyword\(track, activeKeyword\)\)/);
-  assert.match(app, /\[tracks, allAvailableKeywords, selectedCategory, selectedSpeakerRank, selectedKeywords, searchQuery\]/);
+  assert.match(app, /\[tracks, allAvailableKeywords, selectedCategory, selectedSpeakerRank, selectedBadgeSpeakerRank, selectedKeywords, searchQuery\]/);
 });
 
 test('the playlist and keyword counters share one keyword matching rule', () => {
@@ -35,10 +37,11 @@ test('zero-result keyword choices disappear while selected chips remain removabl
   assert.match(app, /selectedKeywords\.map\(kw =>/);
 });
 
-test('keyword controls use consistent readable sizing and the heading owns expand/collapse without a close button', () => {
+test('advanced filter controls use consistent readable sizing and the heading owns expand/collapse without a close button', () => {
+  assert.match(app, /進階篩選/);
   assert.match(app, /網友關鍵字/);
   assert.match(app, /\(可複選多個\)/);
-  assert.match(app, /text-\[9px\]/);
+  assert.match(app, /text-\[11px\]/);
   assert.match(app, />\s*重設\s*<\/button>/);
   assert.match(app, /showKeywordsDrawer \? '▲收起' : '▼展開'/);
   assert.match(app, /aria-expanded=\{showKeywordsDrawer\}/);

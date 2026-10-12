@@ -6,12 +6,13 @@ const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const detail = readFileSync(new URL('../src/components/DetailView.tsx', import.meta.url), 'utf8');
 const card = readFileSync(new URL('../src/components/AudioCard.tsx', import.meta.url), 'utf8');
 
-test('home keyword heading owns expand and collapse state without drawer X', () => {
+test('home advanced-filter heading owns expand and collapse state without drawer X', () => {
   assert.match(app, /按此/);
   assert.match(app, /showKeywordsDrawer \? '▲收起' : '▼展開'/);
+  assert.match(app, /進階篩選/);
   assert.match(app, /網友關鍵字/);
   assert.match(app, /\(可複選多個\)/);
-  assert.match(app, /text-\[9px\]/);
+  assert.match(app, /text-\[11px\]/);
   assert.doesNotMatch(app, /aria-label=\"收起網友關鍵字\"/);
 });
 
