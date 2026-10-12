@@ -28,6 +28,10 @@ import './v189PlaybackSwitchConfirm';
   }
 }
 
+// Share pages embed the real track id in HTML metadata. Temporarily expose it
+// through the existing ?track bootstrap contract, then restore the exact
+// original query string. The exact restoration matters for VIP links whose
+// password is intentionally a bare query such as ?1234 rather than ?p=1234.
 const embeddedShareTrack = document
   .querySelector<HTMLMetaElement>('meta[name="echostars-share-track"]')
   ?.content.trim();
@@ -48,6 +52,13 @@ if (embeddedShareTrack && window.location.pathname.startsWith('/share/')) {
   }
 }
 
+/*
+ * Playback policy: entering/opening a detail page must never start audio by
+ * itself. App.tsx has a few historical bootstrap paths that can still call
+ * HTMLMediaElement.play() while opening a shared track, so enforce the rule at
+ * the single browser-media boundary instead of adding more route-specific
+ * patches. Only an explicit playback control grants the next play() call.
+ */
 const nativeMediaPlay = HTMLMediaElement.prototype.play;
 let explicitPlaybackIntentUntil = 0;
 
@@ -64,6 +75,8 @@ function isPlaybackControl(target: EventTarget | null) {
 
 function rememberPlaybackIntent(target: EventTarget | null) {
   if (isPlaybackControl(target)) {
+    // Keep the intent alive long enough for permission/sticker confirmation
+    // dialogs; it is consumed by the next play() call.
     explicitPlaybackIntentUntil = performance.now() + 30_000;
   }
 }
@@ -85,6 +98,8 @@ function syncBlockedAutoplayUi(media: HTMLMediaElement, attempt = 0) {
     'button[aria-label="暫停播放"], button[title="點擊照片暫停"]'
   );
   if (pauseButton) {
+    // App.tsx historically marks a rejected play() as playing. Use its own
+    // pause control once to bring React state back in line with the real media.
     pauseButton.click();
     return;
   }
@@ -106,6 +121,10 @@ HTMLMediaElement.prototype.play = function manualPlaybackOnly() {
 };
 
 if ('serviceWorker' in navigator) {
+  // PWA updates are intentionally silent:
+  // the browser downloads/activates the newest worker in the background,
+  // and the new app version is picked up on the user's next natural reload/reopen.
+  // Never interrupt playback or browsing with an update confirmation dialog.
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(error => {
       console.warn('Service worker registration failed:', error);
