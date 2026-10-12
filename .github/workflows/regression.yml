@@ -43,6 +43,7 @@ jobs:
             else
               failed=1
               echo "FAIL: ${test_file} (exit ${status})"
+              echo "::error file=${test_file},title=Regression test failed::${test_file} exited with ${status}"
             fi
           done
           echo ""
