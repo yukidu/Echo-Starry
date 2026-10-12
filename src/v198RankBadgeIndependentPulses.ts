@@ -1,5 +1,6 @@
-const TARGET_CONTOUR_LIGHTS = 23;
+const TARGET_CONTOUR_LIGHTS = 12;
 const SYNC_INTERVAL_MS = 650;
+const DOT_SIZE_MULTIPLIER = 1.5;
 
 const runtime = window as Window & typeof globalThis & {
   __ECHOSTARS_V198_RANK_BADGE_INDEPENDENT_PULSES__?: boolean;
@@ -16,35 +17,67 @@ type PulseSpec = {
   peakStart: number;
   brightHoldEnd: number;
   fadeEnd: number;
+  easing: string;
 };
 
-function fractional(value: number) {
-  return value - Math.floor(value);
+function randomUnit() {
+  try {
+    if (globalThis.crypto?.getRandomValues) {
+      const buffer = new Uint32Array(1);
+      globalThis.crypto.getRandomValues(buffer);
+      return buffer[0] / 0x100000000;
+    }
+  } catch {
+    // fallback below
+  }
+  return Math.random();
 }
 
-function deterministicUnit(index: number, salt: number) {
-  return fractional(Math.sin((index + 1) * (12.9898 + salt * 19.19)) * 43758.5453);
+function randomBetween(min: number, max: number) {
+  return min + (max - min) * randomUnit();
 }
 
-function pulseFor(index: number): PulseSpec {
-  // 每顆光點除了總週期不同，連「暗多久、變亮多久、亮多久、變暗多久」都各自不同。
-  const duration = 4.7 + index * 0.29 + deterministicUnit(index, 1) * 0.08;
-  const darkHoldEnd = 0.08 + deterministicUnit(index, 7) * 0.18;
-  const peakStart = Math.min(0.50, darkHoldEnd + 0.10 + deterministicUnit(index, 8) * 0.14);
-  const brightHoldEnd = Math.min(0.78, peakStart + 0.07 + deterministicUnit(index, 9) * 0.16);
-  const fadeEnd = Math.min(0.96, brightHoldEnd + 0.10 + deterministicUnit(index, 10) * 0.16);
+function createUniqueDuration(usedDurations: Set<number>) {
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    const candidate = randomBetween(3.8, 12.8);
+    const collides = [...usedDurations].some(existing => Math.abs(existing - candidate) < 0.18);
+    if (!collides) {
+      usedDurations.add(candidate);
+      return candidate;
+    }
+  }
+
+  const fallback = 4.1 + usedDurations.size * 0.67 + randomBetween(-0.08, 0.08);
+  usedDurations.add(fallback);
+  return fallback;
+}
+
+function createStrongRandomPulse(usedDurations: Set<number>): PulseSpec {
+  const duration = createUniqueDuration(usedDurations);
+  const darkHoldEnd = randomBetween(0.04, 0.27);
+  const peakStart = Math.min(0.56, darkHoldEnd + randomBetween(0.08, 0.24));
+  const brightHoldEnd = Math.min(0.80, peakStart + randomBetween(0.04, 0.20));
+  const fadeEnd = Math.min(0.96, brightHoldEnd + randomBetween(0.10, 0.30));
+  const easings = [
+    'linear',
+    'cubic-bezier(.22,.68,.36,1)',
+    'cubic-bezier(.37,0,.63,1)',
+    'cubic-bezier(.16,1,.3,1)',
+    'cubic-bezier(.65,0,.35,1)'
+  ];
 
   return {
-    size: 1.9 + deterministicUnit(index, 2) * 1.25,
+    size: randomBetween(1.9, 3.15) * DOT_SIZE_MULTIPLIER,
     duration,
-    delay: -(0.35 + index * 0.41 + deterministicUnit(index, 3) * 0.28),
-    min: 0.04 + deterministicUnit(index, 4) * 0.14,
-    max: 0.62 + deterministicUnit(index, 5) * 0.34,
-    scale: 1.08 + deterministicUnit(index, 6) * 0.38,
+    delay: -randomBetween(0.12, Math.max(0.4, duration * 0.94)),
+    min: randomBetween(0.02, 0.17),
+    max: randomBetween(0.68, 1),
+    scale: randomBetween(1.12, 1.58),
     darkHoldEnd,
     peakStart,
     brightHoldEnd,
-    fadeEnd
+    fadeEnd,
+    easing: easings[Math.floor(randomUnit() * easings.length)] || 'linear'
   };
 }
 
@@ -57,8 +90,14 @@ function chooseEvenlySpacedIndices(sourceCount: number, targetCount: number) {
   return keep;
 }
 
-function applyTrueIndependentPulse(light: HTMLElement, index: number) {
-  const pulse = pulseFor(index);
+function applyStrongRandomPulse(light: HTMLElement, usedDurations: Set<number>) {
+  const existingDuration = Number(light.dataset.v200PulseDuration || '');
+  if (light.dataset.v200StrongRandomPulse === '1' && Number.isFinite(existingDuration)) {
+    usedDurations.add(existingDuration);
+    return;
+  }
+
+  const pulse = createStrongRandomPulse(usedDurations);
   light.style.setProperty('--contour-size', `${pulse.size.toFixed(3)}px`);
   light.style.setProperty('--contour-duration', `${pulse.duration.toFixed(3)}s`);
   light.style.setProperty('--contour-delay', `${pulse.delay.toFixed(3)}s`);
@@ -66,10 +105,6 @@ function applyTrueIndependentPulse(light: HTMLElement, index: number) {
   light.style.setProperty('--contour-max', pulse.max.toFixed(3));
   light.style.setProperty('--contour-scale', pulse.scale.toFixed(3));
 
-  if (light.dataset.v199TrueIndependentPulse === '1') return;
-
-  // v198 只改 CSS 變數，視覺上仍可能因共用同一組 keyframes 而看起來同步。
-  // v199 直接替每一顆建立自己的 Web Animations 時間軸與不同相位，徹底解除同步。
   light.getAnimations().forEach(animation => animation.cancel());
   light.style.animation = 'none';
 
@@ -83,8 +118,8 @@ function applyTrueIndependentPulse(light: HTMLElement, index: number) {
       {
         offset: 0,
         opacity: String(minOpacity),
-        filter: 'brightness(.90)',
-        transform: 'translate(-50%, -50%) scale(.72)'
+        filter: 'brightness(.88)',
+        transform: 'translate(-50%, -50%) scale(.70)'
       },
       {
         offset: pulse.darkHoldEnd,
@@ -95,44 +130,47 @@ function applyTrueIndependentPulse(light: HTMLElement, index: number) {
       {
         offset: pulse.peakStart,
         opacity: String(maxOpacity),
-        filter: 'brightness(1.34)',
+        filter: 'brightness(1.38)',
         transform: `translate(-50%, -50%) scale(${pulse.scale.toFixed(3)})`
       },
       {
         offset: pulse.brightHoldEnd,
-        opacity: String(Math.max(minOpacity, maxOpacity * 0.84)),
+        opacity: String(Math.max(minOpacity, maxOpacity * randomBetween(0.72, 0.92))),
         filter: 'brightness(1.18)',
-        transform: `translate(-50%, -50%) scale(${Math.max(1, pulse.scale * 0.93).toFixed(3)})`
+        transform: `translate(-50%, -50%) scale(${Math.max(1, pulse.scale * randomBetween(0.86, 0.96)).toFixed(3)})`
       },
       {
         offset: pulse.fadeEnd,
-        opacity: String(Math.min(maxOpacity, minOpacity + 0.035)),
-        filter: 'brightness(.96)',
-        transform: 'translate(-50%, -50%) scale(.78)'
+        opacity: String(Math.min(maxOpacity, minOpacity + randomBetween(0.02, 0.06))),
+        filter: 'brightness(.95)',
+        transform: 'translate(-50%, -50%) scale(.77)'
       },
       {
         offset: 1,
         opacity: String(minOpacity),
-        filter: 'brightness(.90)',
-        transform: 'translate(-50%, -50%) scale(.72)'
+        filter: 'brightness(.88)',
+        transform: 'translate(-50%, -50%) scale(.70)'
       }
     ], {
       duration: durationMs,
       delay: pulse.delay * 1000,
       iterations: Infinity,
-      easing: 'linear',
+      easing: pulse.easing,
       fill: 'both'
     });
   }
 
   light.dataset.v198IndependentPulse = '1';
   light.dataset.v199TrueIndependentPulse = '1';
-  light.dataset.v199PulseTiming = [
+  light.dataset.v200StrongRandomPulse = '1';
+  light.dataset.v200PulseDuration = pulse.duration.toFixed(6);
+  light.dataset.v200PulseTiming = [
     pulse.duration.toFixed(3),
     pulse.darkHoldEnd.toFixed(3),
     pulse.peakStart.toFixed(3),
     pulse.brightHoldEnd.toFixed(3),
-    pulse.fadeEnd.toFixed(3)
+    pulse.fadeEnd.toFixed(3),
+    pulse.delay.toFixed(3)
   ].join(':');
 }
 
@@ -146,18 +184,35 @@ function reduceContourLights(layer: HTMLElement) {
   }
 
   const survivors = Array.from(layer.querySelectorAll<HTMLElement>('.v195-rank-badge-contour-light'));
-  survivors.forEach(applyTrueIndependentPulse);
+  const usedDurations = new Set<number>();
+  survivors.forEach(light => {
+    const existingDuration = Number(light.dataset.v200PulseDuration || '');
+    if (Number.isFinite(existingDuration)) usedDurations.add(existingDuration);
+  });
+  survivors.forEach(light => applyStrongRandomPulse(light, usedDurations));
 
   layer.dataset.v198ContourLightCount = String(survivors.length);
   layer.dataset.v199PulseMode = 'per-dot-waapi-timeline';
+  layer.dataset.v200PulseMode = 'crypto-random-per-dot-waapi';
 }
 
 function reduceSvgFallback(svg: SVGElement) {
-  // SVG fallback 的 pattern 複製無法讓每個實例擁有獨立時間軸；正式站同源圖片會走 Canvas 主路徑。
-  // 備援仍維持減半密度，避免退回密集同步閃爍。
-  const dots = Array.from(svg.querySelectorAll<SVGElement>('.v195-rank-badge-contour-svg-dot'));
+  const dots = Array.from(svg.querySelectorAll<SVGCircleElement>('.v195-rank-badge-contour-svg-dot'));
   dots.slice(1).forEach(dot => dot.remove());
+  dots.slice(0, 1).forEach(dot => {
+    const radius = Number(dot.getAttribute('r') || '1');
+    dot.setAttribute('r', String(radius * DOT_SIZE_MULTIPLIER));
+  });
+
+  const pattern = svg.querySelector<SVGPatternElement>('pattern');
+  if (pattern) {
+    // v199 fallback 約為 11x11 的單點 pattern；邊長乘 sqrt(2) 可把面積密度再減半。
+    pattern.setAttribute('width', '15.56');
+    pattern.setAttribute('height', '15.56');
+  }
+
   svg.setAttribute('data-v198-contour-light-density', 'half');
+  svg.setAttribute('data-v200-contour-light-density', 'quarter-of-v197');
 }
 
 function syncIndependentPulses() {
@@ -169,6 +224,7 @@ if (!runtime.__ECHOSTARS_V198_RANK_BADGE_INDEPENDENT_PULSES__) {
   runtime.__ECHOSTARS_V198_RANK_BADGE_INDEPENDENT_PULSES__ = true;
   document.documentElement.setAttribute('data-echostars-v198-rank-badge-independent-pulses', 'true');
   document.documentElement.setAttribute('data-echostars-v199-rank-badge-true-independent-pulses', 'true');
+  document.documentElement.setAttribute('data-echostars-v200-rank-badge-strong-random-pulses', 'true');
   syncIndependentPulses();
   window.setInterval(syncIndependentPulses, SYNC_INTERVAL_MS);
   window.addEventListener('focus', syncIndependentPulses);
