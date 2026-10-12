@@ -91,9 +91,10 @@ function chooseEvenlySpacedIndices(sourceCount: number, targetCount: number) {
 }
 
 function applyStrongRandomPulse(light: HTMLElement, usedDurations: Set<number>) {
-  const existingDuration = Number(light.dataset.v200PulseDuration || '');
-  if (light.dataset.v200StrongRandomPulse === '1' && Number.isFinite(existingDuration)) {
-    usedDurations.add(existingDuration);
+  const storedDuration = light.dataset.v200PulseDuration;
+  if (light.dataset.v200StrongRandomPulse === '1' && storedDuration) {
+    const existingDuration = Number(storedDuration);
+    if (Number.isFinite(existingDuration)) usedDurations.add(existingDuration);
     return;
   }
 
@@ -186,7 +187,9 @@ function reduceContourLights(layer: HTMLElement) {
   const survivors = Array.from(layer.querySelectorAll<HTMLElement>('.v195-rank-badge-contour-light'));
   const usedDurations = new Set<number>();
   survivors.forEach(light => {
-    const existingDuration = Number(light.dataset.v200PulseDuration || '');
+    const storedDuration = light.dataset.v200PulseDuration;
+    if (!storedDuration) return;
+    const existingDuration = Number(storedDuration);
     if (Number.isFinite(existingDuration)) usedDurations.add(existingDuration);
   });
   survivors.forEach(light => applyStrongRandomPulse(light, usedDurations));
@@ -197,6 +200,8 @@ function reduceContourLights(layer: HTMLElement) {
 }
 
 function reduceSvgFallback(svg: SVGElement) {
+  if (svg.getAttribute('data-v200-fallback-tuned') === '1') return;
+
   const dots = Array.from(svg.querySelectorAll<SVGCircleElement>('.v195-rank-badge-contour-svg-dot'));
   dots.slice(1).forEach(dot => dot.remove());
   dots.slice(0, 1).forEach(dot => {
@@ -213,6 +218,7 @@ function reduceSvgFallback(svg: SVGElement) {
 
   svg.setAttribute('data-v198-contour-light-density', 'half');
   svg.setAttribute('data-v200-contour-light-density', 'quarter-of-v197');
+  svg.setAttribute('data-v200-fallback-tuned', '1');
 }
 
 function syncIndependentPulses() {
