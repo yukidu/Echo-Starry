@@ -1,0 +1,48 @@
+@keyframes v190-rank-badge-bob {
+  0%, 100% { transform: translateY(0) scale(1); }
+  45% { transform: translateY(-6px) scale(1.045); }
+  65% { transform: translateY(-2px) scale(1.015); }
+}
+
+@keyframes v190-rank-badge-sparkle {
+  0%, 100% { opacity: .15; transform: scale(.55) rotate(0deg); }
+  35% { opacity: 1; transform: scale(1.18) rotate(22deg); }
+  62% { opacity: .45; transform: scale(.8) rotate(40deg); }
+}
+
+.v190-rank-badge-motion {
+  position: relative;
+  display: grid;
+  place-items: center;
+  animation: v190-rank-badge-bob 2.1s ease-in-out infinite;
+  filter: drop-shadow(0 8px 12px rgba(15, 23, 42, .24));
+  transform-origin: 50% 70%;
+}
+
+.v190-rank-badge-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.v190-rank-badge-sparkle {
+  position: absolute;
+  z-index: 2;
+  color: #fff7c2;
+  text-shadow: 0 0 6px #fff, 0 0 12px rgba(250, 204, 21, .95);
+  line-height: 1;
+  pointer-events: none;
+  animation: v190-rank-badge-sparkle 1.55s ease-in-out infinite;
+}
+
+.v190-rank-badge-sparkle--one { top: -7px; right: -5px; font-size: 18px; animation-delay: 0s; }
+.v190-rank-badge-sparkle--two { bottom: 1px; left: -7px; font-size: 13px; animation-delay: .5s; }
+.v190-rank-badge-sparkle--three { top: 28%; left: -10px; font-size: 9px; animation-delay: .92s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .v190-rank-badge-motion,
+  .v190-rank-badge-sparkle {
+    animation-duration: 4.5s;
+  }
+}

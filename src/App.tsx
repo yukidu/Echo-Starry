@@ -8,6 +8,7 @@ import { IOSInstallPage } from './components/IOSInstallPage';
 import { StickerSpendDialog } from './components/StickerSpendDialog';
 import { vipPasswordForTrack } from '../shared/stickers';
 import { baseSpeakerRank, effectiveMemberRank } from './utils/ranks';
+import { normalizeSpeakerRankForBadge } from './utils/speakerRankBadge';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -487,6 +488,7 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState<string>('全部');
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [selectedSpeakerRank, setSelectedSpeakerRank] = useState<string>('全部');
+  const [selectedBadgeSpeakerRank, setSelectedBadgeSpeakerRank] = useState<string>('');
   const [isSpeakerRankDropdownOpen, setIsSpeakerRankDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -2015,6 +2017,7 @@ export default function App() {
   // For a selected keyword, show the current intersection result count.
   const keywordMatchCounts = useMemo(() => {
     const baseTracks = (Array.isArray(tracks) ? tracks : []).filter(track =>
+      (!selectedBadgeSpeakerRank || normalizeSpeakerRankForBadge(track.speakerRank || '') === selectedBadgeSpeakerRank) &&
       trackMatchesHomeBaseFilters(track, selectedCategory, selectedSpeakerRank, searchQuery)
     );
 
@@ -2027,7 +2030,7 @@ export default function App() {
       ).length;
       return counts;
     }, {});
-  }, [tracks, allAvailableKeywords, selectedCategory, selectedSpeakerRank, selectedKeywords, searchQuery]);
+  }, [tracks, allAvailableKeywords, selectedCategory, selectedSpeakerRank, selectedBadgeSpeakerRank, selectedKeywords, searchQuery]);
 
   // Hide zero-result keyword choices; keep selected chips removable.
   const visibleAvailableKeywords = useMemo(() => allAvailableKeywords.filter(keyword => (keywordMatchCounts[keyword] ?? 0) > 0), [allAvailableKeywords, keywordMatchCounts]);
@@ -2040,6 +2043,7 @@ export default function App() {
     const filtered = trackList.filter(t => {
       if (!canAppearInHomeForViewer(t, Boolean(currentUser), checkCanAccess(t))) return false;
       if (!currentUser && !isVisibleOnGuestHome(t)) return false;
+      if (selectedBadgeSpeakerRank && normalizeSpeakerRankForBadge(t.speakerRank || '') !== selectedBadgeSpeakerRank) return false;
       if (!trackMatchesHomeBaseFilters(t, selectedCategory, selectedSpeakerRank, searchQuery)) return false;
       if (selectedKeywords.length > 0 && !selectedKeywords.every(keyword => trackMatchesHomeKeyword(t, keyword))) return false;
       return true;
@@ -2100,6 +2104,7 @@ export default function App() {
     tracks,
     selectedCategory,
     selectedSpeakerRank,
+    selectedBadgeSpeakerRank,
     selectedKeywords,
     searchQuery,
     sortField,
@@ -2117,6 +2122,7 @@ export default function App() {
   }, [
     selectedCategory,
     selectedSpeakerRank,
+    selectedBadgeSpeakerRank,
     selectedKeywords,
     searchQuery,
     sortField,
@@ -2661,9 +2667,23 @@ export default function App() {
                   setTrackToEdit(t);
                   setIsUploadOpen(true);
                 }}
+                onSelectSpeakerRank={rank => {
+                  setSelectedDetailTrack(null);
+                  setPlayerMode(savedPreferredMode);
+                  setSelectedCategory('全部');
+                  setSelectedSpeakerRank('全部');
+                  setSelectedKeywords([]);
+                  setSearchQuery('');
+                  setIsSearchFocused(false);
+                  setSelectedBadgeSpeakerRank(rank);
+                  setUseDefaultHomeOrder(true);
+                  setCurrentTab('home');
+                  window.setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
+                }}
                 onSelectKeyword={kw => {
                   setSelectedDetailTrack(null);
                   setPlayerMode(savedPreferredMode);
+                  setSelectedBadgeSpeakerRank('');
                   setSearchQuery(kw);
                   setCurrentTab('home');
                 }}
@@ -2785,6 +2805,21 @@ export default function App() {
                 )}
               </div>
             </div>
+
+            {selectedBadgeSpeakerRank && (
+              <div className="flex items-center justify-center gap-2 rounded-2xl border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-sm text-amber-900 shadow-2xs dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-200">
+                <span aria-hidden="true">🏅</span>
+                <span className="font-bold">獎章篩選：{selectedBadgeSpeakerRank}</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBadgeSpeakerRank('')}
+                  className="ml-1 rounded-full border border-amber-300/80 bg-white/80 px-2 py-0.5 text-xs font-bold text-amber-800 shadow-2xs hover:bg-amber-100 dark:border-amber-600/60 dark:bg-slate-900/70 dark:text-amber-200 cursor-pointer"
+                  title="清除獎章篩選"
+                >
+                  清除
+                </button>
+              </div>
+            )}
 
             {/* Requirement 6 (v2.8): 多組網友關鍵字交叉複合搜尋 (Selected Keywords Chips & Tag Drawer) */}
             <div className="space-y-1">

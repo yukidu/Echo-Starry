@@ -4,6 +4,7 @@ import App from './App.tsx';
 import './index.css';
 import './mobileMenuHalfLayout.css';
 import './v166FilterSearchMatch.css';
+import './v190RankBadge.css';
 import './taiwanCrownMenuLink';
 import './v181PreviewProductionReadBridge';
 import './v181HomeToolbarDislike';
