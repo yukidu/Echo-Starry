@@ -1,4 +1,4 @@
-import appWorker from './favoriteRouter';
+import appWorker from './v192TrackVisibilityRouter';
 import hiddenTrackWorker from './hiddenTrackRouter';
 import sessionWorker from './sessionCookieRouter';
 import iosGoogleRedirectWorker from './iosGoogleRedirectRouter';
@@ -138,10 +138,6 @@ async function rewriteNoopTrackEditRequest(request: Request): Promise<Request> {
     .filter(key => !NOOP_EDIT_BOOKKEEPING_FIELDS.has(key));
   if (editableKeys.length > 0) return request;
 
-  // v189.2: stickerRouter's legacy no-change branch can call D1 batch with an
-  // empty statement list. Add one internal field so the request follows the
-  // canonical partial-update path instead; worker/index.ts ignores unknown
-  // fields and returns the currently saved track without changing user data.
   return rewriteJsonRequest(request, {
     ...(body as Record<string, unknown>),
     [NOOP_EDIT_MARKER]: true
@@ -190,8 +186,6 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    // Browser cookie writes must originate here. Future external apps require
-    // their own scoped server credentials, not reuse of a member's site cookie.
     const origin = request.headers.get('Origin');
     if (url.pathname.startsWith('/api/') && !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
         origin && origin !== url.origin &&
@@ -201,7 +195,6 @@ export default {
       });
     }
 
-    // Always let crawlers read the explicit global exclusion policy.
     if (request.method === 'GET' && url.pathname === '/robots.txt') {
       return new Response(ROBOTS_TXT, {
         status: 200,
@@ -225,9 +218,6 @@ export default {
       });
     }
 
-    // The default sticker league is server-ranked by cumulative spent stickers.
-    // Searches continue through the existing authenticated sticker router so its
-    // member-only search fields and permissions stay unchanged.
     if (
       request.method === 'GET' &&
       url.pathname === '/api/stickers/leaderboard' &&
@@ -237,30 +227,17 @@ export default {
       if (ranked) return withPrivacyHeaders(ranked);
     }
 
-    // StarBeauty SSO is composed into the privacy router instead of replacing
-    // the site entrypoint. This keeps every EchoStars request under the same
-    // crawler/privacy boundary while allowing the external app to exchange a
-    // short-lived one-time code for the member's current basic-profile snapshot.
     const starBeautyResponse = await handleStarbeautySso(request, env);
     if (starBeautyResponse) return withPrivacyHeaders(starBeautyResponse);
 
-    // Member dislike endpoints are routed explicitly here so the long-standing
-    // favorite/admin/category/organization/session/playback/auth wrapper chain
-    // remains unchanged while these member-only preferences stay under the same
-    // privacy and cross-site-write boundary.
     if (url.pathname === '/api/member-hidden-speakers' || url.pathname.startsWith('/api/member-hidden-speakers/')) {
       return withPrivacyHeaders(await hiddenTrackWorker.fetch(request, env));
     }
 
-    // Authentication must not wait for unrelated sticker/catalog migrations.
     if (url.pathname === '/api/users/google-sync' || url.pathname.startsWith('/api/auth/')) {
       return withPrivacyHeaders(await sessionWorker.fetch(request, env));
     }
 
-    // Keep the long-standing application wrapper chain untouched. Only the
-    // Google Identity Services redirect POST at the origin root is routed
-    // through the iOS redirect handler; every other request follows the exact
-    // same favorite/admin/category/organization/session/playback/auth chain as before.
     if (request.method === 'POST' && url.pathname === '/') {
       return withPrivacyHeaders(await iosGoogleRedirectWorker.fetch(request, env));
     }
