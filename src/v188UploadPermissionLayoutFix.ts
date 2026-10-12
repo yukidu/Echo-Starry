@@ -1,52 +1,136 @@
-const STYLE_ID = 'echostars-v188-upload-permission-layout-fix';
+const LEGACY_STYLE_ID = 'echostars-v188-upload-permission-layout-fix';
+const STYLE_ID = 'echostars-v188b-upload-permission-layout-fix';
 
-if (!document.getElementById(STYLE_ID)) {
-  const style = document.createElement('style');
+// Remove the first v188 attempt if an already-open PWA tab still has it in memory.
+document.getElementById(LEGACY_STYLE_ID)?.remove();
+
+let style = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
+if (!style) {
+  style = document.createElement('style');
   style.id = STYLE_ID;
-  style.textContent = `
-    /*
-     * v188: The guest-visibility block is already marked by React with
-     * data-upload-guest-visibility="true". The older presentation grid gave the
-     * required-rank card an explicit two-row span but left this block on auto
-     * placement, so on narrow screens both could land in the same grid area.
-     * That visual overlap also blocked taps on the permission dropdown.
-     */
+  document.head.appendChild(style);
+}
+
+style.textContent = `
+  /*
+   * v188b: 瀏覽權限與兩個可見性勾選功能必須是彼此獨立的版面區域。
+   * 舊 presentation policy 會把欄位 grid 攤平；這裡明確指定各自的 grid row，
+   * 並把勾選區內部改成直向排列，避免任何 checkbox 再擠進 select 的點擊範圍。
+   */
+  #track-upload-form[data-upload-presentation="1"] [data-upload-permission="1"] {
+    grid-column: 5 / 7 !important;
+    grid-row: 2 !important;
+    align-self: stretch !important;
+    display: block !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    position: relative !important;
+    inset: auto !important;
+    transform: none !important;
+    isolation: isolate !important;
+    z-index: 3 !important;
+  }
+
+  #track-upload-form[data-upload-presentation="1"] [data-upload-permission="1"] > span,
+  #track-upload-form[data-upload-presentation="1"] [data-upload-permission="1"] .relative.inline-block {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    position: relative !important;
+    z-index: 4 !important;
+  }
+
+  #track-upload-form[data-upload-presentation="1"] [data-upload-permission="1"] button {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    position: relative !important;
+    inset: auto !important;
+    transform: none !important;
+    pointer-events: auto !important;
+    z-index: 5 !important;
+  }
+
+  #track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility="true"] {
+    grid-column: 5 / 7 !important;
+    grid-row: 3 !important;
+    align-self: stretch !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    position: relative !important;
+    inset: auto !important;
+    transform: none !important;
+    isolation: isolate !important;
+    z-index: 2 !important;
+  }
+
+  #track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility="true"] > div {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: .7rem !important;
+    align-items: start !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  #track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility="true"] label {
+    display: flex !important;
+    align-items: center !important;
+    gap: .65rem !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    position: relative !important;
+    inset: auto !important;
+    transform: none !important;
+    line-height: 1.35 !important;
+  }
+
+  #track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility="true"] input[type="checkbox"] {
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+    min-width: 1.25rem !important;
+    min-height: 1.25rem !important;
+    max-width: 1.25rem !important;
+    max-height: 1.25rem !important;
+    flex: 0 0 1.25rem !important;
+    margin: 0 !important;
+    position: relative !important;
+    inset: auto !important;
+    transform: none !important;
+  }
+
+  @media (max-width: 767px) {
     #track-upload-form[data-upload-presentation="1"] [data-upload-permission="1"] {
-      grid-row: 2 !important;
-      position: relative;
-      z-index: 2;
+      grid-column: 1 / -1 !important;
+      grid-row: 5 !important;
+      width: 100% !important;
     }
 
     #track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility="true"] {
-      grid-column: 5 / 7 !important;
-      grid-row: 3 !important;
-      align-self: stretch;
-      margin: 0 !important;
-      position: relative;
-      z-index: 1;
+      grid-column: 1 / -1 !important;
+      grid-row: 6 !important;
+      width: 100% !important;
     }
 
-    @media (max-width: 767px) {
-      #track-upload-form[data-upload-presentation="1"] [data-upload-permission="1"] {
-        grid-column: 1 !important;
-        grid-row: 5 !important;
-      }
-
-      #track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility="true"] {
-        grid-column: 1 !important;
-        grid-row: 6 !important;
-      }
-
-      #track-upload-form[data-upload-presentation="1"] [data-upload-vip="1"] {
-        grid-column: 1 !important;
-        grid-row: 7 !important;
-      }
-
-      #track-upload-form[data-upload-presentation="1"] [data-upload-cover-library="1"] {
-        grid-column: 1 !important;
-        grid-row: 8 !important;
-      }
+    #track-upload-form[data-upload-presentation="1"] [data-upload-vip="1"] {
+      grid-column: 1 / -1 !important;
+      grid-row: 7 !important;
+      width: 100% !important;
     }
-  `;
-  document.head.appendChild(style);
-}
+
+    #track-upload-form[data-upload-presentation="1"] [data-upload-cover-library="1"] {
+      grid-column: 1 / -1 !important;
+      grid-row: 8 !important;
+      width: 100% !important;
+    }
+  }
+`;
