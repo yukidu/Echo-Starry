@@ -21,18 +21,24 @@ not_found_handling = "single-page-application"
 # 一致套用 X-Robots-Tag，並阻擋已知搜尋引擎／AI crawler。
 run_worker_first = ["/*"]
 
-# 1. Cloudflare D1 資料庫 (SQLite)
+# 1. Cloudflare D1：EchoStars App 專屬資料
 [[d1_databases]]
 binding = "DB"
 database_name = "echoes_db"
 database_id = "e0a696a9-0233-4186-be4d-229435b19a27"
 
-# 2. Cloudflare R2 物件儲存桶 (音檔與圖檔直傳)
+# 2. Cloudflare D1：Starry ID 中央會員資料（跨 App 共用）
+[[d1_databases]]
+binding = "STARRY_ID_DB"
+database_name = "starry_id_db"
+database_id = "01195c92-555e-4816-bddc-5b8cb2e795db"
+
+# 3. Cloudflare R2 物件儲存桶 (音檔與圖檔直傳)
 [[r2_buckets]]
 binding = "R2_BUCKET"
 bucket_name = "echoes-audio-bucket"
 
-# 3. Cloudflare KV 快取與連線狀態儲存庫
+# 4. Cloudflare KV 快取與連線狀態儲存庫
 [[kv_namespaces]]
 binding = "KV"
 id = "a2e345e244cb40b4a804be3f89584b90"
