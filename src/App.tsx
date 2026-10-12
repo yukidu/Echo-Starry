@@ -8,6 +8,7 @@ import { IOSInstallPage } from './components/IOSInstallPage';
 import { StickerSpendDialog } from './components/StickerSpendDialog';
 import { vipPasswordForTrack } from '../shared/stickers';
 import { baseSpeakerRank, effectiveMemberRank } from './utils/ranks';
+import { normalizeSpeakerRankForBadge } from './utils/speakerRankBadge';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -487,6 +488,7 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState<string>('全部');
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [selectedSpeakerRank, setSelectedSpeakerRank] = useState<string>('全部');
+  const [selectedBadgeSpeakerRank, setSelectedBadgeSpeakerRank] = useState<string>('');
   const [isSpeakerRankDropdownOpen, setIsSpeakerRankDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -950,6 +952,7 @@ export default function App() {
     setSelectedDetailTrack(null);
     setSelectedCategory('全部');
     setSelectedSpeakerRank('全部');
+    setSelectedBadgeSpeakerRank('');
     setIsSpeakerRankDropdownOpen(false);
     setSearchQuery('');
     setSelectedKeywords([]);
@@ -2015,6 +2018,7 @@ export default function App() {
   // For a selected keyword, show the current intersection result count.
   const keywordMatchCounts = useMemo(() => {
     const baseTracks = (Array.isArray(tracks) ? tracks : []).filter(track =>
+      (!selectedBadgeSpeakerRank || normalizeSpeakerRankForBadge(track.speakerRank || '') === selectedBadgeSpeakerRank) &&
       trackMatchesHomeBaseFilters(track, selectedCategory, selectedSpeakerRank, searchQuery)
     );
 
@@ -2027,7 +2031,7 @@ export default function App() {
       ).length;
       return counts;
     }, {});
-  }, [tracks, allAvailableKeywords, selectedCategory, selectedSpeakerRank, selectedKeywords, searchQuery]);
+  }, [tracks, allAvailableKeywords, selectedCategory, selectedSpeakerRank, selectedBadgeSpeakerRank, selectedKeywords, searchQuery]);
 
   // Hide zero-result keyword choices; keep selected chips removable.
   const visibleAvailableKeywords = useMemo(() => allAvailableKeywords.filter(keyword => (keywordMatchCounts[keyword] ?? 0) > 0), [allAvailableKeywords, keywordMatchCounts]);
@@ -2040,6 +2044,7 @@ export default function App() {
     const filtered = trackList.filter(t => {
       if (!canAppearInHomeForViewer(t, Boolean(currentUser), checkCanAccess(t))) return false;
       if (!currentUser && !isVisibleOnGuestHome(t)) return false;
+      if (selectedBadgeSpeakerRank && normalizeSpeakerRankForBadge(t.speakerRank || '') !== selectedBadgeSpeakerRank) return false;
       if (!trackMatchesHomeBaseFilters(t, selectedCategory, selectedSpeakerRank, searchQuery)) return false;
       if (selectedKeywords.length > 0 && !selectedKeywords.every(keyword => trackMatchesHomeKeyword(t, keyword))) return false;
       return true;
@@ -2100,6 +2105,7 @@ export default function App() {
     tracks,
     selectedCategory,
     selectedSpeakerRank,
+    selectedBadgeSpeakerRank,
     selectedKeywords,
     searchQuery,
     sortField,
@@ -2117,6 +2123,7 @@ export default function App() {
   }, [
     selectedCategory,
     selectedSpeakerRank,
+    selectedBadgeSpeakerRank,
     selectedKeywords,
     searchQuery,
     sortField,
@@ -2661,9 +2668,24 @@ export default function App() {
                   setTrackToEdit(t);
                   setIsUploadOpen(true);
                 }}
+                onSelectSpeakerRank={rank => {
+                  setSelectedDetailTrack(null);
+                  setPlayerMode(savedPreferredMode);
+                  setSelectedCategory('全部');
+                  setSelectedSpeakerRank('全部');
+                  setSelectedKeywords([]);
+                  setSearchQuery('');
+                  setIsSearchFocused(false);
+                  setSelectedBadgeSpeakerRank(rank);
+                  setShowKeywordsDrawer(true);
+                  setUseDefaultHomeOrder(true);
+                  setCurrentTab('home');
+                  window.setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
+                }}
                 onSelectKeyword={kw => {
                   setSelectedDetailTrack(null);
                   setPlayerMode(savedPreferredMode);
+                  setSelectedBadgeSpeakerRank('');
                   setSearchQuery(kw);
                   setCurrentTab('home');
                 }}
@@ -2786,7 +2808,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Requirement 6 (v2.8): 多組網友關鍵字交叉複合搜尋 (Selected Keywords Chips & Tag Drawer) */}
+            {/* 進階篩選：獎章條件與網友關鍵字統一收在同一個抽屜 */}
             <div className="space-y-1">
               <div className="flex items-center gap-2 px-0.5">
                 <button
@@ -2797,26 +2819,52 @@ export default function App() {
                 >
                   <span className="font-semibold">按此</span>
                   <span className="font-black">{showKeywordsDrawer ? '▲收起' : '▼展開'}</span>
-                  <span className="font-bold">網友關鍵字<span className="ml-0.5 text-[9px] font-semibold">(可複選多個)</span></span>
+                  <span className="font-bold">進階篩選</span>
+                  {(selectedBadgeSpeakerRank || selectedKeywords.length > 0) && (
+                    <span className="ml-1 rounded-full bg-amber-100 dark:bg-amber-950/70 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">已套用</span>
+                  )}
                 </button>
 
                 <div className="ml-auto flex items-center gap-2">
-                  {selectedKeywords.length > 0 && (
+                  {(selectedKeywords.length > 0 || selectedBadgeSpeakerRank) && (
                     <button
                       type="button"
-                      onClick={() => setSelectedKeywords([])}
+                      onClick={() => {
+                        setSelectedKeywords([]);
+                        setSelectedBadgeSpeakerRank('');
+                      }}
                       className="text-sm font-bold text-slate-500 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-300 underline cursor-pointer"
                     >
                       重設
                     </button>
                   )}
-
                 </div>
               </div>
 
-              {/* Expandable Keywords Tag Cloud Drawer for Multi-selection */}
               {showKeywordsDrawer && (
-                <div className="relative p-1.5 rounded-xl bg-amber-50/80 dark:bg-slate-800/80 border border-amber-200/70 dark:border-slate-700 animate-in fade-in">
+                <div className="relative p-2 rounded-xl bg-amber-50/80 dark:bg-slate-800/80 border border-amber-200/70 dark:border-slate-700 animate-in fade-in space-y-2">
+                  {selectedBadgeSpeakerRank && (
+                    <div className="flex items-center gap-2 rounded-xl border border-amber-200/80 bg-white/85 dark:bg-slate-900/75 px-2.5 py-2 text-sm text-amber-900 dark:text-amber-200">
+                      <span aria-hidden="true">🏅</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">獎章</span>
+                      <span className="font-bold">{selectedBadgeSpeakerRank}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBadgeSpeakerRank('')}
+                        className="ml-auto rounded-full border border-amber-300/80 bg-white px-2 py-0.5 text-xs font-bold text-amber-800 shadow-2xs hover:bg-amber-100 dark:border-amber-600/60 dark:bg-slate-900 dark:text-amber-200 cursor-pointer"
+                        title="清除獎章篩選"
+                      >
+                        清除
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                    <span aria-hidden="true">💬</span>
+                    <span>網友關鍵字</span>
+                    <span className="font-normal">(可複選多個)</span>
+                  </div>
+
                   <div className="flex flex-wrap gap-0.5 max-h-40 overflow-y-auto">
                     {visibleAvailableKeywords.length === 0 ? (
                       <span className="text-xs text-slate-400 italic">目前條件下沒有其他符合的關鍵字</span>

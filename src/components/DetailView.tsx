@@ -32,6 +32,7 @@ import { exportTrackFullCardImage, shareOrDownloadImage } from '../utils/canvasE
 import { CommentsSection } from './CommentsSection';
 import { SocialLinkList } from './SocialLinkList';
 import { TwinklingStars } from './TwinklingStars';
+import { speakerRankBadge } from '../utils/speakerRankBadge';
 
 interface DetailViewProps {
   track: Track;
@@ -66,6 +67,7 @@ interface DetailViewProps {
   onViewMember?: (user: UserProfile) => void;
   onUpdateTrack?: (trackId: string, updates: Partial<Track>, options?: { persist?: boolean }) => Promise<void>;
   onSelectKeyword?: (keyword: string) => void;
+  onSelectSpeakerRank?: (rank: string) => void;
   onEditTrack?: (track: Track) => void;
   isVipUnlocked?: boolean;
   hasVipAccess?: boolean;
@@ -106,6 +108,7 @@ export const DetailView: React.FC<DetailViewProps> = ({
   onViewMember,
   onUpdateTrack,
   onSelectKeyword,
+  onSelectSpeakerRank,
   onEditTrack,
   isVipUnlocked = true,
   hasVipAccess = true,
@@ -464,6 +467,7 @@ export const DetailView: React.FC<DetailViewProps> = ({
   const categories = track.categories && track.categories.length > 0
     ? track.categories
     : track.category ? [track.category] : [];
+  const rankBadge = speakerRankBadge(track.speakerRank || '');
 
   const displayField = (value?: string | null) => {
     const text = String(value || '').trim();
@@ -708,6 +712,31 @@ export const DetailView: React.FC<DetailViewProps> = ({
                 className="w-full h-full object-cover"
               />
             </button>
+
+            {rankBadge && (
+              <button
+                type="button"
+                onClick={event => {
+                  event.stopPropagation();
+                  onSelectSpeakerRank?.(rankBadge.rank);
+                }}
+                className="absolute top-1/2 -translate-y-1/2 z-20 w-16 h-16 sm:w-20 sm:h-20 p-1 rounded-2xl cursor-pointer hover:scale-110 active:scale-95 transition-transform focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber-300"
+                style={{ left: 'calc(100% + 0.55rem)' }}
+                title={`查看所有「${rankBadge.rank}」講師音檔`}
+                aria-label={`篩選所有${rankBadge.rank}講師音檔`}
+              >
+                <span className="v190-rank-badge-motion w-full h-full">
+                  <img
+                    src={rankBadge.url}
+                    alt={`${rankBadge.rank}獎章`}
+                    className="v190-rank-badge-image"
+                  />
+                  <span aria-hidden="true" className="v190-rank-badge-sparkle v190-rank-badge-sparkle--one">✦</span>
+                  <span aria-hidden="true" className="v190-rank-badge-sparkle v190-rank-badge-sparkle--two">✦</span>
+                  <span aria-hidden="true" className="v190-rank-badge-sparkle v190-rank-badge-sparkle--three">✦</span>
+                </span>
+              </button>
+            )}
 
             {/* Badge: Required permission (Requirement 11 v2.7: 私秘VIP顯示鎖頭+私秘VIP) */}
             <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-xs text-amber-300 text-[9px] font-bold px-2.5 py-0.5 rounded-full shadow-md border border-amber-500/40 whitespace-nowrap flex items-center gap-1 z-10">
