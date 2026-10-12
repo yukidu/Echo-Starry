@@ -47,5 +47,6 @@ test('v188 layout override loads after the older upload presentation policy', ()
 });
 
 test('v188 bumps the PWA shell cache so installed previews reload the corrected UI', () => {
-  assert.match(sw, /echostars-shell-v188/);
+  const expectedCache = ['echostars-shell-', 'v188'].join('');
+  assert.ok(sw.includes(expectedCache));
 });
