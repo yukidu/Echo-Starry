@@ -1,0 +1,17 @@
+/* v194：詳細頁只保留獎章本體，移除所有既有星星與環繞動畫。 */
+.v190-rank-badge-sparkle {
+  display: none !important;
+  animation: none !important;
+}
+
+.v190-rank-badge-motion::before,
+.v190-rank-badge-motion::after {
+  content: none !important;
+  display: none !important;
+  animation: none !important;
+}
+
+.v190-rank-badge-motion,
+.v190-rank-badge-image {
+  animation: none !important;
+}
