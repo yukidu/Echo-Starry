@@ -1,0 +1,40 @@
+name: v206 diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Capture diagnostics
+        shell: bash
+        run: |
+          mkdir -p diagnostics
+          set +e
+          npm run lint > diagnostics/lint.txt 2>&1
+          echo $? > diagnostics/lint.exit
+          npm run build > diagnostics/build.txt 2>&1
+          echo $? > diagnostics/build.exit
+          for test_file in tests/*.mjs; do
+            test_name="$(basename "$test_file" .mjs)"
+            node "$test_file" > "diagnostics/${test_name}.txt" 2>&1
+            echo $? > "diagnostics/${test_name}.exit"
+          done
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v206-diagnostics
+          path: diagnostics
+          if-no-files-found: error
+          retention-days: 7
