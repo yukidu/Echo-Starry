@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Star, MessageSquare, Heart, Clock, Lock, MoreVertical, Share2, Bookmark, Info } from 'lucide-react';
+import { Star, MessageSquare, Heart, Clock, Lock, MoreVertical, Share2, Bookmark, Info, EyeOff } from 'lucide-react';
 import { Track } from '../types';
 import { AudioMemory } from '../utils/audio';
 import './AudioCard.css';
@@ -249,6 +249,15 @@ export const AudioCard: React.FC<AudioCardProps> = ({
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               loading="lazy"
             />
+
+            {track.authorizedOnlyVisible && (
+              <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none" aria-label="隱藏顯示">
+                <div className="flex flex-col items-center justify-center gap-1 rounded-xl bg-black/60 px-2.5 py-2 text-white shadow-xl backdrop-blur-[1px]">
+                  <EyeOff className="w-10 h-10 sm:w-12 sm:h-12 stroke-[2.4]" />
+                  <span className="text-[11px] sm:text-xs font-black tracking-wide whitespace-nowrap">隱藏顯示</span>
+                </div>
+              </div>
+            )}
 
             {isGuest ? (
               guestProgressPercent > 0 ? (
