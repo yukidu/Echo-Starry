@@ -1,8 +1,10 @@
 const LEGACY_STYLE_ID = 'echostars-v188-upload-permission-layout-fix';
-const STYLE_ID = 'echostars-v188b-upload-permission-layout-fix';
+const PREVIOUS_STYLE_ID = 'echostars-v188b-upload-permission-layout-fix';
+const STYLE_ID = 'echostars-v188c-upload-permission-layout-fix';
 
-// Remove the first v188 attempt if an already-open PWA tab still has it in memory.
+// Remove older v188 attempts if an already-open PWA tab still has them in memory.
 document.getElementById(LEGACY_STYLE_ID)?.remove();
+document.getElementById(PREVIOUS_STYLE_ID)?.remove();
 
 let style = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
 if (!style) {
@@ -13,9 +15,10 @@ if (!style) {
 
 style.textContent = `
   /*
-   * v188b: 瀏覽權限與兩個可見性勾選功能必須是彼此獨立的版面區域。
+   * v188c: 瀏覽權限與兩個可見性勾選功能必須是彼此獨立的版面區域。
    * 舊 presentation policy 會把欄位 grid 攤平；這裡明確指定各自的 grid row，
-   * 並把勾選區內部改成直向排列，避免任何 checkbox 再擠進 select 的點擊範圍。
+   * 並把勾選區內部改成直向排列。手機版額外加入實際垂直留白，
+   * 確保第一個 checkbox 不會再侵入 select 的邊框／點擊範圍。
    */
   #track-upload-form[data-upload-presentation="1"] [data-upload-permission="1"] {
     grid-column: 5 / 7 !important;
@@ -113,12 +116,16 @@ style.textContent = `
       grid-column: 1 / -1 !important;
       grid-row: 5 !important;
       width: 100% !important;
+      padding-bottom: .9rem !important;
+      box-sizing: border-box !important;
     }
 
     #track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility="true"] {
       grid-column: 1 / -1 !important;
       grid-row: 6 !important;
       width: 100% !important;
+      padding-top: .35rem !important;
+      box-sizing: border-box !important;
     }
 
     #track-upload-form[data-upload-presentation="1"] [data-upload-vip="1"] {
