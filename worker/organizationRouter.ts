@@ -52,7 +52,7 @@ async function verifiedActor(request: Request, env: Env) {
   if (!TOKEN_PATTERN.test(token)) return null;
   const tokenHash = await hashToken(token);
   const actor: any = await env.DB.prepare(`
-    SELECT u.id,u.email,u.name,u.amwayId,u.rank,u.approvedRank,u.rankApproved,u.role,u.isBlocked,s.expiresAt
+    SELECT u.id,u.email,u.name,u.amwayId,u.rank,u.approvedRank,u.rankApproved,u.rankAuditStatus,u.role,u.isBlocked,s.expiresAt
     FROM auth_sessions s JOIN users u ON u.id=s.userId
     WHERE s.tokenHash=? LIMIT 1
   `).bind(tokenHash).first();
@@ -90,6 +90,26 @@ async function handleOrganizationApi(request: Request, env: Env, actor: any): Pr
     if (!group) return json({ linked:false, displayName:actor.name || '', dealerId:normalizeDealerId(actor.amwayId), members:[] });
     const partner = group.members.find((member:any)=>member.id!==actor.id) || null;
     return json({ linked:group.members.length===2, displayName:group.displayName, dealerId:group.dealerId, kind:group.kind, partner:partner ? {id:partner.id,name:partner.name}:null, members:group.members.map((member:any)=>({id:member.id,name:member.name})) });
+  }
+
+  if (path === '/api/organization/upline-suggestions' && method === 'GET') {
+    try {
+      const { results } = await db.prepare(`SELECT kind,name FROM upline_names
+        WHERE kind IN ('platinum','diamond') AND TRIM(COALESCE(name,''))<>''
+        ORDER BY kind,name`).all();
+      const platinum: string[] = [];
+      const diamond: string[] = [];
+      for (const row of results || []) {
+        const name = String((row as any).name || '').trim();
+        if (!name) continue;
+        if ((row as any).kind === 'diamond') diamond.push(name);
+        else if ((row as any).kind === 'platinum') platinum.push(name);
+      }
+      return json({ platinum: [...new Set(platinum)], diamond: [...new Set(diamond)] });
+    } catch (error) {
+      console.warn('Unable to load canonical upline name dictionary:', error);
+      return json({ platinum: [], diamond: [] });
+    }
   }
 
   if (path === '/api/organization/couple-candidate' && method === 'GET') {

@@ -223,11 +223,11 @@ export const AudioCard: React.FC<AudioCardProps> = ({
             </button>
             <button type="button" onClick={openDetails} className="w-full px-3 py-2.5 flex items-center gap-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-[var(--color-light-pill,#fae8ed)] dark:hover:bg-slate-800">
               <Info className="w-4 h-4 text-[var(--color-primary,#c06c84)]" />
-              <span>查看詳細內容</span>
+              <span>詳細內容</span>
             </button>
             <button type="button" onClick={toggleFavorite} className="w-full px-3 py-2.5 flex items-center gap-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-[var(--color-light-pill,#fae8ed)] dark:hover:bg-slate-800">
               <Bookmark className={`w-4 h-4 text-[var(--color-primary,#c06c84)] ${isFavorite ? 'fill-[var(--color-primary,#c06c84)]' : ''}`} />
-              <span>{isFavorite ? '取消收藏' : '收藏'}</span>
+              <span>{isFavorite ? '取消收藏' : '加入收藏'}</span>
             </button>
           </div>
         )}

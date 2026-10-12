@@ -1,4 +1,4 @@
-import { isPlatinumOrAboveRank } from '../shared/stickers';
+import { isPlatinumOrAboveRank, isPlatinumToolsEligible } from '../shared/stickers';
 
 export type UplineKind = 'platinum' | 'diamond';
 
@@ -59,7 +59,7 @@ export async function groupForDealerId(db: any, dealerId: string) {
 export async function groupMembers(db: any, groupId: string) {
   await ensureOrganizationSchema(db);
   const { results } = await db.prepare(`
-    SELECT u.id,u.name,u.email,u.amwayId,u.rank,u.approvedRank,u.rankApproved,u.isBlocked,om.memberOrder
+    SELECT u.id,u.name,u.email,u.amwayId,u.rank,u.approvedRank,u.rankApproved,u.rankAuditStatus,u.isBlocked,om.memberOrder
     FROM organization_members om
     JOIN users u ON u.id = om.userId
     WHERE om.groupId = ? AND COALESCE(u.isBlocked,0)=0
@@ -77,9 +77,9 @@ export async function organizationSummary(db: any, groupId: string) {
 }
 
 export function highestApprovedKind(members: any[]): UplineKind | null {
-  const approved = members.filter(member => Boolean(member.rankApproved));
-  if (approved.some(member => /鑽石|皇冠|大使/.test(String(member.approvedRank || member.rank || '')))) return 'diamond';
-  if (approved.some(member => isPlatinumOrAboveRank(member.approvedRank || member.rank))) return 'platinum';
+  const eligible = members.filter(member => isPlatinumToolsEligible(member));
+  if (eligible.some(member => /鑽石|皇冠|大使/.test(String(member.rankApproved ? (member.approvedRank || member.rank) : member.rank || member.approvedRank || '')))) return 'diamond';
+  if (eligible.some(member => isPlatinumOrAboveRank(member.rankApproved ? (member.approvedRank || member.rank) : member.rank || member.approvedRank))) return 'platinum';
   return null;
 }
 
@@ -102,7 +102,7 @@ export async function activeUsersByDealerId(db: any, dealerId: string) {
 
 export async function ensureSingleMemberOrganization(db: any, userId: string) {
   await ensureOrganizationSchema(db);
-  const member: any = await db.prepare(`SELECT id,name,amwayId,rank,approvedRank,rankApproved,isBlocked FROM users WHERE id=? LIMIT 1`).bind(userId).first();
+  const member: any = await db.prepare(`SELECT id,name,amwayId,rank,approvedRank,rankApproved,rankAuditStatus,isBlocked FROM users WHERE id=? LIMIT 1`).bind(userId).first();
   if (!member || member.isBlocked) return { error: '找不到有效會員', status: 404 } as const;
   const dealerId = normalizeDealerId(member.amwayId);
   if (!dealerId) return { error: '請先在基本資料填寫直銷商編號', status: 409, code: 'MISSING_DEALER_ID' } as const;
@@ -223,6 +223,11 @@ export async function bindDownlineToGroup(db: any, memberId: string, groupId: st
   const summary = await organizationSummary(db,groupId);
   if (!summary) return { error: '找不到上手組織', status: 404 } as const;
   if (summary.members.some((member:any)=>member.id===memberId)) return { error: '不能把自己綁定成自己的下線', status: 400 } as const;
+  const target: any = await db.prepare('SELECT id,rank,approvedRank FROM users WHERE id=? LIMIT 1').bind(memberId).first();
+  if (!target) return { error: '找不到要綁定的會員', status: 404 } as const;
+  if (isPlatinumOrAboveRank(target.rank) || isPlatinumOrAboveRank(target.approvedRank)) {
+    return { error: '白金或白金以上會員不可綁定成為下線', status: 409 } as const;
+  }
   const now=Date.now();
   await db.prepare(`INSERT INTO upline_bindings(memberId,kind,groupId,createdAt,updatedAt) VALUES (?,?,?,?,?)
     ON CONFLICT(memberId,kind) DO UPDATE SET groupId=excluded.groupId,updatedAt=excluded.updatedAt`).bind(memberId,kind,groupId,now,now).run();

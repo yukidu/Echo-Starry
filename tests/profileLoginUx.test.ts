@@ -4,19 +4,19 @@ import { readFileSync } from 'node:fs';
 
 const bridge = readFileSync(new URL('../src/googleIdentityBridge.ts', import.meta.url), 'utf8');
 const navbar = readFileSync(new URL('../src/components/Navbar.tsx', import.meta.url), 'utf8');
+const completion = readFileSync(new URL('../shared/profileCompletion.ts', import.meta.url), 'utf8');
 
-test('new and existing members with any missing basic profile field reopen directly in edit mode on each page entry', () => {
-  assert.match(bridge, /const REQUIRED_PROFILE_FIELDS = \[/);
-  for (const field of ['name', 'amwayId', 'residence', 'center', 'rank', 'joinReason', 'stayReason', 'sponsor', 'platinumUpline', 'diamondUpline', 'birthday']) {
-    assert.match(bridge, new RegExp(`'${field}'`));
-  }
-  assert.match(bridge, /function profileNeedsCompletion\(user: any \| null\)/);
-  assert.match(bridge, /REQUIRED_PROFILE_FIELDS\.some\(field => String\(user\?\.\[field\] \?\? ''\)\.trim\(\) === ''\)/);
-  assert.match(bridge, /function resumeIncompleteProfileEdit\(\)/);
+test('new members and members with incomplete basic data enter profile edit mode; email is not a required field', () => {
+  assert.match(bridge, /missingProfileFields/);
+  assert.match(bridge, /NEW_MEMBER_PROFILE_MARKER/);
+  assert.match(bridge, /data\.isNewUser/);
+  assert.match(bridge, /newMemberNeedsFirstProfileEdit/);
+  assert.match(bridge, /resumeIncompleteProfileEdit/);
   assert.match(bridge, /profileButton\.click\(\)/);
-  assert.match(bridge, /const editButton = headerButtons\.find\(button => button\.textContent\?\.trim\(\) === '修改'\)/);
   assert.match(bridge, /editButton\.click\(\)/);
-  assert.doesNotMatch(bridge, /data\.isNewUser/);
+  assert.match(completion, /'avatar'/);
+  for (const field of ['name','amwayId','residence','center','rank','joinReason','stayReason','sponsor','platinumUpline','diamondUpline','birthday']) assert.match(completion,new RegExp(`'${field}'`));
+  assert.doesNotMatch(completion, /'email'/);
 });
 
 test('profile edit save decoration is one-time so the mutation observer cannot freeze the page', () => {

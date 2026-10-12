@@ -2,6 +2,7 @@ import { exchangeGoogleCredential } from './googleCredentialExchange';
 import { shouldDiscardSession } from './authSessionPolicy';
 import { discardCachedIdentity } from './sessionCache';
 import { GOOGLE_CLIENT_ID } from './config/auth';
+import { missingProfileFields } from '../shared/profileCompletion';
 
 declare global {
   interface Window {
@@ -16,21 +17,8 @@ const PLAYBACK_PREFIX = 'sq_audio_progress_v1_';
 const CLAIM_MARKER_PREFIX = 'echostars_playback_claim_v1';
 const SESSION_CHECK_KEY = 'echostars_auth_session_checked_at';
 const SESSION_CHECK_TTL = 10 * 60 * 1000;
+const NEW_MEMBER_PROFILE_MARKER = 'echostars_v201_new_member_profile_edit';
 const originalFetch = window.fetch.bind(window);
-
-const REQUIRED_PROFILE_FIELDS = [
-  'name',
-  'amwayId',
-  'residence',
-  'center',
-  'rank',
-  'joinReason',
-  'stayReason',
-  'sponsor',
-  'platinumUpline',
-  'diamondUpline',
-  'birthday'
-] as const;
 
 type LocalPlaybackRow = {
   trackId: string;
@@ -51,7 +39,12 @@ function readCachedUser(): any | null {
 
 function profileNeedsCompletion(user: any | null) {
   if (!user) return false;
-  return REQUIRED_PROFILE_FIELDS.some(field => String(user?.[field] ?? '').trim() === '');
+  return missingProfileFields(user).length > 0;
+}
+
+function newMemberNeedsFirstProfileEdit(user: any | null) {
+  if (!user?.id) return false;
+  return sessionStorage.getItem(NEW_MEMBER_PROFILE_MARKER) === String(user.id);
 }
 
 function authToken() {
@@ -284,7 +277,8 @@ async function handleGoogleCredential(response: any) {
     };
     localStorage.setItem(USER_KEY, JSON.stringify(user));
     sessionStorage.setItem(SESSION_CHECK_KEY, String(Date.now()));
-    setStatus(profileNeedsCompletion(user) ? '登入成功，正在開啟個人資料…' : '登入成功，正在同步學習紀錄…');
+    if (data.isNewUser) sessionStorage.setItem(NEW_MEMBER_PROFILE_MARKER, String(user.id));
+    setStatus((data.isNewUser || profileNeedsCompletion(user)) ? '登入成功，正在開啟個人資料…' : '登入成功，正在同步學習紀錄…');
     // The next page validates the session and retries playback import.
     // A slow optional import must never hold a verified login on this screen.
     window.location.reload();
@@ -404,7 +398,7 @@ function renderOfficialButton(legacyButton: HTMLButtonElement) {
 
 function resumeIncompleteProfileEdit() {
   const cachedUser = readCachedUser();
-  if (!profileNeedsCompletion(cachedUser) || incompleteProfilePromptedThisLoad) return;
+  if ((!profileNeedsCompletion(cachedUser) && !newMemberNeedsFirstProfileEdit(cachedUser)) || incompleteProfilePromptedThisLoad) return;
 
   const profileButtons = Array.from(
     document.querySelectorAll<HTMLButtonElement>('[data-tutorial-target="visitor-profile"]')
@@ -450,6 +444,7 @@ function normalizeProfileModalUx() {
   if (!editButton) return;
 
   incompleteProfileEditStartedThisLoad = true;
+  if (newMemberNeedsFirstProfileEdit(readCachedUser())) sessionStorage.removeItem(NEW_MEMBER_PROFILE_MARKER);
   editButton.click();
 }
 
