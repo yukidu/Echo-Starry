@@ -10,10 +10,12 @@ workers_dev = true
 preview_urls = true
 
 # 正式自訂網域：Cloudflare Workers Custom Domain。
-# Cloudflare 會自動建立 DNS 與 SSL 憑證。
+# 只供 Production 使用；PR Preview 仍使用 workers.dev。
 [[routes]]
 pattern = "echo.starry.phd"
 custom_domain = true
+enabled = true
+previews_enabled = false
 
 # Pull request previews are intentionally isolated from production resources.
 # Storage bindings are omitted here so preview branches cannot read/write production D1, KV or R2.
