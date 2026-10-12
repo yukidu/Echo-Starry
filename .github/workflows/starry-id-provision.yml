@@ -1,0 +1,38 @@
+name: Provision Starry ID
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'starry-id/**'
+      - '.github/workflows/starry-id-provision.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provision-and-audit:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify Cloudflare credentials
+        run: |
+          test -n "${CLOUDFLARE_API_TOKEN:-}"
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
+      - name: Provision central D1 and audit source members
+        run: bash starry-id/provision-and-audit.sh
+      - name: Upload non-PII audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: starry-id-member-audit
+          path: starry-id/audit-output/member-audit.json
+          if-no-files-found: error
