@@ -45,6 +45,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   return (
     <div
       data-echostars-media-session="1"
+      data-media-track-id={track.id}
       data-media-title={track.title}
       data-media-artist={`${track.speaker}${track.speakerRank ? ` ${track.speakerRank}` : ''}`}
       data-media-artwork={track.speakerAvatar || '/icon-512.png'}
