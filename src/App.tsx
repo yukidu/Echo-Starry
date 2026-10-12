@@ -952,6 +952,7 @@ export default function App() {
     setSelectedDetailTrack(null);
     setSelectedCategory('全部');
     setSelectedSpeakerRank('全部');
+    setSelectedBadgeSpeakerRank('');
     setIsSpeakerRankDropdownOpen(false);
     setSearchQuery('');
     setSelectedKeywords([]);
@@ -2676,6 +2677,7 @@ export default function App() {
                   setSearchQuery('');
                   setIsSearchFocused(false);
                   setSelectedBadgeSpeakerRank(rank);
+                  setShowKeywordsDrawer(true);
                   setUseDefaultHomeOrder(true);
                   setCurrentTab('home');
                   window.setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
@@ -2806,22 +2808,7 @@ export default function App() {
               </div>
             </div>
 
-            {selectedBadgeSpeakerRank && (
-              <div className="flex items-center justify-center gap-2 rounded-2xl border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-sm text-amber-900 shadow-2xs dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-200">
-                <span aria-hidden="true">🏅</span>
-                <span className="font-bold">獎章篩選：{selectedBadgeSpeakerRank}</span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedBadgeSpeakerRank('')}
-                  className="ml-1 rounded-full border border-amber-300/80 bg-white/80 px-2 py-0.5 text-xs font-bold text-amber-800 shadow-2xs hover:bg-amber-100 dark:border-amber-600/60 dark:bg-slate-900/70 dark:text-amber-200 cursor-pointer"
-                  title="清除獎章篩選"
-                >
-                  清除
-                </button>
-              </div>
-            )}
-
-            {/* Requirement 6 (v2.8): 多組網友關鍵字交叉複合搜尋 (Selected Keywords Chips & Tag Drawer) */}
+            {/* 進階篩選：獎章條件與網友關鍵字統一收在同一個抽屜 */}
             <div className="space-y-1">
               <div className="flex items-center gap-2 px-0.5">
                 <button
@@ -2832,26 +2819,52 @@ export default function App() {
                 >
                   <span className="font-semibold">按此</span>
                   <span className="font-black">{showKeywordsDrawer ? '▲收起' : '▼展開'}</span>
-                  <span className="font-bold">網友關鍵字<span className="ml-0.5 text-[9px] font-semibold">(可複選多個)</span></span>
+                  <span className="font-bold">進階篩選</span>
+                  {(selectedBadgeSpeakerRank || selectedKeywords.length > 0) && (
+                    <span className="ml-1 rounded-full bg-amber-100 dark:bg-amber-950/70 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">已套用</span>
+                  )}
                 </button>
 
                 <div className="ml-auto flex items-center gap-2">
-                  {selectedKeywords.length > 0 && (
+                  {(selectedKeywords.length > 0 || selectedBadgeSpeakerRank) && (
                     <button
                       type="button"
-                      onClick={() => setSelectedKeywords([])}
+                      onClick={() => {
+                        setSelectedKeywords([]);
+                        setSelectedBadgeSpeakerRank('');
+                      }}
                       className="text-sm font-bold text-slate-500 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-300 underline cursor-pointer"
                     >
                       重設
                     </button>
                   )}
-
                 </div>
               </div>
 
-              {/* Expandable Keywords Tag Cloud Drawer for Multi-selection */}
               {showKeywordsDrawer && (
-                <div className="relative p-1.5 rounded-xl bg-amber-50/80 dark:bg-slate-800/80 border border-amber-200/70 dark:border-slate-700 animate-in fade-in">
+                <div className="relative p-2 rounded-xl bg-amber-50/80 dark:bg-slate-800/80 border border-amber-200/70 dark:border-slate-700 animate-in fade-in space-y-2">
+                  {selectedBadgeSpeakerRank && (
+                    <div className="flex items-center gap-2 rounded-xl border border-amber-200/80 bg-white/85 dark:bg-slate-900/75 px-2.5 py-2 text-sm text-amber-900 dark:text-amber-200">
+                      <span aria-hidden="true">🏅</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">獎章</span>
+                      <span className="font-bold">{selectedBadgeSpeakerRank}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBadgeSpeakerRank('')}
+                        className="ml-auto rounded-full border border-amber-300/80 bg-white px-2 py-0.5 text-xs font-bold text-amber-800 shadow-2xs hover:bg-amber-100 dark:border-amber-600/60 dark:bg-slate-900 dark:text-amber-200 cursor-pointer"
+                        title="清除獎章篩選"
+                      >
+                        清除
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                    <span aria-hidden="true">💬</span>
+                    <span>網友關鍵字</span>
+                    <span className="font-normal">(可複選多個)</span>
+                  </div>
+
                   <div className="flex flex-wrap gap-0.5 max-h-40 overflow-y-auto">
                     {visibleAvailableKeywords.length === 0 ? (
                       <span className="text-xs text-slate-400 italic">目前條件下沒有其他符合的關鍵字</span>
