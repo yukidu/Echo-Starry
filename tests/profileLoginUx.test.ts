@@ -49,5 +49,5 @@ test('profile save action remains a high-contrast emerald call to action', () =>
   assert.match(bridge, /saveButton\.textContent = '儲存資料'/);
   assert.match(bridge, /saveButton\.style\.background = '#10b981'/);
   assert.match(bridge, /saveButton\.style\.fontWeight = '900'/);
-  assert.match(bridge, /saveButton\.style\.boxShadow = '0 8px 22px rgba\\(16,185,129,0\\.35\\)'/);
+  assert.match(bridge, /saveButton\.style\.boxShadow = '0 8px 22px rgba\(16,185,129,0\.35\)'/);
 });
