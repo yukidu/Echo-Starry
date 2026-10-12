@@ -62,7 +62,7 @@ function memberStatements(row: any, batchId: string, now: number): Statement[] {
         rank, approvedRank, rankApproved, rankAuditStatus, rankAuditType, rankUpdatedAt,
         joinReason, stayReason, birthday, motto, zodiac, talentNumber, lifeNumber,
         registerDate, auditedBy, auditedAt, createdAt, updatedAt
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULLIF(?,''),NULLIF(?,''),?,?,?,?,?,?)
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULLIF(?,''),NULLIF(?,''),?,?,?,?,?)
       ON CONFLICT(userId) DO UPDATE SET
         name=excluded.name, avatar=excluded.avatar, googleAvatar=excluded.googleAvatar,
         amwayId=excluded.amwayId, phone=excluded.phone, residence=excluded.residence,
