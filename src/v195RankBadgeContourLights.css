@@ -1,4 +1,4 @@
-/* v195：把皇冠大使照片外框的圓形光點節奏移植到獎章透明外輪廓。 */
+/* v197：沿獎章真正 painted content box 顯示圓形光點，不再沿 img 正方形盒或高 alpha 上蓋錯位。 */
 .v195-rank-badge-contour-host {
   position: relative;
   overflow: visible !important;
@@ -7,10 +7,8 @@
 .v195-rank-badge-contour-layer,
 .v195-rank-badge-contour-svg {
   position: absolute;
-  inset: 0;
+  inset: auto;
   z-index: 5;
-  width: 100%;
-  height: 100%;
   overflow: visible;
   pointer-events: none;
 }
@@ -64,7 +62,7 @@
   }
 }
 
-/* Preview 若因跨來源圖片無法讀取 Canvas 像素，改用同一透明 PNG 的 alpha 外框做備援。 */
+/* Preview 若因跨來源圖片無法讀取 Canvas 像素，使用同一透明 PNG 的 alpha 外框備援。 */
 .v195-rank-badge-contour-svg-dot {
   fill: rgb(255 255 255 / .98);
   filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 3px rgb(255 255 255 / .9));
