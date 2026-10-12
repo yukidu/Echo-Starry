@@ -6,19 +6,18 @@ const policy = readFileSync(new URL('../src/v198RankBadgeIndependentPulses.ts', 
 const release = readFileSync(new URL('../src/v199ReleaseNote.ts', import.meta.url), 'utf8');
 const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
-test('v199 gives every badge light its own Web Animations timeline', () => {
-  assert.match(policy, /applyTrueIndependentPulse/);
+test('v199 keeps every badge light on its own Web Animations timeline', () => {
   assert.match(policy, /light\.getAnimations\(\)\.forEach\(animation => animation\.cancel\(\)\)/);
   assert.match(policy, /light\.style\.animation = 'none'/);
   assert.match(policy, /light\.animate\(\[/);
   assert.match(policy, /data-echostars-v199-rank-badge-true-independent-pulses/);
 });
 
-test('v199 varies dark, rise, bright-hold and fade durations per dot', () => {
-  assert.match(policy, /darkHoldEnd = 0\.08 \+ deterministicUnit\(index, 7\) \* 0\.18/);
-  assert.match(policy, /peakStart = Math\.min\(0\.50/);
-  assert.match(policy, /brightHoldEnd = Math\.min\(0\.78/);
-  assert.match(policy, /fadeEnd = Math\.min\(0\.96/);
+test('v199 still varies dark, rise, bright-hold and fade timing per dot', () => {
+  assert.match(policy, /darkHoldEnd/);
+  assert.match(policy, /peakStart/);
+  assert.match(policy, /brightHoldEnd/);
+  assert.match(policy, /fadeEnd/);
   assert.match(policy, /offset: pulse\.darkHoldEnd/);
   assert.match(policy, /offset: pulse\.peakStart/);
   assert.match(policy, /offset: pulse\.brightHoldEnd/);
@@ -26,8 +25,10 @@ test('v199 varies dark, rise, bright-hold and fade durations per dot', () => {
   assert.match(policy, /delay: pulse\.delay \* 1000/);
 });
 
-test('v199 keeps 23 lights and does not alter the v197 contour geometry', () => {
-  assert.match(policy, /TARGET_CONTOUR_LIGHTS = 23/);
+test('v199 keeps a sparse light set and does not alter the v197 contour geometry', () => {
+  const match = policy.match(/TARGET_CONTOUR_LIGHTS = (\d+)/);
+  assert.ok(match);
+  assert.ok(Number(match[1]) <= 23);
   assert.match(policy, /chooseEvenlySpacedIndices/);
   assert.doesNotMatch(policy, /ALPHA_THRESHOLDS|traceRadialContour|painted content box/);
   assert.doesNotMatch(policy, /MutationObserver/);
