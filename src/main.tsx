@@ -8,6 +8,7 @@ import './v190RankBadge.css';
 import './taiwanCrownMenuLink';
 import './v181PreviewProductionReadBridge';
 import './v181HomeToolbarDislike';
+import './v189PlaybackSwitchConfirm';
 
 // Old long VIP links (?vipToken=...&trackId=...) are retired. Strip those
 // named parameters before React starts, including when somebody appends them
@@ -84,6 +85,12 @@ document.addEventListener('pointerdown', event => rememberPlaybackIntent(event.t
 document.addEventListener('keydown', event => {
   if (event.key === 'Enter' || event.key === ' ') rememberPlaybackIntent(document.activeElement);
 }, true);
+window.addEventListener('echostars:grant-playback-intent', () => {
+  explicitPlaybackIntentUntil = performance.now() + 30_000;
+});
+window.addEventListener('echostars:clear-playback-intent', () => {
+  explicitPlaybackIntentUntil = 0;
+});
 
 function syncBlockedAutoplayUi(media: HTMLMediaElement, attempt = 0) {
   media.pause();

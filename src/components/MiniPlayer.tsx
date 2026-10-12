@@ -38,13 +38,13 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
 }) => {
   const safeDuration = duration > 0 ? duration : (track.durationSeconds || 600);
 
-  // Requirement 14: 記憶播放器狀態，維持浮動狀態，不會因點擊或切換而強制跳回底部播放器
   const [position, setPosition] = useState<{left:number;top:number}|null>(null);
   const drag = useRef<{x:number;y:number;left:number;top:number}|null>(null);
 
   return (
     <div
       data-echostars-media-session="1"
+      data-media-track-id={track.id}
       data-media-title={track.title}
       data-media-artist={`${track.speaker}${track.speakerRank ? ` ${track.speakerRank}` : ''}`}
       data-media-artwork={track.speakerAvatar || '/icon-512.png'}
