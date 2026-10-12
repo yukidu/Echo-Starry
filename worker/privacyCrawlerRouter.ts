@@ -7,6 +7,8 @@ import type { Env } from './index';
 import { unitsToStickers } from '../shared/stickers';
 
 const X_ROBOTS_TAG = 'noindex, nofollow, noarchive, nosnippet, noimageindex';
+const NOOP_EDIT_MARKER = '__ECHOSTARS_NOOP_EDIT_SAVE__';
+const NOOP_EDIT_BOOKKEEPING_FIELDS = new Set(['userEmail', 'stickerOperationId']);
 
 const BLOCKED_CRAWLER_PATTERNS: RegExp[] = [
   /Googlebot/i,
@@ -111,6 +113,38 @@ function withPrivacyHeaders(response: Response): Response {
     status: response.status,
     statusText: response.statusText,
     headers
+  });
+}
+
+function rewriteJsonRequest(request: Request, body: Record<string, unknown>) {
+  const headers = new Headers(request.headers);
+  headers.set('Content-Type', 'application/json');
+  headers.delete('Content-Length');
+  return new Request(request, { headers, body: JSON.stringify(body) });
+}
+
+async function rewriteNoopTrackEditRequest(request: Request): Promise<Request> {
+  const url = new URL(request.url);
+  if (
+    request.method.toUpperCase() !== 'PUT' ||
+    !/^\/api\/tracks\/[^/]+$/.test(url.pathname) ||
+    !(request.headers.get('Content-Type') || '').toLowerCase().includes('application/json')
+  ) return request;
+
+  const body: unknown = await request.clone().json().catch(() => null);
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return request;
+
+  const editableKeys = Object.keys(body as Record<string, unknown>)
+    .filter(key => !NOOP_EDIT_BOOKKEEPING_FIELDS.has(key));
+  if (editableKeys.length > 0) return request;
+
+  // v189.2: stickerRouter's legacy no-change branch can call D1 batch with an
+  // empty statement list. Add one internal field so the request follows the
+  // canonical partial-update path instead; worker/index.ts ignores unknown
+  // fields and returns the currently saved track without changing user data.
+  return rewriteJsonRequest(request, {
+    ...(body as Record<string, unknown>),
+    [NOOP_EDIT_MARKER]: true
   });
 }
 
@@ -231,6 +265,7 @@ export default {
       return withPrivacyHeaders(await iosGoogleRedirectWorker.fetch(request, env));
     }
 
-    return withPrivacyHeaders(await appWorker.fetch(request, env));
+    const appRequest = await rewriteNoopTrackEditRequest(request);
+    return withPrivacyHeaders(await appWorker.fetch(appRequest, env));
   }
 };
