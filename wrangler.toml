@@ -4,6 +4,12 @@ main = "worker/privacyCrawlerRouter.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
+# 正式自訂網域：Cloudflare Workers Custom Domain。
+# Cloudflare 會自動建立 DNS 與 SSL 憑證；workers.dev 保留作為備援入口。
+[[routes]]
+pattern = "echo.starry.phd"
+custom_domain = true
+
 # Pull request previews are intentionally isolated from production resources.
 # Storage bindings are omitted here so preview branches cannot read/write production D1, KV or R2.
 previews = { }
