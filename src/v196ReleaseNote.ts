@@ -80,3 +80,5 @@ if (!runtime.__ECHOSTARS_V196_RELEASE_PATCH__) {
     }
   }) as typeof window.fetch;
 }
+
+// v196 Production 重新觸發 checkpoint：無功能行為變更。
