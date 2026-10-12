@@ -29,6 +29,7 @@ jobs:
           failed=0
           total=0
           passed=0
+          : > /tmp/v201-failed-tests.txt
           for test_file in tests/*.test.ts; do
             total=$((total + 1))
             echo ""
@@ -42,6 +43,7 @@ jobs:
               echo "PASS: ${test_file}"
             else
               failed=1
+              echo "${test_file}" >> /tmp/v201-failed-tests.txt
               echo "FAIL: ${test_file} (exit ${status})"
               echo "::error file=${test_file},title=Regression test failed::${test_file} exited with ${status}"
             fi
@@ -49,6 +51,15 @@ jobs:
           echo ""
           echo "Regression files passed: ${passed}/${total}"
           exit ${failed}
+
+      - name: Upload v201 failed-test list
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v201-failed-tests-${{ github.sha }}
+          path: /tmp/v201-failed-tests.txt
+          if-no-files-found: error
+          retention-days: 1
 
       - name: TypeScript diagnostic
         if: always()
