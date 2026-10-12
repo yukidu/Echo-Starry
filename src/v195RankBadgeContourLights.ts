@@ -1,9 +1,12 @@
 import './v195RankBadgeContourLights.css';
 
-const SAMPLE_SIZE = 180;
-const ALPHA_THRESHOLD = 40;
-const CONTOUR_POINT_COUNT = 84;
-const CONTOUR_OUTSET_PX = 2.4;
+const SAMPLE_SIZE = 220;
+const ALPHA_THRESHOLDS = [220, 180, 140] as const;
+const CONTOUR_POINT_COUNT = 52;
+const CONTOUR_OUTSET_PX = 2.8;
+const MIN_COMPONENT_PIXELS = 180;
+const EDGE_BAND_PX = 5;
+const RAY_COUNT = 360;
 
 const runtime = window as Window & typeof globalThis & {
   __ECHOSTARS_V195_RANK_BADGE_CONTOUR_LIGHTS__?: boolean;
@@ -20,15 +23,22 @@ type PulseSpec = {
   scale: number;
 };
 
-// 直接沿用皇冠大使 v179 光點的明暗、縮放與不同步閃耀節奏。
+type Component = {
+  mask: Uint8Array;
+  count: number;
+  centerX: number;
+  centerY: number;
+};
+
+// 沿用皇冠大使 v179 的明暗、縮放與不同步節奏，但稍微縮小光點，避免小獎章形成 LED 燈帶。
 const CROWN_PULSES: PulseSpec[] = [
-  { size: 3.5, duration: 5.7, delay: -1.1, min: 0.14, max: 0.98, scale: 1.38 },
-  { size: 2.9, duration: 8.6, delay: -5.3, min: 0.08, max: 0.72, scale: 1.30 },
-  { size: 3.8, duration: 6.9, delay: -2.8, min: 0.18, max: 0.90, scale: 1.36 },
-  { size: 3.1, duration: 9.7, delay: -7.4, min: 0.10, max: 0.68, scale: 1.28 },
-  { size: 4.0, duration: 7.8, delay: -4.6, min: 0.16, max: 1.00, scale: 1.40 },
-  { size: 2.8, duration: 6.3, delay: -0.7, min: 0.09, max: 0.76, scale: 1.30 },
-  { size: 3.4, duration: 10.4, delay: -6.1, min: 0.12, max: 0.84, scale: 1.34 }
+  { size: 2.8, duration: 5.7, delay: -1.1, min: 0.12, max: 0.96, scale: 1.38 },
+  { size: 2.3, duration: 8.6, delay: -5.3, min: 0.07, max: 0.70, scale: 1.30 },
+  { size: 3.0, duration: 6.9, delay: -2.8, min: 0.16, max: 0.88, scale: 1.36 },
+  { size: 2.4, duration: 9.7, delay: -7.4, min: 0.08, max: 0.66, scale: 1.28 },
+  { size: 3.2, duration: 7.8, delay: -4.6, min: 0.14, max: 0.98, scale: 1.40 },
+  { size: 2.2, duration: 6.3, delay: -0.7, min: 0.08, max: 0.74, scale: 1.30 },
+  { size: 2.7, duration: 10.4, delay: -6.1, min: 0.10, max: 0.82, scale: 1.34 }
 ];
 
 function waitForImage(image: HTMLImageElement) {
@@ -45,67 +55,236 @@ function waitForImage(image: HTMLImageElement) {
   });
 }
 
+function alphaAt(pixels: Uint8ClampedArray, x: number, y: number) {
+  return pixels[(y * SAMPLE_SIZE + x) * 4 + 3];
+}
+
+function buildAlphaMask(pixels: Uint8ClampedArray, threshold: number) {
+  const mask = new Uint8Array(SAMPLE_SIZE * SAMPLE_SIZE);
+  for (let y = 0; y < SAMPLE_SIZE; y += 1) {
+    for (let x = 0; x < SAMPLE_SIZE; x += 1) {
+      if (alphaAt(pixels, x, y) >= threshold) mask[y * SAMPLE_SIZE + x] = 1;
+    }
+  }
+  return mask;
+}
+
+function largestConnectedComponent(mask: Uint8Array): Component | null {
+  const visited = new Uint8Array(mask.length);
+  const queue = new Int32Array(mask.length);
+  let bestMembers: number[] | null = null;
+  let bestScore = -1;
+  let bestSumX = 0;
+  let bestSumY = 0;
+
+  for (let start = 0; start < mask.length; start += 1) {
+    if (!mask[start] || visited[start]) continue;
+
+    let head = 0;
+    let tail = 0;
+    queue[tail++] = start;
+    visited[start] = 1;
+    const members: number[] = [];
+    let sumX = 0;
+    let sumY = 0;
+    let edgeCount = 0;
+
+    while (head < tail) {
+      const current = queue[head++];
+      members.push(current);
+      const x = current % SAMPLE_SIZE;
+      const y = Math.floor(current / SAMPLE_SIZE);
+      sumX += x;
+      sumY += y;
+      if (
+        x < EDGE_BAND_PX || y < EDGE_BAND_PX ||
+        x >= SAMPLE_SIZE - EDGE_BAND_PX || y >= SAMPLE_SIZE - EDGE_BAND_PX
+      ) edgeCount += 1;
+
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= SAMPLE_SIZE || ny >= SAMPLE_SIZE) continue;
+          const next = ny * SAMPLE_SIZE + nx;
+          if (!mask[next] || visited[next]) continue;
+          visited[next] = 1;
+          queue[tail++] = next;
+        }
+      }
+    }
+
+    if (members.length < MIN_COMPONENT_PIXELS) continue;
+
+    // 矩形光暈／圖片邊界常大量貼著畫布四周；對這類 component 降權，優先取中央的獎章實體。
+    const edgeRatio = edgeCount / members.length;
+    const score = members.length * (1 - Math.min(0.88, edgeRatio * 2.2));
+    if (score <= bestScore) continue;
+
+    bestScore = score;
+    bestMembers = members;
+    bestSumX = sumX;
+    bestSumY = sumY;
+  }
+
+  if (!bestMembers) return null;
+  const componentMask = new Uint8Array(mask.length);
+  bestMembers.forEach(index => { componentMask[index] = 1; });
+  return {
+    mask: componentMask,
+    count: bestMembers.length,
+    centerX: bestSumX / bestMembers.length,
+    centerY: bestSumY / bestMembers.length
+  };
+}
+
+function choosePrimaryComponent(pixels: Uint8ClampedArray) {
+  for (const threshold of ALPHA_THRESHOLDS) {
+    const component = largestConnectedComponent(buildAlphaMask(pixels, threshold));
+    if (component) return component;
+  }
+  return null;
+}
+
+function traceRadialContour(component: Component): Point[] {
+  const raw: Point[] = [];
+  const maxRadius = Math.hypot(SAMPLE_SIZE, SAMPLE_SIZE);
+
+  for (let index = 0; index < RAY_COUNT; index += 1) {
+    const angle = (Math.PI * 2 * index) / RAY_COUNT;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    let lastOpaque: Point | null = null;
+
+    for (let radius = 0; radius <= maxRadius; radius += 0.55) {
+      const x = Math.round(component.centerX + cos * radius);
+      const y = Math.round(component.centerY + sin * radius);
+      if (x < 0 || y < 0 || x >= SAMPLE_SIZE || y >= SAMPLE_SIZE) break;
+      if (component.mask[y * SAMPLE_SIZE + x]) lastOpaque = { x, y };
+    }
+
+    if (!lastOpaque) continue;
+    const previous = raw[raw.length - 1];
+    if (!previous || previous.x !== lastOpaque.x || previous.y !== lastOpaque.y) raw.push(lastOpaque);
+  }
+
+  if (raw.length > 1) {
+    const first = raw[0];
+    const last = raw[raw.length - 1];
+    if (first.x === last.x && first.y === last.y) raw.pop();
+  }
+  return raw;
+}
+
+function smoothClosedContour(points: Point[]) {
+  if (points.length < 5) return points;
+  return points.map((point, index) => {
+    const previous = points[(index - 1 + points.length) % points.length];
+    const next = points[(index + 1) % points.length];
+    return {
+      x: (previous.x + point.x * 2 + next.x) / 4,
+      y: (previous.y + point.y * 2 + next.y) / 4
+    };
+  });
+}
+
+function resampleClosedContour(points: Point[], count: number) {
+  if (points.length < 12) return null;
+  const smoothed = smoothClosedContour(points);
+  const lengths: number[] = [];
+  let total = 0;
+
+  for (let index = 0; index < smoothed.length; index += 1) {
+    const current = smoothed[index];
+    const next = smoothed[(index + 1) % smoothed.length];
+    const length = Math.hypot(next.x - current.x, next.y - current.y);
+    lengths.push(length);
+    total += length;
+  }
+
+  if (total < 20) return null;
+  const result: Point[] = [];
+  let segment = 0;
+  let segmentStartDistance = 0;
+
+  for (let sample = 0; sample < count; sample += 1) {
+    const target = (total * sample) / count;
+    while (segment < lengths.length - 1 && segmentStartDistance + lengths[segment] < target) {
+      segmentStartDistance += lengths[segment];
+      segment += 1;
+    }
+    const current = smoothed[segment];
+    const next = smoothed[(segment + 1) % smoothed.length];
+    const length = Math.max(lengths[segment], 0.001);
+    const t = Math.min(1, Math.max(0, (target - segmentStartDistance) / length));
+    result.push({
+      x: current.x + (next.x - current.x) * t,
+      y: current.y + (next.y - current.y) * t
+    });
+  }
+  return result;
+}
+
+function contourPercentPoints(component: Component) {
+  const contour = resampleClosedContour(traceRadialContour(component), CONTOUR_POINT_COUNT);
+  if (!contour) return null;
+
+  return contour.map(point => {
+    const dx = point.x - component.centerX;
+    const dy = point.y - component.centerY;
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    const x = point.x + (dx / distance) * CONTOUR_OUTSET_PX;
+    const y = point.y + (dy / distance) * CONTOUR_OUTSET_PX;
+    return {
+      x: (x / SAMPLE_SIZE) * 100,
+      y: (y / SAMPLE_SIZE) * 100
+    };
+  });
+}
+
 function sampleAlphaContour(image: HTMLImageElement): Point[] | null {
   const canvas = document.createElement('canvas');
   canvas.width = SAMPLE_SIZE;
   canvas.height = SAMPLE_SIZE;
   const context = canvas.getContext('2d', { willReadFrequently: true });
-  if (!context) return null;
+  if (!context || !image.naturalWidth || !image.naturalHeight) return null;
 
   try {
     context.clearRect(0, 0, SAMPLE_SIZE, SAMPLE_SIZE);
-    context.drawImage(image, 0, 0, SAMPLE_SIZE, SAMPLE_SIZE);
+
+    // 與 CSS object-fit: contain 相同：保留 PNG 原始長寬比，不再把長方形獎章硬拉成正方形。
+    const scale = Math.min(SAMPLE_SIZE / image.naturalWidth, SAMPLE_SIZE / image.naturalHeight);
+    const drawWidth = image.naturalWidth * scale;
+    const drawHeight = image.naturalHeight * scale;
+    const offsetX = (SAMPLE_SIZE - drawWidth) / 2;
+    const offsetY = (SAMPLE_SIZE - drawHeight) / 2;
+    context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
+
     const pixels = context.getImageData(0, 0, SAMPLE_SIZE, SAMPLE_SIZE).data;
-
-    let sumX = 0;
-    let sumY = 0;
-    let opaqueCount = 0;
-    for (let y = 0; y < SAMPLE_SIZE; y += 1) {
-      for (let x = 0; x < SAMPLE_SIZE; x += 1) {
-        if (pixels[(y * SAMPLE_SIZE + x) * 4 + 3] <= ALPHA_THRESHOLD) continue;
-        sumX += x;
-        sumY += y;
-        opaqueCount += 1;
-      }
-    }
-    if (opaqueCount < 20) return null;
-
-    const centerX = sumX / opaqueCount;
-    const centerY = sumY / opaqueCount;
-    const maxRadius = Math.hypot(SAMPLE_SIZE, SAMPLE_SIZE);
-    const raw: Point[] = [];
-
-    for (let index = 0; index < CONTOUR_POINT_COUNT; index += 1) {
-      const angle = (Math.PI * 2 * index) / CONTOUR_POINT_COUNT;
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      let lastOpaque: Point | null = null;
-
-      for (let radius = 0; radius <= maxRadius; radius += 0.7) {
-        const x = Math.round(centerX + cos * radius);
-        const y = Math.round(centerY + sin * radius);
-        if (x < 0 || y < 0 || x >= SAMPLE_SIZE || y >= SAMPLE_SIZE) break;
-        if (pixels[(y * SAMPLE_SIZE + x) * 4 + 3] > ALPHA_THRESHOLD) {
-          lastOpaque = { x, y };
-        }
-      }
-
-      if (!lastOpaque) continue;
-      raw.push({
-        x: ((lastOpaque.x + cos * CONTOUR_OUTSET_PX) / SAMPLE_SIZE) * 100,
-        y: ((lastOpaque.y + sin * CONTOUR_OUTSET_PX) / SAMPLE_SIZE) * 100
-      });
-    }
-
-    // 去掉極少數因為像素取樣而重疊的點，避免局部亮成一團。
-    const deduped: Point[] = [];
-    for (const point of raw) {
-      const tooClose = deduped.some(existing => Math.hypot(existing.x - point.x, existing.y - point.y) < 1.15);
-      if (!tooClose) deduped.push(point);
-    }
-    return deduped.length >= 20 ? deduped : null;
+    const component = choosePrimaryComponent(pixels);
+    return component ? contourPercentPoints(component) : null;
   } catch {
-    // Preview 可能因跨來源圖片而禁止 Canvas 讀取像素；會改用 SVG alpha 外框備援。
+    // 跨來源圖片可能使 Canvas tainted；decorateBadge 會再嘗試以 Blob 重新解碼。
+    return null;
+  }
+}
+
+async function sampleAlphaContourViaBlob(source: string) {
+  try {
+    const response = await fetch(source, { credentials: 'same-origin', cache: 'force-cache' });
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      const probe = new Image();
+      probe.src = objectUrl;
+      await waitForImage(probe);
+      return sampleAlphaContour(probe);
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  } catch {
     return null;
   }
 }
@@ -143,7 +322,7 @@ function svgElement<K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTag
 
 function createSvgContourFallback(image: HTMLImageElement) {
   fallbackId += 1;
-  const suffix = `v195-${fallbackId}`;
+  const suffix = `v196-${fallbackId}`;
   const filterId = `${suffix}-outline`;
   const maskId = `${suffix}-mask`;
   const patternId = `${suffix}-dots`;
@@ -164,16 +343,40 @@ function createSvgContourFallback(image: HTMLImageElement) {
   filter.setAttribute('width', '116');
   filter.setAttribute('height', '116');
 
+  // 備援也先做高 alpha 門檻 + opening，消除 PNG 四周的淡矩形光暈與零碎亮點。
+  const threshold = svgElement('feComponentTransfer');
+  threshold.setAttribute('in', 'SourceAlpha');
+  threshold.setAttribute('result', 'thresholded');
+  const alpha = svgElement('feFuncA');
+  alpha.setAttribute('type', 'discrete');
+  alpha.setAttribute('tableValues', '0 0 0 0 1');
+  threshold.appendChild(alpha);
+  filter.appendChild(threshold);
+
+  const erode = svgElement('feMorphology');
+  erode.setAttribute('in', 'thresholded');
+  erode.setAttribute('operator', 'erode');
+  erode.setAttribute('radius', '1.1');
+  erode.setAttribute('result', 'eroded');
+  filter.appendChild(erode);
+
+  const reopen = svgElement('feMorphology');
+  reopen.setAttribute('in', 'eroded');
+  reopen.setAttribute('operator', 'dilate');
+  reopen.setAttribute('radius', '1.1');
+  reopen.setAttribute('result', 'opened');
+  filter.appendChild(reopen);
+
   const dilate = svgElement('feMorphology');
-  dilate.setAttribute('in', 'SourceAlpha');
+  dilate.setAttribute('in', 'opened');
   dilate.setAttribute('operator', 'dilate');
-  dilate.setAttribute('radius', '2.8');
+  dilate.setAttribute('radius', '2.4');
   dilate.setAttribute('result', 'dilated');
   filter.appendChild(dilate);
 
   const outline = svgElement('feComposite');
   outline.setAttribute('in', 'dilated');
-  outline.setAttribute('in2', 'SourceAlpha');
+  outline.setAttribute('in2', 'opened');
   outline.setAttribute('operator', 'out');
   filter.appendChild(outline);
   defs.appendChild(filter);
@@ -200,14 +403,13 @@ function createSvgContourFallback(image: HTMLImageElement) {
 
   const pattern = svgElement('pattern');
   pattern.id = patternId;
-  pattern.setAttribute('width', '7');
-  pattern.setAttribute('height', '7');
+  pattern.setAttribute('width', '10');
+  pattern.setAttribute('height', '10');
   pattern.setAttribute('patternUnits', 'userSpaceOnUse');
 
   [
-    { cx: 1.4, cy: 1.7, r: 1.15, variant: 0 },
-    { cx: 5.0, cy: 2.8, r: 0.82, variant: 2 },
-    { cx: 3.4, cy: 5.8, r: 0.95, variant: 4 }
+    { cx: 2.0, cy: 2.2, r: 1.05, variant: 0 },
+    { cx: 7.1, cy: 6.7, r: 0.78, variant: 4 }
   ].forEach(spec => {
     const circle = svgElement('circle');
     circle.setAttribute('cx', String(spec.cx));
@@ -247,8 +449,16 @@ async function decorateBadge(image: HTMLImageElement) {
     motion.querySelectorAll<HTMLElement>('[data-v195-rank-contour="1"]').forEach(node => node.remove());
     motion.classList.add('v195-rank-badge-contour-host');
 
-    const points = sampleAlphaContour(image);
-    motion.appendChild(points ? createContourLayer(points) : createSvgContourFallback(image));
+    let points = sampleAlphaContour(image);
+    if (!points) points = await sampleAlphaContourViaBlob(source);
+
+    if (points) {
+      motion.appendChild(createContourLayer(points));
+      motion.dataset.v196ContourMode = 'primary-alpha-component';
+    } else {
+      motion.appendChild(createSvgContourFallback(image));
+      motion.dataset.v196ContourMode = 'thresholded-svg-fallback';
+    }
     image.dataset.v195ContourSource = source;
   } catch {
     // 保留獎章本體；圖片暫時失敗時不阻擋詳細頁其他功能。
@@ -266,6 +476,7 @@ function syncV195ContourLights() {
 if (!runtime.__ECHOSTARS_V195_RANK_BADGE_CONTOUR_LIGHTS__) {
   runtime.__ECHOSTARS_V195_RANK_BADGE_CONTOUR_LIGHTS__ = true;
   document.documentElement.setAttribute('data-echostars-v195-rank-badge-contour-lights', 'true');
+  document.documentElement.setAttribute('data-echostars-v196-rank-badge-contour-fix', 'true');
   syncV195ContourLights();
   window.setInterval(syncV195ContourLights, 700);
   window.addEventListener('focus', syncV195ContourLights);
