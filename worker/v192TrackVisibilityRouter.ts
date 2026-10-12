@@ -1,4 +1,3 @@
-import appWorker from './favoriteRouter';
 import type { Env } from './index';
 
 const META_NAME = '__ECHOSTARS_V185_META__';
@@ -8,6 +7,8 @@ type VisibilitySetting = {
   authorizedOnlyVisible: boolean;
   hiddenShareAllowed: boolean;
 };
+
+type NextWorker = (request: Request, env: Env) => Promise<Response>;
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -150,85 +151,89 @@ async function shareBlockedBySlug(db: any, slug: string) {
     const allowed = saved ? Boolean(saved.hiddenShareAllowed) : false;
     return hidden && !allowed;
   } catch {
-    // shareSlug may not exist yet on a brand-new database. In that case there
-    // cannot be a previously allocated short link to block.
     return false;
   }
 }
 
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-    const method = request.method.toUpperCase();
-    const path = url.pathname;
-    const db = env.DB;
+export async function handleV192TrackVisibility(
+  request: Request,
+  env: Env,
+  next: NextWorker
+): Promise<Response> {
+  const url = new URL(request.url);
+  const method = request.method.toUpperCase();
+  const path = url.pathname;
+  const db = env.DB;
 
-    const shareAction = path.match(/^\/api\/tracks\/([^/]+)\/(?:share-slug|vip-share(?:\/reset)?)$/);
-    if (db && shareAction && method === 'POST') {
-      const trackId = decodeURIComponent(shareAction[1]);
-      if (await shareBlockedByTrackId(db, trackId)) {
-        return json({ error: '此音檔已被隱藏，目前禁止分享' }, 403);
-      }
-    }
-
-    if (db && method === 'GET' && path.startsWith('/share/')) {
-      const slug = decodeURIComponent(path.slice('/share/'.length)).trim();
-      if (await shareBlockedBySlug(db, slug)) {
-        return new Response('分享連結不存在', { status: 404 });
-      }
-    }
-
-    let body: any = null;
-    const trackWrite = path === '/api/tracks' && method === 'POST'
-      ? { create: true, trackId: '' }
-      : (/^\/api\/tracks\/[^/]+$/.test(path) && method === 'PUT'
-        ? { create: false, trackId: decodeURIComponent(path.split('/api/tracks/')[1]) }
-        : null);
-
-    if (trackWrite && (request.headers.get('Content-Type') || '').toLowerCase().includes('application/json')) {
-      body = await request.clone().json().catch(() => null);
-      if (body && Object.prototype.hasOwnProperty.call(body, 'hiddenShareAllowed') && typeof body.hiddenShareAllowed !== 'boolean') {
-        return json({ error: '隱藏音檔分享設定格式錯誤' }, 400);
-      }
-    }
-
-    const response = await appWorker.fetch(request, env);
-    if (!db) return response;
-
-    if (path === '/api/tracks' && method === 'GET') {
-      try {
-        return await overlayTrackResponse(response, db);
-      } catch (error) {
-        console.warn('v192 visibility overlay skipped:', error);
-        return response;
-      }
-    }
-
-    if (!trackWrite || !response.ok || !body || typeof body !== 'object') {
-      return response;
-    }
-
-    try {
-      const responseData: any = await response.clone().json().catch(() => null);
-      const savedId = trackWrite.create
-        ? String(responseData?.track?.id || responseData?.id || body.id || '').trim()
-        : trackWrite.trackId;
-      if (!savedId) return response;
-
-      const touchesHidden = Object.prototype.hasOwnProperty.call(body, 'authorizedOnlyVisible');
-      const touchesShare = Object.prototype.hasOwnProperty.call(body, 'hiddenShareAllowed');
-      if (touchesHidden || touchesShare) {
-        const current = await effectiveSetting(db, savedId);
-        const hidden = touchesHidden ? body.authorizedOnlyVisible === true : Boolean(current?.authorizedOnlyVisible);
-        const allowShare = hidden && (touchesShare ? body.hiddenShareAllowed === true : Boolean(current?.hiddenShareAllowed));
-        await saveSetting(db, savedId, hidden, allowShare);
-      } else if (trackWrite.create) {
-        await saveSetting(db, savedId, body.authorizedOnlyVisible === true, false);
-      }
-      return await overlayTrackResponse(response, db);
-    } catch (error) {
-      console.error('v192 visibility setting save failed:', error);
-      return json({ error: '隱藏音檔設定儲存失敗，請重試' }, 500);
+  const shareAction = path.match(/^\/api\/tracks\/([^/]+)\/(?:share-slug|vip-share(?:\/reset)?)$/);
+  if (db && shareAction && method === 'POST') {
+    const trackId = decodeURIComponent(shareAction[1]);
+    if (await shareBlockedByTrackId(db, trackId)) {
+      return json({ error: '此音檔已被隱藏，目前禁止分享' }, 403);
     }
   }
-};
+
+  if (db && method === 'GET' && path.startsWith('/share/')) {
+    const slug = decodeURIComponent(path.slice('/share/'.length)).trim();
+    if (await shareBlockedBySlug(db, slug)) {
+      return new Response('分享連結不存在', { status: 404 });
+    }
+  }
+
+  let body: any = null;
+  const trackWrite = path === '/api/tracks' && method === 'POST'
+    ? { create: true, trackId: '' }
+    : (/^\/api\/tracks\/[^/]+$/.test(path) && method === 'PUT'
+      ? { create: false, trackId: decodeURIComponent(path.split('/api/tracks/')[1]) }
+      : null);
+
+  if (trackWrite && (request.headers.get('Content-Type') || '').toLowerCase().includes('application/json')) {
+    body = await request.clone().json().catch(() => null);
+    if (body && Object.prototype.hasOwnProperty.call(body, 'hiddenShareAllowed') && typeof body.hiddenShareAllowed !== 'boolean') {
+      return json({ error: '隱藏音檔分享設定格式錯誤' }, 400);
+    }
+  }
+
+  // The original favorite -> member-delete -> category -> organization ->
+  // sticker -> session -> auth chain remains the authority for write access.
+  // We only persist v192 state after that chain returns a successful response,
+  // so a spoofed userEmail cannot change hidden/share settings.
+  const response = await next(request, env);
+  if (!db) return response;
+
+  if (path === '/api/tracks' && method === 'GET') {
+    try {
+      return await overlayTrackResponse(response, db);
+    } catch (error) {
+      console.warn('v192 visibility overlay skipped:', error);
+      return response;
+    }
+  }
+
+  if (!trackWrite || !response.ok || !body || typeof body !== 'object') {
+    return response;
+  }
+
+  try {
+    const responseData: any = await response.clone().json().catch(() => null);
+    const savedId = trackWrite.create
+      ? String(responseData?.track?.id || responseData?.id || body.id || '').trim()
+      : trackWrite.trackId;
+    if (!savedId) return response;
+
+    const touchesHidden = Object.prototype.hasOwnProperty.call(body, 'authorizedOnlyVisible');
+    const touchesShare = Object.prototype.hasOwnProperty.call(body, 'hiddenShareAllowed');
+    if (touchesHidden || touchesShare) {
+      const current = await effectiveSetting(db, savedId);
+      const hidden = touchesHidden ? body.authorizedOnlyVisible === true : Boolean(current?.authorizedOnlyVisible);
+      const allowShare = hidden && (touchesShare ? body.hiddenShareAllowed === true : Boolean(current?.hiddenShareAllowed));
+      await saveSetting(db, savedId, hidden, allowShare);
+    } else if (trackWrite.create) {
+      await saveSetting(db, savedId, body.authorizedOnlyVisible === true, false);
+    }
+    return await overlayTrackResponse(response, db);
+  } catch (error) {
+    console.error('v192 visibility setting save failed:', error);
+    return json({ error: '隱藏音檔設定儲存失敗，請重試' }, 500);
+  }
+}
