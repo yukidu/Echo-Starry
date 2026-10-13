@@ -9,7 +9,7 @@ const AUTH_RETURN_KEY = 'echostars_auth_return_v1';
 const AUTH_RESTORE_KEY = 'echostars_auth_restore_v1';
 const SKIP_FORCED_PROFILE_KEY = 'echostars_skip_forced_profile_once';
 const PROFILE_AUTO_OPEN_DISABLED_KEY = 'echostars_profile_auto_open_disabled_v1';
-const PROD_HOST = 'echostars.yukidu.workers.dev';
+const PROD_HOSTS = new Set(['echo.starry.phd', 'echostars.yukidu.workers.dev']);
 
 let patched = false;
 let oneTapPrompted = false;
@@ -21,7 +21,7 @@ function isIOSDevice() {
 }
 
 function isProductionHost() {
-  return window.location.hostname === PROD_HOST;
+  return PROD_HOSTS.has(window.location.hostname);
 }
 
 function readCachedUser() {
@@ -116,7 +116,7 @@ function addLoginIntro(buttonHost: HTMLElement) {
   });
 
   const title = document.createElement('div');
-  title.textContent = '登入繁星回聲';
+  title.textContent = '登入 Echo-Starry';
   Object.assign(title.style, {
     fontSize: '20px',
     lineHeight: '1.3',
@@ -206,7 +206,7 @@ function patchGoogleIdentity() {
     }
     if (useRedirect) {
       // Google documents redirect mode as required on iOS because of ITP.
-      // The credential is POSTed to the production origin root and handled by
+      // The credential is POSTed to the current production origin root and handled by
       // worker/iosGoogleRedirectRouter.ts before the SPA asset fallback runs.
       next.ux_mode = 'redirect';
       next.login_uri = `${window.location.origin}/`;
