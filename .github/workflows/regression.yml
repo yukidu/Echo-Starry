@@ -29,7 +29,6 @@ jobs:
           failed=0
           total=0
           passed=0
-          : > /tmp/regression-failures.txt
           for test_file in tests/*.test.ts; do
             total=$((total + 1))
             echo ""
@@ -43,7 +42,6 @@ jobs:
               echo "PASS: ${test_file}"
             else
               failed=1
-              echo "${test_file}" >> /tmp/regression-failures.txt
               echo "FAIL: ${test_file} (exit ${status})"
             fi
           done
@@ -156,7 +154,6 @@ jobs:
         with:
           name: browser-ui-${{ github.sha }}
           path: |
-            /tmp/regression-failures.txt
             /tmp/echostars-theme-*
             /tmp/echostars-category-*
             /tmp/echostars-v156-*
