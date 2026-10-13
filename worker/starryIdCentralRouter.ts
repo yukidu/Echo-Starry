@@ -228,7 +228,7 @@ async function syncVerifiedIdentity(
   ).bind(identity.email, userId).first();
   if (otherEmailOwner) throw new Error('email_conflict');
 
-  const statements = [
+  const statements: any[] = [
     db.prepare(`INSERT INTO users (id,primaryEmail,status,createdAt,updatedAt)
       VALUES (?,?,'active',?,?)
       ON CONFLICT(id) DO UPDATE SET primaryEmail=excluded.primaryEmail,updatedAt=excluded.updatedAt`)
