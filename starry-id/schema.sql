@@ -118,6 +118,32 @@ CREATE TABLE IF NOT EXISTS public_cards (
 CREATE UNIQUE INDEX IF NOT EXISTS public_cards_slug ON public_cards(slug);
 CREATE UNIQUE INDEX IF NOT EXISTS public_cards_number ON public_cards(cardNumber);
 
+-- 若會員手動把電子名片編號改成較大的 n 編號，立即把 AUTOINCREMENT 水位推到該編號。
+-- 這樣未來新會員自動配號會從更大的號碼開始，不會撞到已被手動占用的編號。
+UPDATE sqlite_sequence
+SET seq = MAX(
+  seq,
+  COALESCE((
+    SELECT MAX(CAST(SUBSTR(cardNumber, 2) AS INTEGER))
+    FROM public_cards
+    WHERE cardNumber GLOB 'n[0-9]*'
+      AND SUBSTR(cardNumber, 2) NOT GLOB '*[^0-9]*'
+      AND LENGTH(SUBSTR(cardNumber, 2)) > 0
+  ), 0)
+)
+WHERE name = 'public_cards';
+
+CREATE TRIGGER IF NOT EXISTS public_cards_bump_sequence
+AFTER UPDATE OF cardNumber ON public_cards
+WHEN NEW.cardNumber GLOB 'n[0-9]*'
+  AND SUBSTR(NEW.cardNumber, 2) NOT GLOB '*[^0-9]*'
+  AND LENGTH(SUBSTR(NEW.cardNumber, 2)) > 0
+BEGIN
+  UPDATE sqlite_sequence
+  SET seq = MAX(seq, CAST(SUBSTR(NEW.cardNumber, 2) AS INTEGER))
+  WHERE name = 'public_cards';
+END;
+
 -- v211：電子名片每個欄位獨立公開／隱藏；未建立資料列時由應用層套預設值。
 -- 預設全部公開，只有手機與生日預設隱藏。
 CREATE TABLE IF NOT EXISTS profile_field_visibility (
