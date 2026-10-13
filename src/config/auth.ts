@@ -1,9 +1,19 @@
 /**
- * Google OAuth 2.0 Client ID Configuration
+ * Google Identity Services client selection.
  *
- * Echo-Starry 以環境變數為優先；若未提供則沿用既有 Web Client ID，
- * 以維持現有會員 Google 身分關聯不中斷。
+ * echo.starry.phd uses the Starry ID Google Cloud client.
+ * The legacy workers.dev host keeps its existing client so the backup URL
+ * remains usable without requiring a second OAuth-origin migration.
  */
-export const GOOGLE_CLIENT_ID =
+const STARRY_GOOGLE_CLIENT_ID =
   (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
+  '661055525630-633btocuq7hs6pu7v5gkg3n2fouupubp.apps.googleusercontent.com';
+
+const LEGACY_ECHOSTARS_GOOGLE_CLIENT_ID =
   '400699489182-lb412nhvj4s6t1qr5ovkg40hc646dq79.apps.googleusercontent.com';
+
+const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+
+export const GOOGLE_CLIENT_ID = hostname === 'echostars.yukidu.workers.dev'
+  ? LEGACY_ECHOSTARS_GOOGLE_CLIENT_ID
+  : STARRY_GOOGLE_CLIENT_ID;
