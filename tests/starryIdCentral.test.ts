@@ -26,13 +26,14 @@ test('Starry ID central backend uses the dedicated Google OAuth client', () => {
   assert.doesNotMatch(router, new RegExp(LEGACY_ECHO_CLIENT.replaceAll('.', '\\.')));
 });
 
-test('Starry ID does not accept arbitrary app ids for self enrollment', () => {
+test('Starry ID only accepts registered app ids for self enrollment', () => {
   assert.match(router, /STARRY_ID_ALLOWED_APPS/);
   assert.match(router, /STARRY_ID_SELF_ENROLL_APPS/);
   assert.match(router, /if \(!allowedApp\(env, appId\)\) throw new Error\('unsupported_app'\)/);
   assert.match(router, /if \(!membership && !selfEnrollApp\(env, appId\)\) throw new Error\('app_membership_required'\)/);
-  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id"/);
-  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id"/);
+  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,downloadstarry"/);
+  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,downloadstarry"/);
+  assert.doesNotMatch(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,downloadstarry,.*"/);
 });
 
 test('Starry ID central sessions are persisted as hashed server sessions', () => {

@@ -7,6 +7,7 @@ import { handleV192TrackVisibility } from './v192TrackVisibilityRouter';
 import { syncEchoMemberToStarryBestEffort } from './starryIdSync';
 import { handleStarryIdV211 } from './starryIdV211Router';
 import { handleStarryIdCentral } from './starryIdCentralRouter';
+import { handleDownloadStarryCentralSso } from './downloadStarryCentralSso';
 import type { Env } from './index';
 import { unitsToStickers } from '../shared/stickers';
 
@@ -196,6 +197,12 @@ async function spentStickerLeaderboard(env: Env): Promise<Response | null> {
 export default {
   async fetch(request: Request, env: Env, ctx?: any): Promise<Response> {
     const url = new URL(request.url);
+
+    // Download Starry central SSO has dedicated routes on id.starry.phd. It must
+    // run before the v211 and generic Starry ID routers so these routes cannot
+    // be swallowed by another id.starry.phd handler.
+    const downloadStarryCentralResponse = await handleDownloadStarryCentralSso(request, env);
+    if (downloadStarryCentralResponse) return withPrivacyHeaders(downloadStarryCentralResponse);
 
     // v211 adds public-card/settings UI without replacing the v209/v210 identity core.
     const starryV211Response = await handleStarryIdV211(request, env as any);
