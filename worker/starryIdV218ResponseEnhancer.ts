@@ -12,12 +12,15 @@ function memberCenterScript() {
     const brand=q('.brand');
     const originalBrand=brand?{html:brand.innerHTML,className:brand.className}:null;
     async function cardUrl(){const r=await fetch('/api/card-settings',{credentials:'same-origin'});const d=await r.json().catch(()=>({}));if(!r.ok||!d.url)throw new Error(d.error||'找不到名片網址');return d.url}
-    function restoreBrand(){const el=q('.brand');if(!el||!originalBrand)return;if(el.innerHTML!==originalBrand.html||el.className!==originalBrand.className){el.className=originalBrand.className;el.innerHTML=originalBrand.html}}
+    function restoreBrand(){const el=q('.brand');if(!el||!originalBrand)return;if(el.className!==originalBrand.className)el.className=originalBrand.className;if(el.innerHTML!==originalBrand.html)el.innerHTML=originalBrand.html}
     function removeMenuCardLinks(){qa('.v216-menu a').forEach(a=>{const t=(a.textContent||'').trim();if(t==='我的電子名片'||t==='我的名片')a.remove()})}
-    function enforceToolbar(){const actions=document.getElementById('topActions');if(!actions)return;let card=document.getElementById('myCardBtn');if(card&&!card.dataset.v218){const clone=card.cloneNode(true);clone.dataset.v216='1';clone.dataset.v218='1';clone.textContent='我的名片';clone.title='開啟我的公開名片';clone.addEventListener('click',async e=>{e.preventDefault();try{location.href=await cardUrl()}catch(err){alert(err?.message||'無法開啟名片')}});card.replaceWith(clone);card=clone}else if(card){card.textContent='我的名片';card.title='開啟我的公開名片'}const burger=document.getElementById('v216Menu')||qa('button',actions).find(b=>(b.textContent||'').trim()==='☰');if(card&&burger&&card.nextElementSibling!==burger)actions.insertBefore(card,burger);removeMenuCardLinks()}
-    function sync(){restoreBrand();enforceToolbar()}
+    function enforceToolbar(){const actions=document.getElementById('topActions');if(!actions)return;let card=document.getElementById('myCardBtn');if(card&&!card.dataset.v218){const clone=card.cloneNode(true);clone.dataset.v216='1';clone.dataset.v218='1';clone.textContent='我的名片';clone.title='開啟我的公開名片';clone.addEventListener('click',async e=>{e.preventDefault();try{location.href=await cardUrl()}catch(err){alert(err?.message||'無法開啟名片')}});card.replaceWith(clone);card=clone}else if(card){if((card.textContent||'')!=='我的名片')card.textContent='我的名片';if(card.title!=='開啟我的公開名片')card.title='開啟我的公開名片'}const burger=document.getElementById('v216Menu')||qa('button',actions).find(b=>(b.textContent||'').trim()==='☰');if(card&&burger&&card.nextElementSibling!==burger)actions.insertBefore(card,burger);removeMenuCardLinks()}
+    let syncing=false;
+    function sync(){if(syncing)return;syncing=true;try{restoreBrand();enforceToolbar()}finally{syncing=false}}
     sync();
-    const observer=new MutationObserver(sync);observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
+    const target=q('.topbar')||document.body;
+    const observer=new MutationObserver(()=>sync());
+    observer.observe(target,{subtree:true,childList:true});
   })();</script>`;
 }
 
