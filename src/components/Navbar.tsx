@@ -501,7 +501,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="absolute inset-0 rounded-2xl border-2 animate-ping" style={{ borderColor: 'var(--color-primary, #c06c84)' }} />
           </div>
           <div className="flex min-w-0 items-center gap-1.5">
-            <span className="text-base sm:text-xl font-black tracking-wider echo-wave-text inline-flex items-baseline whitespace-nowrap shrink-0" style={{ color: 'var(--color-primary, #c06c84)' }}>Echo-Starry</span>
+            <span className="text-base sm:text-xl font-black tracking-wider echo-wave-text inline-flex items-baseline whitespace-nowrap shrink-0" style={{ color: 'var(--color-primary, #c06c84)' }}>繁星回聲</span>
             <div className="hidden sm:flex shrink-0 items-center gap-0.5 h-4 ml-0.5">
               <span className="w-0.5 rounded-full animate-[pulseWaveBar_1.2s_ease-in-out_infinite]" style={{ backgroundColor: 'var(--color-primary, #c06c84)' }} />
               <span className="w-0.5 rounded-full animate-[pulseWaveBar_1.2s_ease-in-out_0.2s_infinite]" style={{ backgroundColor: 'var(--color-primary, #c06c84)' }} />
@@ -525,7 +525,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="mobile-menu-shell">
           <div className="mobile-menu-panel animate-in slide-in-from-top-2" data-react-menu="true" style={{ '--navbar-font-zoom': fontZoom, zoom: 1 / fontZoom } as React.CSSProperties}>
             <div className="navbar-menu-profile-head px-3 py-2 border-b border-slate-200 dark:border-slate-700 mb-1">
-              <button type="button" onClick={() => handleMobileNav('profile')} className="navbar-menu-identity" aria-label={currentUser ? '開啟個人中心' : '登入 Echo-Starry'}>
+              <button type="button" onClick={() => handleMobileNav('profile')} className="navbar-menu-identity" aria-label={currentUser ? '開啟個人中心' : '登入繁星回聲'}>
                 <span className="navbar-menu-identity-icon" aria-hidden="true">
                   {identityAvatarIsImage ? <img src={identityAvatar} alt="" /> : identityAvatar}
                 </span>
