@@ -116,7 +116,7 @@ function addLoginIntro(buttonHost: HTMLElement) {
   });
 
   const title = document.createElement('div');
-  title.textContent = '登入 Echo-Starry';
+  title.textContent = '登入繁星回聲';
   Object.assign(title.style, {
     fontSize: '20px',
     lineHeight: '1.3',
