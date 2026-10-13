@@ -1,8 +1,10 @@
-# 繁星回聲 - Cloudflare 全端架構部屬指南
+# Echo-Starry - Cloudflare 全端架構部署指南
 
-本專案已完整支援以 **Cloudflare Workers (後端執行環境) + D1 (分散式 SQLite 資料庫) + R2 (音訊與圖檔物件儲存) + KV (極速鍵值快取)** 架構部屬。
+本專案已完整支援以 **Cloudflare Workers (後端執行環境) + D1 (分散式 SQLite 資料庫) + R2 (音訊與圖檔物件儲存) + KV (極速鍵值快取)** 架構部署。
 
-- **線上正式運行網址 (Cloudflare Workers)**: [https://echostars.yukidu.workers.dev](https://echostars.yukidu.workers.dev)
+- **GitHub Repository**: `yukidu/Echo-Starry`
+- **正式網址**: [https://echo.starry.phd](https://echo.starry.phd)
+- **Cloudflare Workers 備援網址**: [https://echostars.yukidu.workers.dev](https://echostars.yukidu.workers.dev)
 - **已綁定 R2 儲存桶**: `echoes-audio-bucket`
 - **已綁定 D1 資料庫**: `echoes_db` (ID: `e0a696a9-0233-4186-be4d-229435b19a27`)
 - **已綁定 KV 命名空間**: `KV` (ID: `a2e345e244cb40b4a804be3f89584b90`)
@@ -54,7 +56,7 @@ Cloudflare 預設在偵測到 `package-lock.json` 時會執行嚴格的比對指
    - `.gitignore` 已將 `package-lock.json` 排除，避免將單一作業系統鎖定的相依版本推上 GitHub。
 
 2. **Cloudflare 控制台「組建設定」調整**（若使用 GitHub 自動連動）：
-   - 進入 Cloudflare 控制台 > **Workers 和 Pages** > 專案 `echostars` > **設定** > **組建與部署**。
+   - 進入 Cloudflare 控制台 > **Workers 和 Pages** > Worker `echostars` > **設定** > **組建與部署**。
    - 將 **組建命令 (Build command)** 修改為：
      ```bash
      npm install --legacy-peer-deps && npm run build
@@ -67,7 +69,7 @@ Cloudflare 預設在偵測到 `package-lock.json` 時會執行嚴格的比對指
 
 ---
 
-## 🚀 手動一鍵部屬 (Wrangler CLI)
+## 🚀 手動一鍵部署 (Wrangler CLI)
 
 在已配置 `CLOUDFLARE_API_TOKEN` 或登入 Wrangler 的環境中，只需執行：
 
@@ -75,7 +77,7 @@ Cloudflare 預設在偵測到 `package-lock.json` 時會執行嚴格的比對指
 # 1. 編譯前端 React SPA
 npm run build
 
-# 2. 一鍵部屬至 Cloudflare Workers
+# 2. 一鍵部署至 Cloudflare Workers
 npx wrangler deploy
 ```
 

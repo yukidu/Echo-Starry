@@ -3,7 +3,10 @@ import appWorker from './shareRouter';
 import { syncVerifiedMember, MemberIdentityError, normalizeMember } from './memberRepository';
 import type { Env } from './index';
 
-const GOOGLE_CLIENT_ID = '400699489182-lb412nhvj4s6t1qr5ovkg40hc646dq79.apps.googleusercontent.com';
+const GOOGLE_CLIENT_IDS = [
+  '661055525630-633btocuq7hs6pu7v5gkg3n2fouupubp.apps.googleusercontent.com',
+  '400699489182-lb412nhvj4s6t1qr5ovkg40hc646dq79.apps.googleusercontent.com'
+] as const;
 const SUPER_ADMIN_EMAIL = 'yukidu@gmail.com';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const GOOGLE_JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
@@ -120,7 +123,7 @@ async function sessionUser(request: Request, env: Env) {
 async function verifyGoogleCredential(credential: string) {
   if (!credential || credential.split('.').length !== 3) throw new Error('缺少 Google 身分憑證');
   const { payload } = await jwtVerify(credential, GOOGLE_JWKS, {
-    audience: GOOGLE_CLIENT_ID,
+    audience: [...GOOGLE_CLIENT_IDS],
     issuer: ['https://accounts.google.com', 'accounts.google.com']
   });
   const email = normalizeEmail(payload.email);
