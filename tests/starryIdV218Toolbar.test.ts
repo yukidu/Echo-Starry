@@ -34,6 +34,17 @@ test('My Card button is four characters, immediately left of hamburger, and open
   assert.match(html, /t==='我的電子名片'\|\|t==='我的名片'/);
 });
 
+test('toolbar observer is idempotent and cannot retrigger itself forever on mobile', () => {
+  assert.match(enhancerSource, /if\(\(card\.textContent\|\|'\'\)!=='我的名片'\)card\.textContent='我的名片'/);
+  assert.match(enhancerSource, /if\(card\.title!=='開啟我的公開名片'\)card\.title='開啟我的公開名片'/);
+  assert.match(enhancerSource, /let syncing=false/);
+  assert.match(enhancerSource, /if\(syncing\)return/);
+  assert.match(enhancerSource, /const target=q\('\.topbar'\)\|\|document\.body/);
+  assert.match(enhancerSource, /observer\.observe\(target,\{subtree:true,childList:true\}\)/);
+  assert.doesNotMatch(enhancerSource, /observer\.observe\(document\.documentElement/);
+  assert.doesNotMatch(enhancerSource, /attributeFilter:\['class'\]/);
+});
+
 test('public card removes the owner-only return bar completely', async () => {
   const request = new Request('https://id.starry.phd/122');
   const response = new Response('<html><head><style>.owner{position:sticky;top:0;padding:10px;text-align:center;background:#0b1528e8;backdrop-filter:blur(12px);z-index:4}.owner a{color:#dce7ff}</style></head><body><div class="owner"><a href="/">← 回到我的 Starry ID 會員中心</a></div><main>card</main></body></html>', {
