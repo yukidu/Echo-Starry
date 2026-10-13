@@ -1,28 +1,41 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { Env } from './index';
+import { renderStarryIdMemberCenterPage } from './starryIdMemberCenterPage';
 
 type StarryEnv = Env & {
   STARRY_ID_DB?: any;
   STARRY_ID_GOOGLE_CLIENT_ID?: string;
   STARRY_ID_ALLOWED_APPS?: string;
   STARRY_ID_SELF_ENROLL_APPS?: string;
+  STARRY_ID_SUPER_ADMIN_EMAILS?: string;
 };
 
 const STAR_DOMAIN = 'id.starry.phd';
 const DEFAULT_GOOGLE_CLIENT_ID = '661055525630-ndcq5gtr16h7rqqprlqqkkvineea87lc.apps.googleusercontent.com';
 const DEFAULT_ALLOWED_APPS = 'starry-id';
 const DEFAULT_SELF_ENROLL_APPS = 'starry-id';
+const DEFAULT_SUPER_ADMIN_EMAILS = ['yukidu@gmail.com'];
 const GOOGLE_JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const TOKEN_RE = /^[A-Za-z0-9_-]{30,}$/;
 const APP_ID_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const NOINDEX = 'noindex, nofollow, noarchive, nosnippet, noimageindex';
+const SESSION_COOKIE = 'starry_id_session';
 const sessionSchemaReady = new WeakMap<object, Promise<void>>();
 
 const USER_EDITABLE_PROFILE_FIELDS = new Set([
   'name', 'avatar', 'amwayId', 'phone', 'residence', 'center', 'joinReason', 'stayReason',
   'birthday', 'motto', 'zodiac', 'talentNumber', 'lifeNumber'
 ]);
+const ADMIN_EDITABLE_PROFILE_FIELDS = new Set([
+  ...USER_EDITABLE_PROFILE_FIELDS,
+  'rank'
+]);
+const RELATIONSHIP_FIELDS: Record<string, string> = {
+  sponsor: 'sponsor',
+  platinumUpline: 'platinum_upline',
+  diamondUpline: 'diamond_upline'
+};
 
 function text(value: unknown) {
   return value == null ? '' : String(value).trim();
@@ -59,6 +72,16 @@ function allowedApp(env: StarryEnv, appId: string) {
 
 function selfEnrollApp(env: StarryEnv, appId: string) {
   return parseAppSet(env.STARRY_ID_SELF_ENROLL_APPS, DEFAULT_SELF_ENROLL_APPS).has(appId);
+}
+
+function configuredSuperAdminEmails(env: StarryEnv) {
+  const raw = text(env.STARRY_ID_SUPER_ADMIN_EMAILS);
+  const values = raw ? raw.split(',') : DEFAULT_SUPER_ADMIN_EMAILS;
+  return new Set(values.map(item => lower(item)).filter(Boolean));
+}
+
+function configuredSuperAdmin(env: StarryEnv, email: unknown) {
+  return configuredSuperAdminEmails(env).has(lower(email));
 }
 
 function bytesToBase64Url(bytes: Uint8Array) {
@@ -125,12 +148,42 @@ function apiHeaders(request: Request) {
   return headers;
 }
 
-function json(request: Request, data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: apiHeaders(request) });
+function json(request: Request, data: unknown, status = 200, extraHeaders?: HeadersInit) {
+  const headers = apiHeaders(request);
+  if (extraHeaders) {
+    const extras = new Headers(extraHeaders);
+    extras.forEach((value, key) => headers.set(key, value));
+  }
+  return new Response(JSON.stringify(data), { status, headers });
 }
 
 async function requestBody(request: Request) {
   return request.clone().json().catch(() => ({} as any)) as Promise<any>;
+}
+
+function cookieValue(request: Request, name: string) {
+  const cookie = request.headers.get('Cookie') || '';
+  for (const part of cookie.split(';')) {
+    const [rawKey, ...rest] = part.trim().split('=');
+    if (rawKey === name) return decodeURIComponent(rest.join('='));
+  }
+  return '';
+}
+
+function requestSessionToken(request: Request) {
+  const bearer = request.headers.get('Authorization')?.match(/^Bearer\s+([A-Za-z0-9_-]{30,})$/i)?.[1] || '';
+  if (bearer && TOKEN_RE.test(bearer)) return bearer;
+  const cookie = cookieValue(request, SESSION_COOKIE);
+  return TOKEN_RE.test(cookie) ? cookie : '';
+}
+
+function sessionCookie(token: string, expiresAt: number) {
+  const maxAge = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+  return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
+}
+
+function clearSessionCookie() {
+  return `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
 }
 
 async function verifyGoogleCredential(env: StarryEnv, credential: string) {
@@ -151,15 +204,22 @@ async function verifyGoogleCredential(env: StarryEnv, credential: string) {
   };
 }
 
+const memberSelect = `SELECT
+  u.id,u.primaryEmail,u.status,
+  p.name,p.avatar,p.googleAvatar,p.amwayId,p.phone,p.residence,p.center,
+  p.rank,p.approvedRank,p.rankApproved,p.rankAuditStatus,p.rankAuditType,p.rankUpdatedAt,
+  p.joinReason,p.stayReason,p.birthday,p.motto,p.zodiac,p.talentNumber,p.lifeNumber,p.registerDate,
+  COALESCE((SELECT NULLIF(TRIM(rp.name),'') FROM member_relationships mr LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId WHERE mr.userId=u.id AND mr.relationType='sponsor' LIMIT 1),
+           (SELECT mr.legacyLabel FROM member_relationships mr WHERE mr.userId=u.id AND mr.relationType='sponsor' LIMIT 1),'') AS sponsor,
+  COALESCE((SELECT NULLIF(TRIM(rp.name),'') FROM member_relationships mr LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId WHERE mr.userId=u.id AND mr.relationType='platinum_upline' LIMIT 1),
+           (SELECT mr.legacyLabel FROM member_relationships mr WHERE mr.userId=u.id AND mr.relationType='platinum_upline' LIMIT 1),'') AS platinumUpline,
+  COALESCE((SELECT NULLIF(TRIM(rp.name),'') FROM member_relationships mr LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId WHERE mr.userId=u.id AND mr.relationType='diamond_upline' LIMIT 1),
+           (SELECT mr.legacyLabel FROM member_relationships mr WHERE mr.userId=u.id AND mr.relationType='diamond_upline' LIMIT 1),'') AS diamondUpline
+  FROM users u
+  LEFT JOIN profiles p ON p.userId=u.id`;
+
 async function readMember(db: any, userId: string) {
-  return db.prepare(`SELECT
-      u.id,u.primaryEmail,u.status,
-      p.name,p.avatar,p.googleAvatar,p.amwayId,p.phone,p.residence,p.center,
-      p.rank,p.approvedRank,p.rankApproved,p.rankAuditStatus,p.rankAuditType,p.rankUpdatedAt,
-      p.joinReason,p.stayReason,p.birthday,p.motto,p.zodiac,p.talentNumber,p.lifeNumber,p.registerDate
-    FROM users u
-    LEFT JOIN profiles p ON p.userId=u.id
-    WHERE u.id=? LIMIT 1`).bind(userId).first();
+  return db.prepare(`${memberSelect} WHERE u.id=? LIMIT 1`).bind(userId).first();
 }
 
 function publicMember(row: any) {
@@ -188,7 +248,10 @@ function publicMember(row: any) {
     zodiac: row.zodiac || '',
     talentNumber: row.talentNumber ?? null,
     lifeNumber: row.lifeNumber ?? null,
-    registerDate: row.registerDate || ''
+    registerDate: row.registerDate || '',
+    sponsor: row.sponsor || '',
+    platinumUpline: row.platinumUpline || '',
+    diamondUpline: row.diamondUpline || ''
   };
 }
 
@@ -218,7 +281,7 @@ async function syncVerifiedIdentity(
   if (existing?.status && existing.status !== 'active') throw new Error('account_inactive');
 
   const membership: any = await db.prepare(
-    'SELECT status FROM app_memberships WHERE userId=? AND appId=? LIMIT 1'
+    'SELECT status,role,isAdminUser FROM app_memberships WHERE userId=? AND appId=? LIMIT 1'
   ).bind(userId, appId).first();
   if (membership && membership.status !== 'active') throw new Error('app_membership_blocked');
   if (!membership && !selfEnrollApp(env, appId)) throw new Error('app_membership_required');
@@ -249,12 +312,18 @@ async function syncVerifiedIdentity(
       .bind(userId, identity.name, identity.avatar, identity.avatar, now, now)
   ];
 
+  const shouldBeSuperAdmin = appId === 'starry-id' && configuredSuperAdmin(env, identity.email);
   if (!membership) {
     statements.push(
       db.prepare(`INSERT INTO app_memberships
         (userId,appId,status,role,isAdminUser,isContributor,canUpload,joinedAt,updatedAt)
-        VALUES (?,?,'active','member',0,0,0,?,?)`)
-        .bind(userId, appId, now, now)
+        VALUES (?,?,'active',?,?,0,0,?,?)`)
+        .bind(userId, appId, shouldBeSuperAdmin ? 'super-admin' : 'member', shouldBeSuperAdmin ? 1 : 0, now, now)
+    );
+  } else if (shouldBeSuperAdmin) {
+    statements.push(
+      db.prepare(`UPDATE app_memberships SET role='super-admin',isAdminUser=1,updatedAt=? WHERE userId=? AND appId=?`)
+        .bind(now, userId, appId)
     );
   }
 
@@ -278,11 +347,12 @@ async function createSession(db: any, userId: string, appId: string) {
   return { token, expiresAt };
 }
 
-async function sessionUser(request: Request, db: any) {
-  const match = request.headers.get('Authorization')?.match(/^Bearer\s+([A-Za-z0-9_-]{30,})$/i);
-  if (!match || !TOKEN_RE.test(match[1])) return null;
+async function sessionUser(request: Request, env: StarryEnv) {
+  const db = env.STARRY_ID_DB;
+  const token = requestSessionToken(request);
+  if (!token) return null;
   await ensureSessionSchema(db);
-  const tokenHash = await hashToken(match[1]);
+  const tokenHash = await hashToken(token);
   const session: any = await db.prepare(
     'SELECT userId,appId,expiresAt FROM auth_sessions WHERE tokenHash=? LIMIT 1'
   ).bind(tokenHash).first();
@@ -300,11 +370,13 @@ async function sessionUser(request: Request, db: any) {
   if (!membership || membership.status !== 'active') return null;
   const publicUser = publicMember(member);
   if (!publicUser) return null;
+  const isSuperAdmin = configuredSuperAdmin(env, publicUser.email) || membership.role === 'super-admin';
 
   return {
     member: publicUser,
     appId: session.appId,
     expiresAt: Number(session.expiresAt),
+    isSuperAdmin,
     membership: {
       status: membership.status,
       role: membership.role || 'member',
@@ -315,19 +387,43 @@ async function sessionUser(request: Request, db: any) {
   };
 }
 
-async function updateProfile(env: StarryEnv, userId: string, actorUserId: string, sourceAppId: string, changes: any) {
+async function writeAudit(db: any, userId: string, sourceAppId: string, actorUserId: string, fieldName: string, oldValue: unknown, newValue: unknown, now: number) {
+  await db.prepare(`INSERT INTO profile_audit_logs
+    (id,userId,appId,actorUserId,fieldName,oldValue,newValue,createdAt)
+    VALUES (?,?,?,?,?,?,?,?)`)
+    .bind(crypto.randomUUID(), userId, sourceAppId, actorUserId, fieldName,
+      oldValue == null ? '' : String(oldValue), newValue == null ? '' : String(newValue), now).run();
+}
+
+async function updateProfile(
+  env: StarryEnv,
+  userId: string,
+  actorUserId: string,
+  sourceAppId: string,
+  changes: any,
+  isSuperAdmin = false
+) {
   const db = env.STARRY_ID_DB;
-  const current: any = await db.prepare('SELECT * FROM profiles WHERE userId=? LIMIT 1').bind(userId).first();
+  const current: any = await readMember(db, userId);
   if (!current) throw new Error('profile_not_found');
 
+  const editableFields = isSuperAdmin ? ADMIN_EDITABLE_PROFILE_FIELDS : USER_EDITABLE_PROFILE_FIELDS;
   const allowed: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(changes || {})) {
-    if (!USER_EDITABLE_PROFILE_FIELDS.has(key)) continue;
+    if (!editableFields.has(key)) continue;
     allowed[key] = key === 'talentNumber' || key === 'lifeNumber' ? integerOrNull(value) : text(value);
+  }
+
+  const relationshipChanges: Record<string, string> = {};
+  for (const [fieldName] of Object.entries(RELATIONSHIP_FIELDS)) {
+    if (Object.prototype.hasOwnProperty.call(changes || {}, fieldName)) {
+      relationshipChanges[fieldName] = text(changes[fieldName]);
+    }
   }
 
   const now = Date.now();
   const statements: any[] = [];
+  const legacyChanges: Record<string, unknown> = { ...allowed };
   for (const [key, value] of Object.entries(allowed)) {
     const before = current[key] == null ? '' : String(current[key]);
     const after = value == null ? '' : String(value);
@@ -337,16 +433,50 @@ async function updateProfile(env: StarryEnv, userId: string, actorUserId: string
       (id,userId,appId,actorUserId,fieldName,oldValue,newValue,createdAt)
       VALUES (?,?,?,?,?,?,?,?)`)
       .bind(crypto.randomUUID(), userId, sourceAppId, actorUserId, key, before, after, now));
+
+    if (key === 'rank' && isSuperAdmin) {
+      const rankText = text(value);
+      const rankUpdatedAt = new Date(now).toISOString();
+      statements.push(db.prepare(`UPDATE profiles SET approvedRank=?,rankApproved=1,rankAuditStatus='approved',rankAuditType='super-admin',rankUpdatedAt=?,updatedAt=? WHERE userId=?`)
+        .bind(rankText, rankUpdatedAt, now, userId));
+      legacyChanges.approvedRank = rankText;
+      legacyChanges.rankApproved = 1;
+      legacyChanges.rankAuditStatus = 'approved';
+      legacyChanges.rankAuditType = 'super-admin';
+      legacyChanges.rankUpdatedAt = rankUpdatedAt;
+    }
   }
+
+  for (const [fieldName, relationType] of Object.entries(RELATIONSHIP_FIELDS)) {
+    if (!Object.prototype.hasOwnProperty.call(relationshipChanges, fieldName)) continue;
+    const before = text(current[fieldName]);
+    const after = relationshipChanges[fieldName];
+    if (before === after) continue;
+    if (after) {
+      statements.push(db.prepare(`INSERT INTO member_relationships
+        (userId,relationType,relatedUserId,legacyLabel,resolutionStatus,updatedAt)
+        VALUES (?,?,NULL,?,'unresolved',?)
+        ON CONFLICT(userId,relationType) DO UPDATE SET relatedUserId=NULL,legacyLabel=excluded.legacyLabel,resolutionStatus='unresolved',updatedAt=excluded.updatedAt`)
+        .bind(userId, relationType, after, now));
+    } else {
+      statements.push(db.prepare('DELETE FROM member_relationships WHERE userId=? AND relationType=?').bind(userId, relationType));
+    }
+    statements.push(db.prepare(`INSERT INTO profile_audit_logs
+      (id,userId,appId,actorUserId,fieldName,oldValue,newValue,createdAt)
+      VALUES (?,?,?,?,?,?,?,?)`)
+      .bind(crypto.randomUUID(), userId, sourceAppId, actorUserId, fieldName, before, after, now));
+    legacyChanges[fieldName] = after;
+  }
+
   if (statements.length) await db.batch(statements);
 
-  if (env.DB && Object.keys(allowed).length) {
+  if (env.DB && Object.keys(legacyChanges).length) {
     try {
       const legacy: any = await env.DB.prepare('SELECT id FROM users WHERE id=? LIMIT 1').bind(userId).first();
       if (legacy) {
-        const keys = Object.keys(allowed);
+        const keys = Object.keys(legacyChanges);
         await env.DB.prepare(`UPDATE users SET ${keys.map(key => `${key}=?`).join(',')} WHERE id=?`)
-          .bind(...keys.map(key => allowed[key]), userId).run();
+          .bind(...keys.map(key => legacyChanges[key]), userId).run();
       }
     } catch (error) {
       console.warn('Starry ID legacy dual-write skipped', {
@@ -358,15 +488,38 @@ async function updateProfile(env: StarryEnv, userId: string, actorUserId: string
   return publicMember(await readMember(db, userId));
 }
 
-function servicePage() {
-  return new Response(`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Starry ID｜繁星會員中心</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b1020;color:#f7f8fb}.card{width:min(520px,calc(100% - 40px));padding:36px;border:1px solid #27304a;border-radius:24px;background:#121a30;box-shadow:0 20px 60px #0008}.mark{font-size:42px}.muted{color:#aab4ca;line-height:1.7}.status{display:inline-flex;gap:8px;align-items:center;margin-top:18px;padding:8px 12px;border-radius:999px;background:#17223c}.dot{width:9px;height:9px;border-radius:50%;background:#5ee6a8}</style></head><body><main class="card"><div class="mark">✦</div><h1>Starry ID</h1><p class="muted">繁星會員中心中央身份服務已啟用。</p><div class="status"><span class="dot"></span><span>Central identity service</span></div></main></body></html>`, {
-    status: 200,
-    headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'no-store',
-      'X-Robots-Tag': NOINDEX
-    }
-  });
+async function listMembers(db: any, search: string) {
+  const q = text(search).slice(0, 80);
+  const like = `%${q}%`;
+  const where = q
+    ? `WHERE LOWER(COALESCE(p.name,'')) LIKE LOWER(?) OR LOWER(u.primaryEmail) LIKE LOWER(?) OR LOWER(COALESCE(p.amwayId,'')) LIKE LOWER(?)`
+    : '';
+  const params = q ? [like, like, like] : [];
+  const rows: any = await db.prepare(`SELECT
+      u.id,u.primaryEmail,u.status,p.name,p.rank,p.approvedRank,p.amwayId
+    FROM users u LEFT JOIN profiles p ON p.userId=u.id
+    ${where}
+    ORDER BY LOWER(COALESCE(p.name,'')),LOWER(u.primaryEmail)
+    LIMIT 100`).bind(...params).all();
+  const countRow: any = await db.prepare(`SELECT COUNT(*) AS count
+    FROM users u LEFT JOIN profiles p ON p.userId=u.id ${where}`).bind(...params).first();
+  return {
+    total: Number(countRow?.count || 0),
+    members: (rows?.results || []).map((row: any) => ({
+      id: row.id,
+      email: row.primaryEmail,
+      status: row.status,
+      name: row.name || '',
+      amwayId: row.amwayId || '',
+      rank: row.rank || '',
+      approvedRank: row.approvedRank || ''
+    }))
+  };
+}
+
+function servicePage(env: StarryEnv) {
+  const clientId = text(env.STARRY_ID_GOOGLE_CLIENT_ID) || DEFAULT_GOOGLE_CLIENT_ID;
+  return renderStarryIdMemberCenterPage(clientId);
 }
 
 async function handleApi(request: Request, env: StarryEnv, path: string) {
@@ -398,9 +551,9 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
         success: true,
         user: synced.user,
         appId: synced.appId,
-        authToken: session.token,
-        sessionExpiresAt: session.expiresAt
-      });
+        sessionExpiresAt: session.expiresAt,
+        isSuperAdmin: configuredSuperAdmin(env, synced.user.email)
+      }, 200, { 'Set-Cookie': sessionCookie(session.token, session.expiresAt) });
     } catch (error) {
       const code = error instanceof Error ? error.message : 'login_failed';
       const conflict = ['identity_conflict', 'email_conflict'].includes(code);
@@ -422,29 +575,35 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
   }
 
   if (path === '/api/session' && method === 'GET') {
-    const session = await sessionUser(request, db);
+    const session = await sessionUser(request, env);
     if (!session) return json(request, { authenticated: false }, 401);
     return json(request, {
       authenticated: true,
       user: session.member,
       appId: session.appId,
       membership: session.membership,
+      isSuperAdmin: session.isSuperAdmin,
       sessionExpiresAt: session.expiresAt
     });
   }
 
   if (path === '/api/profile' && method === 'GET') {
-    const session = await sessionUser(request, db);
+    const session = await sessionUser(request, env);
     if (!session) return json(request, { error: '請先登入 Starry ID' }, 401);
-    return json(request, { user: session.member, appId: session.appId, membership: session.membership });
+    return json(request, {
+      user: session.member,
+      appId: session.appId,
+      membership: session.membership,
+      isSuperAdmin: session.isSuperAdmin
+    });
   }
 
   if (path === '/api/profile' && method === 'PUT') {
-    const session = await sessionUser(request, db);
+    const session = await sessionUser(request, env);
     if (!session) return json(request, { error: '請先登入 Starry ID' }, 401);
     try {
       const changes = await requestBody(request);
-      const user = await updateProfile(env, session.member.id, session.member.id, session.appId, changes);
+      const user = await updateProfile(env, session.member.id, session.member.id, session.appId, changes, session.isSuperAdmin);
       return json(request, { success: true, user });
     } catch (error) {
       console.warn('Starry ID profile update failed', {
@@ -454,14 +613,45 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
     }
   }
 
+  if (path === '/api/admin/members' && method === 'GET') {
+    const session = await sessionUser(request, env);
+    if (!session) return json(request, { error: '請先登入 Starry ID' }, 401);
+    if (!session.isSuperAdmin) return json(request, { error: '只有超級管理員可以管理全部會員。' }, 403);
+    const search = new URL(request.url).searchParams.get('search') || '';
+    return json(request, await listMembers(db, search));
+  }
+
+  const adminMemberMatch = path.match(/^\/api\/admin\/members\/([^/]+)$/);
+  if (adminMemberMatch && (method === 'GET' || method === 'PUT')) {
+    const session = await sessionUser(request, env);
+    if (!session) return json(request, { error: '請先登入 Starry ID' }, 401);
+    if (!session.isSuperAdmin) return json(request, { error: '只有超級管理員可以管理全部會員。' }, 403);
+    const targetUserId = decodeURIComponent(adminMemberMatch[1]);
+    if (method === 'GET') {
+      const member = publicMember(await readMember(db, targetUserId));
+      if (!member) return json(request, { error: '找不到會員。' }, 404);
+      return json(request, { user: member });
+    }
+    try {
+      const changes = await requestBody(request);
+      const user = await updateProfile(env, targetUserId, session.member.id, 'starry-id', changes, true);
+      return json(request, { success: true, user });
+    } catch (error) {
+      console.warn('Starry ID admin profile update failed', {
+        code: error instanceof Error ? error.message : 'unknown'
+      });
+      return json(request, { error: '會員資料更新失敗，請稍後再試。' }, 503);
+    }
+  }
+
   if (path === '/api/logout' && method === 'POST') {
-    const match = request.headers.get('Authorization')?.match(/^Bearer\s+([A-Za-z0-9_-]{30,})$/i);
-    if (match) {
+    const token = requestSessionToken(request);
+    if (token) {
       await ensureSessionSchema(db);
-      const tokenHash = await hashToken(match[1]);
+      const tokenHash = await hashToken(token);
       await db.prepare('DELETE FROM auth_sessions WHERE tokenHash=?').bind(tokenHash).run().catch(() => undefined);
     }
-    return json(request, { success: true });
+    return json(request, { success: true }, 200, { 'Set-Cookie': clearSessionCookie() });
   }
 
   return json(request, { error: 'Not found' }, 404);
@@ -471,7 +661,7 @@ export async function handleStarryIdCentral(request: Request, env: StarryEnv): P
   const url = new URL(request.url);
   if (url.hostname !== STAR_DOMAIN) return null;
 
-  if (url.pathname === '/' && request.method.toUpperCase() === 'GET') return servicePage();
+  if (url.pathname === '/' && request.method.toUpperCase() === 'GET') return servicePage(env);
   if (url.pathname === '/robots.txt' && request.method.toUpperCase() === 'GET') {
     return new Response('User-agent: *\nDisallow: /\n', {
       headers: { 'Content-Type': 'text/plain; charset=utf-8', 'X-Robots-Tag': NOINDEX }
