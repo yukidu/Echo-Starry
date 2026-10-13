@@ -7,7 +7,7 @@ const read = (path: string) => readFile(new URL(`../${path}`, import.meta.url), 
 test('Starry ID places inline visibility controls next to editable profile fields', async () => {
   const page = await read('worker/starryIdMemberCenterPage.ts');
   assert.match(page, /function makeVisibilityButton\(field,titleText,className\)/);
-  assert.match(page, /className='field-eye'/);
+  assert.match(page, /className=\(className\|\|'field-eye'\)/);
   assert.match(page, /\/api\/card-settings/);
   assert.match(page, /visibility:\{\[field\]:next\}/);
   assert.match(page, /眼睛可控制該欄位是否顯示在公開名片/);
