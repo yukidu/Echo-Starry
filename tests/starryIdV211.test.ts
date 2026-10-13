@@ -29,6 +29,13 @@ test('electronic cards use formal D1 schema and schema verification', () => {
   assert.match(verifySchema, /'profile_field_visibility'/);
 });
 
+test('manual n-number changes advance the allocator so future automatic cards cannot collide', () => {
+  assert.match(schema, /UPDATE sqlite_sequence/);
+  assert.match(schema, /CREATE TRIGGER IF NOT EXISTS public_cards_bump_sequence/);
+  assert.match(schema, /AFTER UPDATE OF cardNumber ON public_cards/);
+  assert.match(schema, /MAX\(seq, CAST\(SUBSTR\(NEW\.cardNumber, 2\) AS INTEGER\)\)/);
+});
+
 test('non-Amway members get n-number cards while Amway ID controls its own URL slug', () => {
   assert.match(router, /const number = `n\$\{Number\(row\.seq\)\}`/);
   assert.match(router, /\^n\[1-9\]\[0-9\]\*\$/);
