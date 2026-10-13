@@ -5,6 +5,7 @@ import iosGoogleRedirectWorker from './iosGoogleRedirectRouter';
 import { handleStarbeautySso } from './starbeautySsoRouter';
 import { handleV192TrackVisibility } from './v192TrackVisibilityRouter';
 import { syncEchoMemberToStarryBestEffort } from './starryIdSync';
+import { handleStarryIdV211 } from './starryIdV211Router';
 import { handleStarryIdCentral } from './starryIdCentralRouter';
 import type { Env } from './index';
 import { unitsToStickers } from '../shared/stickers';
@@ -195,6 +196,10 @@ async function spentStickerLeaderboard(env: Env): Promise<Response | null> {
 export default {
   async fetch(request: Request, env: Env, ctx?: any): Promise<Response> {
     const url = new URL(request.url);
+
+    // v211 adds public-card/settings UI without replacing the v209/v210 identity core.
+    const starryV211Response = await handleStarryIdV211(request, env as any);
+    if (starryV211Response) return withPrivacyHeaders(starryV211Response);
 
     // Starry ID owns id.starry.phd only. Keeping privacyCrawlerRouter as the
     // Worker entry point protects the existing EchoStars / DownloadStarry chain.

@@ -104,6 +104,58 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
 CREATE INDEX IF NOT EXISTS auth_sessions_user ON auth_sessions(userId);
 CREATE INDEX IF NOT EXISTS auth_sessions_expiry ON auth_sessions(expiresAt);
 
+-- v211：每位會員一組電子名片編號與目前公開網址後綴。
+-- 非安麗會員預設使用 n1、n2...；若有 Amway ID，應用層會讓 slug 跟著 Amway ID 更新。
+CREATE TABLE IF NOT EXISTS public_cards (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId TEXT NOT NULL UNIQUE,
+  slug TEXT NOT NULL UNIQUE,
+  cardNumber TEXT NOT NULL UNIQUE,
+  createdAt INTEGER NOT NULL,
+  updatedAt INTEGER NOT NULL,
+  FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS public_cards_slug ON public_cards(slug);
+CREATE UNIQUE INDEX IF NOT EXISTS public_cards_number ON public_cards(cardNumber);
+
+-- 若會員手動把電子名片編號改成較大的 n 編號，立即把 AUTOINCREMENT 水位推到該編號。
+-- 這樣未來新會員自動配號會從更大的號碼開始，不會撞到已被手動占用的編號。
+UPDATE sqlite_sequence
+SET seq = MAX(
+  seq,
+  COALESCE((
+    SELECT MAX(CAST(SUBSTR(cardNumber, 2) AS INTEGER))
+    FROM public_cards
+    WHERE cardNumber GLOB 'n[0-9]*'
+      AND SUBSTR(cardNumber, 2) NOT GLOB '*[^0-9]*'
+      AND LENGTH(SUBSTR(cardNumber, 2)) > 0
+  ), 0)
+)
+WHERE name = 'public_cards';
+
+CREATE TRIGGER IF NOT EXISTS public_cards_bump_sequence
+AFTER UPDATE OF cardNumber ON public_cards
+WHEN NEW.cardNumber GLOB 'n[0-9]*'
+  AND SUBSTR(NEW.cardNumber, 2) NOT GLOB '*[^0-9]*'
+  AND LENGTH(SUBSTR(NEW.cardNumber, 2)) > 0
+BEGIN
+  UPDATE sqlite_sequence
+  SET seq = MAX(seq, CAST(SUBSTR(NEW.cardNumber, 2) AS INTEGER))
+  WHERE name = 'public_cards';
+END;
+
+-- v211：電子名片每個欄位獨立公開／隱藏；未建立資料列時由應用層套預設值。
+-- 預設全部公開，只有手機與生日預設隱藏。
+CREATE TABLE IF NOT EXISTS profile_field_visibility (
+  userId TEXT NOT NULL,
+  fieldName TEXT NOT NULL,
+  isVisible INTEGER NOT NULL DEFAULT 1,
+  updatedAt INTEGER NOT NULL,
+  PRIMARY KEY(userId, fieldName),
+  FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS profile_field_visibility_user ON profile_field_visibility(userId);
+
 -- 保留舊系統 ID，讓既有播放、收藏、學習紀錄不需要重寫 owner id。
 CREATE TABLE IF NOT EXISTS legacy_links (
   sourceApp TEXT NOT NULL,
