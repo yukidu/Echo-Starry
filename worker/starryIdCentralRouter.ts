@@ -428,7 +428,7 @@ function servicePage() {
 }
 
 export default {
-  async fetch(request: Request, env: StarryEnv, ctx?: any): Promise<Response> {
+  async fetch(request: Request, env: StarryEnv): Promise<Response> {
     const url = new URL(request.url);
     const isCentralHost = url.hostname === STAR_DOMAIN;
 
@@ -451,6 +451,6 @@ export default {
       return handleApi(request, env, canonicalPath);
     }
 
-    return echoStarsWorker.fetch(request, env, ctx);
+    return echoStarsWorker.fetch(request, env);
   }
 };
