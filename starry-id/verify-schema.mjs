@@ -7,7 +7,7 @@ const parts = Array.isArray(raw) ? raw : (raw.result || []);
 const rows = parts.flatMap(item => item?.results || []);
 const names = new Set(rows.map(row => row.name));
 const required = [
-  'users', 'identities', 'profiles', 'member_relationships', 'app_memberships',
+  'users', 'identities', 'profiles', 'member_relationships', 'app_memberships', 'auth_sessions',
   'legacy_links', 'profile_audit_logs', 'migration_batches', 'migration_issues'
 ];
 const missing = required.filter(name => !names.has(name));
