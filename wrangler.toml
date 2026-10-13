@@ -1,6 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/privacyCrawlerRouter.ts"
+main = "worker/starryIdCentralRouter.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
@@ -13,10 +13,14 @@ preview_urls = true
 # Storage bindings are omitted here so preview branches cannot read/write production D1, KV or R2.
 previews = { }
 
-# 正式自訂網域：Cloudflare Workers Custom Domain。
-# Cloudflare 會自動建立 DNS 與 SSL 憑證。
+# 正式自訂網域：EchoStars 與 Starry ID 共用同一部署流程，
+# 但由入口 router 依 hostname 完全分流；中央資料使用獨立 starry_id_db。
 [[routes]]
 pattern = "echo.starry.phd"
+custom_domain = true
+
+[[routes]]
+pattern = "id.starry.phd"
 custom_domain = true
 
 # 保留原本 Cloudflare 建置流程；回歸測試由 GitHub Actions 額外把關。
@@ -28,8 +32,7 @@ command = "npm run build"
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# 所有請求先經過 privacyCrawlerRouter，才能對首頁、分享頁、靜態資源與 API
-# 一致套用 X-Robots-Tag，並阻擋已知搜尋引擎／AI crawler。
+# 所有請求先經過 Starry ID hostname router；EchoStars 再交給既有 privacyCrawlerRouter。
 run_worker_first = ["/*"]
 
 # 1. Cloudflare D1 資料庫 (SQLite)
