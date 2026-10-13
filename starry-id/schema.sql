@@ -92,6 +92,18 @@ CREATE TABLE IF NOT EXISTS app_memberships (
 );
 CREATE INDEX IF NOT EXISTS app_memberships_app ON app_memberships(appId, status);
 
+-- Starry ID server session。瀏覽器只拿到 raw token，D1 僅保存 SHA-256 hash。
+CREATE TABLE IF NOT EXISTS auth_sessions (
+  tokenHash TEXT PRIMARY KEY,
+  userId TEXT NOT NULL,
+  appId TEXT NOT NULL,
+  expiresAt INTEGER NOT NULL,
+  createdAt INTEGER NOT NULL,
+  FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS auth_sessions_user ON auth_sessions(userId);
+CREATE INDEX IF NOT EXISTS auth_sessions_expiry ON auth_sessions(expiresAt);
+
 -- 保留舊系統 ID，讓既有播放、收藏、學習紀錄不需要重寫 owner id。
 CREATE TABLE IF NOT EXISTS legacy_links (
   sourceApp TEXT NOT NULL,
