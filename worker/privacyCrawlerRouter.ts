@@ -9,6 +9,7 @@ import { handleStarryIdV211 } from './starryIdV211Router';
 import { handleStarryIdV212PublicCardFallback } from './starryIdV212PublicCardBridge';
 import { handleStarryIdCentral } from './starryIdCentralRouter';
 import { handleDownloadStarryCentralSso } from './downloadStarryCentralSso';
+import { enhanceStarryIdV218Response } from './starryIdV218ResponseEnhancer';
 import type { Env } from './index';
 import { unitsToStickers } from '../shared/stickers';
 
@@ -214,7 +215,11 @@ export default {
         env as any,
         starryV211Response
       );
-      return withPrivacyHeaders(starryV212Response || starryV211Response);
+      const enhancedStarryIdResponse = await enhanceStarryIdV218Response(
+        request,
+        starryV212Response || starryV211Response
+      );
+      return withPrivacyHeaders(enhancedStarryIdResponse);
     }
 
     // Starry ID owns id.starry.phd only. Keeping privacyCrawlerRouter as the
