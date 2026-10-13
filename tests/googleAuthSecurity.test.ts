@@ -21,7 +21,7 @@ const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 test('Google identity is verified server-side instead of trusting a submitted email', () => {
   assert.match(authRouter, /jwtVerify\(credential, GOOGLE_JWKS/);
-  assert.match(authRouter, /audience:\s*GOOGLE_CLIENT_ID/);
+  assert.match(authRouter, /audience:\s*\[\.\.\.GOOGLE_CLIENT_IDS\]/);
   assert.match(authRouter, /issuer:\s*\['https:\/\/accounts\.google\.com', 'accounts\.google\.com'\]/);
   assert.match(authRouter, /payload\.email_verified !== true/);
   assert.match(authRouter, /path === '\/api\/users\/google-sync'/);
