@@ -7,6 +7,12 @@
 - **已綁定 D1 資料庫**: `echoes_db` (ID: `e0a696a9-0233-4186-be4d-229435b19a27`)
 - **已綁定 KV 命名空間**: `KV` (ID: `a2e345e244cb40b4a804be3f89584b90`)
 
+## 2026-10-14 v212 正式部署重新觸發
+
+- 以 `main` 的 v212（公開電子名片網址補強）為基準重新觸發 Cloudflare Production Deploy。
+- 此次只更新部署紀錄文件，不變更 Worker、Starry ID、DownloadStarry SSO、D1、R2、KV 或前端功能。
+- 正式完成標準仍是：合併後 exact-main 的 Cloudflare Workers Production Build 必須 `completed + success`。
+
 ## 2026-10-02 功能與部署修正
 
 - 新增 PWA 安裝按鈕、manifest、192/512 PNG 圖示與 Service Worker。Chrome/Edge 支援原生安裝提示；iPhone/iPad 提供 Safari「加入主畫面」步驟。
