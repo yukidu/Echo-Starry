@@ -7,7 +7,7 @@ const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.ur
 const STARRY_CLIENT_ID = '661055525630-633btocuq7hs6pu7v5gkg3n2fouupubp.apps.googleusercontent.com';
 const LEGACY_CLIENT_ID = '400699489182-lb412nhvj4s6t1qr5ovkg40hc646dq79.apps.googleusercontent.com';
 
-test('v214: public brand surfaces use Echo-Starry', () => {
+test('v214/v219: project brand surfaces stay Echo-Starry while navbar displays 繁星回聲', () => {
   const index = read('index.html');
   const manifest = read('public/manifest.webmanifest');
   const metadata = read('metadata.json');
@@ -15,13 +15,13 @@ test('v214: public brand surfaces use Echo-Starry', () => {
   const googleUx = read('src/googleIdentityPlatformUx.ts');
 
   assert.match(index, /<title>Echo-Starry<\/title>/);
-  assert.match(index, /apple-mobile-web-app-title" content="Echo-Starry"/);
-  assert.match(index, /og:title" content="Echo-Starry"/);
+  assert.match(index, /apple-mobile-web-app-title\" content=\"Echo-Starry\"/);
+  assert.match(index, /og:title\" content=\"Echo-Starry\"/);
   assert.equal(JSON.parse(manifest).name, 'Echo-Starry');
   assert.equal(JSON.parse(manifest).short_name, 'Echo-Starry');
   assert.equal(JSON.parse(metadata).name, 'Echo-Starry');
-  assert.match(navbar, />Echo-Starry<\/span>/);
-  assert.match(navbar, /登入 Echo-Starry/);
+  assert.match(navbar, />繁星回聲<\/span>/);
+  assert.match(navbar, /登入繁星回聲/);
   assert.match(googleUx, /登入 Echo-Starry/);
 });
 
@@ -52,8 +52,8 @@ test('v214: rename preserves legacy internal identity keys and Cloudflare resour
   assert.match(index, /echostars_user_font_zoom_v1/);
   assert.match(navbar, /echostars_user_font_zoom_v1/);
   assert.match(googleUx, /echostars_auth_return_v1/);
-  assert.match(wrangler, /name = "echostars"/);
-  assert.match(wrangler, /pattern = "echo\.starry\.phd"/);
+  assert.match(wrangler, /name = \"echostars\"/);
+  assert.match(wrangler, /pattern = \"echo\.starry\.phd\"/);
 });
 
 test('v214: App legacy display text is rewritten at build time without runtime work', () => {
