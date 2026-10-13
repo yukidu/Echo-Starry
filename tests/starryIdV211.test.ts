@@ -51,9 +51,12 @@ test('field visibility is per-field and defaults only phone and birthday to hidd
   assert.match(router, /visibility\[row\.fieldName\] = Boolean\(row\.isVisible\)/);
 });
 
-test('public visitor card hides owner menu and exposes a floating login only for visitors', () => {
+test('public card honors hidden fields even when the owner opens their own public URL', () => {
   assert.match(router, /const owner=viewer===card\.userId/);
-  assert.match(router, /rows\.filter\(\(\[key\]\)=>owner\|\|visibility\[key\]!==false\)/);
+  assert.match(router, /rows\.filter\(\(\[key\]\)=>visibility\[key\]!==false\)/);
+  assert.doesNotMatch(router, /rows\.filter\(\(\[key\]\)=>owner\|\|visibility\[key\]!==false\)/);
+  assert.match(router, /const avatar=visibility\.avatar!==false&&data\.avatar/);
+  assert.match(router, /const grid=visibility\.numerology!==false&&data\.birthday/);
   assert.match(router, /owner\?'<div class="owner"/);
   assert.match(router, /owner\?'':`<a class="login" href="\/">登入 Starry ID<\/a>`/);
   assert.match(router, /\.login\{position:fixed;right:18px;bottom:18px/);
