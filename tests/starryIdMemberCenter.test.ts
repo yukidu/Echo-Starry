@@ -14,7 +14,7 @@ test('Starry ID root is a real Google member login and electronic card page', ()
   assert.match(page, /accounts\.google\.com\/gsi\/client/);
   assert.match(page, /\/api\/google-sync/);
   assert.match(page, /電子名片/);
-  assert.match(page, /原地修改/);
+  assert.match(page, /鉛筆可修改資料/);
   assert.match(router, new RegExp(STARRY_CLIENT.replaceAll('.', '\\.')));
 });
 
@@ -50,8 +50,9 @@ test('rank editing is reserved for Super Admin and records central approval stat
   assert.match(page, /if\(field==='rank'\) return state\.isSuperAdmin/);
 });
 
-test('private member center is not automatically a public personal-data page', () => {
+test('member center keeps public visibility explicit and remains noindex', () => {
   assert.match(page, /noindex,nofollow,noarchive,nosnippet,noimageindex/);
-  assert.match(page, /個人資料目前只在登入後顯示，不會自動公開/);
+  assert.match(page, /眼睛可控制該欄位是否顯示在公開名片/);
+  assert.match(page, /\/api\/card-settings/);
   assert.match(page, /Content-Security-Policy/);
 });
