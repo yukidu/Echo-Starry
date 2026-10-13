@@ -26,15 +26,17 @@ test('Download Starry SSO uses one-time code and central Starry ID database', as
   assert.match(source, /app = 'downloadstarry'/);
   assert.match(source, /STARRY_ID_DB/);
   assert.match(source, /syncEchoMemberToStarryBestEffort/);
-  assert.match(source, /https:\/\/download\.starry\.phd\/auth\/callback\?code=/);
+  assert.match(source, /const DOWNLOAD_STARRY_URL = 'https:\/\/download\.starry\.phd'/);
+  assert.match(source, /\/auth\/callback\?code=/);
   assert.doesNotMatch(source, /googleSubject.*return json/s);
 });
 
-test('Worker entry stays a thin wrapper around current privacy router', async () => {
-  const entry = await read('worker/downloadStarryEntry.ts');
+test('Download Starry SSO stays behind the existing privacy Worker entry', async () => {
+  const privacy = await read('worker/privacyCrawlerRouter.ts');
+  const externalSso = await read('worker/starbeautySsoRouter.ts');
   const wrangler = await read('wrangler.toml');
-  assert.match(entry, /privacyCrawlerRouter/);
-  assert.match(entry, /handleDownloadStarrySso/);
-  assert.match(wrangler, /main = "worker\/downloadStarryEntry\.ts"/);
+  assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
   assert.match(wrangler, /binding = "STARRY_ID_DB"/);
+  assert.match(privacy, /handleStarbeautySso/);
+  assert.match(externalSso, /handleDownloadStarrySso/);
 });
