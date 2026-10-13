@@ -1,5 +1,6 @@
 import sessionWorker from './sessionCookieRouter';
 import type { Env } from './index';
+import { handleDownloadStarrySso } from './downloadStarrySsoRouter';
 import {
   readStarBeautyMemberSnapshot,
   stableStarBeautyProfile,
@@ -159,6 +160,9 @@ btn.onclick=go;go().catch(()=>renderGoogle());
 }
 
 export async function handleStarbeautySso(request: Request, env: Env): Promise<Response | null> {
+  const downloadStarryResponse = await handleDownloadStarrySso(request, env as any);
+  if (downloadStarryResponse) return downloadStarryResponse;
+
   const url = new URL(request.url);
   if (url.pathname === '/auth/starbeauty' && request.method === 'GET') return loginPage();
   if (url.pathname === '/api/auth/starbeauty-health' && request.method === 'GET') return integrationHealth(env);
