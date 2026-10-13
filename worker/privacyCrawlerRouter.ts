@@ -6,6 +6,7 @@ import { handleStarbeautySso } from './starbeautySsoRouter';
 import { handleV192TrackVisibility } from './v192TrackVisibilityRouter';
 import { syncEchoMemberToStarryBestEffort } from './starryIdSync';
 import { handleStarryIdV211 } from './starryIdV211Router';
+import { handleStarryIdV212PublicCardFallback } from './starryIdV212PublicCardBridge';
 import { handleStarryIdCentral } from './starryIdCentralRouter';
 import { handleDownloadStarryCentralSso } from './downloadStarryCentralSso';
 import type { Env } from './index';
@@ -204,9 +205,17 @@ export default {
     const downloadStarryCentralResponse = await handleDownloadStarryCentralSso(request, env);
     if (downloadStarryCentralResponse) return withPrivacyHeaders(downloadStarryCentralResponse);
 
-    // v211 adds public-card/settings UI without replacing the v209/v210 identity core.
+    // v211 owns the established public-card renderer/privacy rules. v212 only
+    // bridges a legacy member whose Amway ID exists before public_cards did.
     const starryV211Response = await handleStarryIdV211(request, env as any);
-    if (starryV211Response) return withPrivacyHeaders(starryV211Response);
+    if (starryV211Response) {
+      const starryV212Response = await handleStarryIdV212PublicCardFallback(
+        request,
+        env as any,
+        starryV211Response
+      );
+      return withPrivacyHeaders(starryV212Response || starryV211Response);
+    }
 
     // Starry ID owns id.starry.phd only. Keeping privacyCrawlerRouter as the
     // Worker entry point protects the existing EchoStars / DownloadStarry chain.
