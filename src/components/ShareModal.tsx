@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Share2, Copy, Check, X, Smartphone, RefreshCw } from 'lucide-react';
 import { Track, UserProfile } from '../types';
 import { VisitorIdentity, getRandomExcitement } from '../utils/visitor';
+import { copyText, share } from '../platform';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -86,26 +87,23 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
   const handleNativeShare = async () => {
     if (!shareUrl) return;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: categoryName,
-          text: shareText,
-          url: shareUrl
-        });
-        recordShareEvent();
-        onClose();
-        return;
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
-      }
+    const result = await share({
+      title: categoryName,
+      text: shareText,
+      url: shareUrl
+    });
+    if (result === 'shared') {
+      recordShareEvent();
+      onClose();
+      return;
     }
+    if (result === 'cancelled') return;
     handleCopy();
   };
 
   const handleCopy = async () => {
     if (!shareUrl) return;
-    try { await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`); } catch { return; }
+    if (!await copyText(`${shareText}\n${shareUrl}`)) return;
     recordShareEvent();
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
