@@ -29,14 +29,25 @@ jobs:
           failed=0
           total=0
           passed=0
+          : > /tmp/echostars-regression-tests.log
           for test_file in tests/*.test.ts; do
             total=$((total + 1))
             echo ""
             echo "============================================================"
             echo "TEST FILE: ${test_file}"
             echo "============================================================"
-            node --import tsx --test "${test_file}"
+            test_output="$(mktemp)"
+            node --import tsx --test "${test_file}" > "${test_output}" 2>&1
             status=$?
+            cat "${test_output}"
+            {
+              echo ""
+              echo "============================================================"
+              echo "TEST FILE: ${test_file}"
+              echo "============================================================"
+              cat "${test_output}"
+            } >> /tmp/echostars-regression-tests.log
+            rm -f "${test_output}"
             if [ ${status} -eq 0 ]; then
               passed=$((passed + 1))
               echo "PASS: ${test_file}"
@@ -154,6 +165,7 @@ jobs:
         with:
           name: browser-ui-${{ github.sha }}
           path: |
+            /tmp/echostars-regression-tests.log
             /tmp/echostars-theme-*
             /tmp/echostars-category-*
             /tmp/echostars-v156-*
