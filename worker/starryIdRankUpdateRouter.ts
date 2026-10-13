@@ -33,18 +33,23 @@ async function sessionData(request: Request, env: Env) {
 
 export async function handleStarryIdRankUpdate(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
-  if (url.hostname !== STAR_DOMAIN || url.pathname !== '/api/profile-rank') return null;
-  if (request.method.toUpperCase() !== 'PUT') return json({ error: 'Method not allowed' }, 405);
+  if (url.hostname !== STAR_DOMAIN) return null;
+  if (request.method.toUpperCase() !== 'PUT') return url.pathname === '/api/profile-rank' ? json({ error: 'Method not allowed' }, 405) : null;
+
+  const rawInput: any = await request.clone().json().catch(() => ({}));
+  const isDedicatedRoute = url.pathname === '/api/profile-rank';
+  const isOwnProfileRankOnly = url.pathname === '/api/profile' && rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput)
+    && Object.keys(rawInput).length === 1 && Object.prototype.hasOwnProperty.call(rawInput, 'rank');
+  if (!isDedicatedRoute && !isOwnProfileRankOnly) return null;
 
   const origin = request.headers.get('Origin');
   if (origin && origin !== url.origin) return json({ error: 'Origin not allowed' }, 403);
   const session = await sessionData(request, env);
   if (!session) return json({ error: '請先登入 Starry ID' }, 401);
 
-  const input: any = await request.clone().json().catch(() => ({}));
-  const value = text(input.value);
+  const value = text(isDedicatedRoute ? rawInput.value : rawInput.rank);
   if (!(PROFILE_OPTIONS.rank as readonly string[]).includes(value)) return json({ error: '請從中央獎銜選項中選擇' }, 400);
-  const targetUserId = text(input.targetUserId) || text(session.user.id);
+  const targetUserId = isDedicatedRoute ? (text(rawInput.targetUserId) || text(session.user.id)) : text(session.user.id);
   if (targetUserId !== text(session.user.id) && !session.isSuperAdmin) return json({ error: '只有超級管理員可以修改其他會員' }, 403);
   const db = (env as any).STARRY_ID_DB;
   if (!db) return json({ error: 'Starry ID service unavailable' }, 503);
