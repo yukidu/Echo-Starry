@@ -4,6 +4,7 @@ import sessionWorker from './sessionCookieRouter';
 import iosGoogleRedirectWorker from './iosGoogleRedirectRouter';
 import { handleStarbeautySso } from './starbeautySsoRouter';
 import { handleV192TrackVisibility } from './v192TrackVisibilityRouter';
+import { syncEchoMemberToStarryBestEffort } from './starryIdSync';
 import type { Env } from './index';
 import { unitsToStickers } from '../shared/stickers';
 
@@ -117,6 +118,13 @@ function withPrivacyHeaders(response: Response): Response {
   });
 }
 
+function scheduleStarrySync(ctx: any, env: Env, userId: string, actorUserId: string, reason: string) {
+  if (!userId || !(env as any).STARRY_ID_DB) return;
+  const task = syncEchoMemberToStarryBestEffort(env as any, userId, actorUserId, reason);
+  if (ctx?.waitUntil) ctx.waitUntil(task);
+  else void task;
+}
+
 function rewriteJsonRequest(request: Request, body: Record<string, unknown>) {
   const headers = new Headers(request.headers);
   headers.set('Content-Type', 'application/json');
@@ -184,7 +192,7 @@ async function spentStickerLeaderboard(env: Env): Promise<Response | null> {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: any): Promise<Response> {
     const url = new URL(request.url);
 
     const origin = request.headers.get('Origin');
@@ -236,7 +244,13 @@ export default {
     }
 
     if (url.pathname === '/api/users/google-sync' || url.pathname.startsWith('/api/auth/')) {
-      return withPrivacyHeaders(await sessionWorker.fetch(request, env));
+      const response = await sessionWorker.fetch(request, env);
+      if (response.ok && url.pathname === '/api/users/google-sync' && request.method.toUpperCase() === 'POST') {
+        const data: any = await response.clone().json().catch(() => null);
+        const userId = String(data?.user?.id || '');
+        scheduleStarrySync(ctx, env, userId, userId || 'echostars', 'verified-google-login');
+      }
+      return withPrivacyHeaders(response);
     }
 
     if (request.method === 'POST' && url.pathname === '/') {
@@ -249,6 +263,15 @@ export default {
       env,
       (nextRequest, nextEnv) => appWorker.fetch(nextRequest, nextEnv)
     );
+
+    if (response.ok && request.method.toUpperCase() === 'PUT') {
+      const memberWrite = url.pathname.match(/^\/api\/users\/([^/]+)(?:\/(?:contributor|admin-role|block|audit-rank))?$/);
+      if (memberWrite) {
+        const userId = decodeURIComponent(memberWrite[1]);
+        scheduleStarrySync(ctx, env, userId, 'echostars', 'member-profile-or-membership-update');
+      }
+    }
+
     return withPrivacyHeaders(response);
   }
 };

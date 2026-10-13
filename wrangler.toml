@@ -38,6 +38,13 @@ binding = "DB"
 database_name = "echoes_db"
 database_id = "e0a696a9-0233-4186-be4d-229435b19a27"
 
+# Starry ID 中央會員資料庫。只同步跨 App 共用的身份與固定基本資料；
+# EchoStars 專屬播放、收藏、學習、徽章與權限仍留在原資料庫。
+[[d1_databases]]
+binding = "STARRY_ID_DB"
+database_name = "starry_id_db"
+database_id = "01195c92-555e-4816-bddc-5b8cb2e795db"
+
 # 2. Cloudflare R2 物件儲存桶 (音檔與圖檔直傳)
 [[r2_buckets]]
 binding = "R2_BUCKET"
