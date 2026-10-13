@@ -4,6 +4,9 @@ import { readFileSync } from 'node:fs';
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
+const STARRY_CLIENT_ID = '661055525630-633btocuq7hs6pu7v5gkg3n2fouupubp.apps.googleusercontent.com';
+const LEGACY_CLIENT_ID = '400699489182-lb412nhvj4s6t1qr5ovkg40hc646dq79.apps.googleusercontent.com';
+
 test('v214: public brand surfaces use Echo-Starry', () => {
   const index = read('index.html');
   const manifest = read('public/manifest.webmanifest');
@@ -27,6 +30,17 @@ test('v214: new custom domain and workers.dev backup both keep iOS Google redire
   assert.match(googleUx, /'echo\.starry\.phd'/);
   assert.match(googleUx, /'echostars\.yukidu\.workers\.dev'/);
   assert.match(googleUx, /PROD_HOSTS\.has\(window\.location\.hostname\)/);
+});
+
+test('v214: custom domain uses Starry Google client while workers.dev keeps legacy client', () => {
+  const auth = read('src/config/auth.ts');
+  const workerAuth = read('worker/authRouter.ts');
+  assert.match(auth, new RegExp(STARRY_CLIENT_ID.replaceAll('.', '\\.')));
+  assert.match(auth, new RegExp(LEGACY_CLIENT_ID.replaceAll('.', '\\.')));
+  assert.match(auth, /hostname === 'echostars\.yukidu\.workers\.dev'/);
+  assert.match(workerAuth, new RegExp(STARRY_CLIENT_ID.replaceAll('.', '\\.')));
+  assert.match(workerAuth, new RegExp(LEGACY_CLIENT_ID.replaceAll('.', '\\.')));
+  assert.match(workerAuth, /audience: \[\.\.\.GOOGLE_CLIENT_IDS\]/);
 });
 
 test('v214: rename preserves legacy internal identity keys and Cloudflare resource ids', () => {
