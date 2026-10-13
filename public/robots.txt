@@ -1,4 +1,4 @@
-# 繁星回聲：禁止搜尋引擎與 AI 爬蟲索引／抓取
+# Echo-Starry：禁止搜尋引擎與 AI 爬蟲索引／抓取
 User-agent: *
 Disallow: /
 
