@@ -1,8 +1,8 @@
 /**
  * Google OAuth 2.0 Client ID Configuration
  *
- * 專案已綁定 Google Cloud Console 用戶端 ID (echostars 專案)。
- * 無需一般用戶手動輸入，直接內建生效。
+ * Echo-Starry 以環境變數為優先；若未提供則沿用既有 Web Client ID，
+ * 以維持現有會員 Google 身分關聯不中斷。
  */
 export const GOOGLE_CLIENT_ID =
   (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
