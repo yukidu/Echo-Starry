@@ -390,6 +390,7 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
       const input = await requestBody(request);
       const identity = await verifyGoogleCredential(env, text(input.credential));
       const synced = await syncVerifiedIdentity(env, identity, input.appId || 'starry-id');
+      if (!synced.user) throw new Error('member_sync_failed');
       const session = await createSession(db, synced.user.id, synced.appId);
       return json(request, {
         success: true,
