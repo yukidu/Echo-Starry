@@ -298,9 +298,11 @@ async function sessionUser(request: Request, db: any) {
     'SELECT status,role,isAdminUser,isContributor,canUpload FROM app_memberships WHERE userId=? AND appId=? LIMIT 1'
   ).bind(session.userId, session.appId).first();
   if (!membership || membership.status !== 'active') return null;
+  const publicUser = publicMember(member);
+  if (!publicUser) return null;
 
   return {
-    member: publicMember(member),
+    member: publicUser,
     appId: session.appId,
     expiresAt: Number(session.expiresAt),
     membership: {
