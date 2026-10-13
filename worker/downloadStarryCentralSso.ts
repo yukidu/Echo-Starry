@@ -1,4 +1,5 @@
 import { handleStarryIdCentral } from './starryIdCentralRouter';
+import { handleStarryIdProfileDirectory } from './starryIdProfileDirectoryRouter';
 import type { Env } from './index';
 
 const STARRY_ID_HOST = 'id.starry.phd';
@@ -162,6 +163,10 @@ function appIdFromTicketPath(pathname: string): CentralSsoAppId | null {
 export async function handleDownloadStarryCentralSso(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
   if (url.hostname !== STARRY_ID_HOST) return null;
+
+  const profileDirectoryResponse = await handleStarryIdProfileDirectory(request, env);
+  if (profileDirectoryResponse) return profileDirectoryResponse;
+
   const method = request.method.toUpperCase();
   const authAppId = appIdFromAuthPath(url.pathname);
   if (authAppId && method === 'GET') return loginPage(env, authAppId, url.searchParams.get('choose') === '1');
