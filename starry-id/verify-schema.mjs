@@ -8,7 +8,7 @@ const rows = parts.flatMap(item => item?.results || []);
 const names = new Set(rows.map(row => row.name));
 const required = [
   'users', 'identities', 'profiles', 'member_relationships', 'app_memberships',
-  'legacy_links', 'profile_audit_logs', 'migration_batches', 'migration_issues'
+  'auth_sessions', 'legacy_links', 'profile_audit_logs', 'migration_batches', 'migration_issues'
 ];
 const missing = required.filter(name => !names.has(name));
 if (missing.length) throw new Error(`Central schema missing tables: ${missing.join(', ')}`);
