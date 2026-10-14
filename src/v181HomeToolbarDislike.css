@@ -226,3 +226,34 @@ button[data-main-menu='hamburger']:active {
 .dark .v181-confirm-icon {
   opacity: 0.3;
 }
+
+/* v234: keep the alert icon large but independent on the left, never behind text. */
+.v181-confirm-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-height: 7.5rem;
+  overflow: visible;
+}
+
+.v181-confirm-icon {
+  position: static;
+  width: clamp(3.25rem, 9vw, 4.75rem);
+  height: clamp(3.25rem, 9vw, 4.75rem);
+  margin: 0;
+  transform: none;
+  opacity: 1;
+  flex: none;
+  pointer-events: none;
+}
+
+.v181-confirm-body {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  text-align: center;
+}
+
+.dark .v181-confirm-icon {
+  opacity: 1;
+}
