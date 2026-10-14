@@ -14,8 +14,9 @@ test('v246 scheduler coalesces mutations without repeated clearTimeout starvatio
   assert.doesNotMatch(source, /clearTimeout\(timer\);timer=setTimeout\(syncBattery/);
 });
 
-test('v246 ignores battery card and feedback mutations caused by itself', () => {
-  assert.match(source, /closest\?\.\('\[data-v245-battery="1"\],\.v245-feedback'\)/);
+test('v246 self-generated mutations remain ignored while v247 also excludes menu churn', () => {
+  assert.match(source, /\[data-v245-battery="1"\],\.v245-feedback/);
+  assert.match(source, /\.v216-menu,\.topbar/);
 });
 
 test('v246 DOM writes are idempotent so observer cannot self-loop', () => {
