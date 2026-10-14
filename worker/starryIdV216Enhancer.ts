@@ -21,7 +21,7 @@ export function enhanceStarryIdMemberCenterV216(html: string) {
   </style>`;
 
   const script = `<script id="v216-script">(()=>{
-    const APPS=[['繁星宇宙','https://starry.phd'],['Starry ID','https://id.starry.phd'],['繁星回聲','https://echo.starry.phd'],['繁星下載','https://download.starry.phd'],['繁星任意門','https://go.starry.phd'],['繁星雞湯','https://quotes.starry.phd'],['繁星膠囊','https://box.starry.phd'],['美力之星','https://starbeauty.yukidu.workers.dev']];
+    const APPS=[['繁星宇宙','https://starry.phd'],['Starry ID','https://id.starry.phd'],['繁星回聲','https://echo.starry.phd'],['繁星下載','https://download.starry.phd'],['繁星任意門','https://go.starry.phd'],['繁星雞湯','https://quotes.starry.phd'],['繁星膠囊','https://box.starry.phd']];
     let sessionUser=null,pendingAvatar='',pendingAvatarTarget='';
     const q=(s,r=document)=>r.querySelector(s),qa=(s,r=document)=>Array.from(r.querySelectorAll(s));
     async function api(path,opt={}){const r=await fetch(path,{credentials:'same-origin',...opt,headers:{'Content-Type':'application/json',...(opt.headers||{})}});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.error||'操作失敗');return d}
