@@ -154,7 +154,7 @@ function configuredSuperAdminEmails(env: Env) {
   return new Set((raw ? raw.split(',') : ['yukidu@gmail.com']).map(item => item.trim().toLowerCase()).filter(Boolean));
 }
 
-async function sessionContext(request: Request, env: Env) {
+export async function sessionContext(request: Request, env: Env) {
   const db = (env as any).STARRY_ID_DB;
   if (!db) return null;
   const token = cookieValue(request, SESSION_COOKIE);
