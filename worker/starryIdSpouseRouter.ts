@@ -14,7 +14,8 @@ async function generate(db:any){
     const num='n'+String(bits[0]%10000000).padStart(7,'0');
     const exists=await db.prepare("SELECT userId FROM profiles WHERE amwayId=? LIMIT 1").bind(num).first();
     const reserved=await db.prepare("SELECT userId FROM non_distributor_ids WHERE number=? LIMIT 1").bind(num).first();
-    if(!exists&&!reserved)return num;
+    const card:any=await db.prepare("SELECT userId FROM public_cards WHERE slug=? OR cardNumber=? LIMIT 1").bind(num,num).first().catch(()=>null);
+    if(!exists&&!reserved&&!card)return num;
   }throw Error('no_available_non_distributor_number');
 }
 async function status(db:any,id:string){
