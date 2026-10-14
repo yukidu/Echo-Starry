@@ -44,7 +44,13 @@ export function enhanceStarryIdV222MemberCenter(html: string): string {
       if(a.field==='amwayId'){
         if(targetId()!==sessionId)throw Error('請由會員本人修改直銷商編號');
         const result=await api('/api/distributor-number',{method:'PUT',body:JSON.stringify(a.nonDistributor?.checked?{nonDistributor:true}:{nonDistributor:false,number:next})});
-        if(result.pending){reset();notify('已提出夫妻綁定申請，待另一位會員確認');refreshSpouse();return true}
+        if(result.requiresConfirmation){
+          const partner=result.partner||{};
+          const details=['姓名：'+(partner.name||'未設定'),'獎銜：'+(partner.rank||'未審核'),'會場：'+(partner.center||'未設定')].join('\n');
+          if(!window.confirm('直銷商編號已有人使用：\n'+details+'\n\n確定與此會員綁定夫妻？綁定後立即生效，不需要對方確認。'))return false;
+          const confirmed=await api('/api/distributor-number',{method:'PUT',body:JSON.stringify({nonDistributor:false,number:next,confirmSpouse:true})});
+          a.original=confirmed.number;reset();notify('夫妻綁定已成立');refreshSpouse();return true;
+        }
         a.original=result.number;reset();notify('編號已更新');refreshSpouse();return true;
       }
       if(RELATION.has(a.field)){
@@ -60,7 +66,17 @@ export function enhanceStarryIdV222MemberCenter(html: string): string {
       if(field==='amwayId'){
         if(targetId()!==sessionId)throw Error('此欄位請由會員本人修改');
         input=makeInput(field,original);input.inputMode='numeric';input.pattern='[0-9]*';input.placeholder='僅限純數字';
-        const label=document.createElement('label');label.className='v224-checkbox';const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=/^n[0-9]{7}$/.test(original);const span=document.createElement('span');span.textContent='非直銷商（自動產生 n＋7 位數編號）';label.append(checkbox,span);input.readOnly=checkbox.checked;checkbox.onchange=()=>{input.readOnly=checkbox.checked;input.value=checkbox.checked?( /^n[0-9]{7}$/.test(original)?original:'由系統產生'):'';input.placeholder=checkbox.checked?'儲存後產生專屬編號':'請輸入純數字'};wrap.append(label,input);getValue=()=>checkbox.checked?'__nonDistributor__':input.value;
+        const label=document.createElement('label');label.className='v224-checkbox';const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=/^n[0-9]{7}$/.test(original);const span=document.createElement('span');span.textContent='非直銷商（自動產生 n＋7 位數編號）';label.append(checkbox,span);input.readOnly=checkbox.checked;checkbox.onchange=async()=>{
+          input.readOnly=checkbox.checked;
+          if(!checkbox.checked){input.value='';input.placeholder='請輸入純數字';return}
+          input.value='正在產生編號…';checkbox.disabled=true;button.disabled=true;
+          try{
+            const d=await api('/api/distributor-number',{method:'PUT',body:JSON.stringify({nonDistributor:true})});
+            input.value=d.number;if(active?.field==='amwayId')active.original=d.number;
+            notify('專屬編號：'+d.number+'（已儲存）');refreshSpouse();
+          }catch(e){checkbox.checked=false;input.readOnly=false;input.value=original;notify(e.message||'編號產生失敗')}
+          finally{checkbox.disabled=false;button.disabled=false}
+        };wrap.append(label,input);getValue=()=>checkbox.checked?'__nonDistributor__':input.value;
         wrap._nonDistributor=checkbox;
       }else if(SELECT.has(field)){
         const opts=await loadOptions();const values=Array.isArray(opts[field])?[...opts[field]]:[];if(original&&!values.includes(original))values.unshift(original);

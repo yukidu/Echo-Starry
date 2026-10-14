@@ -5,7 +5,7 @@ import { ensureSpouseSchema } from './starryIdSpouseSchema';
 const host='id.starry.phd', numeric=/^[0-9]+$/, synthetic=/^n[0-9]{7}$/;
 const clean=(v:unknown)=>v==null?'':String(v).trim();
 const json=(v:unknown,s=200)=>new Response(JSON.stringify(v),{status:s,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
-const member=(db:any,id:string)=>db.prepare("SELECT u.id,u.status,p.name,p.amwayId FROM users u JOIN profiles p ON p.userId=u.id WHERE u.id=?").bind(id).first();
+const member=(db:any,id:string)=>db.prepare("SELECT u.id,u.status,p.name,p.amwayId,p.center,p.approvedRank FROM users u JOIN profiles p ON p.userId=u.id WHERE u.id=?").bind(id).first();
 const link=(db:any,id:string)=>db.prepare("SELECT * FROM spouse_links WHERE (userA=? OR userB=?) AND status IN ('pending','active','unlink_pending') LIMIT 1").bind(id,id).first();
 async function audit(db:any,userId:string,actorId:string,before:string,after:string,fieldName='amwayId'){
   await db.prepare("INSERT INTO profile_audit_logs (id,userId,appId,actorUserId,fieldName,oldValue,newValue,createdAt) VALUES (?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),userId,'starry-id',actorId,fieldName,before,after,Date.now()).run().catch(()=>undefined);
@@ -62,16 +62,22 @@ async function change(db:any,id:string,input:any){
   }
   const other:any=await member(db,duplicate.userId);
   if(!other||other.status!=='active'||await link(db,other.id))return json({error:'此編號已有夫妻關係或無法提出綁定申請'},409);
+  if(input.confirmSpouse!==true)return json({requiresConfirmation:true,number,partner:{name:clean(other.name),rank:clean(other.approvedRank)||'未審核',center:clean(other.center)||'未設定'}});
+  const third:any=await db.prepare("SELECT COUNT(*) AS count FROM profiles WHERE amwayId=? AND userId NOT IN (?,?)").bind(number,id,other.id).first();
+  if(Number(third?.count||0)>0)return json({error:'此編號已有其他會員使用，無法建立夫妻綁定'},409);
   const users=[id,other.id].sort();
   const linkId=crypto.randomUUID();
   try {
     await db.batch([
-      db.prepare("INSERT INTO spouse_links(id,userA,userB,status,requestedBy,createdAt,updatedAt) VALUES(?,?,?,'pending',?,?,?)").bind(linkId,users[0],users[1],id,now,now),
+      db.prepare("INSERT INTO spouse_links(id,userA,userB,status,requestedBy,createdAt,updatedAt) VALUES(?,?,?,'active',?,?,?)").bind(linkId,users[0],users[1],id,now,now),
       db.prepare("INSERT INTO spouse_slots(userId,linkId) VALUES (?,?)").bind(users[0],linkId),
-      db.prepare("INSERT INTO spouse_slots(userId,linkId) VALUES (?,?)").bind(users[1],linkId)
+      db.prepare("INSERT INTO spouse_slots(userId,linkId) VALUES (?,?)").bind(users[1],linkId),
+      db.prepare("UPDATE profiles SET amwayId=?,updatedAt=? WHERE userId=?").bind(number,now,id),
+      db.prepare("DELETE FROM non_distributor_ids WHERE userId=?").bind(id)
     ]);
   }catch{return json({error:'任一會員已有夫妻關係或待確認申請'},409)}
-  return json({pending:true,message:'直銷商編號相同，已提出夫妻綁定申請；需另一位會員確認',partnerName:clean(other.name)},202);
+  await audit(db,id,id,clean(me.amwayId),number,'spouse-single-confirm');
+  return json({success:true,number,spouseLinked:true,partner:{name:clean(other.name),rank:clean(other.approvedRank)||'未審核',center:clean(other.center)||'未設定'}});
 }
 async function action(db:any,id:string,input:any,isAdmin=false){
   const l:any=await link(db,id);if(!l)return json({error:'沒有待處理的夫妻關係'},404);
