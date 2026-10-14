@@ -213,7 +213,7 @@ async function publicCard(request: Request, env: StarryEnv, slug: string) {
   const member: any = await readMember(db,card.userId); if(!member||member.status!=='active') return null;
   const visibility=await readVisibility(db,card.userId); const data:any=memberPayload(member); data.cardNumber=card.cardNumber;
   const viewer=await currentUserId(request,db); const owner=viewer===card.userId;
-  const rows=[['name','姓名'],[text(member.amwayId)?'amwayId':'cardNumber',text(member.amwayId)?'會員編號 / Amway ID':'電子名片編號'],['email','Email'],['phone','手機'],['residence','居住地'],['center','中心'],['rank','獎銜'],['birthday','生日'],['motto','座右銘'],['zodiac','星座'],['talentNumber','天賦數'],['lifeNumber','生命靈數'],['sponsor','推薦人'],['platinumUpline','白金上線'],['diamondUpline','鑽石上線']];
+  const rows=[['name','姓名'],[text(member.amwayId)?'amwayId':'cardNumber',text(member.amwayId)?'會員編號 / Amway ID':'電子名片編號'],['email','Email'],['phone','手機'],['residence','居住地'],['center','中心'],['rank','獎銜'],['birthday','生日'],['motto','座右銘'],['zodiac','星座'],['sponsor','推薦人'],['platinumUpline','白金上線'],['diamondUpline','鑽石上線']];
   const visibleRows=rows.filter(([key])=>visibility[key]!==false).filter(([key])=>data[key]!==''&&data[key]!=null);
   const avatar=visibility.avatar!==false&&data.avatar?`<img class="avatar" src="${escapeHtml(data.avatar)}" alt="會員頭像" referrerpolicy="no-referrer">`:`<div class="avatar fallback">✦</div>`;
   const grid=visibility.numerology!==false&&data.birthday?numerologyHtml(data.birthday):'';

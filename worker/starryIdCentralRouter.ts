@@ -1,5 +1,6 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { Env } from './index';
+import { calculateNumerology } from '../src/utils/numerology';
 import { renderStarryIdMemberCenterPage } from './starryIdMemberCenterPage';
 
 type StarryEnv = Env & {
@@ -25,7 +26,7 @@ const sessionSchemaReady = new WeakMap<object, Promise<void>>();
 
 const USER_EDITABLE_PROFILE_FIELDS = new Set([
   'name', 'avatar', 'amwayId', 'phone', 'residence', 'center', 'joinReason', 'stayReason',
-  'birthday', 'motto', 'zodiac', 'talentNumber', 'lifeNumber'
+  'birthday', 'motto'
 ]);
 const ADMIN_EDITABLE_PROFILE_FIELDS = new Set([
   ...USER_EDITABLE_PROFILE_FIELDS,
@@ -411,7 +412,25 @@ async function updateProfile(
   const allowed: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(changes || {})) {
     if (!editableFields.has(key)) continue;
-    allowed[key] = key === 'talentNumber' || key === 'lifeNumber' ? integerOrNull(value) : text(value);
+    allowed[key] = text(value);
+  }
+
+  // Numerology and zodiac are derived, not independently editable.
+  if (Object.prototype.hasOwnProperty.call(allowed, 'birthday')) {
+    const raw = text(allowed.birthday);
+    if (raw) {
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+      const year = Number(match?.[1]), month = Number(match?.[2]), day = Number(match?.[3]);
+      const date = new Date(Date.UTC(year, month - 1, day));
+      if (!match || year < 1900 || year > new Date().getUTCFullYear() ||
+          date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+        throw new Error('生日格式不正確，請從日曆選擇有效日期');
+      }
+    }
+    const result = raw ? calculateNumerology(raw) : null;
+    allowed.zodiac = result?.zodiac || '';
+    allowed.talentNumber = result?.talentNumber ?? null;
+    allowed.lifeNumber = result?.lifeNumber ?? null;
   }
 
   const relationshipChanges: Record<string, string> = {};
