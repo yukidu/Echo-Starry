@@ -354,3 +354,13 @@ button[data-main-menu='hamburger']:active {
     padding-right: 0.6rem;
   }
 }
+
+/* v237: extend mobile confirmation text to the same right edge as the centered button group. */
+@media (max-width: 640px) {
+  .v181-confirm-title,
+  .v181-confirm-message {
+    box-sizing: border-box;
+    padding-left: 4.75rem;
+    padding-right: max(0.75rem, calc(50% - 7.425rem));
+  }
+}
