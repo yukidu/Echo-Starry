@@ -30,6 +30,11 @@ test('spouse link is only active after the other account confirms',()=>{
   assert.match(spouse,/approve-unlink/);
   assert.match(spouse,/keepUserId/);
   assert.match(schema,/CREATE TABLE IF NOT EXISTS spouse_links/);
+  assert.match(schema,/spouse_slots \(userId TEXT PRIMARY KEY/);
+  assert.match(spouse,/INSERT INTO spouse_slots/);
+  assert.match(spouse,/DELETE FROM spouse_slots/);
+  assert.match(schema,/non_distributor_history/);
+  assert.match(spouse,/synthetic\.test\(prior\)/);
 });
 
 test('upline couples are displayed with ampersand, sponsors stay individual',()=>{
