@@ -22,6 +22,33 @@ export function enhanceStarryIdV222MemberCenter(html: string): string {
     html[data-starry-theme="light"] .v222-num-cell text{fill:#17243b}
     html[data-starry-theme="light"] .v216-menu{background:#fff!important;color:#14213b!important}
     html[data-starry-theme="light"] .v220-theme{color:#14213b!important}
+    .v226-spouse{grid-column:1/-1!important;display:flex;flex-direction:column;gap:9px;padding:15px 16px!important;margin:2px 0 14px!important;border:1px solid #47648a!important;border-radius:16px!important;background:linear-gradient(125deg,#142943,#1c3552)!important;box-shadow:none!important}
+    .v226-spouse .v222-num-title{font-size:14px!important;letter-spacing:.03em;margin:0!important;color:#c6d9f5!important}
+    .v226-spouse .v222-help{font-size:15px!important;font-weight:750;line-height:1.6;color:#fff!important;margin:0!important}
+    .v226-spouse .v222-motto-actions{margin-top:0!important;flex-wrap:wrap}
+    .v226-spouse .v224-checkbox{margin:4px 0 0!important;font-size:13px}
+    html[data-starry-theme="light"] .v226-spouse{background:linear-gradient(125deg,#f5f9ff,#eaf2ff)!important;border-color:#bfd1ea!important}
+    html[data-starry-theme="light"] .v226-spouse .v222-help{color:#173354!important}
+    html[data-starry-theme="light"] .v226-spouse .v222-num-title{color:#42618c!important}
+    .v226-dialog-overlay{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:20px;background:rgba(4,11,25,.74);backdrop-filter:blur(7px)}
+    .v226-dialog{box-sizing:border-box;width:min(100%,420px);max-height:min(90dvh,640px);overflow:auto;padding:25px 23px 22px;border:1px solid #6383ae;border-radius:23px;background:linear-gradient(160deg,#1a3353,#0e1b30);color:#f7faff;box-shadow:0 28px 75px #0009}
+    .v226-dialog-mark{width:49px;height:49px;border-radius:15px;display:grid;place-items:center;background:#274d78;color:#d6e9ff;font-size:24px;margin-bottom:14px}
+    .v226-dialog h2{font-size:21px;font-weight:850;line-height:1.4;margin:0 0 7px;color:#fff}
+    .v226-dialog-intro{font-size:14px;line-height:1.65;color:#b9cbe4;margin:0 0 17px}
+    .v226-dialog-person{padding:14px 16px;border:1px solid #4d709c;border-radius:15px;background:#10253f;display:grid;gap:11px}
+    .v226-dialog-row{display:flex;align-items:baseline;gap:13px;font-size:15px;line-height:1.5}
+    .v226-dialog-row span{flex:0 0 43px;color:#9fb8db;font-size:13px}
+    .v226-dialog-row strong{color:#fff;overflow-wrap:anywhere}
+    .v226-dialog-note{font-size:13px;color:#d1dded;line-height:1.7;margin:15px 0 20px}
+    .v226-dialog-actions{display:flex;gap:10px}
+    .v226-dialog-actions button{flex:1;min-height:46px;border-radius:12px;border:1px solid #6883a8;background:#233c5c;color:#f7faff;font-size:15px;font-weight:800;cursor:pointer}
+    .v226-dialog-actions .v226-confirm{border-color:#8bb5ef;background:linear-gradient(120deg,#4a87d3,#3269b5);color:#fff}
+    .v226-dialog-actions button:focus-visible{outline:3px solid #f7c96d;outline-offset:2px}
+    html[data-starry-theme="light"] .v226-dialog{background:linear-gradient(160deg,#fff,#f0f6ff);border-color:#c1d2e8;color:#172e4b}
+    html[data-starry-theme="light"] .v226-dialog h2,html[data-starry-theme="light"] .v226-dialog-row strong{color:#142a48}
+    html[data-starry-theme="light"] .v226-dialog-intro,html[data-starry-theme="light"] .v226-dialog-note{color:#455d7b}
+    html[data-starry-theme="light"] .v226-dialog-person{background:#eaf2fc;border-color:#c1d3eb}
+    html[data-starry-theme="light"] .v226-dialog-row span{color:#587498}
     @media(max-width:760px){.topbar{padding:9px 12px!important}.top-actions #myCardBtn{font-size:15px!important;min-width:96px!important;min-height:44px!important;padding:10px 13px!important}.brand .star{width:38px!important;height:38px!important;flex-basis:38px!important}.brand h1{font-size:17px!important}.v222-num{padding:13px}.v222-num-grid{gap:6px}}
   </style>`;
   const js = String.raw`<script id="v222-script">(()=>{
@@ -33,6 +60,28 @@ export function enhanceStarryIdV222MemberCenter(html: string): string {
     const DERIVED=new Set(['talentNumber','lifeNumber','zodiac']);
     async function api(path,opt={}){const r=await fetch(path,{credentials:'same-origin',...opt,headers:{'Content-Type':'application/json',...(opt.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'操作失敗');return d}
     function notify(msg){const t=q('#toast');if(t){t.textContent=msg;t.classList.remove('hidden');setTimeout(()=>t.classList.add('hidden'),2800)}else alert(msg)}
+    function confirmSpousePartner(partner,number){
+      return new Promise(resolve=>{
+        const overlay=document.createElement('div');overlay.className='v226-dialog-overlay';
+        const dialog=document.createElement('section');dialog.className='v226-dialog';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');dialog.setAttribute('aria-labelledby','v226DialogTitle');
+        const mark=document.createElement('div');mark.className='v226-dialog-mark';mark.textContent='♡';
+        const title=document.createElement('h2');title.id='v226DialogTitle';title.textContent='確認夫妻綁定';
+        const intro=document.createElement('p');intro.className='v226-dialog-intro';intro.textContent='此直銷商編號已由以下會員使用，請核對對方資料：';
+        const person=document.createElement('div');person.className='v226-dialog-person';
+        for(const [label,val] of [['姓名',partner.name],['獎銜',partner.rank],['會場',partner.center],['編號',number]]){
+          const row=document.createElement('div');row.className='v226-dialog-row';const key=document.createElement('span');key.textContent=label;const value=document.createElement('strong');value.textContent=val||'未設定';row.append(key,value);person.append(row);
+        }
+        const note=document.createElement('p');note.className='v226-dialog-note';note.textContent='確認後立即建立夫妻關係，無須另一方同意。請確認對方身分正確。';
+        const actions=document.createElement('div');actions.className='v226-dialog-actions';
+        const cancel=document.createElement('button');cancel.type='button';cancel.textContent='返回修改';
+        const confirm=document.createElement('button');confirm.type='button';confirm.className='v226-confirm';confirm.textContent='確認綁定';
+        const previous=document.activeElement;
+        function finish(ok){document.removeEventListener('keydown',onKey,true);overlay.remove();if(previous?.isConnected)previous.focus();resolve(ok)}
+        function onKey(e){if(e.key==='Escape'){e.preventDefault();finish(false)}else if(e.key==='Tab'){const next=e.shiftKey?cancel:confirm;if(document.activeElement=== (e.shiftKey?cancel:confirm)){e.preventDefault();(e.shiftKey?confirm:cancel).focus()}}}
+        cancel.onclick=()=>finish(false);confirm.onclick=()=>finish(true);overlay.onclick=e=>{if(e.target===overlay)finish(false)};
+        actions.append(cancel,confirm);dialog.append(mark,title,intro,person,note,actions);overlay.append(dialog);document.body.append(overlay);document.addEventListener('keydown',onKey,true);cancel.focus();
+      });
+    }
     function display(value){const d=document.createElement('div');d.className='field-value'+(value?'':' empty');d.textContent=value||'尚未填寫';return d}
     function targetId(){return q('.member-item.active')?.dataset.id||sessionId}
     function path(){const id=targetId();return id&&sessionId&&id!==sessionId?'/api/admin/members/'+encodeURIComponent(id):'/api/profile'}
@@ -46,8 +95,7 @@ export function enhanceStarryIdV222MemberCenter(html: string): string {
         const result=await api('/api/distributor-number',{method:'PUT',body:JSON.stringify(a.nonDistributor?.checked?{nonDistributor:true}:{nonDistributor:false,number:next})});
         if(result.requiresConfirmation){
           const partner=result.partner||{};
-          const details=['姓名：'+(partner.name||'未設定'),'獎銜：'+(partner.rank||'未審核'),'會場：'+(partner.center||'未設定')].join('\n');
-          if(!window.confirm('直銷商編號已有人使用：\n'+details+'\n\n確定與此會員綁定夫妻？綁定後立即生效，不需要對方確認。'))return false;
+          if(!await confirmSpousePartner(partner,next))return false;
           const confirmed=await api('/api/distributor-number',{method:'PUT',body:JSON.stringify({nonDistributor:false,number:next,confirmSpouse:true})});
           a.original=confirmed.number;reset();notify('夫妻綁定已成立');refreshSpouse();return true;
         }
@@ -100,7 +148,11 @@ export function enhanceStarryIdV222MemberCenter(html: string): string {
     async function refreshSpouse(){
       const fields=q('#fields');if(!fields||!sessionId)return;
       if(targetId()!==sessionId){q('#v224Spouse')?.remove();return}
-      let panel=q('#v224Spouse');if(!panel){panel=document.createElement('section');panel.id='v224Spouse';panel.className='v222-num v224-spouse';fields.after(panel)}
+      let panel=q('#v224Spouse');
+      const numberField=q('.field[data-field="amwayId"]',fields);
+      if(!numberField)return;
+      if(!panel){panel=document.createElement('section');panel.id='v224Spouse';panel.className='v226-spouse'}
+      if(panel.previousElementSibling!==numberField)numberField.after(panel);
       try{
         const d=await api('/api/spouse-status');panel.replaceChildren();
         const h=document.createElement('div');h.className='v222-num-title';h.textContent='夫妻會員關係';panel.append(h);
@@ -138,7 +190,7 @@ export function enhanceStarryIdV222MemberCenter(html: string): string {
         }
       }catch{panel.textContent='夫妻關係資料暫時無法讀取'}
     }
-    const fields=q('#fields');if(fields){const observer=new MutationObserver(()=>{if(!active)updateChart();clearTimeout(spouseTimer);spouseTimer=setTimeout(refreshSpouse,150)});observer.observe(fields,{childList:true});updateChart()}
+    const fields=q('#fields');if(fields){const observer=new MutationObserver(mutations=>{if(mutations.every(m=>m.target.closest?.('#v224Spouse')))return;if(!active)updateChart();clearTimeout(spouseTimer);spouseTimer=setTimeout(refreshSpouse,150)});observer.observe(fields,{childList:true});updateChart()}
 
     api('/api/session').then(d=>{sessionId=d.user?.id||'';refreshSpouse()}).catch(()=>undefined);
   })();</script>`;
