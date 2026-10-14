@@ -16,8 +16,8 @@ test('貼紙以十分之一整數保存，避免浮點累積誤差', () => {
   assert.equal(formatStickerAmount(3.7), '3.7');
 });
 
-test('後端建立貼紙帳本、永久解鎖、規則與通知資料表', () => {
-  const source = read('worker/stickerRouter.ts');
+test('舊版相容後端保留歷史貼紙帳本、永久解鎖、規則與通知資料表', () => {
+  const source = read('worker/legacyStickerRouter.ts');
   for (const contract of [
     'sticker_transactions',
     'sticker_unlocks',
@@ -65,7 +65,7 @@ test('主選單與貼紙專區保留訪客會員界線及超管分頁', () => {
   assert.match(modal, /keywordRewardLimit/);
 });
 
-test('貼紙路由經過共同組織層再進入 session cookie 後端驗證，且刪會員同步清理貼紙資料', () => {
+test('舊貼紙相容層仍經共同組織層再進入 session cookie 後端驗證，且刪會員同步清理舊資料', () => {
   const categoryRouter = read('worker/categoryIntegrityRouter.ts');
   const organizationRouter = read('worker/organizationRouter.ts');
   const deleteRouter = read('worker/adminUserDeleteRouter.ts');

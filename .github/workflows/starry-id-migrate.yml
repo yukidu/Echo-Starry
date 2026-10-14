@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'starry-id/remoteMigrate.ts'
+      - 'starry-id/migrateBatteries.ts'
+      - 'starry-id/migrations/20261015_battery_ledger.sql'
       - 'starry-id/node-globals.d.ts'
       - '.github/workflows/starry-id-migrate.yml'
   workflow_dispatch:
@@ -41,10 +43,15 @@ jobs:
           set -euo pipefail
           mkdir -p starry-id/audit-output
           npx tsx starry-id/remoteMigrate.ts | tee starry-id/audit-output/member-migration.json
+      - name: Migrate EchoStars sticker ledger to central battery ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx tsx starry-id/migrateBatteries.ts | tee starry-id/audit-output/battery-migration.json
       - name: Upload non-PII migration report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: starry-id-member-migration
-          path: starry-id/audit-output/member-migration.json
+          name: starry-id-member-and-battery-migration
+          path: starry-id/audit-output/*.json
           if-no-files-found: warn

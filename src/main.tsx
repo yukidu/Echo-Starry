@@ -10,6 +10,7 @@ import './v181PreviewProductionReadBridge';
 import './v181HomeToolbarDislike';
 import './v189PlaybackSwitchConfirm';
 import './memberProfileSchemaBridge';
+import './batteryTerminologyPolicy';
 
 {
   const legacyUrl = new URL(window.location.href);

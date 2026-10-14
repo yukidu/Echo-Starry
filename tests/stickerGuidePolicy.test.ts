@@ -57,10 +57,10 @@ test('super admin guide does not claim sticker unlock or downline grant deductio
   assert.equal(rows.find(row => row.behavior === '建立私秘 VIP 錄音')?.amount, '-0.1 張');
 });
 
-test('history page mounts the collapsible guide and backend exposes a signed-in personalized guide endpoint', () => {
+test('history page mounts the collapsible guide and legacy backend still exposes the old compatible endpoint', () => {
   const modal = readFileSync(new URL('../src/components/StickersModal.tsx', import.meta.url), 'utf8');
   const table = readFileSync(new URL('../src/components/StickerGuideTable.tsx', import.meta.url), 'utf8');
-  const router = readFileSync(new URL('../worker/stickerRouter.ts', import.meta.url), 'utf8');
+  const router = readFileSync(new URL('../worker/legacyStickerRouter.ts', import.meta.url), 'utf8');
   assert.match(modal, /<StickerGuideTable currentUser=\{currentUser\} tracks=\{tracks\}\/>/);
   assert.match(table, /如何獲得貼紙？/);
   assert.match(table, /▼展開/);

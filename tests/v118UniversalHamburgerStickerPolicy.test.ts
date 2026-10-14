@@ -6,7 +6,7 @@ const navbar = readFileSync(new URL('../src/components/Navbar.tsx', import.meta.
 const navbarCss = readFileSync(new URL('../src/components/Navbar.css', import.meta.url), 'utf8');
 const profile = readFileSync(new URL('../src/components/ProfileModal.tsx', import.meta.url), 'utf8');
 const guide = readFileSync(new URL('../src/stickerGuidePolicy.ts', import.meta.url), 'utf8');
-const stickerRouter = readFileSync(new URL('../worker/stickerRouter.ts', import.meta.url), 'utf8');
+const stickerRouter = readFileSync(new URL('../worker/legacyStickerRouter.ts', import.meta.url), 'utf8');
 const favoriteRouter = readFileSync(new URL('../worker/favoriteRouter.ts', import.meta.url), 'utf8');
 const privacyRouter = readFileSync(new URL('../worker/privacyCrawlerRouter.ts', import.meta.url), 'utf8');
 
@@ -30,7 +30,7 @@ test('palette and theme controls remain available after collapsing header action
   assert.equal(navbar.includes("{isDark ? '切換淺色模式' : '切換深色模式'}"), true);
 });
 
-test('Summon Stars completion reward is excluded from platinum earning multiplier without an extra D1 trigger wrapper', () => {
+test('legacy Summon Stars completion reward is excluded from platinum earning multiplier without an extra D1 trigger wrapper', () => {
   assert.equal(guide.includes('earned(settings.luckyCompleteReward)'), false);
   assert.equal(guide.includes('召喚繁星完聽獎勵不套用白金級以上獲取倍數'), true);
   assert.equal(stickerRouter.includes("['rank_approval_reward','manual_grant','lucky_complete_reward']"), true);

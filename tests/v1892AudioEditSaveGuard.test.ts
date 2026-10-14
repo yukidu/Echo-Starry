@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const privacyRouter = readFileSync(new URL('../worker/privacyCrawlerRouter.ts', import.meta.url), 'utf8');
-const stickerRouter = readFileSync(new URL('../worker/stickerRouter.ts', import.meta.url), 'utf8');
+const stickerRouter = readFileSync(new URL('../worker/legacyStickerRouter.ts', import.meta.url), 'utf8');
 const wrangler = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
 
 test('v189.2 recognizes a no-change audio edit without treating bookkeeping fields as edits', () => {

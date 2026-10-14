@@ -15,8 +15,8 @@ test('all v112 production sticker targets are exact and non-negative', () => {
   assert.ok(HIDDEN_BALANCE_TARGETS_V112.every(x => Number.isInteger(x.targetUnits) && x.targetUnits >= 0));
 });
 
-test('sticker correction is visible as system error fix but excluded from earned/spent/toast', () => {
-  const router=readFileSync(new URL('../worker/stickerRouter.ts', import.meta.url),'utf8');
+test('legacy sticker correction is visible as system error fix but excluded from earned/spent/toast', () => {
+  const router=readFileSync(new URL('../worker/legacyStickerRouter.ts', import.meta.url),'utf8');
   const modal=readFileSync(new URL('../src/components/StickersModal.tsx', import.meta.url),'utf8');
   assert.match(router,/系統錯誤修正/);
   assert.match(modal,/balance_correction:'系統錯誤修正'/);

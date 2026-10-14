@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const stats=readFileSync(new URL('../src/components/StatisticsView.tsx',import.meta.url),'utf8');
 const tab=readFileSync(new URL('../src/components/StickerLeaderboardTab.tsx',import.meta.url),'utf8');
-const worker=readFileSync(new URL('../worker/stickerRouter.ts',import.meta.url),'utf8');
+const worker=readFileSync(new URL('../worker/legacyStickerRouter.ts',import.meta.url),'utf8');
 const changelog=readFileSync(new URL('../src/changelogReleaseNotes.ts',import.meta.url),'utf8');
 
 test('leaderboard adds the sticker ranking tab with top-20 ledger metrics and member card action',()=>{
@@ -18,7 +18,7 @@ test('leaderboard adds the sticker ranking tab with top-20 ledger metrics and me
   assert.match(tab,/點擊查看會員資訊卡/);
 });
 
-test('sticker ranking search has autocomplete while sensitive profile values stay server-side',()=>{
+test('legacy sticker ranking search has autocomplete while sensitive profile values stay server-side',()=>{
   assert.match(tab,/搜尋會員基本資料關鍵字/);
   assert.match(tab,/suggestions\.map/);
   assert.match(worker,/u\.phone/);
