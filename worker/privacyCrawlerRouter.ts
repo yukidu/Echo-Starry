@@ -12,6 +12,7 @@ import { handleDownloadStarryCentralSso } from './downloadStarryCentralSso';
 import { enhanceStarryIdV218Response } from './starryIdV218ResponseEnhancer';
 import { handleStarryProfileSchema } from './starryProfileSchemaRouter';
 import { handleStarryIdV245Battery, enhanceStarryIdV245Response } from './starryIdV245BatteryRouter';
+import { handleStarryIdV251CardTheme, enhanceStarryIdV251CardThemeResponse } from './starryIdV251CardThemes';
 import type { Env } from './index';
 import { unitsToStickers } from '../shared/stickers';
 
@@ -229,6 +230,10 @@ export default {
   async fetch(request: Request, env: Env, ctx?: any): Promise<Response> {
     const url = new URL(request.url);
 
+    // v251 public-card visual style API is isolated to Starry ID and must run before v211.
+    const starryV251Direct = await handleStarryIdV251CardTheme(request, env as any);
+    if (starryV251Direct) return withPrivacyHeaders(starryV251Direct);
+
     // v245 Starry ID battery routes are isolated to id.starry.phd and handled
     // before the established v211/general Starry ID routers can consume them.
     const starryV245Direct = await handleStarryIdV245Battery(request, env);
@@ -260,7 +265,12 @@ export default {
       );
       const v228StarryIdResponse = await withV228SpouseUnlinkCopy(request, enhancedStarryIdResponse);
       const v245StarryIdResponse = await enhanceStarryIdV245Response(request, v228StarryIdResponse, env);
-      return withPrivacyHeaders(v245StarryIdResponse);
+      const v251StarryIdResponse = await enhanceStarryIdV251CardThemeResponse(
+        request,
+        v245StarryIdResponse,
+        env as any
+      );
+      return withPrivacyHeaders(v251StarryIdResponse);
     }
 
     const starryIdResponse = await handleStarryIdCentral(request, env as any);
