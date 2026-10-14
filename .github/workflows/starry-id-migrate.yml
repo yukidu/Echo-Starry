@@ -6,6 +6,7 @@ on:
     paths:
       - 'starry-id/remoteMigrate.ts'
       - 'starry-id/migrateBatteries.ts'
+      - 'starry-id/retireLegacyStickerLedger.ts'
       - 'starry-id/migrations/20261015_battery_ledger.sql'
       - 'starry-id/node-globals.d.ts'
       - '.github/workflows/starry-id-migrate.yml'
@@ -48,6 +49,11 @@ jobs:
         run: |
           set -euo pipefail
           npx tsx starry-id/migrateBatteries.ts | tee starry-id/audit-output/battery-migration.json
+      - name: Retire verified legacy sticker ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx tsx starry-id/retireLegacyStickerLedger.ts | tee starry-id/audit-output/battery-retirement.json
       - name: Upload non-PII migration report
         if: always()
         uses: actions/upload-artifact@v4
