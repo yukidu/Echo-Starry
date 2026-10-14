@@ -80,8 +80,50 @@ export function enhanceStarryIdV222MemberCenter(html: string): string {
     window.addEventListener('click',e=>{const b=e.target?.closest?.('button.edit');if(!b)return;const card=b.closest('.field');if(!card||DERIVED.has(card.dataset.field))return;e.preventDefault();e.stopImmediatePropagation();if(busy)return;(async()=>{if(active){if(active.button===b){await save();return}if(changed()){const yes=window.confirm('上一個欄位尚未儲存。\\n按「確定」儲存修改；按「取消」放棄修改。');if(yes){if(!await save())return}else reset()}else reset()}try{await start(card,b)}catch(err){notify(err.message||'無法開啟修改模式')}})()},true);
     function num(birthday){const clean=(birthday||'').replace(/[^0-9]/g,'');if(clean.length!==8)return null;const year=+clean.slice(0,4),month=+clean.slice(4,6),day=+clean.slice(6,8);const dt=new Date(Date.UTC(year,month-1,day));if(dt.getUTCFullYear()!==year||dt.getUTCMonth()!==month-1||dt.getUTCDate()!==day)return null;const digits=clean.split('').map(Number),talent=digits.reduce((a,b)=>a+b,0);let life=talent;while(life>9)life=String(life).split('').reduce((a,b)=>a+ +b,0);let birth=day;while(birth>9)birth=String(birth).split('').reduce((a,b)=>a+ +b,0);const zodiac=['摩羯座','水瓶座','雙魚座','牡羊座','金牛座','雙子座','巨蟹座','獅子座','處女座','天秤座','天蠍座','射手座'];const cuts=[20,19,21,20,21,22,23,23,23,24,23,22];const index=(day<cuts[month-1]?month-1:month)%12;const z=zodiac[index];const zn={'牡羊座':1,'金牛座':2,'雙子座':3,'巨蟹座':4,'獅子座':5,'處女座':6,'天秤座':7,'天蠍座':8,'射手座':9,'摩羯座':1,'水瓶座':2,'雙魚座':3}[z];const counts={};digits.forEach(d=>{if(d>0)counts[d]=(counts[d]||0)+1});return{digits,talent,life,birth,z,zn,counts}}
     function updateChart(override){const fields=q('#fields');if(!fields)return;qa('.field',fields).forEach(c=>{if(DERIVED.has(c.dataset.field))c.remove()});let chart=q('#v222Chart');if(!chart){chart=document.createElement('section');chart.id='v222Chart';chart.className='v222-num';fields.after(chart)}let birthday=override;if(birthday===undefined){const birth=q('.field[data-field="birthday"] .field-value',fields);birthday=birth&&!birth.classList.contains('empty')?birth.textContent:''}const data=num(birthday);chart.replaceChildren();const title=document.createElement('div');title.className='v222-num-title';title.textContent='生命靈數九宮格 · 依生日自動計算';chart.append(title);if(!data){const note=document.createElement('div');note.className='v222-help';note.textContent='選擇出生年月日後，即時顯示生命靈數圖';chart.append(note);return}const summary=document.createElement('div');summary.className='v222-num-summary';summary.textContent='星座：'+data.z+'　｜　生日數：'+data.birth+'　｜　天賦數：'+data.talent+'　｜　命數：'+data.life;chart.append(summary);const grid=document.createElement('div');grid.className='v222-num-grid';for(const n of [1,4,7,2,5,8,3,6,9]){const cell=document.createElement('div');cell.className='v222-num-cell';const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 100 100');const rings=[...Array(data.counts[n]||0).fill('#e2e8f0'),...(n===data.birth?['#fbbf24']:[]),...(n===data.zn?['#a855f7']:[]),...Array(String(data.talent).split('').filter(d=>+d===n).length).fill('#84cc16'),...(n===data.life?['#ef4444']:[])];rings.forEach((color,i)=>{const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('cx','50');c.setAttribute('cy','50');c.setAttribute('r',String(rings.length===1?26:19+i*25/Math.max(1,rings.length-1)));c.setAttribute('stroke',color);c.setAttribute('class','v222-num-ring');svg.append(c)});const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('x','50');t.setAttribute('y','50');t.setAttribute('text-anchor','middle');t.setAttribute('dominant-baseline','central');t.textContent=String(n);svg.append(t);cell.append(svg);grid.append(cell)}chart.append(grid);const note=document.createElement('div');note.className='v222-num-note';note.textContent='白：先天數　黃：生日數　紫：星座數　綠：天賦數　紅：命數';chart.append(note)}
-    const fields=q('#fields');if(fields){const observer=new MutationObserver(()=>{if(!active)updateChart()});observer.observe(fields,{childList:true});updateChart()}
-    api('/api/session').then(d=>{sessionId=d.user?.id||''}).catch(()=>undefined);
+    let spouseTimer=0;
+    async function refreshSpouse(){
+      const fields=q('#fields');if(!fields||!sessionId)return;
+      let panel=q('#v224Spouse');if(!panel){panel=document.createElement('section');panel.id='v224Spouse';panel.className='v222-num v224-spouse';fields.after(panel)}
+      try{
+        const d=await api('/api/spouse-status');panel.replaceChildren();
+        const h=document.createElement('div');h.className='v222-num-title';h.textContent='夫妻會員關係';panel.append(h);
+        const line=document.createElement('div');line.className='v222-help';const l=d.spouse;
+        line.textContent=!l?'目前尚未綁定夫妻':l.status==='active'?'已與 '+l.partnerName+' 綁定夫妻':l.status==='pending'?'與 '+l.partnerName+' 的夫妻綁定待確認':'與 '+l.partnerName+' 的解除綁定待確認';
+        panel.append(line);
+        const controls=document.createElement('div');controls.className='v222-motto-actions';panel.append(controls);
+        function btn(label,click){const b=document.createElement('button');b.type='button';b.className='v222-random';b.textContent=label;b.onclick=async()=>{b.disabled=true;try{await click();await refreshSpouse()}catch(e){notify(e.message||'操作失敗')}finally{b.disabled=false}};controls.append(b)}
+        const act=(action,extra={})=>api('/api/spouse-action',{method:'POST',body:JSON.stringify({action,...extra})});
+        if(l?.status==='pending'){
+          if(l.requestedBy===sessionId)btn('取消綁定申請',()=>act('cancel'));
+          else {btn('確認夫妻綁定',async()=>{if(!confirm('確定與 '+l.partnerName+' 共用直銷商編號 '+d.number+'？'))return;await act('approve',{number:d.number})});btn('拒絕申請',()=>act('reject'))}
+        }
+        if(l?.status==='active')btn('解除夫妻綁定',async()=>{
+          const keepSelf=confirm('解除夫妻關係：按「確定」由你保留原直銷商編號；按「取消」由對方保留。下一步仍需另一方確認。');
+          let replacement='';
+          if(!keepSelf){replacement=prompt('請輸入你解除後的新直銷商編號（純數字），或輸入 nonDistributor 改為非直銷商');if(!replacement)return}
+          await act('request-unlink',{keepUserId:keepSelf?sessionId:l.partnerId,replacement});
+          notify('已提出解除申請，待另一位會員確認');
+        });
+        if(l?.status==='unlink_pending'){
+          if(l.unlinkRequestedBy===sessionId)btn('取消解除申請',()=>act('cancel-unlink'));
+          else btn('確認解除夫妻綁定',async()=>{
+            if(!confirm('確定解除與 '+l.partnerName+' 的夫妻關係？'))return;
+            let replacement='';
+            if(l.keepUserId!==sessionId){replacement=prompt('請輸入你解除後的新直銷商編號（純數字），或輸入 nonDistributor 改為非直銷商');if(!replacement)return}
+            await act('approve-unlink',{replacement});notify('夫妻關係已解除');
+          });
+        }
+        if(l?.status==='active'){
+          const label=document.createElement('label');label.className='v224-checkbox';const toggle=document.createElement('input');toggle.type='checkbox';
+          const settings=await api('/api/card-settings');toggle.checked=Boolean(settings.visibility?.spouse);
+          label.append(toggle,document.createTextNode('在公開電子名片顯示夫妻關係'));panel.append(label);
+          toggle.onchange=async()=>{try{await api('/api/card-settings',{method:'PUT',body:JSON.stringify({visibility:{spouse:toggle.checked}})});notify('電子名片顯示設定已儲存')}catch(e){toggle.checked=!toggle.checked;notify(e.message)}};
+        }
+      }catch{panel.textContent='夫妻關係資料暫時無法讀取'}
+    }
+    const fields=q('#fields');if(fields){const observer=new MutationObserver(()=>{if(!active)updateChart();clearTimeout(spouseTimer);spouseTimer=setTimeout(refreshSpouse,150)});observer.observe(fields,{childList:true});updateChart()}
+
+    api('/api/session').then(d=>{sessionId=d.user?.id||'';refreshSpouse()}).catch(()=>undefined);
   })();</script>`;
   return html.replace('</head>', css + '</head>').replace('</body>', js + '</body>');
 }
