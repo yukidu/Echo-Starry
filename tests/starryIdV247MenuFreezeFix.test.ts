@@ -20,10 +20,11 @@ test('v248 supersedes the v247 observer exclusions by removing the battery obser
   assert.match(client, /function finiteSync\(force=false\)/);
 });
 
-test('v247 v216 menu remains the single owner of ecosystem links and battery ledger', () => {
-  for (const url of ['https://starry.phd','https://id.starry.phd','https://echo.starry.phd','https://download.starry.phd','https://go.starry.phd','https://quotes.starry.phd','https://box.starry.phd','https://starbeauty.yukidu.workers.dev']) {
+test('v249 v216 menu remains the single owner of current Starry ecosystem links and battery ledger', () => {
+  for (const url of ['https://starry.phd','https://id.starry.phd','https://echo.starry.phd','https://download.starry.phd','https://go.starry.phd','https://quotes.starry.phd','https://box.starry.phd']) {
     assert.ok(menu.includes(url), `missing ${url}`);
   }
+  assert.doesNotMatch(menu, /美力之星|starbeauty\.yukidu\.workers\.dev/);
   assert.match(menu, /ledger\.href='\/battery-ledger'/);
   assert.match(menu, /電池餘額日誌/);
 });
