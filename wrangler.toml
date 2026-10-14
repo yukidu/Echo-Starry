@@ -23,7 +23,7 @@ custom_domain = true
 pattern = "id.starry.phd"
 custom_domain = true
 
-# 保留原本 Cloudflare 建置流程；回歸測試由 GitHub Actions 額外把關。
+# 保留原本 Cloudflare 建置流程；回歸測試由 GitHub Actions額外把關。
 [build]
 command = "npm run build"
 
@@ -64,5 +64,5 @@ ENVIRONMENT = "production"
 # Google OAuth Client ID 是公開識別碼，不是秘密；Client Secret 不進 GitHub / 前端。
 STARRY_ID_GOOGLE_CLIENT_ID = "661055525630-ndcq5gtr16h7rqqprlqqkkvineea87lc.apps.googleusercontent.com"
 # App 必須先在 Starry ID 登記，不能由瀏覽器任意宣稱 appId 自行取得會員資格。
-STARRY_ID_ALLOWED_APPS = "starry-id,downloadstarry,gostarry,quotes"
-STARRY_ID_SELF_ENROLL_APPS = "starry-id,downloadstarry,gostarry,quotes"
+STARRY_ID_ALLOWED_APPS = "starry-id,downloadstarry,gostarry,quotes,boxstarry"
+STARRY_ID_SELF_ENROLL_APPS = "starry-id,downloadstarry,gostarry,quotes,boxstarry"
