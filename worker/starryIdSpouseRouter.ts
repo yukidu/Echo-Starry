@@ -4,17 +4,6 @@ import { sessionContext } from './starryIdProfileDirectoryRouter';
 const host='id.starry.phd', numeric=/^[0-9]+$/, synthetic=/^n[0-9]{7}$/;
 const clean=(v:unknown)=>v==null?'':String(v).trim();
 const json=(v:unknown,s=200)=>new Response(JSON.stringify(v),{status:s,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
-const ready=new WeakMap<object,Promise<void>>();
-async function schema(db:any){
-  if(!ready.has(db)){
-    const task=(async()=>{
-      await db.prepare("CREATE TABLE IF NOT EXISTS spouse_links (id TEXT PRIMARY KEY,userA TEXT NOT NULL,userB TEXT NOT NULL,status TEXT NOT NULL,requestedBy TEXT NOT NULL,unlinkRequestedBy TEXT,keepUserId TEXT,replacement TEXT,createdAt INTEGER NOT NULL,updatedAt INTEGER NOT NULL)").run();
-      await db.prepare("CREATE INDEX IF NOT EXISTS spouse_links_a ON spouse_links(userA,status)").run();
-      await db.prepare("CREATE INDEX IF NOT EXISTS spouse_links_b ON spouse_links(userB,status)").run();
-      await db.prepare("CREATE TABLE IF NOT EXISTS non_distributor_ids (userId TEXT PRIMARY KEY,number TEXT UNIQUE NOT NULL,createdAt INTEGER NOT NULL)").run();
-    })();ready.set(db,task);task.catch(()=>ready.delete(db));
-  }await ready.get(db);
-}
 const member=(db:any,id:string)=>db.prepare("SELECT u.id,u.status,p.name,p.amwayId FROM users u JOIN profiles p ON p.userId=u.id WHERE u.id=?").bind(id).first();
 const link=(db:any,id:string)=>db.prepare("SELECT * FROM spouse_links WHERE (userA=? OR userB=?) AND status IN ('pending','active','unlink_pending') LIMIT 1").bind(id,id).first();
 const owner=(db:any,num:string,exclude:string)=>db.prepare("SELECT userId FROM profiles WHERE amwayId=? AND userId<>? LIMIT 1").bind(num,exclude).first();
@@ -119,7 +108,7 @@ export async function handleStarryIdSpouse(request:Request,env:Env):Promise<Resp
   const origin=request.headers.get('Origin');if(origin&&origin!==url.origin)return json({error:'Origin not allowed'},403);
   const db=(env as any).STARRY_ID_DB;
   try{
-    await schema(db);
+    await ensureSpouseSchema(db);
     if(url.pathname==='/api/spouse-status'&&request.method==='GET')return json(await status(db,session.userId));
     const input=await request.clone().json().catch(()=>({}));
     if(url.pathname==='/api/distributor-number'&&request.method==='PUT')return change(db,session.userId,input);
