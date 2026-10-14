@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const router = fs.readFileSync('worker/starryIdV245BatteryRouter.ts','utf8');
+const menu = fs.readFileSync('worker/starryIdV216Enhancer.ts','utf8');
 const privacy = fs.readFileSync('worker/privacyCrawlerRouter.ts','utf8');
 const wrangler = fs.readFileSync('wrangler.toml','utf8');
 
@@ -25,12 +26,13 @@ test('v245 battery field is readonly and has its own public visibility control',
   assert.match(router, /<div class=\"label\">電池數量<\/div>/);
 });
 
-test('v245 ecosystem menu includes current Starry apps and battery ledger', () => {
+test('v247 keeps ecosystem menu links and battery ledger in the single v216 menu owner', () => {
   for (const expected of [
     'https://starry.phd','https://id.starry.phd','https://echo.starry.phd','https://download.starry.phd',
     'https://go.starry.phd','https://quotes.starry.phd','https://box.starry.phd','https://starbeauty.yukidu.workers.dev'
-  ]) assert.ok(router.includes(expected), `missing ${expected}`);
-  assert.match(router, /🔋 電池餘額日誌/);
+  ]) assert.ok(menu.includes(expected), `missing ${expected}`);
+  assert.match(menu, /🔋 電池餘額日誌/);
+  assert.doesNotMatch(router, /function syncMenu\(/);
 });
 
 test('v245 stays inside the established privacy router and does not replace the Worker entry', () => {
