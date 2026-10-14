@@ -8,6 +8,8 @@ import {
 
 const CENTRAL_HOST = 'id.starry.phd';
 const SCHEMA_TTL_SECONDS = 300;
+const ECHO_SESSION_COOKIE = 'echostars_session';
+const TOKEN_PATTERN = /^[A-Za-z0-9_-]{30,}$/;
 
 function json(data: unknown, status = 200, headers?: HeadersInit) {
   return new Response(JSON.stringify(data), {
@@ -28,6 +30,23 @@ function isSchemaPath(url: URL) {
 
 function isEchoValuePath(url: URL) {
   return url.pathname === '/api/starry/profile-values';
+}
+
+function withEchoCookieAuthorization(request: Request) {
+  if (request.headers.has('Authorization')) return request;
+  const cookie = request.headers.get('Cookie') || '';
+  let token = '';
+  for (const part of cookie.split(';')) {
+    const separator = part.indexOf('=');
+    if (separator < 0 || part.slice(0,separator).trim() !== ECHO_SESSION_COOKIE) continue;
+    const candidate = part.slice(separator+1).trim();
+    if (TOKEN_PATTERN.test(candidate)) token = candidate;
+    break;
+  }
+  if (!token) return request;
+  const headers = new Headers(request.headers);
+  headers.set('Authorization',`Bearer ${token}`);
+  return new Request(request,{headers});
 }
 
 async function schemaResponse(request: Request, env: Env) {
@@ -63,7 +82,7 @@ async function extensionValues(request: Request, env: Env) {
   if (origin && origin !== new URL(request.url).origin) {
     return json({ error: '不允許跨站修改中央會員資料' }, 403, { 'Cache-Control': 'no-store' });
   }
-  const user = await resolveEchoSessionUser(request, env);
+  const user = await resolveEchoSessionUser(withEchoCookieAuthorization(request), env);
   if (!user?.id) return json({ error: '請先登入繁星回聲會員' }, 401, { 'Cache-Control': 'no-store' });
   const method = request.method.toUpperCase();
   if (method === 'GET') {
