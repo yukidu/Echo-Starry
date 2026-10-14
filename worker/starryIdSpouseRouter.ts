@@ -62,7 +62,7 @@ async function change(db:any,id:string,input:any){
   }
   const other:any=await member(db,duplicate.userId);
   if(!other||other.status!=='active'||await link(db,other.id))return json({error:'此編號已有夫妻關係或無法提出綁定申請'},409);
-  if(input.confirmSpouse!==true)return json({requiresConfirmation:true,number,partner:{name:clean(other.name),rank:clean(other.approvedRank)||'未審核',center:clean(other.center)||'未設定'}},409);
+  if(input.confirmSpouse!==true)return json({requiresConfirmation:true,number,partner:{name:clean(other.name),rank:clean(other.approvedRank)||'未審核',center:clean(other.center)||'未設定'}});
   const third:any=await db.prepare("SELECT COUNT(*) AS count FROM profiles WHERE amwayId=? AND userId NOT IN (?,?)").bind(number,id,other.id).first();
   if(Number(third?.count||0)>0)return json({error:'此編號已有其他會員使用，無法建立夫妻綁定'},409);
   const users=[id,other.id].sort();
