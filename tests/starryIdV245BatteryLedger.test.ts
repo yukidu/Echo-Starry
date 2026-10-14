@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const router = fs.readFileSync('worker/starryIdV245BatteryRouter.ts','utf8');
-const entry = fs.readFileSync('worker/starryIdV245Entry.ts','utf8');
+const privacy = fs.readFileSync('worker/privacyCrawlerRouter.ts','utf8');
 const wrangler = fs.readFileSync('wrangler.toml','utf8');
 
 test('v245 exposes read-only central battery balance and full ledger routes', () => {
@@ -33,10 +33,10 @@ test('v245 ecosystem menu includes current Starry apps and battery ledger', () =
   assert.match(router, /🔋 電池餘額日誌/);
 });
 
-test('v245 entry remains a thin wrapper around the established privacy router', () => {
-  assert.match(entry, /import baseWorker from '\.\/privacyCrawlerRouter'/);
-  assert.match(entry, /const direct = await handleStarryIdV245Battery/);
-  assert.match(entry, /const response = await baseWorker\.fetch/);
-  assert.match(entry, /enhanceStarryIdV245Response/);
-  assert.match(wrangler, /main = "worker\/starryIdV245Entry\.ts"/);
+test('v245 stays inside the established privacy router and does not replace the Worker entry', () => {
+  assert.match(privacy, /handleStarryIdV245Battery/);
+  assert.match(privacy, /enhanceStarryIdV245Response/);
+  assert.match(privacy, /const starryV245Direct = await handleStarryIdV245Battery/);
+  assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
+  assert.doesNotMatch(wrangler, /starryIdV245Entry/);
 });
