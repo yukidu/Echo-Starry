@@ -183,3 +183,46 @@ button[data-main-menu='hamburger']:active {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
 }
+
+/* v233: giant alert icon, centered content, and an 80vw width ceiling. */
+.v181-confirm-card {
+  position: relative;
+  width: min(32rem, 80vw);
+  max-width: 80vw;
+  min-height: 9rem;
+  display: block;
+  overflow: hidden;
+  padding: 1.25rem 1.25rem 1rem;
+}
+
+.v181-confirm-icon {
+  position: absolute;
+  left: 0.35rem;
+  top: 50%;
+  width: clamp(7.5rem, 18vw, 10rem);
+  height: clamp(7.5rem, 18vw, 10rem);
+  margin: 0;
+  transform: translateY(-50%);
+  opacity: 0.26;
+  pointer-events: none;
+}
+
+.v181-confirm-body {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  text-align: center;
+}
+
+.v181-confirm-title,
+.v181-confirm-message {
+  text-align: center;
+}
+
+.v181-confirm-actions {
+  justify-content: center;
+}
+
+.dark .v181-confirm-icon {
+  opacity: 0.3;
+}
