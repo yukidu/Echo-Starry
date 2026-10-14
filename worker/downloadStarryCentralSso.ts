@@ -4,6 +4,7 @@ import { handleStarryIdRandomMotto } from './starryIdRandomMottoRouter';
 import { handleStarryIdSpouse } from './starryIdSpouseRouter';
 import { handleStarryIdRankUpdate } from './starryIdRankUpdateRouter';
 import { handleStarryIdV230Client } from './starryIdV230ClientRouter';
+import { handleStarryIdNotificationSummary } from './starryIdNotificationSummaryRouter';
 import {
   captureSpouseNotificationContext,
   handleStarryIdNotifications,
@@ -178,6 +179,9 @@ export async function handleDownloadStarryCentralSso(request: Request, env: Env)
   const v230ClientResponse = await handleStarryIdV230Client(request, env);
   if (v230ClientResponse) return v230ClientResponse;
 
+  const summaryResponse = await handleStarryIdNotificationSummary(request, env);
+  if (summaryResponse) return summaryResponse;
+
   const notificationsResponse = await handleStarryIdNotifications(request, env);
   if (notificationsResponse) return notificationsResponse;
 
@@ -185,7 +189,13 @@ export async function handleDownloadStarryCentralSso(request: Request, env: Env)
     console.warn('Starry ID card visit tracking skipped', { code: error instanceof Error ? error.message : 'unknown' });
   });
 
-  const spouseNotificationContext = await captureSpouseNotificationContext(request, env).catch(() => null);
+  let spouseNotificationContext: any = null;
+  if (url.pathname === '/api/spouse-action') {
+    spouseNotificationContext = await captureSpouseNotificationContext(request, env).catch(() => null);
+  } else if (url.pathname === '/api/distributor-number') {
+    const input: any = await request.clone().json().catch(() => ({}));
+    if (input.confirmSpouse === true) spouseNotificationContext = await captureSpouseNotificationContext(request, env).catch(() => null);
+  }
   const spouseResponse = await handleStarryIdSpouse(request, env);
   if (spouseResponse) {
     await notifySpouseMutation(env, spouseNotificationContext, spouseResponse).catch(() => undefined);
