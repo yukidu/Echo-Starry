@@ -1,4 +1,4 @@
-import appWorker from './batteryRouter';
+import appWorker from './stickerRouter';
 import type { Env } from './index';
 import {
   activeUsersByDealerId,
