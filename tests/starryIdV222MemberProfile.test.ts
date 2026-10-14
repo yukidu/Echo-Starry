@@ -67,7 +67,9 @@ test('sponsor suggestions show central center and approved rank and bind exact m
 });
 
 test('topbar is full-width max-content, mobile card button enlarged, light theme fixed',()=>{
-  assert.match(ui,/width:100vw!important/);
+  assert.match(ui,/width:100%!important/);
+  assert.match(ui,/box-sizing:border-box!important/);
+  assert.match(ui,/\.topbar \.brand\{flex:1 1 auto!important/);
   assert.match(ui,/calc\(\(100vw - 1060px\)\/2\)/);
   assert.match(ui,/border-radius:0!important/);
   assert.match(ui,/#myCardBtn\{font-size:15px!important;min-width:96px/);
