@@ -10,6 +10,7 @@ import { handleStarryIdV212PublicCardFallback } from './starryIdV212PublicCardBr
 import { handleStarryIdCentral } from './starryIdCentralRouter';
 import { handleDownloadStarryCentralSso } from './downloadStarryCentralSso';
 import { enhanceStarryIdV218Response } from './starryIdV218ResponseEnhancer';
+import { handleStarryProfileSchema } from './starryProfileSchemaRouter';
 import type { Env } from './index';
 import { unitsToStickers } from '../shared/stickers';
 
@@ -200,6 +201,11 @@ export default {
   async fetch(request: Request, env: Env, ctx?: any): Promise<Response> {
     const url = new URL(request.url);
 
+    // Schema-driven member metadata is intentionally lightweight and cacheable.
+    // It is available on id.starry.phd and through the Echo same-origin bridge.
+    const profileSchemaResponse = await handleStarryProfileSchema(request, env);
+    if (profileSchemaResponse) return withPrivacyHeaders(profileSchemaResponse);
+
     // Download Starry central SSO has dedicated routes on id.starry.phd. It must
     // run before the v211 and generic Starry ID routers so these routes cannot
     // be swallowed by another id.starry.phd handler.
@@ -222,8 +228,6 @@ export default {
       return withPrivacyHeaders(enhancedStarryIdResponse);
     }
 
-    // Starry ID owns id.starry.phd only. Keeping privacyCrawlerRouter as the
-    // Worker entry point protects the existing EchoStars / DownloadStarry chain.
     const starryIdResponse = await handleStarryIdCentral(request, env as any);
     if (starryIdResponse) return withPrivacyHeaders(starryIdResponse);
 
@@ -297,10 +301,21 @@ export default {
     );
 
     if (response.ok && request.method.toUpperCase() === 'PUT') {
-      const memberWrite = url.pathname.match(/^\/api\/users\/([^/]+)(?:\/(?:contributor|admin-role|block|audit-rank))?$/);
-      if (memberWrite) {
-        const userId = decodeURIComponent(memberWrite[1]);
-        scheduleStarrySync(ctx, env, userId, 'echostars', 'member-profile-or-membership-update');
+      const directProfileWrite = url.pathname.match(/^\/api\/users\/([^/]+)$/);
+      if (directProfileWrite) {
+        const userId = decodeURIComponent(directProfileWrite[1]);
+        const synced = await syncEchoMemberToStarryBestEffort(env as any, userId, 'echostars', 'member-profile-update');
+        if ((env as any).STARRY_ID_DB && !synced) {
+          return withPrivacyHeaders(new Response(JSON.stringify({
+            error: '繁星回聲已暫存本次修改，但 Starry ID 中央同步暫時失敗，請再按一次儲存。'
+          }), { status: 503, headers: { 'Content-Type':'application/json; charset=utf-8', 'Cache-Control':'no-store' } }));
+        }
+      } else {
+        const membershipWrite = url.pathname.match(/^\/api\/users\/([^/]+)\/(?:contributor|admin-role|block|audit-rank)$/);
+        if (membershipWrite) {
+          const userId = decodeURIComponent(membershipWrite[1]);
+          scheduleStarrySync(ctx, env, userId, 'echostars', 'member-membership-update');
+        }
       }
     }
 
