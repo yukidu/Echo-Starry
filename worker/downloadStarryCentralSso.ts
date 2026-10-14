@@ -6,6 +6,7 @@ import { handleStarryIdRankUpdate } from './starryIdRankUpdateRouter';
 import type { Env } from './index';
 
 const STARRY_ID_HOST = 'id.starry.phd';
+const QUOTES_ORIGIN = 'https://quotes.starry.phd';
 const DEFAULT_GOOGLE_CLIENT_ID = '661055525630-ndcq5gtr16h7rqqprlqqkkvineea87lc.apps.googleusercontent.com';
 const TICKET_TTL_MS = 5 * 60 * 1000;
 const schemaReady = new WeakMap<object, Promise<void>>();
@@ -22,10 +23,17 @@ const APP_CONFIG = {
     label: 'Go Starry',
     origin: 'https://go.starry.phd',
     backPath: '/'
+  },
+  quotes: {
+    appId: 'quotes',
+    label: '繁星語錄',
+    origin: QUOTES_ORIGIN,
+    backPath: '/'
   }
 } as const;
 
 type CentralSsoAppId = keyof typeof APP_CONFIG;
+type TicketAppId = Exclude<CentralSsoAppId, 'quotes'>;
 
 function text(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
@@ -90,7 +98,7 @@ function rejectCrossSite(request: Request) {
   return null;
 }
 
-async function centralSession(request: Request, env: Env, appId: CentralSsoAppId) {
+async function currentCentralSession(request: Request, env: Env) {
   const url = new URL(request.url);
   url.pathname = '/api/session';
   url.search = '';
@@ -102,12 +110,59 @@ async function centralSession(request: Request, env: Env, appId: CentralSsoAppId
   const response = await handleStarryIdCentral(probe, env as any);
   if (!response || !response.ok) return null;
   const data: any = await response.json().catch(() => null);
-  if (!data?.authenticated || !data?.user?.id || data?.appId !== appId) return null;
-  if (data?.membership?.status !== 'active') return null;
+  if (!data?.authenticated || !data?.user?.id) return null;
   return data;
 }
 
-async function issueTicket(request: Request, env: Env, appId: CentralSsoAppId) {
+async function centralSession(request: Request, env: Env, appId: TicketAppId) {
+  const data = await currentCentralSession(request, env);
+  if (!data || data.appId !== appId || data?.membership?.status !== 'active') return null;
+  return data;
+}
+
+function quotesIdentityHeaders(request: Request) {
+  const headers = new Headers({
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'Vary': 'Origin'
+  });
+  if (request.headers.get('Origin') === QUOTES_ORIGIN) {
+    headers.set('Access-Control-Allow-Origin', QUOTES_ORIGIN);
+    headers.set('Access-Control-Allow-Credentials', 'true');
+    headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    headers.set('Access-Control-Allow-Headers', 'Accept');
+  }
+  return headers;
+}
+
+function quotesIdentityJson(request: Request, data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: quotesIdentityHeaders(request) });
+}
+
+async function quotesIdentity(request: Request, env: Env) {
+  const origin = request.headers.get('Origin');
+  if (origin && origin !== QUOTES_ORIGIN) {
+    return quotesIdentityJson(request, { error: 'Origin not allowed' }, 403);
+  }
+  if (request.method.toUpperCase() === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: quotesIdentityHeaders(request) });
+  }
+  if (request.method.toUpperCase() !== 'GET') return quotesIdentityJson(request, { error: 'Method not allowed' }, 405);
+
+  const session = await currentCentralSession(request, env);
+  if (!session) return quotesIdentityJson(request, { authenticated: false });
+  const member = session.user || {};
+  return quotesIdentityJson(request, {
+    authenticated: true,
+    name: text(member.name),
+    rank: text(member.rank),
+    approvedRank: text(member.approvedRank)
+  });
+}
+
+async function issueTicket(request: Request, env: Env, appId: TicketAppId) {
   const rejected = rejectCrossSite(request);
   if (rejected) return rejected;
   const config = APP_CONFIG[appId];
@@ -133,14 +188,15 @@ function loginPage(env: Env, appId: CentralSsoAppId, chooseAccount = false) {
   const config = APP_CONFIG[appId];
   const clientId = text((env as any).STARRY_ID_GOOGLE_CLIENT_ID) || DEFAULT_GOOGLE_CLIENT_ID;
   const ticketPath = `/api/apps/${appId}/ticket`;
+  const identityOnly = appId === 'quotes';
   const backUrl = `${config.origin}${config.backPath}`;
   const html = `<!doctype html>
 <html lang="zh-Hant-TW"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Starry ID × ${config.label}</title><script src="https://accounts.google.com/gsi/client" async defer></script><style>
 :root{color-scheme:light dark}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b1026;font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#eef2ff}.card{width:min(92vw,480px);background:#111833;border:1px solid #2f3b68;border-radius:28px;padding:30px;box-shadow:0 24px 80px rgba(0,0,0,.38);text-align:center}.logo{width:76px;height:76px;margin:0 auto 16px;border-radius:24px;display:grid;place-items:center;background:linear-gradient(135deg,#445cff,#7656db);color:#fff;font-size:36px;font-weight:900}.title{font-size:26px;font-weight:900}.muted{color:#aeb8dc;line-height:1.8}.status{margin-top:16px;min-height:24px;font-weight:800;color:#c8d0ff}.google{display:grid;place-items:center;margin-top:20px}.back{display:inline-block;margin-top:20px;color:#bfc9ff;text-decoration:none;font-weight:800}</style></head><body><main class="card"><div class="logo">ID</div><div class="title">Starry ID × ${config.label}</div><p class="muted">使用繁星生態系中央會員登入。登入完成後會安全返回${config.label}。</p><div id="google" class="google"></div><div id="status" class="status">正在確認登入狀態…</div><a class="back" href="${backUrl}">返回${config.label}</a></main><script>
-const CLIENT_ID=${JSON.stringify(clientId)};const APP_ID=${JSON.stringify(appId)};const TICKET_PATH=${JSON.stringify(ticketPath)};const APP_LABEL=${JSON.stringify(config.label)};const FORCE_ACCOUNT_CHOICE=${JSON.stringify(chooseAccount)};const statusEl=document.getElementById('status');const googleEl=document.getElementById('google');let rendered=false;
-async function ticket(){const r=await fetch(TICKET_PATH,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',cache:'no-store'});const d=await r.json().catch(()=>({}));if(r.ok&&d.redirect){location.replace(d.redirect);return true}return false}
-function renderGoogle(){if(rendered)return;rendered=true;statusEl.textContent=FORCE_ACCOUNT_CHOICE?'請選擇要登入的 Google 帳戶':'請使用 Google 帳戶繼續';const timer=setInterval(()=>{if(!window.google?.accounts?.id)return;clearInterval(timer);google.accounts.id.disableAutoSelect?.();google.accounts.id.initialize({client_id:CLIENT_ID,callback:async x=>{statusEl.textContent='正在登入 Starry ID…';const r=await fetch('/api/google-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential:x.credential,appId:APP_ID}),cache:'no-store'});const d=await r.json().catch(()=>({}));if(!r.ok){statusEl.textContent=d.error||'登入失敗，請再試一次';return}statusEl.textContent='正在返回'+APP_LABEL+'…';if(!await ticket())statusEl.textContent='無法建立登入授權，請再試一次';}});google.accounts.id.renderButton(googleEl,{theme:'outline',size:'large',shape:'pill',text:'continue_with',width:300})},80)}
-(async()=>{if(!FORCE_ACCOUNT_CHOICE){try{if(await ticket())return}catch{}}renderGoogle()})();
+const CLIENT_ID=${JSON.stringify(clientId)};const APP_ID=${JSON.stringify(appId)};const TICKET_PATH=${JSON.stringify(ticketPath)};const APP_LABEL=${JSON.stringify(config.label)};const BACK_URL=${JSON.stringify(backUrl)};const IDENTITY_ONLY=${JSON.stringify(identityOnly)};const FORCE_ACCOUNT_CHOICE=${JSON.stringify(chooseAccount)};const statusEl=document.getElementById('status');const googleEl=document.getElementById('google');let rendered=false;
+async function completeLogin(){if(IDENTITY_ONLY){const r=await fetch('/api/apps/quotes/identity',{cache:'no-store'});const d=await r.json().catch(()=>({}));if(r.ok&&d.authenticated){location.replace(BACK_URL+(BACK_URL.includes('?')?'&':'?')+'starry=login');return true}return false}const r=await fetch(TICKET_PATH,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',cache:'no-store'});const d=await r.json().catch(()=>({}));if(r.ok&&d.redirect){location.replace(d.redirect);return true}return false}
+function renderGoogle(){if(rendered)return;rendered=true;statusEl.textContent=FORCE_ACCOUNT_CHOICE?'請選擇要登入的 Google 帳戶':'請使用 Google 帳戶繼續';const timer=setInterval(()=>{if(!window.google?.accounts?.id)return;clearInterval(timer);google.accounts.id.disableAutoSelect?.();google.accounts.id.initialize({client_id:CLIENT_ID,callback:async x=>{statusEl.textContent='正在登入 Starry ID…';const r=await fetch('/api/google-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential:x.credential,appId:APP_ID}),cache:'no-store'});const d=await r.json().catch(()=>({}));if(!r.ok){statusEl.textContent=d.error||'登入失敗，請再試一次';return}statusEl.textContent='正在返回'+APP_LABEL+'…';if(!await completeLogin())statusEl.textContent='無法確認登入狀態，請再試一次';}});google.accounts.id.renderButton(googleEl,{theme:'outline',size:'large',shape:'pill',text:'continue_with',width:300})},80)}
+(async()=>{if(!FORCE_ACCOUNT_CHOICE){try{if(await completeLogin())return}catch{}}renderGoogle()})();
 </script></body></html>`;
   return new Response(html, {
     headers: {
@@ -154,13 +210,13 @@ function renderGoogle(){if(rendered)return;rendered=true;statusEl.textContent=FO
 }
 
 function appIdFromAuthPath(pathname: string): CentralSsoAppId | null {
-  const match = pathname.match(/^\/auth\/(downloadstarry|gostarry)$/);
+  const match = pathname.match(/^\/auth\/(downloadstarry|gostarry|quotes)$/);
   return match ? match[1] as CentralSsoAppId : null;
 }
 
-function appIdFromTicketPath(pathname: string): CentralSsoAppId | null {
+function appIdFromTicketPath(pathname: string): TicketAppId | null {
   const match = pathname.match(/^\/api\/apps\/(downloadstarry|gostarry)\/ticket$/);
-  return match ? match[1] as CentralSsoAppId : null;
+  return match ? match[1] as TicketAppId : null;
 }
 
 export async function handleDownloadStarryCentralSso(request: Request, env: Env): Promise<Response | null> {
@@ -180,6 +236,9 @@ export async function handleDownloadStarryCentralSso(request: Request, env: Env)
   if (profileDirectoryResponse) return profileDirectoryResponse;
 
   const method = request.method.toUpperCase();
+  if (url.pathname === '/api/apps/quotes/identity' && (method === 'GET' || method === 'OPTIONS')) {
+    return quotesIdentity(request, env);
+  }
   const authAppId = appIdFromAuthPath(url.pathname);
   if (authAppId && method === 'GET') return loginPage(env, authAppId, url.searchParams.get('choose') === '1');
   const ticketAppId = appIdFromTicketPath(url.pathname);
