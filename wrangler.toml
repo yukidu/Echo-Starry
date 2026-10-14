@@ -1,6 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/starryIdV228SingleUnlinkEntry.ts"
+main = "worker/privacyCrawlerRouter.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
@@ -32,8 +32,8 @@ command = "npm run build"
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# v228 只在 id.starry.phd 攔截單方解除夫妻關係與對應文案；
-# 其他請求全部委派既有 privacyCrawlerRouter，保留原安全鏈與路由架構。
+# 所有請求仍先經過 privacyCrawlerRouter；它只把 id.starry.phd 分流給 Starry ID，
+# 其餘 EchoStars / DownloadStarry 路徑保持原有安全鏈。
 run_worker_first = ["/*"]
 
 # 1. Cloudflare D1 資料庫 (SQLite)
