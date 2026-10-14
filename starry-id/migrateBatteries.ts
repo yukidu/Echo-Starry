@@ -7,6 +7,7 @@ if (!accountId || !apiToken) throw new Error('Cloudflare credentials are require
 
 type Statement = { sql: string; params?: string[] };
 type ApiResult = { success?: boolean; results?: any[] };
+type ExpectedTransaction = { userId: string; deltaUnits: number };
 
 async function requestD1(databaseId: string, body: { sql: string; params?: string[] } | { batch: Statement[] }): Promise<ApiResult[]> {
   const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`, {
@@ -61,9 +62,25 @@ function canonicalKey(row: any, canonicalUserId: string) {
   return `echostars:${old}`;
 }
 
+function addBalance(map: Map<string, number>, userId: string, deltaUnits: number) {
+  map.set(userId, (map.get(userId) || 0) + deltaUnits);
+}
+
 async function main() {
   const startedAt = Date.now();
   await batch(targetDbId, schemaStatements);
+
+  const sourceTable = await query(sourceDbId, "SELECT name FROM sqlite_master WHERE type='table' AND name='sticker_transactions'");
+  if (!sourceTable.length) {
+    const state = (await query(targetDbId, "SELECT * FROM battery_migration_state WHERE sourceApp='echostars'"))[0];
+    if (state?.status !== 'completed') throw new Error('Legacy sticker ledger is absent before a completed battery migration was recorded');
+    console.log(JSON.stringify({
+      generatedAt: new Date().toISOString(), source: 'echoes_db.sticker_transactions', target: 'starry_id_db.battery_transactions',
+      terminology: 'battery', containsPII: false, idempotent: true, sourceLedgerPresent: false,
+      status: 'completed', migratedRows: Number(state.migratedCount || 0)
+    }, null, 2));
+    return;
+  }
 
   const links = await query(targetDbId, "SELECT sourceUserId,userId FROM legacy_links WHERE sourceApp='echostars'");
   const memberMap = new Map(links.map((row: any) => [text(row.sourceUserId), text(row.userId)]));
@@ -85,6 +102,8 @@ async function main() {
 
   let cursor = 0;
   let scanned = 0;
+  const expected = new Map<string, ExpectedTransaction>();
+  const sourceBalances = new Map<string, number>();
   while (true) {
     const rows = await query(sourceDbId, `SELECT rowid AS sourceRowId,* FROM sticker_transactions
       WHERE rowid>? ORDER BY rowid LIMIT 250`, [String(cursor)]);
@@ -94,16 +113,23 @@ async function main() {
       const userId = mapUser(row.userId);
       if (!userId) throw new Error('Battery migration found a transaction without userId');
       const uniqueKey = canonicalKey(row, userId);
+      const deltaUnits = Math.trunc(Number(row.deltaUnits) || 0);
+      const priorExpected = expected.get(uniqueKey);
+      if (priorExpected && (priorExpected.userId !== userId || priorExpected.deltaUnits !== deltaUnits)) {
+        throw new Error('Legacy ledger has conflicting idempotency keys');
+      }
+      expected.set(uniqueKey, { userId, deltaUnits });
+      addBalance(sourceBalances, userId, deltaUnits);
       statements.push({
         sql: `INSERT OR IGNORE INTO battery_transactions
           (id,userId,deltaUnits,balanceAfterUnits,type,sourceApp,sourceId,description,actorUserId,uniqueKey,createdAt,
            trackId,commentId,relatedUserId,sourceLabel)
           VALUES (?,?,?,?,?,'echostars',?,?,?,?,?,?,?,?,?)`,
         params: [
-          `echostars:${text(row.id) || uniqueKey}`, userId, integer(row.deltaUnits), integer(row.balanceAfterUnits),
-          text(row.type) || 'legacy', text(row.sourceId), text(row.description) || '歷史電池紀錄',
+          `echostars:${text(row.id) || uniqueKey}`, userId, integer(deltaUnits), integer(row.balanceAfterUnits),
+          text(row.type) || 'legacy', text(row.sourceId), text(row.description).replaceAll('貼紙', '電池') || '歷史電池紀錄',
           mapUser(row.actorUserId), uniqueKey, integer(row.createdAt), text(row.trackId), text(row.commentId),
-          mapUser(row.relatedUserId), text(row.sourceLabel)
+          mapUser(row.relatedUserId), text(row.sourceLabel).replaceAll('貼紙', '電池')
         ]
       });
       cursor = Math.max(cursor, Number(row.sourceRowId || 0));
@@ -112,20 +138,43 @@ async function main() {
     await batch(targetDbId, statements);
   }
 
+  const sourceAfter = (await query(sourceDbId, `SELECT COUNT(*) AS n,COALESCE(SUM(deltaUnits),0) AS balance,
+    COALESCE(MAX(rowid),0) AS maxRowId FROM sticker_transactions`))[0] || {};
+  const sourceChangedDuringMigration =
+    Number(sourceAfter.n || 0) !== sourceCount ||
+    Number(sourceAfter.balance || 0) !== sourceBalance ||
+    Number(sourceAfter.maxRowId || 0) !== sourceMaxRowId;
+
+  const centralRows = await query(targetDbId, `SELECT uniqueKey,userId,deltaUnits FROM battery_transactions
+    WHERE sourceApp='echostars' OR uniqueKey LIKE 'global:initial:%' OR uniqueKey LIKE 'global:rank-approval:%'`);
+  const centralByKey = new Map(centralRows.map((row: any) => [text(row.uniqueKey), row]));
+  let rowMismatches = 0;
+  const verifiedBalances = new Map<string, number>();
+  for (const [uniqueKey, wanted] of expected) {
+    const saved: any = centralByKey.get(uniqueKey);
+    if (!saved || text(saved.userId) !== wanted.userId || Number(saved.deltaUnits || 0) !== wanted.deltaUnits) {
+      rowMismatches += 1;
+      continue;
+    }
+    addBalance(verifiedBalances, wanted.userId, wanted.deltaUnits);
+  }
+
+  let userBalanceMismatches = 0;
+  for (const [userId, balance] of sourceBalances) {
+    if ((verifiedBalances.get(userId) || 0) !== balance) userBalanceMismatches += 1;
+  }
+
   const now = Date.now();
   await query(targetDbId, `DELETE FROM battery_accounts`);
   await query(targetDbId, `INSERT INTO battery_accounts(userId,balanceUnits,updatedAt)
     SELECT userId,COALESCE(SUM(deltaUnits),0),? FROM battery_transactions GROUP BY userId`, [String(now)]);
 
-  const centralSummary = (await query(targetDbId, `SELECT COUNT(*) AS n,COALESCE(SUM(deltaUnits),0) AS balance
-    FROM battery_transactions WHERE sourceApp='echostars'`))[0] || {};
-  const centralCount = Number(centralSummary.n || 0);
-  const centralBalance = Number(centralSummary.balance || 0);
-  const status = centralCount >= sourceCount && centralBalance === sourceBalance ? 'completed' : 'completed_with_issues';
-
+  const exact = !sourceChangedDuringMigration && scanned === sourceCount && expected.size === sourceCount && rowMismatches === 0 && userBalanceMismatches === 0;
+  const status = exact ? 'completed' : 'completed_with_issues';
   await query(targetDbId, `UPDATE battery_migration_state SET status=?,migratedCount=?,centralBalanceUnits=?,
-    completedAt=?,updatedAt=? WHERE sourceApp='echostars'`,
-    [status, String(centralCount), String(centralBalance), String(now), String(now)]);
+    completedAt=?,updatedAt=? WHERE sourceApp='echostars'`, [
+    status, String(expected.size - rowMismatches), String(sourceBalance), exact ? String(now) : '', String(now)
+  ]);
 
   const report = {
     generatedAt: new Date().toISOString(),
@@ -133,17 +182,20 @@ async function main() {
     target: 'starry_id_db.battery_transactions',
     terminology: 'battery',
     containsPII: false,
-    sourcePreservedForRollback: true,
-    sourceWritesWillBeDisabledByApplicationCutover: true,
+    sourcePreservedUntilProductionCutoverVerified: true,
     sourceRows: sourceCount,
     scannedRows: scanned,
-    centralEchoRows: centralCount,
+    expectedUniqueRows: expected.size,
+    verifiedRows: expected.size - rowMismatches,
     sourceBalanceUnits: sourceBalance,
-    centralEchoBalanceUnits: centralBalance,
+    rowMismatches,
+    userBalanceMismatches,
+    sourceChangedDuringMigration,
+    sourceUsers: sourceBalances.size,
     status
   };
   console.log(JSON.stringify(report, null, 2));
-  if (status !== 'completed') process.exitCode = 1;
+  if (!exact) process.exitCode = 1;
 }
 
 main().catch(error => {
