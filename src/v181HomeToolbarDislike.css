@@ -69,8 +69,6 @@ button[data-main-menu='hamburger']:active {
   justify-content: center;
   padding: max(5rem, env(safe-area-inset-top)) 0.5rem 1rem;
   background: rgba(15, 23, 42, 0.22);
-  backdrop-filter: blur(1.5px);
-  -webkit-backdrop-filter: blur(1.5px);
   animation: v181-confirm-fade 140ms ease-out both;
 }
 
