@@ -86,8 +86,8 @@ test('production mappings keep three hash-only non-negative targets and v112 rep
   assert.ok(HIDDEN_BALANCE_TARGETS_V111.every(item => item.targetUnits >= 0 && /^[a-f0-9]{64}$/.test(item.memberNameHash)));
 });
 
-test('member history shows valid correction entries while earned/spent and toast streams still exclude them', () => {
-  const source = readFileSync(new URL('../worker/stickerRouter.ts', import.meta.url), 'utf8');
+test('legacy member history shows correction entries while earned/spent and toast streams still exclude them', () => {
+  const source = readFileSync(new URL('../worker/legacyStickerRouter.ts', import.meta.url), 'utf8');
   assert.match(source, /系統錯誤修正/);
   assert.match(source, /hidden-sticker-balance-v111:%/);
   assert.match(source, /t\.type <> 'balance_correction' AND t\.deltaUnits > 0/);
