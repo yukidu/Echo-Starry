@@ -22,6 +22,12 @@ const APP_CONFIG = {
     label: 'Go Starry',
     origin: 'https://go.starry.phd',
     backPath: '/'
+  },
+  quotes: {
+    appId: 'quotes',
+    label: '繁星語錄',
+    origin: 'https://quotes.starry.phd',
+    backPath: '/'
   }
 } as const;
 
@@ -154,12 +160,12 @@ function renderGoogle(){if(rendered)return;rendered=true;statusEl.textContent=FO
 }
 
 function appIdFromAuthPath(pathname: string): CentralSsoAppId | null {
-  const match = pathname.match(/^\/auth\/(downloadstarry|gostarry)$/);
+  const match = pathname.match(/^\/auth\/(downloadstarry|gostarry|quotes)$/);
   return match ? match[1] as CentralSsoAppId : null;
 }
 
 function appIdFromTicketPath(pathname: string): CentralSsoAppId | null {
-  const match = pathname.match(/^\/api\/apps\/(downloadstarry|gostarry)\/ticket$/);
+  const match = pathname.match(/^\/api\/apps\/(downloadstarry|gostarry|quotes)\/ticket$/);
   return match ? match[1] as CentralSsoAppId : null;
 }
 
