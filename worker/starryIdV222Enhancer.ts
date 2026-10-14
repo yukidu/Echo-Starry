@@ -83,6 +83,7 @@ export function enhanceStarryIdV222MemberCenter(html: string): string {
     let spouseTimer=0;
     async function refreshSpouse(){
       const fields=q('#fields');if(!fields||!sessionId)return;
+      if(targetId()!==sessionId){q('#v224Spouse')?.remove();return}
       let panel=q('#v224Spouse');if(!panel){panel=document.createElement('section');panel.id='v224Spouse';panel.className='v222-num v224-spouse';fields.after(panel)}
       try{
         const d=await api('/api/spouse-status');panel.replaceChildren();
