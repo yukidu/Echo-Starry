@@ -53,7 +53,14 @@ async function change(db:any,id:string,input:any){
   const other:any=await member(db,duplicate.userId);
   if(!other||other.status!=='active'||await link(db,other.id))return json({error:'此編號已有夫妻關係或無法提出綁定申請'},409);
   const users=[id,other.id].sort();
-  await db.prepare("INSERT INTO spouse_links(id,userA,userB,status,requestedBy,createdAt,updatedAt) VALUES(?,?,?,'pending',?,?,?)").bind(crypto.randomUUID(),users[0],users[1],id,now,now).run();
+  const linkId=crypto.randomUUID();
+  try {
+    await db.batch([
+      db.prepare("INSERT INTO spouse_links(id,userA,userB,status,requestedBy,createdAt,updatedAt) VALUES(?,?,?,'pending',?,?,?)").bind(linkId,users[0],users[1],id,now,now),
+      db.prepare("INSERT INTO spouse_slots(userId,linkId) VALUES (?,?)").bind(users[0],linkId),
+      db.prepare("INSERT INTO spouse_slots(userId,linkId) VALUES (?,?)").bind(users[1],linkId)
+    ]);
+  }catch{return json({error:'任一會員已有夫妻關係或待確認申請'},409)}
   return json({pending:true,message:'直銷商編號相同，已提出夫妻綁定申請；需另一位會員確認',partnerName:clean(other.name)},202);
 }
 async function action(db:any,id:string,input:any,isAdmin=false){
@@ -61,7 +68,7 @@ async function action(db:any,id:string,input:any,isAdmin=false){
   const kind=clean(input.action),other=l.userA===id?l.userB:l.userA,now=Date.now();
   if(l.status==='pending'&&(kind==='cancel'||kind==='reject')){
     if((kind==='cancel')!==(l.requestedBy===id))return json({error:'無權執行此操作'},403);
-    await db.prepare("DELETE FROM spouse_links WHERE id=?").bind(l.id).run();return json({success:true});
+    await db.batch([db.prepare("DELETE FROM spouse_links WHERE id=?").bind(l.id),db.prepare("DELETE FROM spouse_slots WHERE linkId=?").bind(l.id)]);return json({success:true});
   }
   if(l.status==='pending'&&kind==='approve'){
     if(l.requestedBy===id)return json({error:'必須由另一位會員確認'},403);
@@ -100,6 +107,10 @@ async function action(db:any,id:string,input:any,isAdmin=false){
     const statements=[
       db.prepare("UPDATE profiles SET amwayId=?,updatedAt=? WHERE userId=?").bind(replacement,now,loser),
       db.prepare("DELETE FROM spouse_links WHERE id=?").bind(l.id),
+      db.prepare("DELETE FROM spouse_slots WHERE linkId=?").bind(l.id),
+      db.prepare("DELETE FROM spouse_slots WHERE linkId=?").bind(l.id),
+      db.prepare("DELETE FROM spouse_slots WHERE linkId=?").bind(l.id),
+      db.prepare("DELETE FROM spouse_slots WHERE linkId=?").bind(l.id),
       db.prepare("DELETE FROM non_distributor_ids WHERE userId=?").bind(loser)
     ];
     if(synthetic.test(replacement))statements.push(db.prepare("INSERT INTO non_distributor_ids(userId,number,createdAt) VALUES(?,?,?)").bind(loser,replacement,now));
