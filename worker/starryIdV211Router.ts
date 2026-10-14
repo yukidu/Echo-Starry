@@ -211,7 +211,19 @@ function numerologyHtml(birthday: string) {
 
 async function publicCard(request: Request, env: StarryEnv, slug: string) {
   const db=env.STARRY_ID_DB; if(!db) return null; await ensureSchema(db);
-  const card: any = await db.prepare('SELECT userId,slug,cardNumber FROM public_cards WHERE slug=? LIMIT 1').bind(slug).first(); if(!card) return null;
+  let card: any = await db.prepare('SELECT userId,slug,cardNumber FROM public_cards WHERE slug=? LIMIT 1').bind(slug).first();
+if(!card && /^[0-9]+$/.test(slug)) {
+  const matches: any = await db.prepare(`SELECT u.id,p.amwayId FROM users u JOIN profiles p ON p.userId=u.id WHERE u.status='active' AND TRIM(COALESCE(p.amwayId,''))=? LIMIT 2`).bind(slug).all();
+  const rows = matches?.results || [];
+  if(rows.length===1 && text(rows[0].amwayId)===slug) {
+    const directMember: any = await readMember(db,rows[0].id);
+    if(directMember && directMember.status==='active') {
+      await ensureCard(db,directMember);
+      card = await db.prepare('SELECT userId,slug,cardNumber FROM public_cards WHERE slug=? LIMIT 1').bind(slug).first();
+    }
+  }
+}
+if(!card) return null;
   const member: any = await readMember(db,card.userId); if(!member||member.status!=='active') return null;
   const visibility=await readVisibility(db,card.userId); const data:any=memberPayload(member); data.cardNumber=card.cardNumber;
   const partner:any=await db.prepare("SELECT p.name FROM spouse_links s JOIN profiles p ON p.userId=CASE WHEN s.userA=? THEN s.userB ELSE s.userA END WHERE s.status='active' AND (s.userA=? OR s.userB=?) LIMIT 1").bind(card.userId,card.userId,card.userId).first().catch(()=>null);
