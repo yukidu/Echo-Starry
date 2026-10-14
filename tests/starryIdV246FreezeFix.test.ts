@@ -4,23 +4,32 @@ import { readFileSync } from 'node:fs';
 
 const source = readFileSync('worker/starryIdV245BatteryRouter.ts','utf8');
 
-test('v246 battery sync no longer observes class and hidden attribute churn', () => {
-  assert.match(source, /observe\(document\.documentElement,\{childList:true,subtree:true\}\)/);
-  assert.doesNotMatch(source, /attributeFilter:\['class','hidden'\]/);
+test('v248 battery client no longer observes the whole Starry ID document', () => {
+  const client = source.split('const CLIENT_SOURCE = `')[1]?.split('`;
+
+export async function handleStarryIdV245Battery')[0] || '';
+  assert.doesNotMatch(client, /new MutationObserver/);
+  assert.doesNotMatch(client, /observe\(document\.documentElement/);
 });
 
-test('v246 scheduler coalesces mutations without repeated clearTimeout starvation', () => {
-  assert.match(source, /function scheduleBattery\(\)\{if\(timer\)return;/);
-  assert.doesNotMatch(source, /clearTimeout\(timer\);timer=setTimeout\(syncBattery/);
+test('v248 battery refresh is finite and event driven', () => {
+  assert.match(source, /const BOOT_DELAYS=\[0,180,500,1200\]/);
+  assert.match(source, /function finiteSync\(force=false\)/);
+  assert.match(source, /closest\?\.\('\.member-item'\)/);
+  assert.match(source, /window\.addEventListener\('pageshow'/);
 });
 
-test('v246 self-generated mutations remain ignored while v247 also excludes menu churn', () => {
-  assert.match(source, /\[data-v245-battery="1"\],\.v245-feedback/);
-  assert.match(source, /\.v216-menu,\.topbar/);
-});
-
-test('v246 DOM writes are idempotent so observer cannot self-loop', () => {
-  assert.match(source, /if\(v\.textContent!==nextText\)v\.textContent=nextText/);
+test('v248 battery DOM writes remain idempotent', () => {
+  assert.match(source, /if\(v&&v\.textContent!==nextText\)v\.textContent=nextText/);
   assert.match(source, /if\(button\.textContent!==icon\)button\.textContent=icon/);
   assert.match(source, /function paintEye\(button,visible\)/);
+});
+
+test('v248 intercepts the legacy v230 client so its global observer cannot self-spin', () => {
+  assert.match(source, /handleStarryIdV230Client/);
+  assert.match(source, /stabilizeStarryIdV230ClientSource/);
+  assert.match(source, /url\.pathname === '\/starry-id-v230\.js'/);
+  assert.match(source, /if\(display\.textContent!==nextText\)display\.textContent=nextText/);
+  assert.match(source, /function scheduleSync\(\)\{if\(observerTimer\)return;/);
+  assert.match(source, /function scheduleRank\(\)\{if\(rankTimer\)return;/);
 });
