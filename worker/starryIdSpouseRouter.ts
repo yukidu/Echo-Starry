@@ -33,11 +33,16 @@ async function change(db:any,id:string,input:any){
   const now=Date.now();
   if(input.nonDistributor===true){
     const existing:any=await db.prepare("SELECT number FROM non_distributor_ids WHERE userId=?").bind(id).first();
-    const number=existing?.number===me.amwayId?existing.number:await generate(db);
+    const history:any=await db.prepare("SELECT lastNumber FROM non_distributor_history WHERE userId=?").bind(id).first();
+    const prior=clean(history?.lastNumber);
+    const priorOwner=prior?await owner(db,prior,id):null;
+    const priorReservation:any=prior?await db.prepare("SELECT userId FROM non_distributor_ids WHERE number=? AND userId<>?").bind(prior,id).first():null;
+    const number=existing?.number===me.amwayId?existing.number:(synthetic.test(prior)&&!priorOwner&&!priorReservation?prior:await generate(db));
     try{await db.batch([
       db.prepare("DELETE FROM non_distributor_ids WHERE userId=?").bind(id),
       db.prepare("INSERT INTO non_distributor_ids(userId,number,createdAt) VALUES(?,?,?)").bind(id,number,now),
-      db.prepare("UPDATE profiles SET amwayId=?,updatedAt=? WHERE userId=?").bind(number,now,id)
+      db.prepare("UPDATE profiles SET amwayId=?,updatedAt=? WHERE userId=?").bind(number,now,id),
+      db.prepare("INSERT INTO non_distributor_history(userId,lastNumber,updatedAt) VALUES(?,?,?) ON CONFLICT(userId) DO UPDATE SET lastNumber=excluded.lastNumber,updatedAt=excluded.updatedAt").bind(id,number,now)
     ]);}catch{return json({error:'編號產生衝突，請重試'},409);}
     await audit(db,id,id,clean(me.amwayId),number);
     return json({success:true,number,nonDistributor:true});
@@ -46,7 +51,12 @@ async function change(db:any,id:string,input:any){
   if(!numeric.test(number))return json({error:'直銷商編號只能輸入純數字'},400);
   const duplicate:any=await owner(db,number,id);
   if(!duplicate){
-    await db.batch([db.prepare("UPDATE profiles SET amwayId=?,updatedAt=? WHERE userId=?").bind(number,now,id),db.prepare("DELETE FROM non_distributor_ids WHERE userId=?").bind(id)]);
+    const updates=[
+      db.prepare("UPDATE profiles SET amwayId=?,updatedAt=? WHERE userId=?").bind(number,now,id),
+      db.prepare("DELETE FROM non_distributor_ids WHERE userId=?").bind(id)
+    ];
+    if(synthetic.test(clean(me.amwayId)))updates.push(db.prepare("INSERT INTO non_distributor_history(userId,lastNumber,updatedAt) VALUES(?,?,?) ON CONFLICT(userId) DO UPDATE SET lastNumber=excluded.lastNumber,updatedAt=excluded.updatedAt").bind(id,clean(me.amwayId),now));
+    await db.batch(updates);
     await audit(db,id,id,clean(me.amwayId),number);
     return json({success:true,number,nonDistributor:false});
   }
