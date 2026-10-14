@@ -1,5 +1,6 @@
 import type { Env } from './index';
 import { sessionContext } from './starryIdProfileDirectoryRouter';
+import { ensureSpouseSchema } from './starryIdSpouseSchema';
 
 const host='id.starry.phd', numeric=/^[0-9]+$/, synthetic=/^n[0-9]{7}$/;
 const clean=(v:unknown)=>v==null?'':String(v).trim();
