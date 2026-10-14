@@ -104,3 +104,183 @@
   background: rgb(51 65 85);
   color: rgb(241 245 249);
 }
+
+/* v238：依 Starry 生態系總覽表 v7 統一置頂主選單視覺。 */
+header.sticky.top-0:has(.navbar-main-row) {
+  background: rgb(255 255 255 / 0.72) !important;
+  border-bottom-color: rgb(255 255 255 / 0.34) !important;
+  box-shadow: 0 8px 28px rgb(15 23 42 / 0.10), 0 1px 0 rgb(148 163 184 / 0.16) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(150%) !important;
+  backdrop-filter: blur(18px) saturate(150%) !important;
+  transition: background-color 280ms ease, color 280ms ease, border-color 280ms ease, box-shadow 280ms ease !important;
+}
+
+.dark header.sticky.top-0:has(.navbar-main-row) {
+  background: rgb(15 23 42 / 0.72) !important;
+  border-bottom-color: rgb(148 163 184 / 0.14) !important;
+  box-shadow: 0 10px 32px rgb(0 0 0 / 0.28), 0 1px 0 rgb(148 163 184 / 0.10) !important;
+}
+
+/* App Icon 與安裝到桌面的圖示來源一致；取消舊版 Logo 外圈脈衝。 */
+.brand-logo-glow::before {
+  display: none !important;
+}
+
+.brand-logo-glow > div:first-of-type {
+  overflow: hidden;
+  border-radius: 0.85rem !important;
+  background: url('/icon-192.png') center / cover no-repeat !important;
+  box-shadow: 0 6px 18px rgb(15 23 42 / 0.16) !important;
+  transition: transform 180ms ease, box-shadow 180ms ease !important;
+}
+
+.brand-logo-glow:hover > div:first-of-type {
+  transform: translateY(-1px) scale(1.02) !important;
+  box-shadow: 0 9px 22px rgb(15 23 42 / 0.20) !important;
+}
+
+.brand-logo-glow > div:first-of-type > svg,
+.brand-logo-glow > div:first-of-type > span.animate-ping {
+  opacity: 0 !important;
+  display: none !important;
+}
+
+.echo-wave-text {
+  background: none !important;
+  -webkit-background-clip: initial !important;
+  background-clip: initial !important;
+  -webkit-text-fill-color: currentColor !important;
+  animation: none !important;
+  filter: none !important;
+  text-shadow: none !important;
+  transition: color 280ms ease, transform 180ms ease !important;
+}
+
+.brand-logo-glow:hover .echo-wave-text {
+  transform: translateY(-1px) !important;
+}
+
+/* 四條迷你等化器：1.15 秒循環、彼此錯開 0.14 秒。 */
+.brand-logo-glow > div:nth-child(2) > div > span {
+  animation: starry-navbar-wave 1.15s ease-in-out infinite !important;
+  transform-origin: center bottom;
+}
+.brand-logo-glow > div:nth-child(2) > div > span:nth-child(1) { animation-delay: 0s !important; }
+.brand-logo-glow > div:nth-child(2) > div > span:nth-child(2) { animation-delay: 0.14s !important; }
+.brand-logo-glow > div:nth-child(2) > div > span:nth-child(3) { animation-delay: 0.28s !important; }
+.brand-logo-glow > div:nth-child(2) > div > span:nth-child(4) { animation-delay: 0.42s !important; }
+
+@keyframes starry-navbar-wave {
+  0%, 100% { height: 4px; opacity: 0.52; transform: scaleY(0.78); }
+  50% { height: 14px; opacity: 1; transform: scaleY(1); }
+}
+
+/* 置頂快捷按鈕：輕微浮起、柔光、按下縮到 95%。 */
+.navbar-top-action {
+  border: 1px solid rgb(148 163 184 / 0.20) !important;
+  background: rgb(255 255 255 / 0.48) !important;
+  box-shadow: 0 5px 16px rgb(15 23 42 / 0.08) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(130%);
+  backdrop-filter: blur(8px) saturate(130%);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease, color 180ms ease, opacity 180ms ease !important;
+}
+
+.dark .navbar-top-action {
+  border-color: rgb(148 163 184 / 0.18) !important;
+  background: rgb(30 41 59 / 0.48) !important;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.18) !important;
+}
+
+.navbar-top-action:hover:not(:disabled) {
+  transform: translateY(-1px) !important;
+  border-color: color-mix(in srgb, var(--color-primary,#c06c84) 52%, transparent) !important;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--color-primary,#c06c84) 18%, transparent) !important;
+}
+
+.navbar-top-action:active:not(:disabled) {
+  transform: scale(0.95) !important;
+}
+
+/* 漢堡按鈕套用與快捷鍵一致的科技玻璃按鍵感。 */
+header.sticky.top-0 button[data-main-menu='hamburger'] {
+  border: 1px solid rgb(148 163 184 / 0.20) !important;
+  border-radius: 0.85rem !important;
+  background: rgb(255 255 255 / 0.50) !important;
+  box-shadow: 0 5px 16px rgb(15 23 42 / 0.08) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(130%);
+  backdrop-filter: blur(8px) saturate(130%);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease !important;
+}
+
+.dark header.sticky.top-0 button[data-main-menu='hamburger'] {
+  border-color: rgb(148 163 184 / 0.18) !important;
+  background: rgb(30 41 59 / 0.52) !important;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.18) !important;
+}
+
+header.sticky.top-0 button[data-main-menu='hamburger']:hover {
+  transform: translateY(-1px) !important;
+  border-color: color-mix(in srgb, var(--color-primary,#c06c84) 52%, transparent) !important;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--color-primary,#c06c84) 18%, transparent) !important;
+}
+
+header.sticky.top-0 button[data-main-menu='hamburger']:active {
+  transform: scale(0.95) !important;
+}
+
+/* 漢堡面板：右上方微縮＋上移＋淡入，19 秒不是持續動畫而是單次 0.19 秒進場。 */
+.mobile-menu-panel {
+  border-radius: 18px !important;
+  border-color: rgb(255 255 255 / 0.42) !important;
+  background: rgb(255 255 255 / 0.76) !important;
+  box-shadow: 0 24px 64px rgb(15 23 42 / 0.24), 0 0 0 1px rgb(255 255 255 / 0.18) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(150%) !important;
+  backdrop-filter: blur(18px) saturate(150%) !important;
+  animation: starry-menu-reveal 190ms ease-out both !important;
+  transform-origin: top right;
+}
+
+.dark .mobile-menu-panel {
+  border-color: rgb(148 163 184 / 0.20) !important;
+  background: rgb(15 23 42 / 0.78) !important;
+  box-shadow: 0 26px 70px rgb(0 0 0 / 0.48), 0 0 0 1px rgb(148 163 184 / 0.10) !important;
+}
+
+@keyframes starry-menu-reveal {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.mobile-menu-row {
+  transition: transform 160ms ease, background-color 160ms ease, color 160ms ease !important;
+}
+
+.mobile-menu-panel .mobile-menu-row:hover {
+  transform: translateX(2px);
+  background: color-mix(in srgb, var(--color-primary,#c06c84) 10%, transparent) !important;
+}
+
+.mobile-menu-panel .mobile-menu-row:hover button,
+.mobile-menu-panel .mobile-menu-row:hover svg,
+.mobile-menu-panel .mobile-menu-row:hover span {
+  color: var(--color-primary,#c06c84) !important;
+}
+
+/* 面板內既有身份區也保持透明、乾淨，不加厚重卡片。 */
+.navbar-menu-profile-head {
+  background: transparent !important;
+}
+
+.navbar-menu-identity-icon {
+  box-shadow: 0 5px 16px rgb(15 23 42 / 0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-logo-glow > div:nth-child(2) > div > span,
+  .mobile-menu-panel,
+  .navbar-top-action,
+  header.sticky.top-0 button[data-main-menu='hamburger'] {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}
