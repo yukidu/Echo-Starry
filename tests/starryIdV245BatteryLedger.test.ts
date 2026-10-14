@@ -26,11 +26,12 @@ test('v245 battery field is readonly and has its own public visibility control',
   assert.match(router, /<div class=\"label\">電池數量<\/div>/);
 });
 
-test('v247 keeps ecosystem menu links and battery ledger in the single v216 menu owner', () => {
+test('v249 keeps current ecosystem menu links and battery ledger in the single v216 menu owner', () => {
   for (const expected of [
     'https://starry.phd','https://id.starry.phd','https://echo.starry.phd','https://download.starry.phd',
-    'https://go.starry.phd','https://quotes.starry.phd','https://box.starry.phd','https://starbeauty.yukidu.workers.dev'
+    'https://go.starry.phd','https://quotes.starry.phd','https://box.starry.phd'
   ]) assert.ok(menu.includes(expected), `missing ${expected}`);
+  assert.doesNotMatch(menu, /美力之星|starbeauty\.yukidu\.workers\.dev/);
   assert.match(menu, /🔋 電池餘額日誌/);
   assert.doesNotMatch(router, /function syncMenu\(/);
 });
