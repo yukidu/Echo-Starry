@@ -10,16 +10,16 @@ test('duplicate distributor number previews the partner name rank and center',()
  assert.match(backend,/name:clean\(other\.name\)/);
  assert.match(backend,/rank:clean\(other\.approvedRank\)/);
  assert.match(backend,/center:clean\(other\.center\)/);
- assert.match(frontend,/姓名：/);
- assert.match(frontend,/獎銜：/);
- assert.match(frontend,/會場：/);
+ assert.match(frontend,/\['姓名',partner\.name\]/);
+ assert.match(frontend,/\['獎銜',partner\.rank\]/);
+ assert.match(frontend,/\['會場',partner\.center\]/);
 });
 test('single confirming member creates active spouse link, never pending',()=>{
  assert.match(backend,/input\.confirmSpouse!==true/);
  assert.match(backend,/VALUES\(\?,\?,\?,'active'/);
  assert.match(backend,/spouseLinked:true/);
  assert.match(frontend,/confirmSpouse:true/);
- assert.match(frontend,/不需要對方確認/);
+ assert.match(frontend,/無須另一方同意/);
 });
 test('non-distributor number appears immediately on checking',()=>{
  assert.match(frontend,/checkbox\.onchange=async/);
