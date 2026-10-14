@@ -44,8 +44,8 @@ test('non-Amway members get n-number cards while Amway ID controls its own URL s
   assert.match(router, /data\.cardUrl = `https:\/\/\$\{STAR_DOMAIN\}\/\$\{card\.slug\}`/);
 });
 
-test('field visibility is per-field and defaults only phone and birthday to hidden', () => {
-  assert.match(router, /const DEFAULT_HIDDEN = new Set\(\['phone','birthday'\]\)/);
+test('field visibility is per-field and defaults phone, birthday and spouse relationship to hidden', () => {
+  assert.match(router, /const DEFAULT_HIDDEN = new Set\(\['phone','birthday','spouse'\]\)/);
   assert.match(router, /profile_field_visibility/);
   assert.match(router, /visibility\[field\] = !DEFAULT_HIDDEN\.has\(field\)/);
   assert.match(router, /visibility\[row\.fieldName\] = Boolean\(row\.isVisible\)/);
