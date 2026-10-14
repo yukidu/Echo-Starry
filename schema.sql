@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS tracks (
   vipToken TEXT,
   vipExpiresAt INTEGER,
   vipDurationDays INTEGER DEFAULT 7,
+  -- 舊欄位名稱只為現有資料相容；對外名稱與功能皆為「電池」。
   stickerUnlockCost INTEGER DEFAULT 0,
   commentStickerReward INTEGER DEFAULT 0,
   externalVideos TEXT,
@@ -193,31 +194,10 @@ CREATE TABLE IF NOT EXISTS user_activity_logs (
   createdAt TEXT NOT NULL
 );
 
--- 7. 貼紙點數：以 0.1 張為 1 unit 的整數帳本，避免浮點誤差。
-CREATE TABLE IF NOT EXISTS sticker_transactions (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
-  deltaUnits INTEGER NOT NULL,
-  balanceAfterUnits INTEGER NOT NULL,
-  type TEXT NOT NULL,
-  sourceId TEXT,
-  description TEXT NOT NULL,
-  actorUserId TEXT,
-  uniqueKey TEXT NOT NULL UNIQUE,
-  createdAt INTEGER NOT NULL,
-  trackId TEXT,
-  commentId TEXT,
-  relatedUserId TEXT,
-  sourceLabel TEXT
-);
-CREATE INDEX IF NOT EXISTS sticker_transactions_user_created ON sticker_transactions(userId, createdAt DESC);
-CREATE INDEX IF NOT EXISTS sticker_transactions_source ON sticker_transactions(sourceId, type);
-CREATE TRIGGER IF NOT EXISTS sticker_spend_balance_guard
-BEFORE INSERT ON sticker_transactions
-WHEN NEW.type IN ('vip_upload_cost', 'lucky_cost', 'track_unlock_cost')
-  AND COALESCE((SELECT SUM(deltaUnits) FROM sticker_transactions WHERE userId = NEW.userId), 0) + NEW.deltaUnits < 0
-BEGIN SELECT RAISE(ABORT, 'sticker_insufficient'); END;
-
+-- 7. 電池經濟：會員的庫存、獲得、消費與完整交易歷史已永久移至
+-- Starry ID 中央資料庫的 battery_transactions / battery_accounts。
+-- EchoStars 不再建立任何會員電池交易帳本；以下只保留本 App 專屬狀態與規則。
+-- legacy sticker_* 表名為資料相容名稱，不是會員資產帳本，也不作為跨 App 餘額來源。
 CREATE TABLE IF NOT EXISTS sticker_unlocks (
   userId TEXT NOT NULL,
   trackId TEXT NOT NULL,
@@ -253,13 +233,12 @@ CREATE TABLE IF NOT EXISTS sticker_comment_rewards (
 );
 CREATE INDEX IF NOT EXISTS sticker_pending_member_track ON sticker_comment_rewards(userId,trackId);
 
--- v100 configurable feedback, lucky completion, and maintained upline names.
+-- App 專屬電池規則、待結算獎勵與上手名單。
 CREATE TABLE IF NOT EXISTS sticker_text_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sticker_lucky_draws (operationId TEXT PRIMARY KEY,userId TEXT NOT NULL,trackId TEXT NOT NULL,rewardUnits INTEGER NOT NULL,day TEXT NOT NULL,createdAt INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS sticker_lucky_member ON sticker_lucky_draws(userId,day);
 CREATE TABLE IF NOT EXISTS upline_names (kind TEXT NOT NULL,name TEXT NOT NULL,PRIMARY KEY(kind,name));
 CREATE TABLE IF NOT EXISTS upline_owners (kind TEXT NOT NULL,name TEXT NOT NULL,userId TEXT NOT NULL,PRIMARY KEY(kind,name));
-
 
 -- v102 canonical shared-business organization. Personal member data remains independent.
 CREATE TABLE IF NOT EXISTS organization_groups (
