@@ -70,6 +70,6 @@ test('fallback rules validate old clients even when central D1 is not bound in t
   assert.equal(invalidDate.ok,false);
   const invalidCenter=await validateCentralProfilePatch({} as any,{center:'不存在的中央選項'});
   assert.equal(invalidCenter.ok,false);
-  const valid=await validateCentralProfilePatch({} as any,{name:'繁星夥伴',center:'苗栗',birthday:'2000-02-29'});
+  const valid=await validateCentralProfilePatch({} as any,{name:'繁星夥伴',center:'台中',birthday:'2000-02-29'});
   assert.equal(valid.ok,true);
 });
