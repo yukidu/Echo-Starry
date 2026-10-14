@@ -408,6 +408,8 @@ async function updateProfile(
   const current: any = await readMember(db, userId);
   if (!current) throw new Error('profile_not_found');
 
+  // Distributor identifiers must pass the central uniqueness/spouse approval workflow.
+  if (Object.prototype.hasOwnProperty.call(changes || {}, 'amwayId')) throw new Error('distributor_number_requires_dedicated_endpoint');
   const editableFields = isSuperAdmin ? ADMIN_EDITABLE_PROFILE_FIELDS : USER_EDITABLE_PROFILE_FIELDS;
   const allowed: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(changes || {})) {
