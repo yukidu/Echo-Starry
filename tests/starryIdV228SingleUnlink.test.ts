@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const spouse = readFileSync(new URL('../worker/starryIdSpouseRouter.ts', import.meta.url), 'utf8');
+const privacy = readFileSync(new URL('../worker/privacyCrawlerRouter.ts', import.meta.url), 'utf8');
 
 test('v228 unlinks an active or legacy unlink-pending spouse relation immediately', () => {
   assert.match(spouse, /l\.status==='active'\|\|l\.status==='unlink_pending'/);
@@ -30,4 +31,10 @@ test('v228 keeps number validation when requester gives the shared number to the
 
 test('v228 exposes legacy unlink-pending rows as active so either spouse can finish unlink immediately', () => {
   assert.match(spouse, /visibleStatus=l\?\.status==='unlink_pending'\?'active':l\?\.status/);
+});
+
+test('v228 member center tells the user unlink is immediate and no partner confirmation is required', () => {
+  assert.match(privacy, /解除後立即生效，不需要另一方確認/);
+  assert.match(privacy, /夫妻關係已解除/);
+  assert.match(privacy, /withV228SpouseUnlinkCopy/);
 });
