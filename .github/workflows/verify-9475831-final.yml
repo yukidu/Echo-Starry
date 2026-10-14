@@ -1,0 +1,40 @@
+name: Verify 9475831 final
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.head_ref == 'safe/verify-9475831-final'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Read-only D1 verification
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/verify-9475831
+          npx wrangler d1 execute starry_id_db --remote --command "SELECT p.name,p.amwayId,p.center,p.rank,p.approvedRank,p.rankApproved,p.rankAuditStatus,u.status FROM users u JOIN profiles p ON p.userId=u.id WHERE TRIM(COALESCE(p.name,''))='杜杜龍' ORDER BY p.updatedAt DESC LIMIT 10" --json > /tmp/verify-9475831/central.json
+          npx wrangler d1 execute echoes_db --remote --command "SELECT name,amwayId,center,rank,approvedRank,rankApproved,rankAuditStatus FROM users WHERE TRIM(COALESCE(name,''))='杜杜龍' ORDER BY registerDate DESC LIMIT 10" --json > /tmp/verify-9475831/echo.json
+          npx wrangler d1 execute starry_id_db --remote --command "SELECT COUNT(*) AS count FROM profiles p JOIN spouse_links s ON (s.userA=p.userId OR s.userB=p.userId) WHERE TRIM(COALESCE(p.name,''))='杜杜龍' AND s.status IN ('pending','active','unlink_pending')" --json > /tmp/verify-9475831/spouse-count.json
+          npx wrangler d1 execute starry_id_db --remote --command "SELECT p.name,n.number,h.lastNumber FROM profiles p LEFT JOIN non_distributor_ids n ON n.userId=p.userId LEFT JOIN non_distributor_history h ON h.userId=p.userId WHERE TRIM(COALESCE(p.name,''))='杜杜龍' LIMIT 10" --json > /tmp/verify-9475831/non-distributor.json
+      - name: Upload verification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-9475831-final-${{ github.sha }}
+          path: /tmp/verify-9475831
+          if-no-files-found: error
+          retention-days: 1
