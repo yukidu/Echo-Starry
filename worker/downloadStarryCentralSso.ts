@@ -3,6 +3,13 @@ import { handleStarryIdProfileDirectory } from './starryIdProfileDirectoryRouter
 import { handleStarryIdRandomMotto } from './starryIdRandomMottoRouter';
 import { handleStarryIdSpouse } from './starryIdSpouseRouter';
 import { handleStarryIdRankUpdate } from './starryIdRankUpdateRouter';
+import {
+  captureSpouseNotificationContext,
+  handleStarryIdNotifications,
+  notifyRankMutation,
+  notifySpouseMutation,
+  observeStarryIdPublicCardVisit
+} from './starryIdNotificationsRouter';
 import type { Env } from './index';
 
 const STARRY_ID_HOST = 'id.starry.phd';
@@ -167,14 +174,28 @@ export async function handleDownloadStarryCentralSso(request: Request, env: Env)
   const url = new URL(request.url);
   if (url.hostname !== STARRY_ID_HOST) return null;
 
+  const notificationsResponse = await handleStarryIdNotifications(request, env);
+  if (notificationsResponse) return notificationsResponse;
+
+  await observeStarryIdPublicCardVisit(request, env).catch(error => {
+    console.warn('Starry ID card visit tracking skipped', { code: error instanceof Error ? error.message : 'unknown' });
+  });
+
+  const spouseNotificationContext = await captureSpouseNotificationContext(request, env).catch(() => null);
   const spouseResponse = await handleStarryIdSpouse(request, env);
-  if (spouseResponse) return spouseResponse;
+  if (spouseResponse) {
+    await notifySpouseMutation(env, spouseNotificationContext, spouseResponse).catch(() => undefined);
+    return spouseResponse;
+  }
 
   const randomMottoResponse = await handleStarryIdRandomMotto(request, env);
   if (randomMottoResponse) return randomMottoResponse;
 
   const rankUpdateResponse = await handleStarryIdRankUpdate(request, env);
-  if (rankUpdateResponse) return rankUpdateResponse;
+  if (rankUpdateResponse) {
+    await notifyRankMutation(request, env, rankUpdateResponse).catch(() => undefined);
+    return rankUpdateResponse;
+  }
 
   const profileDirectoryResponse = await handleStarryIdProfileDirectory(request, env);
   if (profileDirectoryResponse) return profileDirectoryResponse;
