@@ -51,7 +51,7 @@ async function change(db:any,id:string,input:any){
   await db.prepare("INSERT INTO spouse_links(id,userA,userB,status,requestedBy,createdAt,updatedAt) VALUES(?,?,?,'pending',?,?,?)").bind(crypto.randomUUID(),users[0],users[1],id,now,now).run();
   return json({pending:true,message:'直銷商編號相同，已提出夫妻綁定申請；需另一位會員確認',partnerName:clean(other.name)},202);
 }
-async function action(db:any,id:string,input:any){
+async function action(db:any,id:string,input:any,isAdmin=false){
   const l:any=await link(db,id);if(!l)return json({error:'沒有待處理的夫妻關係'},404);
   const kind=clean(input.action),other=l.userA===id?l.userB:l.userA,now=Date.now();
   if(l.status==='pending'&&(kind==='cancel'||kind==='reject')){
@@ -100,6 +100,23 @@ async function action(db:any,id:string,input:any){
     if(synthetic.test(replacement))statements.push(db.prepare("INSERT INTO non_distributor_ids(userId,number,createdAt) VALUES(?,?,?)").bind(loser,replacement,now));
     await db.batch(statements);return json({success:true,status:'unlinked'});
   }
+  if(kind==='admin-unlink'&&isAdmin&&l.status==='active'){
+    const keep=clean(input.keepUserId);
+    if(keep!==l.userA&&keep!==l.userB)return json({error:'管理員必須指定原編號保留者'},400);
+    const loser=keep===l.userA?l.userB:l.userA;
+    let replacement=clean(input.replacement);
+    if(!replacement)return json({error:'管理員必須指定另一方的新編號或非直銷商'},400);
+    if(replacement==='nonDistributor')replacement=await generate(db);
+    else if(!numeric.test(replacement))return json({error:'新編號只能是純數字'},400);
+    if(await owner(db,replacement,loser))return json({error:'新編號已被使用'},409);
+    const statements=[
+      db.prepare("UPDATE profiles SET amwayId=?,updatedAt=? WHERE userId=?").bind(replacement,now,loser),
+      db.prepare("DELETE FROM spouse_links WHERE id=?").bind(l.id),
+      db.prepare("DELETE FROM non_distributor_ids WHERE userId=?").bind(loser)
+    ];
+    if(synthetic.test(replacement))statements.push(db.prepare("INSERT INTO non_distributor_ids(userId,number,createdAt) VALUES(?,?,?)").bind(loser,replacement,now));
+    await db.batch(statements);return json({success:true,status:'unlinked',byAdmin:true});
+  }
   return json({error:'關係狀態不允許此操作'},409);
 }
 export async function handleStarryIdSpouse(request:Request,env:Env):Promise<Response|null>{
@@ -114,7 +131,11 @@ export async function handleStarryIdSpouse(request:Request,env:Env):Promise<Resp
     if(url.pathname==='/api/spouse-status'&&request.method==='GET')return json(await status(db,session.userId));
     const input=await request.clone().json().catch(()=>({}));
     if(url.pathname==='/api/distributor-number'&&request.method==='PUT')return change(db,session.userId,input);
-    if(url.pathname==='/api/spouse-action'&&request.method==='POST')return action(db,session.userId,input);
+    if(url.pathname==='/api/spouse-action'&&request.method==='POST'){
+      const target=clean(input.targetUserId);
+      if(target&&target!==session.userId&&!session.isSuperAdmin)return json({error:'沒有管理權限'},403);
+      return action(db,target&&session.isSuperAdmin?target:session.userId,input,session.isSuperAdmin);
+    }
     return json({error:'Method not allowed'},405);
   }catch(e){console.warn('spouse service failed',{code:e instanceof Error?e.message:'unknown'});return json({error:'操作失敗，請稍後再試'},503);}
 }
