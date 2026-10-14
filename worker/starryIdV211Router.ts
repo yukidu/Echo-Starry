@@ -217,7 +217,7 @@ async function publicCard(request: Request, env: StarryEnv, slug: string) {
   const partner:any=await db.prepare("SELECT p.name FROM spouse_links s JOIN profiles p ON p.userId=CASE WHEN s.userA=? THEN s.userB ELSE s.userA END WHERE s.status='active' AND (s.userA=? OR s.userB=?) LIMIT 1").bind(card.userId,card.userId,card.userId).first().catch(()=>null);
   data.spouse=partner?.name?'已與 '+text(partner.name)+' 綁定夫妻':'';
   const viewer=await currentUserId(request,db); const owner=viewer===card.userId;
-  const rows=[['name','姓名'],[text(member.amwayId)?'amwayId':'cardNumber',text(member.amwayId)?'會員編號 / Amway ID':'電子名片編號'],['email','Email'],['phone','手機'],['residence','居住地'],['center','中心'],['rank','獎銜'],['joinReason','初次如何認識安麗？'],['stayReason','什麼原因留在安麗？'],['birthday','生日'],['motto','座右銘'],['zodiac','星座'],['talentNumber','天賦數'],['lifeNumber','生命靈數'],['sponsor','推薦人'],['platinumUpline','白金上線'],['diamondUpline','鑽石上線'],['spouse','夫妻關係']];
+  const rows=[['name','姓名'],[text(member.amwayId)?'amwayId':'cardNumber',text(member.amwayId)?'會員編號 / Amway ID':'電子名片編號'],['email','Email'],['phone','手機'],['residence','居住地'],['center','中心'],['rank','獎銜'],['joinReason','初次如何認識安麗？'],['stayReason','什麼原因留在安麗？'],['birthday','生日'],['motto','座右銘'],['zodiac','星座'],['sponsor','推薦人'],['platinumUpline','白金上線'],['diamondUpline','鑽石上線'],['spouse','夫妻關係']];
   const visibleRows=rows.filter(([key])=>visibility[key]!==false).filter(([key])=>data[key]!==''&&data[key]!=null);
   const avatar=visibility.avatar!==false&&data.avatar?`<img class="avatar" src="${escapeHtml(data.avatar)}" alt="會員頭像" referrerpolicy="no-referrer">`:`<div class="avatar fallback">✦</div>`;
   const grid=visibility.numerology!==false&&data.birthday?numerologyHtml(data.birthday):'';
