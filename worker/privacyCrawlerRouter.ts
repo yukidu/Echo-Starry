@@ -10,6 +10,11 @@ import { handleStarryIdV212PublicCardFallback } from './starryIdV212PublicCardBr
 import { handleStarryIdCentral } from './starryIdCentralRouter';
 import { handleDownloadStarryCentralSso } from './downloadStarryCentralSso';
 import { enhanceStarryIdV218Response } from './starryIdV218ResponseEnhancer';
+import {
+  handleStarryProfileSchemaRequest,
+  validateStarryProfileCoreWrite,
+  injectStarryProfileSchemaClient
+} from './starryProfileSchemaHooks';
 import type { Env } from './index';
 import { unitsToStickers } from '../shared/stickers';
 
@@ -200,6 +205,13 @@ export default {
   async fetch(request: Request, env: Env, ctx?: any): Promise<Response> {
     const url = new URL(request.url);
 
+    // v225 central Schema-driven member rules are deliberately hooks inside
+    // the canonical privacy router, not a replacement Worker entry point.
+    const schemaResponse = await handleStarryProfileSchemaRequest(request, env as any);
+    if (schemaResponse) return withPrivacyHeaders(schemaResponse);
+    const schemaValidation = await validateStarryProfileCoreWrite(request, env as any);
+    if (schemaValidation) return withPrivacyHeaders(schemaValidation);
+
     // Download Starry central SSO has dedicated routes on id.starry.phd. It must
     // run before the v211 and generic Starry ID routers so these routes cannot
     // be swallowed by another id.starry.phd handler.
@@ -304,6 +316,7 @@ export default {
       }
     }
 
-    return withPrivacyHeaders(response);
+    const schemaEnhancedResponse = await injectStarryProfileSchemaClient(request, response);
+    return withPrivacyHeaders(schemaEnhancedResponse);
   }
 };
