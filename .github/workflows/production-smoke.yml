@@ -1,0 +1,72 @@
+name: Production smoke verification
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify official Starry production domains
+        shell: bash
+        run: |
+          set -euo pipefail
+          user_agent='Mozilla/5.0 StarryProductionSmoke/1.0'
+          echo 'Waiting for the production deployment to settle...'
+          sleep 20
+
+          for attempt in $(seq 1 24); do
+            echo "Production verification attempt ${attempt}/24"
+            nonce="${GITHUB_SHA}-${attempt}"
+
+            home_ok=0
+            echo_schema_ok=0
+            id_schema_ok=0
+
+            if curl -A "${user_agent}" --connect-timeout 5 --max-time 15 -fsS \
+              "https://echo.starry.phd/?smoke=${nonce}" -o /tmp/echo-home.html; then
+              if grep -Eqi '<!doctype html|<html' /tmp/echo-home.html; then home_ok=1; fi
+            fi
+
+            if curl -A "${user_agent}" --connect-timeout 5 --max-time 15 -fsS \
+              -H 'Accept: application/json' \
+              "https://echo.starry.phd/api/starry/profile-schema?smoke=${nonce}" -o /tmp/echo-schema.json; then
+              if node -e "const x=JSON.parse(require('fs').readFileSync('/tmp/echo-schema.json','utf8')); if(!(Number(x.version)>=1&&Array.isArray(x.fields)&&x.options&&typeof x.options==='object')) process.exit(1)"; then
+                echo_schema_ok=1
+              fi
+            fi
+
+            if curl -A "${user_agent}" --connect-timeout 5 --max-time 15 -fsS \
+              -H 'Accept: application/json' \
+              "https://id.starry.phd/api/profile-schema?smoke=${nonce}" -o /tmp/id-schema.json; then
+              if node -e "const x=JSON.parse(require('fs').readFileSync('/tmp/id-schema.json','utf8')); if(!(Number(x.version)>=1&&Array.isArray(x.fields)&&x.options&&typeof x.options==='object')) process.exit(1)"; then
+                id_schema_ok=1
+              fi
+            fi
+
+            echo "echo home=${home_ok}, echo schema=${echo_schema_ok}, id schema=${id_schema_ok}"
+            if [ "${home_ok}" = 1 ] && [ "${echo_schema_ok}" = 1 ] && [ "${id_schema_ok}" = 1 ]; then
+              echo 'Official production domains verified successfully.'
+              exit 0
+            fi
+
+            sleep 5
+          done
+
+          echo 'Production verification failed after all retries.' >&2
+          echo '--- echo home (first 500 bytes) ---' >&2
+          head -c 500 /tmp/echo-home.html 2>/dev/null || true
+          echo >&2
+          echo '--- echo schema ---' >&2
+          head -c 1000 /tmp/echo-schema.json 2>/dev/null || true
+          echo >&2
+          echo '--- id schema ---' >&2
+          head -c 1000 /tmp/id-schema.json 2>/dev/null || true
+          echo >&2
+          exit 1
