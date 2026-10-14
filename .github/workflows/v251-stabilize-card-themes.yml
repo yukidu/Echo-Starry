@@ -1,0 +1,65 @@
+name: v251 stabilize card themes
+
+on:
+  push:
+    branches:
+      - safe/v251-card-themes
+    paths:
+      - .github/workflows/v251-stabilize-card-themes.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: safe/v251-card-themes
+          fetch-depth: 0
+      - name: Remove broad observer and runtime schema ownership
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path('worker/starryIdV251CardThemes.ts')
+          s = path.read_text()
+
+          s = s.replace("const schemaReady = new WeakMap<object, Promise<void>>();\n", "")
+          s, n = re.subn(
+              r"\nasync function ensureThemeSchema\(db: any\) \{.*?\n\}\n\nfunction normalizeTheme",
+              "\nfunction normalizeTheme",
+              s,
+              count=1,
+              flags=re.S,
+          )
+          if n != 1:
+              raise SystemExit('ensureThemeSchema block not found exactly once')
+
+          s = s.replace("  await ensureThemeSchema(db);\n", "")
+          old = "    const observer=new MutationObserver(()=>{ensurePicker();const card=document.getElementById('profileCard');if(card&&card.dataset.cardTheme!==current)card.dataset.cardTheme=current});observer.observe(document.documentElement,{childList:true,subtree:true});boot();"
+          new = "    const actions=document.getElementById('topActions');if(actions){const visibilityObserver=new MutationObserver(()=>{if(!actions.hidden)void boot()});visibilityObserver.observe(actions,{attributes:true,attributeFilter:['hidden']})}void boot();"
+          if old not in s:
+              raise SystemExit('broad v251 observer block not found')
+          s = s.replace(old, new)
+          path.write_text(s)
+
+          test_path = Path('tests/starryIdV251CardThemes.test.ts')
+          t = test_path.read_text()
+          old_test = """test('every theme has dedicated public and edit-preview styling', () => {\n  for (const theme of STARRY_CARD_THEMES) {\n    assert.ok(source.includes(`data-card-theme=\\\\\"${theme.id}\\\\\"`), `${theme.id} public style missing`);\n    assert.ok(source.includes(`data-card-preview-theme=\\\\\"${theme.id}\\\\\"`), `${theme.id} edit preview style missing`);\n  }\n  assert.match(source, /prefers-reduced-motion:reduce/);\n  assert.doesNotMatch(source, /html\\[data-starry-theme=/);\n});"""
+          new_test = """test('every theme has dedicated public and edit-preview styling', () => {\n  const normalizedSource = source.replace(/\\\\([\"'])/g, '$1');\n  for (const theme of STARRY_CARD_THEMES) {\n    assert.ok(normalizedSource.includes(`data-card-theme=\"${theme.id}\"`), `${theme.id} public style missing`);\n    assert.ok(normalizedSource.includes(`data-card-preview-theme=\"${theme.id}\"`), `${theme.id} edit preview style missing`);\n  }\n  assert.match(source, /prefers-reduced-motion:reduce/);\n  assert.doesNotMatch(source, /html\\[data-starry-theme=/);\n  assert.doesNotMatch(source, /observe\\(document\\.(?:documentElement|body)/);\n  assert.doesNotMatch(source, /subtree\\s*:\\s*true/);\n  assert.doesNotMatch(source, /CREATE TABLE IF NOT EXISTS public_card_preferences/);\n});"""
+          if old_test not in t:
+              raise SystemExit('v251 theme test block not found')
+          test_path.write_text(t.replace(old_test, new_test))
+      - name: Remove temporary workflow and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/v251-stabilize-card-themes.yml
+          git config user.name 'Starry Engineering Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add worker/starryIdV251CardThemes.ts tests/starryIdV251CardThemes.test.ts .github/workflows/v251-stabilize-card-themes.yml
+          git commit -m 'v251: remove broad observer and stabilize card themes'
+          git push origin HEAD:safe/v251-card-themes
