@@ -37,6 +37,22 @@ test('Go Starry central login uses the same Starry ID ticket flow', async () => 
   assert.match(html, /https:\/\/go\.starry\.phd/);
 });
 
+test('Quotes central login uses Starry ID and returns only to the official Quotes domain', async () => {
+  const response = await handleDownloadStarryCentralSso(
+    new Request('https://id.starry.phd/auth/quotes'),
+    {} as any
+  );
+  assert.ok(response);
+  assert.equal(response?.status, 200);
+  const html = await response!.text();
+  assert.match(html, /Starry ID × 繁星語錄/);
+  assert.match(html, /\/api\/google-sync/);
+  assert.match(html, /quotes/);
+  assert.match(html, /\/api\/apps\/quotes\/ticket/);
+  assert.match(html, /https:\/\/quotes\.starry\.phd/);
+  assert.doesNotMatch(html, /quotes-starry-phd\.yukidu\.workers\.dev/);
+});
+
 test('central SSO stores one-time codes in Starry ID D1 for registered apps', async () => {
   const source = await read('worker/downloadStarryCentralSso.ts');
   assert.match(source, /STARRY_ID_DB/);
@@ -44,8 +60,10 @@ test('central SSO stores one-time codes in Starry ID D1 for registered apps', as
   assert.match(source, /appId,userId,expiresAt,createdAt/);
   assert.match(source, /downloadstarry/);
   assert.match(source, /gostarry/);
+  assert.match(source, /quotes/);
   assert.match(source, /https:\/\/download\.starry\.phd/);
   assert.match(source, /https:\/\/go\.starry\.phd/);
+  assert.match(source, /https:\/\/quotes\.starry\.phd/);
   assert.match(source, /TICKET_TTL_MS = 5 \* 60 \* 1000/);
   assert.doesNotMatch(source, /syncEchoMemberToStarryBestEffort/);
 });
@@ -57,6 +75,6 @@ test('privacy entry routes central app SSO before generic Starry ID router', asy
   const genericIndex = privacy.indexOf('handleStarryIdCentral(request');
   assert.ok(centralIndex >= 0 && genericIndex > centralIndex);
   assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
-  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,downloadstarry,gostarry"/);
-  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,downloadstarry,gostarry"/);
+  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,downloadstarry,gostarry,quotes"/);
+  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,downloadstarry,gostarry,quotes"/);
 });
