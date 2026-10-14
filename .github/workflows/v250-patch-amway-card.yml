@@ -1,0 +1,54 @@
+name: v250 patch Amway public card
+
+on:
+  push:
+    branches:
+      - safe/v250-amway-id-public-card
+    paths:
+      - .github/workflows/v250-patch-amway-card.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: safe/v250-amway-id-public-card
+      - name: Patch numeric Amway ID public-card fallback
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'worker/starryIdV211Router.ts';
+          let source = fs.readFileSync(path, 'utf8');
+          const oldText = "  const card: any = await db.prepare('SELECT userId,slug,cardNumber FROM public_cards WHERE slug=? LIMIT 1').bind(slug).first(); if(!card) return null;";
+          const newText = `  let card: any = await db.prepare('SELECT userId,slug,cardNumber FROM public_cards WHERE slug=? LIMIT 1').bind(slug).first();
+          if(!card && /^[0-9]+$/.test(slug)) {
+            const matches: any = await db.prepare(\`SELECT u.id,p.amwayId FROM users u JOIN profiles p ON p.userId=u.id WHERE u.status='active' AND TRIM(COALESCE(p.amwayId,''))=? LIMIT 2\`).bind(slug).all();
+            const rows = matches?.results || [];
+            if(rows.length===1 && text(rows[0].amwayId)===slug) {
+              const directMember: any = await readMember(db,rows[0].id);
+              if(directMember && directMember.status==='active') {
+                await ensureCard(db,directMember);
+                card = await db.prepare('SELECT userId,slug,cardNumber FROM public_cards WHERE slug=? LIMIT 1').bind(slug).first();
+              }
+            }
+          }
+          if(!card) return null;`;
+          const count = source.split(oldText).length - 1;
+          if (count !== 1) throw new Error('Expected exactly one public-card lookup pattern, found ' + count);
+          source = source.replace(oldText, newText);
+          fs.writeFileSync(path, source);
+          NODE
+      - name: Remove one-time patch workflow
+        run: rm .github/workflows/v250-patch-amway-card.yml
+      - name: Commit patch
+        run: |
+          git config user.name "Starry Engineering Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add worker/starryIdV211Router.ts .github/workflows/v250-patch-amway-card.yml
+          git commit -m "v250: 修復直銷商 ID 公開名片網址"
+          git push origin HEAD:safe/v250-amway-id-public-card
