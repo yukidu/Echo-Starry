@@ -257,3 +257,48 @@ button[data-main-menu='hamburger']:active {
 .dark .v181-confirm-icon {
   opacity: 1;
 }
+
+/* v235: keep the mobile dialog inside its 80vw card without button overflow. */
+@media (max-width: 640px) {
+  .v181-confirm-card {
+    width: 80vw;
+    max-width: 80vw;
+    box-sizing: border-box;
+    gap: 0.7rem;
+    min-height: 0;
+    padding: 1rem 0.85rem;
+    overflow: hidden;
+  }
+
+  .v181-confirm-icon {
+    width: clamp(2.75rem, 12vw, 3.5rem);
+    height: clamp(2.75rem, 12vw, 3.5rem);
+  }
+
+  .v181-confirm-body {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .v181-confirm-title,
+  .v181-confirm-message {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .v181-confirm-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  .v181-confirm-button {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+}
