@@ -1,4 +1,5 @@
 import { handleStarryIdCentral } from './starryIdCentralRouter';
+import { ensureSpouseSchema } from './starryIdSpouseSchema';
 import { renderStarryIdMemberCenterPage } from './starryIdMemberCenterPage';
 import { enhanceStarryIdMemberCenterV216 } from './starryIdV216Enhancer';
 import type { Env } from './index';
@@ -84,7 +85,7 @@ COALESCE((SELECT NULLIF(TRIM(rp.name),'')||COALESCE((SELECT '&'||TRIM(sp.name) F
 COALESCE((SELECT NULLIF(TRIM(rp.name),'')||COALESCE((SELECT '&'||TRIM(sp.name) FROM spouse_links sl JOIN profiles sp ON sp.userId=CASE WHEN sl.userA=rp.userId THEN sl.userB ELSE sl.userA END WHERE sl.status='active' AND (sl.userA=rp.userId OR sl.userB=rp.userId) LIMIT 1),'') FROM member_relationships mr LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId WHERE mr.userId=u.id AND mr.relationType='diamond_upline' LIMIT 1),(SELECT mr.legacyLabel FROM member_relationships mr WHERE mr.userId=u.id AND mr.relationType='diamond_upline' LIMIT 1),'') AS diamondUpline
 FROM users u LEFT JOIN profiles p ON p.userId=u.id`;
 
-async function readMember(db: any, userId: string) { return db.prepare(`${memberSelect} WHERE u.id=? LIMIT 1`).bind(userId).first(); }
+async function readMember(db: any, userId: string) { await ensureSpouseSchema(db); return db.prepare(`${memberSelect} WHERE u.id=? LIMIT 1`).bind(userId).first(); }
 async function readVisibility(db: any, userId: string) {
   const result: any = await db.prepare('SELECT fieldName,isVisible FROM profile_field_visibility WHERE userId=?').bind(userId).all();
   const visibility: Record<string, boolean> = {};
