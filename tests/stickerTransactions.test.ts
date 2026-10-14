@@ -431,6 +431,23 @@ test('manual grant history is scoped to issuer, custom decimal amounts are accep
 
 test('v98 migration preserves balances and translates keyword count to sticker cap', async () => {
   const db=database();const token=await session(db,'member');const admin=await session(db,'admin');
+  // v244: production no longer provisions this ledger; this old migration case owns its legacy fixture.
+  db.sqlite.exec(`CREATE TABLE sticker_transactions (
+    id TEXT PRIMARY KEY,
+    userId TEXT NOT NULL,
+    deltaUnits INTEGER NOT NULL,
+    balanceAfterUnits INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    trackId TEXT,
+    commentId TEXT,
+    relatedUserId TEXT,
+    sourceLabel TEXT,
+    description TEXT NOT NULL DEFAULT '',
+    sourceType TEXT,
+    sourceId TEXT,
+    uniqueKey TEXT NOT NULL UNIQUE,
+    createdAt INTEGER NOT NULL
+  );`);
   db.sqlite.exec(`DROP INDEX IF EXISTS sticker_transactions_member_track;
     ALTER TABLE sticker_transactions DROP COLUMN trackId;
     ALTER TABLE sticker_transactions DROP COLUMN commentId;
@@ -533,7 +550,7 @@ test('unchanged summaries avoid ledger aggregation while still checking notifica
  db.queries.length=0;
  const same=(await call(db,member,'/api/stickers/summary?after='+initial.cursor)).data;
  assert.equal(same.unchanged,true);assert.equal(same.balance,undefined);
- assert.ok(!db.queries.some(sql=>/SUM\\(deltaUnits\\)|sticker_unlocks|json_group_array/.test(sql)));
+ assert.ok(!db.queries.some(sql=>/SUM\(deltaUnits\)|sticker_unlocks|json_group_array/.test(sql)));
  assert.ok(db.queries.length<=4,'cheap summary SQL count='+db.queries.length);
  db.sqlite.exec("INSERT INTO member_notifications(id,userId,type,title,message,createdAt) VALUES ('notice','member','test','title','message',1)");
  assert.equal((await call(db,member,'/api/stickers/summary?after='+initial.cursor)).data.unreadNotifications,1);
