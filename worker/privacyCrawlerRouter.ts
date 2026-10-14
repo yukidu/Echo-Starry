@@ -11,6 +11,7 @@ import { handleStarryIdCentral } from './starryIdCentralRouter';
 import { handleDownloadStarryCentralSso } from './downloadStarryCentralSso';
 import { enhanceStarryIdV218Response } from './starryIdV218ResponseEnhancer';
 import { handleStarryProfileSchema } from './starryProfileSchemaRouter';
+import { handleStarryIdV245Battery, enhanceStarryIdV245Response } from './starryIdV245BatteryRouter';
 import type { Env } from './index';
 import { unitsToStickers } from '../shared/stickers';
 
@@ -228,6 +229,11 @@ export default {
   async fetch(request: Request, env: Env, ctx?: any): Promise<Response> {
     const url = new URL(request.url);
 
+    // v245 Starry ID battery routes are isolated to id.starry.phd and handled
+    // before the established v211/general Starry ID routers can consume them.
+    const starryV245Direct = await handleStarryIdV245Battery(request, env);
+    if (starryV245Direct) return withPrivacyHeaders(starryV245Direct);
+
     // Schema-driven member metadata is intentionally lightweight and cacheable.
     // It is available on id.starry.phd and through the Echo same-origin bridge.
     const profileSchemaResponse = await handleStarryProfileSchema(request, env);
@@ -253,7 +259,8 @@ export default {
         starryV212Response || starryV211Response
       );
       const v228StarryIdResponse = await withV228SpouseUnlinkCopy(request, enhancedStarryIdResponse);
-      return withPrivacyHeaders(v228StarryIdResponse);
+      const v245StarryIdResponse = await enhanceStarryIdV245Response(request, v228StarryIdResponse, env);
+      return withPrivacyHeaders(v245StarryIdResponse);
     }
 
     const starryIdResponse = await handleStarryIdCentral(request, env as any);
