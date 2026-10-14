@@ -7,6 +7,9 @@ const clean=(v:unknown)=>v==null?'':String(v).trim();
 const json=(v:unknown,s=200)=>new Response(JSON.stringify(v),{status:s,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 const member=(db:any,id:string)=>db.prepare("SELECT u.id,u.status,p.name,p.amwayId FROM users u JOIN profiles p ON p.userId=u.id WHERE u.id=?").bind(id).first();
 const link=(db:any,id:string)=>db.prepare("SELECT * FROM spouse_links WHERE (userA=? OR userB=?) AND status IN ('pending','active','unlink_pending') LIMIT 1").bind(id,id).first();
+async function audit(db:any,userId:string,actorId:string,before:string,after:string,fieldName='amwayId'){
+  await db.prepare("INSERT INTO profile_audit_logs (id,userId,appId,actorUserId,fieldName,oldValue,newValue,createdAt) VALUES (?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),userId,'starry-id',actorId,fieldName,before,after,Date.now()).run().catch(()=>undefined);
+}
 const owner=(db:any,num:string,exclude:string)=>db.prepare("SELECT userId FROM profiles WHERE amwayId=? AND userId<>? LIMIT 1").bind(num,exclude).first();
 async function generate(db:any){
   for(let i=0;i<40;i++){
@@ -36,6 +39,7 @@ async function change(db:any,id:string,input:any){
       db.prepare("INSERT INTO non_distributor_ids(userId,number,createdAt) VALUES(?,?,?)").bind(id,number,now),
       db.prepare("UPDATE profiles SET amwayId=?,updatedAt=? WHERE userId=?").bind(number,now,id)
     ]);}catch{return json({error:'編號產生衝突，請重試'},409);}
+    await audit(db,id,id,clean(me.amwayId),number);
     return json({success:true,number,nonDistributor:true});
   }
   const number=clean(input.number);
@@ -43,6 +47,7 @@ async function change(db:any,id:string,input:any){
   const duplicate:any=await owner(db,number,id);
   if(!duplicate){
     await db.batch([db.prepare("UPDATE profiles SET amwayId=?,updatedAt=? WHERE userId=?").bind(number,now,id),db.prepare("DELETE FROM non_distributor_ids WHERE userId=?").bind(id)]);
+    await audit(db,id,id,clean(me.amwayId),number);
     return json({success:true,number,nonDistributor:false});
   }
   const other:any=await member(db,duplicate.userId);
@@ -69,7 +74,7 @@ async function action(db:any,id:string,input:any,isAdmin=false){
       db.prepare("UPDATE spouse_links SET status='active',updatedAt=? WHERE id=? AND status='pending'").bind(now,l.id),
       db.prepare("UPDATE profiles SET amwayId=?,updatedAt=? WHERE userId=?").bind(num,now,other),
       db.prepare("DELETE FROM non_distributor_ids WHERE userId=?").bind(other)
-    ]);return json({success:true,status:'active'});
+    ]);await audit(db,other,id,clean(b?.amwayId),num,'spouse-approve');return json({success:true,status:'active'});
   }
   if(l.status==='active'&&kind==='request-unlink'){
     const keep=clean(input.keepUserId);
@@ -98,7 +103,8 @@ async function action(db:any,id:string,input:any,isAdmin=false){
       db.prepare("DELETE FROM non_distributor_ids WHERE userId=?").bind(loser)
     ];
     if(synthetic.test(replacement))statements.push(db.prepare("INSERT INTO non_distributor_ids(userId,number,createdAt) VALUES(?,?,?)").bind(loser,replacement,now));
-    await db.batch(statements);return json({success:true,status:'unlinked'});
+    const before:any=await member(db,loser);
+    await db.batch(statements);await audit(db,loser,id,clean(before?.amwayId),replacement,'spouse-unlink');return json({success:true,status:'unlinked'});
   }
   if(kind==='admin-unlink'&&isAdmin&&l.status==='active'){
     const keep=clean(input.keepUserId);
@@ -115,7 +121,8 @@ async function action(db:any,id:string,input:any,isAdmin=false){
       db.prepare("DELETE FROM non_distributor_ids WHERE userId=?").bind(loser)
     ];
     if(synthetic.test(replacement))statements.push(db.prepare("INSERT INTO non_distributor_ids(userId,number,createdAt) VALUES(?,?,?)").bind(loser,replacement,now));
-    await db.batch(statements);return json({success:true,status:'unlinked',byAdmin:true});
+    const before:any=await member(db,loser);
+    await db.batch(statements);await audit(db,loser,id,clean(before?.amwayId),replacement,'spouse-admin-unlink');return json({success:true,status:'unlinked',byAdmin:true});
   }
   return json({error:'關係狀態不允許此操作'},409);
 }
