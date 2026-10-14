@@ -1,6 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { Env } from './index';
 import { calculateNumerology } from '../src/utils/numerology';
+import { ensureSpouseSchema } from './starryIdSpouseSchema';
 import { renderStarryIdMemberCenterPage } from './starryIdMemberCenterPage';
 
 type StarryEnv = Env & {
@@ -220,6 +221,7 @@ const memberSelect = `SELECT
   LEFT JOIN profiles p ON p.userId=u.id`;
 
 async function readMember(db: any, userId: string) {
+  await ensureSpouseSchema(db);
   return db.prepare(`${memberSelect} WHERE u.id=? LIMIT 1`).bind(userId).first();
 }
 
