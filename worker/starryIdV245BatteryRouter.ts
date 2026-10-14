@@ -1,5 +1,6 @@
 import type { Env } from './index';
 import { sessionContext } from './starryIdProfileDirectoryRouter';
+import { handleStarryIdV230Client } from './starryIdV230ClientRouter';
 import { unitsToBatteries } from '../shared/battery';
 
 const STAR_DOMAIN = 'id.starry.phd';
@@ -33,6 +34,36 @@ function appLabel(appId: unknown) {
 function formatBattery(units: unknown) {
   const amount = unitsToBatteries(Number(units || 0));
   return Number.isInteger(amount) ? String(amount) : amount.toFixed(1).replace(/\.0$/, '');
+}
+
+export function stabilizeStarryIdV230ClientSource(source: string) {
+  return source
+    .replace(
+      "if(display){display.textContent=next||'尚未填寫';display.classList.toggle('empty',!next)}",
+      "if(display){const nextText=next||'尚未填寫';if(display.textContent!==nextText)display.textContent=nextText;const empty=!next;if(display.classList.contains('empty')!==empty)display.classList.toggle('empty',empty)}"
+    )
+    .replace(
+      "async function syncV242ProfileFields(){const emailSource=q('#displayEmail');if(emailSource)emailSource.style.display='none';",
+      "async function syncV242ProfileFields(){const emailSource=q('#displayEmail');if(emailSource&&emailSource.style.display!=='none')emailSource.style.display='none';"
+    )
+    .replace(
+      'let rankTimer=0;function scheduleRank(){clearTimeout(rankTimer);rankTimer=setTimeout(syncRank,260)}',
+      'let rankTimer=0;function scheduleRank(){if(rankTimer)return;rankTimer=setTimeout(()=>{rankTimer=0;void syncRank()},260)}'
+    )
+    .replace(
+      "const observer=new MutationObserver(sync);observer.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['class','hidden']});sync();void syncRank();setInterval(()=>syncBell(true),45000);",
+      "let observerTimer=0;function scheduleSync(){if(observerTimer)return;observerTimer=setTimeout(()=>{observerTimer=0;sync()},32)}const observer=new MutationObserver(scheduleSync);observer.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['class','hidden']});sync();void syncRank();setInterval(()=>syncBell(true),45000);"
+    );
+}
+
+async function stabilizedV230Client(request: Request, env: Env) {
+  const response = await handleStarryIdV230Client(request, env);
+  if (!response) return null;
+  const source = stabilizeStarryIdV230ClientSource(await response.text());
+  const headers = new Headers(response.headers);
+  headers.delete('Content-Length');
+  headers.set('Cache-Control','no-store');
+  return new Response(source,{status:response.status,statusText:response.statusText,headers});
 }
 
 async function ensureSchema(env: Env) {
@@ -155,25 +186,28 @@ function ledgerPage() {
 
 const CLIENT_SOURCE = `(()=>{
   if(window.__starryV245)return;window.__starryV245=true;
-  const q=(s,r=document)=>r.querySelector(s),qa=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const q=(s,r=document)=>r.querySelector(s);
   async function api(path,opt={}){const r=await fetch(path,{credentials:'same-origin',...opt,headers:{'Content-Type':'application/json',...(opt.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'操作失敗');return d}
-  let sessionId='',lastTarget='',loading=false,visibility=null,balanceCache=new Map();
+  let sessionId='',lastTarget='',loading=false,visibility=null;
+  const balanceCache=new Map();
+  const BOOT_DELAYS=[0,180,500,1200];
   function targetId(){return q('.member-item.active')?.dataset?.id||sessionId||''}
   function eyeSvg(visible){return visible?'👁':'⊘'}
   function paintEye(button,visible){const next=visible?'1':'0';if(button.dataset.visible!==next)button.dataset.visible=next;const off=!visible;if(button.classList.contains('visibility-off')!==off)button.classList.toggle('visibility-off',off);const icon=eyeSvg(visible);if(button.textContent!==icon)button.textContent=icon}
   function feedback(button,label,visible){q('.v245-feedback')?.remove();const p=document.createElement('div');p.className='v241-eye-feedback v245-feedback';p.textContent=(visible?'已開啟':'已關閉')+label;document.body.append(p);const r=button.getBoundingClientRect(),b=p.getBoundingClientRect();p.style.left=Math.max(8,Math.min(innerWidth-b.width-8,r.right+8))+'px';p.style.top=Math.max(8,Math.min(innerHeight-b.height-8,r.bottom+8))+'px';setTimeout(()=>p.remove(),2000)}
-  async function toggleBatteryEye(button){const before=button.dataset.visible!=='0',next=!before;paintEye(button,next);feedback(button,'電池數量',next);try{const d=await api('/api/card-settings',{method:'PUT',body:JSON.stringify({visibility:{battery:next}})});visibility=d.visibility||visibility}catch(e){paintEye(button,before)}}
-  function upsert(root,value,own){let card=q('.field[data-v245-battery="1"]',root);if(!card){card=document.createElement('div');card.className='field readonly v242-readonly';card.dataset.v245Battery='1';card.dataset.field='v245Battery';const l=document.createElement('div');l.className='field-label';l.textContent='電池數量';const v=document.createElement('div');v.className='field-value';const hint=document.createElement('div');hint.className='field-hint';hint.textContent='中央電池餘額，無法手動修改';card.append(l,v,hint);root.append(card)}const v=q('.field-value',card);const nextText=String(value)+' 顆';if(v.textContent!==nextText)v.textContent=nextText;if(v.classList.contains('empty'))v.classList.remove('empty');let eye=q('.v245-battery-eye',card);if(own){const visible=visibility?.battery!==false;if(!eye){eye=document.createElement('button');eye.type='button';eye.className='v241-eye v245-battery-eye';eye.dataset.v241Eye='1';eye.title='控制電池數量是否顯示在公開名片';eye.onclick=e=>{e.preventDefault();e.stopPropagation();toggleBatteryEye(eye)};card.append(eye)}paintEye(eye,visible)}else eye?.remove()}
-  async function syncBattery(){const root=q('#fields');const target=targetId();if(!root||!sessionId||!target||loading)return;const own=target===sessionId;if(lastTarget!==target){lastTarget=target;visibility=null}loading=true;try{if(own&&!visibility){const s=await api('/api/card-settings');visibility=s.visibility||{}}let data=balanceCache.get(target);if(!data){data=await api('/api/battery-ledger/summary?targetUserId='+encodeURIComponent(target));balanceCache.set(target,data)}upsert(root,data.balance,own)}catch{}finally{loading=false}}
-  let timer=0;function scheduleBattery(){if(timer)return;timer=setTimeout(()=>{timer=0;void syncBattery()},40)}function sync(){scheduleBattery()}
-  new MutationObserver(mutations=>{const relevant=mutations.some(m=>{const target=m.target instanceof Element?m.target:m.target.parentElement;if(target?.closest?.('[data-v245-battery="1"],.v245-feedback,.v216-menu,.topbar'))return false;const nodes=[...m.addedNodes,...m.removedNodes].filter(n=>n instanceof Element);if(nodes.length&&nodes.every(n=>n.matches?.('.v216-menu')||n.closest?.('.v216-menu')))return false;return true});if(relevant)scheduleBattery()}).observe(document.documentElement,{childList:true,subtree:true});
-  document.addEventListener('pointerdown',e=>{if(!e.target.closest?.('.v245-battery-eye'))q('.v245-feedback')?.remove()},true);
-  api('/api/session').then(d=>{sessionId=d.user?.id||'';sync()}).catch(()=>undefined);sync();
+  async function toggleBatteryEye(button){const before=button.dataset.visible!=='0',next=!before;paintEye(button,next);feedback(button,'電池數量',next);try{const d=await api('/api/card-settings',{method:'PUT',body:JSON.stringify({visibility:{battery:next}})});visibility=d.visibility||visibility}catch{paintEye(button,before)}}
+  function upsert(root,value,own){let card=q('.field[data-v245-battery="1"]',root);if(!card){card=document.createElement('div');card.className='field readonly v242-readonly';card.dataset.v245Battery='1';card.dataset.field='v245Battery';const l=document.createElement('div');l.className='field-label';l.textContent='電池數量';const v=document.createElement('div');v.className='field-value';const hint=document.createElement('div');hint.className='field-hint';hint.textContent='中央電池餘額，無法手動修改';card.append(l,v,hint);root.append(card)}const v=q('.field-value',card);const nextText=String(value)+' 顆';if(v&&v.textContent!==nextText)v.textContent=nextText;if(v?.classList.contains('empty'))v.classList.remove('empty');let eye=q('.v245-battery-eye',card);if(own){const visibleNow=visibility?.battery!==false;if(!eye){eye=document.createElement('button');eye.type='button';eye.className='v241-eye v245-battery-eye';eye.dataset.v241Eye='1';eye.title='控制電池數量是否顯示在公開名片';eye.onclick=e=>{e.preventDefault();e.stopPropagation();void toggleBatteryEye(eye)};card.append(eye)}paintEye(eye,visibleNow)}else eye?.remove()}
+  async function syncBattery(force=false){const root=q('#fields');const target=targetId();if(!root||!sessionId||!target||loading)return;const own=target===sessionId;if(lastTarget!==target){lastTarget=target;visibility=null}loading=true;try{if(own&&!visibility){const s=await api('/api/card-settings');visibility=s.visibility||{}}let data=force?null:balanceCache.get(target);if(!data){data=await api('/api/battery-ledger/summary?targetUserId='+encodeURIComponent(target));balanceCache.set(target,data)}upsert(root,data.balance,own)}catch{}finally{loading=false}}
+  function finiteSync(force=false){for(const delay of BOOT_DELAYS)setTimeout(()=>void syncBattery(force),delay)}
+  document.addEventListener('click',e=>{const member=e.target?.closest?.('.member-item');if(member){const id=member.dataset?.id||'';if(id)balanceCache.delete(id);lastTarget='';finiteSync(true)}if(!e.target?.closest?.('.v245-battery-eye'))q('.v245-feedback')?.remove()},true);
+  window.addEventListener('pageshow',()=>finiteSync(false),{once:true});
+  api('/api/session').then(d=>{sessionId=d.user?.id||'';finiteSync(false)}).catch(()=>undefined);
 })();`;
 
 export async function handleStarryIdV245Battery(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
   if (url.hostname !== STAR_DOMAIN) return null;
+  if (url.pathname === '/starry-id-v230.js' && request.method === 'GET') return stabilizedV230Client(request, env);
   if (url.pathname === '/starry-id-v245.js' && request.method === 'GET') return new Response(CLIENT_SOURCE,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow'}});
   if (url.pathname === '/battery-ledger' && request.method === 'GET') {
     const session = await sessionContext(request, env);

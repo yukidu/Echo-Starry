@@ -11,12 +11,16 @@ test('v247 battery enhancer no longer owns or rebuilds the main menu', () => {
   assert.doesNotMatch(battery, /for\(const a of qa\(':scope > a',menu\)\)a\.remove\(\)/);
 });
 
-test('v247 battery observer ignores main-menu and topbar mutations', () => {
-  assert.match(battery, /\.v216-menu,\.topbar/);
-  assert.match(battery, /if\(relevant\)scheduleBattery\(\)/);
+test('v248 supersedes the v247 observer exclusions by removing the battery observer entirely', () => {
+  const start = battery.indexOf('const CLIENT_SOURCE = `');
+  const end = battery.indexOf('export async function handleStarryIdV245Battery');
+  const client = battery.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.doesNotMatch(client, /MutationObserver/);
+  assert.match(client, /function finiteSync\(force=false\)/);
 });
 
-test('v247 v216 menu is the single owner of ecosystem links and battery ledger', () => {
+test('v247 v216 menu remains the single owner of ecosystem links and battery ledger', () => {
   for (const url of ['https://starry.phd','https://id.starry.phd','https://echo.starry.phd','https://download.starry.phd','https://go.starry.phd','https://quotes.starry.phd','https://box.starry.phd','https://starbeauty.yukidu.workers.dev']) {
     assert.ok(menu.includes(url), `missing ${url}`);
   }
