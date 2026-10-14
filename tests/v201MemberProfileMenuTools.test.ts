@@ -7,7 +7,7 @@ const dislike = readFileSync(new URL('../src/v181HomeToolbarDislike.ts', import.
 const dislikeCss = readFileSync(new URL('../src/v181HomeToolbarDislike.css', import.meta.url), 'utf8');
 const stickers = readFileSync(new URL('../src/components/StickersModal.tsx', import.meta.url), 'utf8');
 const shared = readFileSync(new URL('../shared/stickers.ts', import.meta.url), 'utf8');
-const backend = readFileSync(new URL('../worker/stickerRouter.ts', import.meta.url), 'utf8');
+const backend = readFileSync(new URL('../worker/legacyStickerRouter.ts', import.meta.url), 'utf8');
 const organization = readFileSync(new URL('../worker/organizationModel.ts', import.meta.url), 'utf8');
 
 test('homepage card menu uses the requested compact copy and matching text size', () => {
@@ -17,7 +17,7 @@ test('homepage card menu uses the requested compact copy and matching text size'
   assert.match(dislikeCss, /font-size: 0\.875rem;[\s\S]*line-height: 1\.25rem;/);
 });
 
-test('Platinum tools use one shared legacy-safe eligibility rule in UI and backend', () => {
+test('Platinum tools use one shared legacy-safe eligibility rule in UI and legacy backend', () => {
   assert.match(shared, /function isPlatinumToolsEligible/);
   assert.match(shared, /auditStatus === 'pending'/);
   assert.match(stickers, /isPlatinumToolsEligible\(currentUser\)/);
