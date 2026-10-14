@@ -3,6 +3,7 @@ import { handleStarryIdProfileDirectory } from './starryIdProfileDirectoryRouter
 import { handleStarryIdRandomMotto } from './starryIdRandomMottoRouter';
 import { handleStarryIdSpouse } from './starryIdSpouseRouter';
 import { handleStarryIdRankUpdate } from './starryIdRankUpdateRouter';
+import { handleStarryIdV230Client } from './starryIdV230ClientRouter';
 import {
   captureSpouseNotificationContext,
   handleStarryIdNotifications,
@@ -173,6 +174,9 @@ function appIdFromTicketPath(pathname: string): CentralSsoAppId | null {
 export async function handleDownloadStarryCentralSso(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
   if (url.hostname !== STARRY_ID_HOST) return null;
+
+  const v230ClientResponse = await handleStarryIdV230Client(request, env);
+  if (v230ClientResponse) return v230ClientResponse;
 
   const notificationsResponse = await handleStarryIdNotifications(request, env);
   if (notificationsResponse) return notificationsResponse;
