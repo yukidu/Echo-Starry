@@ -431,6 +431,23 @@ test('manual grant history is scoped to issuer, custom decimal amounts are accep
 
 test('v98 migration preserves balances and translates keyword count to sticker cap', async () => {
   const db=database();const token=await session(db,'member');const admin=await session(db,'admin');
+  // v244: production no longer provisions this ledger; recreate the real legacy column order only for this migration test.
+  db.sqlite.exec(`CREATE TABLE sticker_transactions (
+    id TEXT PRIMARY KEY,
+    userId TEXT NOT NULL,
+    deltaUnits INTEGER NOT NULL,
+    balanceAfterUnits INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    sourceId TEXT,
+    description TEXT NOT NULL,
+    actorUserId TEXT,
+    uniqueKey TEXT NOT NULL UNIQUE,
+    createdAt INTEGER NOT NULL,
+    trackId TEXT,
+    commentId TEXT,
+    relatedUserId TEXT,
+    sourceLabel TEXT
+  );`);
   db.sqlite.exec(`DROP INDEX IF EXISTS sticker_transactions_member_track;
     ALTER TABLE sticker_transactions DROP COLUMN trackId;
     ALTER TABLE sticker_transactions DROP COLUMN commentId;
