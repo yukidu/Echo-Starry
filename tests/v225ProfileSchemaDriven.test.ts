@@ -3,16 +3,18 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const file=(path:string)=>readFileSync(path,'utf8');
-const gateway=file('worker/starryProfileSchemaGateway.ts');
+const hooks=file('worker/starryProfileSchemaHooks.ts');
+const privacy=file('worker/privacyCrawlerRouter.ts');
 const migration=file('starry-id/migrations/20261014_profile_schema.sql');
 const provision=file('starry-id/provision-and-audit.sh');
 const verify=file('starry-id/verify-schema.mjs');
 const wrangler=file('wrangler.toml');
 
-test('v225 keeps the existing privacy router behind a thin schema gateway',()=>{
-  assert.match(wrangler,/main = "worker\/starryProfileSchemaGateway\.ts"/);
-  assert.match(gateway,/import appWorker from '\.\/privacyCrawlerRouter'/);
-  assert.match(gateway,/appWorker\.fetch\(request,env as any,ctx\)/);
+test('v225 preserves the canonical privacy Worker entrypoint and adds hooks inside it',()=>{
+  assert.match(wrangler,/main = "worker\/privacyCrawlerRouter\.ts"/);
+  assert.match(privacy,/handleStarryProfileSchemaRequest/);
+  assert.match(privacy,/validateStarryProfileCoreWrite/);
+  assert.match(privacy,/injectStarryProfileSchemaClient/);
   assert.match(wrangler,/pattern = "echo\.starry\.phd"/);
   assert.match(wrangler,/pattern = "id\.starry\.phd"/);
 });
@@ -31,30 +33,30 @@ test('central schema has versioning, field metadata and dynamic values',()=>{
 });
 
 test('schema endpoint is lightweight, versioned and cacheable',()=>{
-  assert.match(gateway,/\/api\/profile-schema/);
-  assert.match(gateway,/starry-profile-schema-v\$\{data\.version\}/);
-  assert.match(gateway,/If-None-Match/);
-  assert.match(gateway,/status:304/);
-  assert.match(gateway,/caches\?\.default/);
-  assert.match(gateway,/stale-while-revalidate=86400/);
+  assert.match(hooks,/\/api\/profile-schema/);
+  assert.match(hooks,/starry-profile-schema-v\$\{data\.version\}/);
+  assert.match(hooks,/If-None-Match/);
+  assert.match(hooks,/status:304/);
+  assert.match(hooks,/caches\?\.default/);
+  assert.match(hooks,/stale-while-revalidate=86400/);
 });
 
 test('central rules validate core writes and dynamic fields server-side',()=>{
-  assert.match(gateway,/validateCoreWrite/);
-  assert.match(gateway,/storageMode!==\'core\'/);
-  assert.match(gateway,/field\.fieldType===\'select\'/);
-  assert.match(gateway,/中央清單中的選項/);
-  assert.match(gateway,/profile_dynamic_values/);
-  assert.match(gateway,/Starry ID Super Admin/);
+  assert.match(hooks,/validateStarryProfileCoreWrite/);
+  assert.match(hooks,/field\.storageMode !== 'core'/);
+  assert.match(hooks,/field\.fieldType === 'select'/);
+  assert.match(hooks,/中央清單中的選項/);
+  assert.match(hooks,/profile_dynamic_values/);
+  assert.match(hooks,/Starry ID Super Admin/);
 });
 
 test('EchoStars auto-sync client caches schema and adds ordinary dynamic fields without manual trigger',()=>{
-  assert.match(gateway,/starry-profile-schema-cache-v1/);
-  assert.match(gateway,/localStorage\.setItem\(CACHE_KEY/);
-  assert.match(gateway,/data-starry-central-select/);
-  assert.match(gateway,/storageMode===\'dynamic\'/);
-  assert.match(gateway,/id='starry-schema-dynamic'|section\.id='starry-schema-dynamic'/);
-  assert.match(gateway,/\/api\/profile-extra/);
-  assert.match(gateway,/txt\(btn\)!==\'儲存\'/);
-  assert.match(gateway,/bypass=true;btn\.click\(\)/);
+  assert.match(hooks,/starry-profile-schema-cache-v1/);
+  assert.match(hooks,/localStorage\.setItem\(CACHE/);
+  assert.match(hooks,/data-starry-central-select/);
+  assert.match(hooks,/storageMode==='dynamic'/);
+  assert.match(hooks,/sec\.id='starry-schema-dynamic'/);
+  assert.match(hooks,/\/api\/profile-extra/);
+  assert.match(hooks,/t\(b\)!=='儲存'/);
+  assert.match(hooks,/bypass=true;b\.click\(\)/);
 });
