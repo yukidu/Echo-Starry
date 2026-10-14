@@ -19,12 +19,16 @@ test('v251 exposes exactly ten uniquely named fixed public-card themes', () => {
 });
 
 test('every theme has dedicated public and edit-preview styling', () => {
+  const normalizedSource = source.replace(/\\(["'])/g, '$1');
   for (const theme of STARRY_CARD_THEMES) {
-    assert.ok(source.includes(`data-card-theme=\\"${theme.id}\\"`), `${theme.id} public style missing`);
-    assert.ok(source.includes(`data-card-preview-theme=\\"${theme.id}\\"`), `${theme.id} edit preview style missing`);
+    assert.ok(normalizedSource.includes(`data-card-theme="${theme.id}"`), `${theme.id} public style missing`);
+    assert.ok(normalizedSource.includes(`data-card-preview-theme="${theme.id}"`), `${theme.id} edit preview style missing`);
   }
   assert.match(source, /prefers-reduced-motion:reduce/);
   assert.doesNotMatch(source, /html\[data-starry-theme=/);
+  assert.doesNotMatch(source, /observe\(document\.(?:documentElement|body)/);
+  assert.doesNotMatch(source, /subtree\s*:\s*true/);
+  assert.doesNotMatch(source, /CREATE TABLE IF NOT EXISTS public_card_preferences/);
 });
 
 test('edit mode has a top-right theme select with instant preview and persistence', () => {

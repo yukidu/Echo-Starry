@@ -22,7 +22,6 @@ const DEFAULT_THEME = 'starry-cosmos';
 const STAR_DOMAIN = 'id.starry.phd';
 const SESSION_COOKIE = 'starry_id_session';
 const TOKEN_RE = /^[A-Za-z0-9_-]{30,}$/;
-const schemaReady = new WeakMap<object, Promise<void>>();
 
 function text(value: unknown) {
   return value == null ? '' : String(value).trim();
@@ -50,31 +49,12 @@ async function currentUserId(request: Request, db: any) {
   return text(row.userId);
 }
 
-async function ensureThemeSchema(db: any) {
-  const key = db as object;
-  if (!schemaReady.has(key)) {
-    const task = db.prepare(`CREATE TABLE IF NOT EXISTS public_card_preferences (
-      userId TEXT PRIMARY KEY,
-      theme TEXT NOT NULL DEFAULT 'starry-cosmos' CHECK(theme IN (
-        'starry-cosmos','golden-prestige','aurora-realm','sunrise-paper','neon-pulse',
-        'forest-whisper','ocean-flow','sakura-ink','lunar-minimal','royal-gem'
-      )),
-      updatedAt INTEGER NOT NULL,
-      FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
-    )`).run().then(() => undefined);
-    schemaReady.set(key, task);
-    task.catch(() => schemaReady.delete(key));
-  }
-  await schemaReady.get(key);
-}
-
 function normalizeTheme(value: unknown) {
   const theme = text(value).toLowerCase();
   return THEME_IDS.has(theme) ? theme : DEFAULT_THEME;
 }
 
 async function readTheme(db: any, userId: string) {
-  await ensureThemeSchema(db);
   const row: any = await db.prepare('SELECT theme FROM public_card_preferences WHERE userId=? LIMIT 1').bind(userId).first();
   return normalizeTheme(row?.theme);
 }
@@ -106,8 +86,7 @@ export async function handleStarryIdV251CardTheme(request: Request, env: StarryC
     const body: any = await request.clone().json().catch(() => null);
     const requested = text(body?.theme).toLowerCase();
     if (!THEME_IDS.has(requested)) return json({ error: '找不到這個名片樣式' }, 400);
-    await ensureThemeSchema(db);
-    await db.prepare(`INSERT INTO public_card_preferences (userId,theme,updatedAt) VALUES (?,?,?)
+      await db.prepare(`INSERT INTO public_card_preferences (userId,theme,updatedAt) VALUES (?,?,?)
       ON CONFLICT(userId) DO UPDATE SET theme=excluded.theme,updatedAt=excluded.updatedAt`)
       .bind(userId, requested, Date.now()).run();
   }
@@ -244,7 +223,7 @@ function memberCenterScript() {
     async function api(method,body){const r=await fetch('/api/card-theme',{method,credentials:'same-origin',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'名片樣式操作失敗');return d}
     function ensurePicker(){const actions=document.getElementById('topActions');if(!actions||document.getElementById('v251CardThemePicker'))return;const wrap=document.createElement('div');wrap.id='v251CardThemePicker';wrap.className='v251-theme-picker';const label=document.createElement('label');label.htmlFor='v251CardThemeSelect';label.textContent='名片樣式';const select=document.createElement('select');select.id='v251CardThemeSelect';select.className='v251-theme-select';select.title='選擇公開電子名片版面';for(const item of themes){const o=document.createElement('option');o.value=item.id;o.textContent=item.name;select.appendChild(o)}select.value=current;select.addEventListener('change',async()=>{if(busy)return;const previous=current,next=select.value;apply(next);busy=true;select.disabled=true;try{const data=await api('PUT',{theme:next});apply(data.theme||next)}catch(err){apply(previous);alert(err?.message||'名片樣式儲存失敗')}finally{busy=false;select.disabled=false}});wrap.append(label,select);const burger=document.getElementById('v216Menu');if(burger)actions.insertBefore(wrap,burger);else actions.appendChild(wrap)}
     async function boot(){ensurePicker();apply(current);try{const data=await api('GET');if(data?.theme)apply(data.theme)}catch{}ensurePicker()}
-    const observer=new MutationObserver(()=>{ensurePicker();const card=document.getElementById('profileCard');if(card&&card.dataset.cardTheme!==current)card.dataset.cardTheme=current});observer.observe(document.documentElement,{childList:true,subtree:true});boot();
+    const actions=document.getElementById('topActions');if(actions){const visibilityObserver=new MutationObserver(()=>{if(!actions.hidden)void boot()});visibilityObserver.observe(actions,{attributes:true,attributeFilter:['hidden']})}void boot();
   })();</script>`;
 }
 
@@ -281,8 +260,7 @@ export async function enhanceStarryIdV251CardThemeResponse(
   const db = env.STARRY_ID_DB;
   if (!slug || !db) return response;
   try {
-    await ensureThemeSchema(db);
-    const card: any = await db.prepare('SELECT userId FROM public_cards WHERE slug=? LIMIT 1').bind(slug).first();
+      const card: any = await db.prepare('SELECT userId FROM public_cards WHERE slug=? LIMIT 1').bind(slug).first();
     if (!card?.userId) return response;
     const theme = await readTheme(db, text(card.userId));
     let html = await response.text();
