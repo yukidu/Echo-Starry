@@ -19,6 +19,16 @@ function memberCenterStyle() {
   </style>`;
 }
 
+function mobileToolbarFixStyle() {
+  return `<style id="v227-mobile-toolbar-fix">
+    .topbar{box-sizing:border-box!important;width:100%!important;max-width:none!important;left:auto!important;transform:none!important}
+    .topbar .brand{flex:1 1 auto!important;min-width:0!important;display:flex!important;align-items:center!important;overflow:hidden!important}
+    .topbar .brand h1{min-width:0!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+    .topbar .top-actions{flex:0 0 auto!important;display:flex!important;align-items:center!important;gap:8px!important;margin-left:auto!important}
+    @media(max-width:760px){.topbar{gap:8px!important}.topbar .brand{flex:1 1 0!important;min-width:0!important}.topbar .top-actions{flex:0 0 auto!important}.topbar .brand h1{font-size:15px!important;max-width:100%!important}}
+  </style>`;
+}
+
 function memberCenterScript() {
   return `<script id="v218-script">(()=>{
     const q=(s,r=document)=>r.querySelector(s),qa=(s,r=document)=>Array.from(r.querySelectorAll(s));
@@ -78,6 +88,7 @@ export async function enhanceStarryIdV218Response(request: Request, response: Re
     html = html.replace('</head>', memberCenterStyle() + '</head>');
     html = html.replace('</body>', memberCenterScript() + '</body>');
     html = enhanceStarryIdV222MemberCenter(html);
+    html = html.replace('</head>', mobileToolbarFixStyle() + '</head>');
   } else if (!url.pathname.startsWith('/api/')) {
     html = html
       .replace(/<div class="owner"><a href="\/">← 回到我的 Starry ID 會員中心<\/a><\/div>/g, '')
