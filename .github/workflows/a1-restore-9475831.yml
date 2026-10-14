@@ -1,0 +1,113 @@
+name: A1 restore 9475831
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  restore:
+    if: github.head_ref == 'safe/a1-restore-9475831'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Preflight safety checks
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/a1-restore
+
+          npx wrangler d1 execute starry_id_db --remote --command "SELECT u.id,p.name,p.amwayId,p.center,p.rank,p.approvedRank,p.rankApproved,p.rankAuditStatus FROM users u JOIN profiles p ON p.userId=u.id WHERE TRIM(COALESCE(p.name,''))='杜杜龍' AND TRIM(COALESCE(p.amwayId,''))='n8405265'" --json > /tmp/a1-restore/central-current.json
+
+          node <<'NODE'
+          const fs=require('fs');
+          const raw=JSON.parse(fs.readFileSync('/tmp/a1-restore/central-current.json','utf8'));
+          const rows=(Array.isArray(raw)?raw[0]?.results:raw?.results)||[];
+          if(rows.length!==1) throw new Error(`A1 safety stop: expected exactly one central 杜杜龍@n8405265 row, found ${rows.length}`);
+          const id=String(rows[0].id||'');
+          if(!/^[A-Za-z0-9._:-]+$/.test(id)) throw new Error('A1 safety stop: unexpected user id format');
+          fs.appendFileSync(process.env.GITHUB_ENV,`TARGET_ID=${id}\n`);
+          NODE
+
+          npx wrangler d1 execute starry_id_db --remote --command "SELECT COUNT(*) AS count FROM profiles WHERE TRIM(COALESCE(amwayId,''))='9475831' AND userId<>'${TARGET_ID}'" --json > /tmp/a1-restore/central-947-owner-count.json
+          npx wrangler d1 execute starry_id_db --remote --command "SELECT COUNT(*) AS count FROM spouse_links WHERE (userA='${TARGET_ID}' OR userB='${TARGET_ID}') AND status IN ('pending','active','unlink_pending')" --json > /tmp/a1-restore/spouse-count.json
+          npx wrangler d1 execute echoes_db --remote --command "SELECT id,name,amwayId,center,rank,approvedRank,rankApproved,rankAuditStatus FROM users WHERE id='${TARGET_ID}' LIMIT 1" --json > /tmp/a1-restore/echo-target.json
+          npx wrangler d1 execute echoes_db --remote --command "SELECT COUNT(*) AS count FROM users WHERE TRIM(COALESCE(amwayId,''))='9475831' AND id<>'${TARGET_ID}'" --json > /tmp/a1-restore/echo-947-owner-count.json
+
+          node <<'NODE'
+          const fs=require('fs');
+          const rows=p=>{const x=JSON.parse(fs.readFileSync(p,'utf8'));return (Array.isArray(x)?x[0]?.results:x?.results)||[]};
+          const count=p=>Number(rows(p)[0]?.count||0);
+          if(count('/tmp/a1-restore/central-947-owner-count.json')!==0) throw new Error('A1 safety stop: 9475831 is occupied by another central member');
+          if(count('/tmp/a1-restore/spouse-count.json')!==0) throw new Error('A1 safety stop: target still has spouse relationship state');
+          if(count('/tmp/a1-restore/echo-947-owner-count.json')!==0) throw new Error('A1 safety stop: 9475831 is occupied by another Echo member');
+          const echo=rows('/tmp/a1-restore/echo-target.json');
+          if(echo.length!==1) throw new Error(`A1 safety stop: expected one Echo target row, found ${echo.length}`);
+          if(String(echo[0].amwayId||'').trim()!=='9475831') throw new Error(`A1 safety stop: Echo target is no longer 9475831 (current=${echo[0].amwayId||''})`);
+          if(String(echo[0].name||'').trim()!=='杜杜龍') throw new Error('A1 safety stop: Echo target identity mismatch');
+          NODE
+
+      - name: Restore central Starry ID to 9475831
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          NOW="$(date +%s%3N)"
+          AUDIT_ID="$(node -e "console.log(require('crypto').randomUUID())")"
+
+          npx wrangler d1 execute starry_id_db --remote --command "UPDATE profiles SET amwayId='9475831',updatedAt=${NOW} WHERE userId='${TARGET_ID}' AND amwayId='n8405265'" --json > /tmp/a1-restore/update-central.json
+          npx wrangler d1 execute starry_id_db --remote --command "DELETE FROM non_distributor_ids WHERE userId='${TARGET_ID}'" --json > /tmp/a1-restore/delete-synthetic-reservation.json
+          npx wrangler d1 execute starry_id_db --remote --command "INSERT INTO profile_audit_logs (id,userId,appId,actorUserId,fieldName,oldValue,newValue,createdAt) VALUES ('${AUDIT_ID}','${TARGET_ID}','starry-id','${TARGET_ID}','amwayId','n8405265','9475831',${NOW})" --json > /tmp/a1-restore/audit.json
+          npx wrangler d1 execute echoes_db --remote --command "UPDATE users SET amwayId='9475831' WHERE id='${TARGET_ID}'" --json > /tmp/a1-restore/update-echo.json
+
+      - name: Verify final state
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute starry_id_db --remote --command "SELECT p.name,p.amwayId,p.center,p.rank,p.approvedRank,p.rankApproved,p.rankAuditStatus FROM profiles p WHERE p.userId='${TARGET_ID}' LIMIT 1" --json > /tmp/a1-restore/final-central.json
+          npx wrangler d1 execute starry_id_db --remote --command "SELECT COUNT(*) AS count FROM non_distributor_ids WHERE userId='${TARGET_ID}'" --json > /tmp/a1-restore/final-reservation-count.json
+          npx wrangler d1 execute echoes_db --remote --command "SELECT name,amwayId,center,rank,approvedRank,rankApproved,rankAuditStatus FROM users WHERE id='${TARGET_ID}' LIMIT 1" --json > /tmp/a1-restore/final-echo.json
+
+          node <<'NODE'
+          const fs=require('fs');
+          const rows=p=>{const x=JSON.parse(fs.readFileSync(p,'utf8'));return (Array.isArray(x)?x[0]?.results:x?.results)||[]};
+          const central=rows('/tmp/a1-restore/final-central.json');
+          const echo=rows('/tmp/a1-restore/final-echo.json');
+          const reservations=Number(rows('/tmp/a1-restore/final-reservation-count.json')[0]?.count||0);
+          if(central.length!==1||String(central[0].amwayId)!=='9475831') throw new Error('A1 verification failed: central ID not restored');
+          if(echo.length!==1||String(echo[0].amwayId)!=='9475831') throw new Error('A1 verification failed: Echo ID not aligned');
+          if(reservations!==0) throw new Error('A1 verification failed: stale non-distributor reservation remains');
+          const safe={
+            central:{name:central[0].name,amwayId:central[0].amwayId,center:central[0].center,rank:central[0].rank,approvedRank:central[0].approvedRank,rankApproved:central[0].rankApproved,rankAuditStatus:central[0].rankAuditStatus},
+            echo:{name:echo[0].name,amwayId:echo[0].amwayId,center:echo[0].center,rank:echo[0].rank,approvedRank:echo[0].approvedRank,rankApproved:echo[0].rankApproved,rankAuditStatus:echo[0].rankAuditStatus},
+            nonDistributorReservationCount:reservations,
+            result:'A1 restored and verified'
+          };
+          fs.writeFileSync('/tmp/a1-restore/result.json',JSON.stringify(safe,null,2));
+          console.log('A1 restore verified successfully.');
+          NODE
+
+      - name: Upload verification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: a1-restore-9475831-${{ github.sha }}
+          path: /tmp/a1-restore/result.json
+          if-no-files-found: error
+          retention-days: 1
