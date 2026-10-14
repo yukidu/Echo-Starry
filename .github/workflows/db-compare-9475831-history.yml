@@ -1,0 +1,39 @@
+name: Diagnostic 9475831 history
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    if: github.head_ref == 'safe/v229-db-compare'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Read-only history check
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/db-history
+          npx wrangler d1 execute starry_id_db --remote --command "SELECT p.name,p.amwayId,p.center,p.rank,p.approvedRank,p.rankApproved,p.rankAuditStatus,p.updatedAt,u.status FROM users u JOIN profiles p ON p.userId=u.id WHERE TRIM(COALESCE(p.name,''))='杜杜龍' ORDER BY p.updatedAt DESC LIMIT 20" --json > /tmp/db-history/central-by-name.json
+          npx wrangler d1 execute starry_id_db --remote --command "SELECT fieldName,oldValue,newValue,appId,createdAt FROM profile_audit_logs WHERE fieldName='amwayId' AND (TRIM(COALESCE(oldValue,''))='9475831' OR TRIM(COALESCE(newValue,''))='9475831') ORDER BY createdAt DESC LIMIT 30" --json > /tmp/db-history/amway-audit.json
+          npx wrangler d1 execute starry_id_db --remote --command "SELECT pa.name AS userAName,pb.name AS userBName,sl.status,sl.createdAt,sl.updatedAt FROM spouse_links sl LEFT JOIN profiles pa ON pa.userId=sl.userA LEFT JOIN profiles pb ON pb.userId=sl.userB WHERE TRIM(COALESCE(pa.name,''))='杜杜龍' OR TRIM(COALESCE(pb.name,''))='杜杜龍' ORDER BY sl.updatedAt DESC LIMIT 20" --json > /tmp/db-history/spouse-history.json
+      - name: Upload private diagnostic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-history-9475831-${{ github.sha }}
+          path: /tmp/db-history
+          if-no-files-found: error
+          retention-days: 1
