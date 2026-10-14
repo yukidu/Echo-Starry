@@ -1,6 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { Env } from './index';
 import { calculateNumerology } from '../src/utils/numerology';
+import { ensureSpouseSchema } from './starryIdSpouseSchema';
 import { renderStarryIdMemberCenterPage } from './starryIdMemberCenterPage';
 
 type StarryEnv = Env & {
@@ -212,14 +213,15 @@ const memberSelect = `SELECT
   p.joinReason,p.stayReason,p.birthday,p.motto,p.zodiac,p.talentNumber,p.lifeNumber,p.registerDate,
   COALESCE((SELECT NULLIF(TRIM(rp.name),'') FROM member_relationships mr LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId WHERE mr.userId=u.id AND mr.relationType='sponsor' LIMIT 1),
            (SELECT mr.legacyLabel FROM member_relationships mr WHERE mr.userId=u.id AND mr.relationType='sponsor' LIMIT 1),'') AS sponsor,
-  COALESCE((SELECT NULLIF(TRIM(rp.name),'') FROM member_relationships mr LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId WHERE mr.userId=u.id AND mr.relationType='platinum_upline' LIMIT 1),
+  COALESCE((SELECT NULLIF(TRIM(rp.name),'')||COALESCE((SELECT '&'||TRIM(sp.name) FROM spouse_links sl JOIN profiles sp ON sp.userId=CASE WHEN sl.userA=rp.userId THEN sl.userB ELSE sl.userA END WHERE sl.status='active' AND (sl.userA=rp.userId OR sl.userB=rp.userId) LIMIT 1),'') FROM member_relationships mr LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId WHERE mr.userId=u.id AND mr.relationType='platinum_upline' LIMIT 1),
            (SELECT mr.legacyLabel FROM member_relationships mr WHERE mr.userId=u.id AND mr.relationType='platinum_upline' LIMIT 1),'') AS platinumUpline,
-  COALESCE((SELECT NULLIF(TRIM(rp.name),'') FROM member_relationships mr LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId WHERE mr.userId=u.id AND mr.relationType='diamond_upline' LIMIT 1),
+  COALESCE((SELECT NULLIF(TRIM(rp.name),'')||COALESCE((SELECT '&'||TRIM(sp.name) FROM spouse_links sl JOIN profiles sp ON sp.userId=CASE WHEN sl.userA=rp.userId THEN sl.userB ELSE sl.userA END WHERE sl.status='active' AND (sl.userA=rp.userId OR sl.userB=rp.userId) LIMIT 1),'') FROM member_relationships mr LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId WHERE mr.userId=u.id AND mr.relationType='diamond_upline' LIMIT 1),
            (SELECT mr.legacyLabel FROM member_relationships mr WHERE mr.userId=u.id AND mr.relationType='diamond_upline' LIMIT 1),'') AS diamondUpline
   FROM users u
   LEFT JOIN profiles p ON p.userId=u.id`;
 
 async function readMember(db: any, userId: string) {
+  await ensureSpouseSchema(db);
   return db.prepare(`${memberSelect} WHERE u.id=? LIMIT 1`).bind(userId).first();
 }
 
@@ -408,6 +410,8 @@ async function updateProfile(
   const current: any = await readMember(db, userId);
   if (!current) throw new Error('profile_not_found');
 
+  // Distributor identifiers must pass the central uniqueness/spouse approval workflow.
+  if (Object.prototype.hasOwnProperty.call(changes || {}, 'amwayId')) throw new Error('distributor_number_requires_dedicated_endpoint');
   const editableFields = isSuperAdmin ? ADMIN_EDITABLE_PROFILE_FIELDS : USER_EDITABLE_PROFILE_FIELDS;
   const allowed: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(changes || {})) {
@@ -625,6 +629,7 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
       const user = await updateProfile(env, session.member.id, session.member.id, session.appId, changes, session.isSuperAdmin);
       return json(request, { success: true, user });
     } catch (error) {
+      if (error instanceof Error && error.message === 'distributor_number_requires_dedicated_endpoint') return json(request, { error: '請使用非直銷商／夫妻綁定專用欄位修改直銷商編號' }, 409);
       console.warn('Starry ID profile update failed', {
         code: error instanceof Error ? error.message : 'unknown'
       });
@@ -656,6 +661,7 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
       const user = await updateProfile(env, targetUserId, session.member.id, 'starry-id', changes, true);
       return json(request, { success: true, user });
     } catch (error) {
+      if (error instanceof Error && error.message === 'distributor_number_requires_dedicated_endpoint') return json(request, { error: '請使用非直銷商／夫妻綁定專用欄位修改直銷商編號' }, 409);
       console.warn('Starry ID admin profile update failed', {
         code: error instanceof Error ? error.message : 'unknown'
       });

@@ -1,4 +1,5 @@
 import { handleStarryIdCentral } from './starryIdCentralRouter';
+import { ensureSpouseSchema } from './starryIdSpouseSchema';
 import { renderStarryIdMemberCenterPage } from './starryIdMemberCenterPage';
 import { enhanceStarryIdMemberCenterV216 } from './starryIdV216Enhancer';
 import type { Env } from './index';
@@ -10,8 +11,8 @@ const SESSION_COOKIE = 'starry_id_session';
 const TOKEN_RE = /^[A-Za-z0-9_-]{30,}$/;
 const DEFAULT_GOOGLE_CLIENT_ID = '661055525630-ndcq5gtr16h7rqqprlqqkkvineea87lc.apps.googleusercontent.com';
 const RESERVED_SLUGS = new Set(['api','robots.txt','login','logout','admin','my-card','manifest.webmanifest','favicon.ico','assets']);
-const PUBLIC_FIELDS = ['name','email','avatar','amwayId','cardNumber','residence','center','rank','motto','zodiac','talentNumber','lifeNumber','sponsor','platinumUpline','diamondUpline','phone','birthday','numerology'] as const;
-const DEFAULT_HIDDEN = new Set(['phone','birthday']);
+const PUBLIC_FIELDS = ['name','email','avatar','amwayId','cardNumber','residence','center','rank','motto','zodiac','talentNumber','lifeNumber','sponsor','platinumUpline','diamondUpline','phone','birthday','numerology','spouse'] as const;
+const DEFAULT_HIDDEN = new Set(['phone','birthday','spouse']);
 const schemaReady = new WeakMap<object, Promise<void>>();
 
 function text(value: unknown) { return value == null ? '' : String(value).trim(); }
@@ -80,11 +81,11 @@ async function ensureSchema(db: any) {
 
 const memberSelect = `SELECT u.id,u.primaryEmail,u.status,p.name,p.avatar,p.googleAvatar,p.amwayId,p.phone,p.residence,p.center,p.rank,p.approvedRank,p.birthday,p.motto,p.zodiac,p.talentNumber,p.lifeNumber,
 COALESCE((SELECT NULLIF(TRIM(rp.name),'') FROM member_relationships mr LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId WHERE mr.userId=u.id AND mr.relationType='sponsor' LIMIT 1),(SELECT mr.legacyLabel FROM member_relationships mr WHERE mr.userId=u.id AND mr.relationType='sponsor' LIMIT 1),'') AS sponsor,
-COALESCE((SELECT NULLIF(TRIM(rp.name),'') FROM member_relationships mr LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId WHERE mr.userId=u.id AND mr.relationType='platinum_upline' LIMIT 1),(SELECT mr.legacyLabel FROM member_relationships mr WHERE mr.userId=u.id AND mr.relationType='platinum_upline' LIMIT 1),'') AS platinumUpline,
-COALESCE((SELECT NULLIF(TRIM(rp.name),'') FROM member_relationships mr LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId WHERE mr.userId=u.id AND mr.relationType='diamond_upline' LIMIT 1),(SELECT mr.legacyLabel FROM member_relationships mr WHERE mr.userId=u.id AND mr.relationType='diamond_upline' LIMIT 1),'') AS diamondUpline
+COALESCE((SELECT NULLIF(TRIM(rp.name),'')||COALESCE((SELECT '&'||TRIM(sp.name) FROM spouse_links sl JOIN profiles sp ON sp.userId=CASE WHEN sl.userA=rp.userId THEN sl.userB ELSE sl.userA END WHERE sl.status='active' AND (sl.userA=rp.userId OR sl.userB=rp.userId) LIMIT 1),'') FROM member_relationships mr LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId WHERE mr.userId=u.id AND mr.relationType='platinum_upline' LIMIT 1),(SELECT mr.legacyLabel FROM member_relationships mr WHERE mr.userId=u.id AND mr.relationType='platinum_upline' LIMIT 1),'') AS platinumUpline,
+COALESCE((SELECT NULLIF(TRIM(rp.name),'')||COALESCE((SELECT '&'||TRIM(sp.name) FROM spouse_links sl JOIN profiles sp ON sp.userId=CASE WHEN sl.userA=rp.userId THEN sl.userB ELSE sl.userA END WHERE sl.status='active' AND (sl.userA=rp.userId OR sl.userB=rp.userId) LIMIT 1),'') FROM member_relationships mr LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId WHERE mr.userId=u.id AND mr.relationType='diamond_upline' LIMIT 1),(SELECT mr.legacyLabel FROM member_relationships mr WHERE mr.userId=u.id AND mr.relationType='diamond_upline' LIMIT 1),'') AS diamondUpline
 FROM users u LEFT JOIN profiles p ON p.userId=u.id`;
 
-async function readMember(db: any, userId: string) { return db.prepare(`${memberSelect} WHERE u.id=? LIMIT 1`).bind(userId).first(); }
+async function readMember(db: any, userId: string) { await ensureSpouseSchema(db); return db.prepare(`${memberSelect} WHERE u.id=? LIMIT 1`).bind(userId).first(); }
 async function readVisibility(db: any, userId: string) {
   const result: any = await db.prepare('SELECT fieldName,isVisible FROM profile_field_visibility WHERE userId=?').bind(userId).all();
   const visibility: Record<string, boolean> = {};
@@ -212,8 +213,10 @@ async function publicCard(request: Request, env: StarryEnv, slug: string) {
   const card: any = await db.prepare('SELECT userId,slug,cardNumber FROM public_cards WHERE slug=? LIMIT 1').bind(slug).first(); if(!card) return null;
   const member: any = await readMember(db,card.userId); if(!member||member.status!=='active') return null;
   const visibility=await readVisibility(db,card.userId); const data:any=memberPayload(member); data.cardNumber=card.cardNumber;
+  const partner:any=await db.prepare("SELECT p.name FROM spouse_links s JOIN profiles p ON p.userId=CASE WHEN s.userA=? THEN s.userB ELSE s.userA END WHERE s.status='active' AND (s.userA=? OR s.userB=?) LIMIT 1").bind(card.userId,card.userId,card.userId).first().catch(()=>null);
+  data.spouse=partner?.name?'已與 '+text(partner.name)+' 綁定夫妻':'';
   const viewer=await currentUserId(request,db); const owner=viewer===card.userId;
-  const rows=[['name','姓名'],[text(member.amwayId)?'amwayId':'cardNumber',text(member.amwayId)?'會員編號 / Amway ID':'電子名片編號'],['email','Email'],['phone','手機'],['residence','居住地'],['center','中心'],['rank','獎銜'],['birthday','生日'],['motto','座右銘'],['zodiac','星座'],['sponsor','推薦人'],['platinumUpline','白金上線'],['diamondUpline','鑽石上線']];
+  const rows=[['name','姓名'],[text(member.amwayId)?'amwayId':'cardNumber',text(member.amwayId)?'會員編號 / Amway ID':'電子名片編號'],['email','Email'],['phone','手機'],['residence','居住地'],['center','中心'],['rank','獎銜'],['birthday','生日'],['motto','座右銘'],['zodiac','星座'],['sponsor','推薦人'],['platinumUpline','白金上線'],['diamondUpline','鑽石上線'],['spouse','夫妻關係']];
   const visibleRows=rows.filter(([key])=>visibility[key]!==false).filter(([key])=>data[key]!==''&&data[key]!=null);
   const avatar=visibility.avatar!==false&&data.avatar?`<img class="avatar" src="${escapeHtml(data.avatar)}" alt="會員頭像" referrerpolicy="no-referrer">`:`<div class="avatar fallback">✦</div>`;
   const grid=visibility.numerology!==false&&data.birthday?numerologyHtml(data.birthday):'';
