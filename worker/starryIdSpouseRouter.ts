@@ -5,10 +5,20 @@ import { ensureSpouseSchema } from './starryIdSpouseSchema';
 const host='id.starry.phd', numeric=/^[0-9]+$/, synthetic=/^n[0-9]{7}$/;
 const clean=(v:unknown)=>v==null?'':String(v).trim();
 const json=(v:unknown,s=200)=>new Response(JSON.stringify(v),{status:s,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
-const member=(db:any,id:string)=>db.prepare("SELECT u.id,u.status,p.name,p.amwayId,p.center,p.approvedRank FROM users u JOIN profiles p ON p.userId=u.id WHERE u.id=?").bind(id).first();
+const member=(db:any,id:string)=>db.prepare("SELECT u.id,u.status,p.name,p.amwayId,p.center,p.rank,p.approvedRank,p.rankApproved,p.rankAuditStatus FROM users u JOIN profiles p ON p.userId=u.id WHERE u.id=?").bind(id).first();
+const effectiveRank=(row:any)=>Number(row?.rankApproved||0)===1?clean(row?.approvedRank||row?.rank):'';
 const link=(db:any,id:string)=>db.prepare("SELECT * FROM spouse_links WHERE (userA=? OR userB=?) AND status IN ('pending','active','unlink_pending') LIMIT 1").bind(id,id).first();
 async function audit(db:any,userId:string,actorId:string,before:string,after:string,fieldName='amwayId'){
   await db.prepare("INSERT INTO profile_audit_logs (id,userId,appId,actorUserId,fieldName,oldValue,newValue,createdAt) VALUES (?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),userId,'starry-id',actorId,fieldName,before,after,Date.now()).run().catch(()=>undefined);
+}
+async function syncLegacyNumber(legacyDb:any,userId:string,number:string){
+  if(!legacyDb)return;
+  try{
+    const legacy:any=await legacyDb.prepare("SELECT id FROM users WHERE id=? LIMIT 1").bind(userId).first();
+    if(legacy)await legacyDb.prepare("UPDATE users SET amwayId=? WHERE id=?").bind(number,userId).run();
+  }catch(e){
+    console.warn('legacy distributor sync skipped',{code:e instanceof Error?e.message:'unknown'});
+  }
 }
 const owner=(db:any,num:string,exclude:string)=>db.prepare("SELECT userId FROM profiles WHERE amwayId=? AND userId<>? LIMIT 1").bind(num,exclude).first();
 async function generate(db:any){
@@ -28,7 +38,7 @@ async function status(db:any,id:string){
   const visibleStatus=l?.status==='unlink_pending'?'active':l?.status;
   return {number:clean(me?.amwayId),nonDistributor:synthetic.test(clean(me?.amwayId)),spouse:l?{status:visibleStatus,partnerId,partnerName:clean(partner?.name),requestedBy:l.requestedBy,unlinkRequestedBy:visibleStatus==='active'?null:l.unlinkRequestedBy,keepUserId:visibleStatus==='active'?null:l.keepUserId}:null};
 }
-async function change(db:any,id:string,input:any){
+async function change(db:any,legacyDb:any,id:string,input:any){
   const me:any=await member(db,id);if(!me)return json({error:'找不到會員'},404);
   if(await link(db,id))return json({error:'夫妻關係處理中或已綁定，請先完成解除程序'},409);
   const now=Date.now();
@@ -46,6 +56,7 @@ async function change(db:any,id:string,input:any){
       db.prepare("INSERT INTO non_distributor_history(userId,lastNumber,updatedAt) VALUES(?,?,?) ON CONFLICT(userId) DO UPDATE SET lastNumber=excluded.lastNumber,updatedAt=excluded.updatedAt").bind(id,number,now)
     ]);}catch{return json({error:'編號產生衝突，請重試'},409);}
     await audit(db,id,id,clean(me.amwayId),number);
+    await syncLegacyNumber(legacyDb,id,number);
     return json({success:true,number,nonDistributor:true});
   }
   const number=clean(input.number);
@@ -59,11 +70,12 @@ async function change(db:any,id:string,input:any){
     if(synthetic.test(clean(me.amwayId)))updates.push(db.prepare("INSERT INTO non_distributor_history(userId,lastNumber,updatedAt) VALUES(?,?,?) ON CONFLICT(userId) DO UPDATE SET lastNumber=excluded.lastNumber,updatedAt=excluded.updatedAt").bind(id,clean(me.amwayId),now));
     await db.batch(updates);
     await audit(db,id,id,clean(me.amwayId),number);
+    await syncLegacyNumber(legacyDb,id,number);
     return json({success:true,number,nonDistributor:false});
   }
   const other:any=await member(db,duplicate.userId);
   if(!other||other.status!=='active'||await link(db,other.id))return json({error:'此編號已有夫妻關係或無法提出綁定申請'},409);
-  if(input.confirmSpouse!==true)return json({requiresConfirmation:true,number,partner:{name:clean(other.name),rank:clean(other.approvedRank)||'未審核',center:clean(other.center)||'未設定'}});
+  if(input.confirmSpouse!==true)return json({requiresConfirmation:true,number,partner:{name:clean(other.name),rank:effectiveRank(other)||'未審核',center:clean(other.center)||'未設定'}});
   const third:any=await db.prepare("SELECT COUNT(*) AS count FROM profiles WHERE amwayId=? AND userId NOT IN (?,?)").bind(number,id,other.id).first();
   if(Number(third?.count||0)>0)return json({error:'此編號已有其他會員使用，無法建立夫妻綁定'},409);
   const users=[id,other.id].sort();
@@ -78,9 +90,10 @@ async function change(db:any,id:string,input:any){
     ]);
   }catch{return json({error:'任一會員已有夫妻關係或待確認申請'},409)}
   await audit(db,id,id,clean(me.amwayId),number,'spouse-single-confirm');
-  return json({success:true,number,spouseLinked:true,partner:{name:clean(other.name),rank:clean(other.approvedRank)||'未審核',center:clean(other.center)||'未設定'}});
+  await syncLegacyNumber(legacyDb,id,number);
+  return json({success:true,number,spouseLinked:true,partner:{name:clean(other.name),rank:effectiveRank(other)||'未審核',center:clean(other.center)||'未設定'}});
 }
-async function action(db:any,id:string,input:any,isAdmin=false){
+async function action(db:any,legacyDb:any,id:string,input:any,isAdmin=false){
   const l:any=await link(db,id);if(!l)return json({error:'沒有待處理的夫妻關係'},404);
   const kind=clean(input.action),other=l.userA===id?l.userB:l.userA,now=Date.now();
   if(l.status==='pending'&&(kind==='cancel'||kind==='reject')){
@@ -98,7 +111,10 @@ async function action(db:any,id:string,input:any,isAdmin=false){
       db.prepare("UPDATE spouse_links SET status='active',updatedAt=? WHERE id=? AND status='pending'").bind(now,l.id),
       db.prepare("UPDATE profiles SET amwayId=?,updatedAt=? WHERE userId=?").bind(num,now,other),
       db.prepare("DELETE FROM non_distributor_ids WHERE userId=?").bind(other)
-    ]);await audit(db,other,id,clean(b?.amwayId),num,'spouse-approve');return json({success:true,status:'active'});
+    ]);
+    await audit(db,other,id,clean(b?.amwayId),num,'spouse-approve');
+    await syncLegacyNumber(legacyDb,other,num);
+    return json({success:true,status:'active'});
   }
   if((l.status==='active'||l.status==='unlink_pending')&&(kind==='request-unlink'||kind==='unlink')){
     const keep=clean(input.keepUserId);
@@ -127,6 +143,7 @@ async function action(db:any,id:string,input:any,isAdmin=false){
     }
     await db.batch(statements);
     await audit(db,loser,id,clean(before?.amwayId),replacement,'spouse-single-unlink');
+    await syncLegacyNumber(legacyDb,loser,replacement);
     return json({success:true,status:'unlinked',keepUserId:keep,reassignedUserId:loser,replacement,autoAssigned});
   }
   if(l.status==='unlink_pending'&&kind==='cancel-unlink'&&l.unlinkRequestedBy===id){
@@ -148,7 +165,10 @@ async function action(db:any,id:string,input:any,isAdmin=false){
     ];
     if(synthetic.test(replacement))statements.push(db.prepare("INSERT INTO non_distributor_ids(userId,number,createdAt) VALUES(?,?,?)").bind(loser,replacement,now));
     const before:any=await member(db,loser);
-    await db.batch(statements);await audit(db,loser,id,clean(before?.amwayId),replacement,'spouse-unlink');return json({success:true,status:'unlinked'});
+    await db.batch(statements);
+    await audit(db,loser,id,clean(before?.amwayId),replacement,'spouse-unlink');
+    await syncLegacyNumber(legacyDb,loser,replacement);
+    return json({success:true,status:'unlinked'});
   }
   if(kind==='admin-unlink'&&isAdmin&&l.status==='active'){
     const keep=clean(input.keepUserId);
@@ -167,7 +187,10 @@ async function action(db:any,id:string,input:any,isAdmin=false){
     ];
     if(synthetic.test(replacement))statements.push(db.prepare("INSERT INTO non_distributor_ids(userId,number,createdAt) VALUES(?,?,?)").bind(loser,replacement,now));
     const before:any=await member(db,loser);
-    await db.batch(statements);await audit(db,loser,id,clean(before?.amwayId),replacement,'spouse-admin-unlink');return json({success:true,status:'unlinked',byAdmin:true});
+    await db.batch(statements);
+    await audit(db,loser,id,clean(before?.amwayId),replacement,'spouse-admin-unlink');
+    await syncLegacyNumber(legacyDb,loser,replacement);
+    return json({success:true,status:'unlinked',byAdmin:true});
   }
   return json({error:'關係狀態不允許此操作'},409);
 }
@@ -178,15 +201,16 @@ export async function handleStarryIdSpouse(request:Request,env:Env):Promise<Resp
   if(!session)return json({error:'請先登入 Starry ID'},401);
   const origin=request.headers.get('Origin');if(origin&&origin!==url.origin)return json({error:'Origin not allowed'},403);
   const db=(env as any).STARRY_ID_DB;
+  const legacyDb=(env as any).DB;
   try{
     await ensureSpouseSchema(db);
     if(url.pathname==='/api/spouse-status'&&request.method==='GET')return json(await status(db,session.userId));
     const input=await request.clone().json().catch(()=>({}));
-    if(url.pathname==='/api/distributor-number'&&request.method==='PUT')return change(db,session.userId,input);
+    if(url.pathname==='/api/distributor-number'&&request.method==='PUT')return change(db,legacyDb,session.userId,input);
     if(url.pathname==='/api/spouse-action'&&request.method==='POST'){
       const target=clean(input.targetUserId);
       if(target&&target!==session.userId&&!session.isSuperAdmin)return json({error:'沒有管理權限'},403);
-      return action(db,target&&session.isSuperAdmin?target:session.userId,input,session.isSuperAdmin);
+      return action(db,legacyDb,target&&session.isSuperAdmin?target:session.userId,input,session.isSuperAdmin);
     }
     return json({error:'Method not allowed'},405);
   }catch(e){console.warn('spouse service failed',{code:e instanceof Error?e.message:'unknown'});return json({error:'操作失敗，請稍後再試'},503);}
