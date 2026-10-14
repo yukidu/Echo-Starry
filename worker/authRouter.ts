@@ -1,6 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import appWorker from './shareRouter';
 import { syncVerifiedMember, MemberIdentityError, normalizeMember } from './memberRepository';
+import { validateCentralProfilePatch } from './starryProfileSchemaService';
 import type { Env } from './index';
 
 const GOOGLE_CLIENT_IDS = [
@@ -120,6 +121,10 @@ async function sessionUser(request: Request, env: Env) {
   return row;
 }
 
+export async function resolveEchoSessionUser(request: Request, env: Env) {
+  return sessionUser(request, env);
+}
+
 async function verifyGoogleCredential(credential: string) {
   if (!credential || credential.split('.').length !== 3) throw new Error('缺少 Google 身分憑證');
   const { payload } = await jwtVerify(credential, GOOGLE_JWKS, {
@@ -178,7 +183,6 @@ async function handleGoogleLogin(request: Request, env: Env) {
     const code = String((error as any)?.code || '');
     const temporary = stage !== 'credential' || code === 'ERR_JWKS_TIMEOUT' || error instanceof TypeError;
     const status = error instanceof MemberIdentityError ? error.status : temporary ? 503 : 401;
-    // Never log credentials, profiles or session tokens.
     console.warn('Google login failed', { requestId, stage, status, code, elapsedMs: Date.now() - startedAt });
     return json({ requestId, code: status === 503 ? 'LOGIN_SERVICE_UNAVAILABLE' : 'LOGIN_REJECTED',
       error: error instanceof MemberIdentityError ? error.message : status === 503
@@ -261,11 +265,13 @@ async function authorizeAndRewrite(request: Request, env: Env, user: any) {
     const targetId = decodeURIComponent(userWrite[1]);
     if (!isSuperAdmin(user) && targetId !== String(user.id)) return json({ error: '只能修改自己的基本資料' }, 403);
     const body = await requestBody(request);
+    const validation = await validateCentralProfilePatch(env as any, body);
+    if (!validation.ok) return json({ error: validation.error, field: validation.field, schemaVersion: validation.version }, 400);
     if (isSuperAdmin(user)) return jsonRequest(request, body);
 
     const safeKeys = new Set([
       'name', 'avatar', 'phone', 'amwayId', 'center', 'rank', 'joinReason', 'stayReason',
-      'sponsor', 'platinumUpline', 'diamondUpline', 'birthDate', 'birthday', 'notes',
+      'sponsor', 'platinumUpline', 'diamondUpline', 'birthDate', 'birthday', 'notes', 'motto',
       'residence', 'zodiac', 'talentNumber', 'lifeNumber', 'profileEditCount', 'profileEditMonth',
       'avatarUploadCount', 'avatarUploadMonth', 'rankUpdatedAt'
     ]);
@@ -360,7 +366,6 @@ export default {
       return json({ authenticated: true, user: normalizeMember(publicUser), sessionExpiresAt: __sessionExpiresAt });
     }
 
-    // Private member fields are available only to the owner or authorized staff.
     if (method === 'GET' && ['/api/users', '/api/users/profile', '/api/users/activity-logs'].includes(path)) {
       const user = await sessionUser(request, env);
       if (!user) return json({ error: '請先登入會員' }, 401);

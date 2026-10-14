@@ -29,25 +29,38 @@ jobs:
           failed=0
           total=0
           passed=0
+          mkdir -p /tmp/regression-output
+          : > /tmp/regression-output/failures.txt
           for test_file in tests/*.test.ts; do
             total=$((total + 1))
+            test_name=$(basename "${test_file}")
             echo ""
             echo "============================================================"
             echo "TEST FILE: ${test_file}"
             echo "============================================================"
-            node --import tsx --test "${test_file}"
-            status=$?
+            node --import tsx --test "${test_file}" 2>&1 | tee "/tmp/regression-output/${test_name}.log"
+            status=${PIPESTATUS[0]}
             if [ ${status} -eq 0 ]; then
               passed=$((passed + 1))
               echo "PASS: ${test_file}"
             else
               failed=1
+              echo "${test_file}" >> /tmp/regression-output/failures.txt
               echo "FAIL: ${test_file} (exit ${status})"
             fi
           done
           echo ""
-          echo "Regression files passed: ${passed}/${total}"
+          echo "Regression files passed: ${passed}/${total}" | tee /tmp/regression-output/summary.txt
           exit ${failed}
+
+      - name: Upload regression failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-output-${{ github.sha }}
+          path: /tmp/regression-output
+          if-no-files-found: error
+          retention-days: 1
 
       - name: TypeScript diagnostic
         if: always()
