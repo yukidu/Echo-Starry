@@ -21,13 +21,10 @@ test('track aggregates are canonicalized from source-of-truth fields', () => {
 });
 
 test('new tracks do not receive a synthetic five-star rating', () => {
-  const start = favoriteRouter.indexOf('if (isCreate) {');
-  const end = favoriteRouter.indexOf('return { body: nextBody, names };', start);
-  assert.ok(start >= 0 && end > start);
-  const createPolicy = favoriteRouter.slice(start, end);
-  assert.match(createPolicy, /canonicalRating\(nextBody\.ratings\)/);
-  assert.match(createPolicy, /nextBody\.commentsCount = 0/);
-  assert.doesNotMatch(createPolicy, /rating\s*=\s*5/);
+  assert.match(favoriteRouter, /canonicalRating\(nextBody\.ratings\)/);
+  assert.match(favoriteRouter, /nextBody\.commentsCount = 0/);
+  assert.doesNotMatch(favoriteRouter, /nextBody\.rating\s*=\s*5/);
+  assert.doesNotMatch(favoriteRouter, /nextBody\.ratingCount\s*=\s*1/);
 });
 
 test('dislike reuses card speaker and hides optimistically before persistence', () => {
