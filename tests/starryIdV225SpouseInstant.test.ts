@@ -4,11 +4,12 @@ import { readFileSync } from 'node:fs';
 const backend=readFileSync('worker/starryIdSpouseRouter.ts','utf8');
 const frontend=readFileSync('worker/starryIdV222Enhancer.ts','utf8');
 
-test('duplicate distributor number previews the partner name rank and center',()=>{
- assert.match(backend,/p\.name,p\.amwayId,p\.center,p\.approvedRank/);
+test('duplicate distributor number previews the partner name effective approved rank and center',()=>{
+ assert.match(backend,/p\.name,p\.amwayId,p\.center,p\.rank,p\.approvedRank,p\.rankApproved,p\.rankAuditStatus/);
+ assert.match(backend,/effectiveRank=\(row:any\)=>Number\(row\?\.rankApproved\|\|0\)===1\?clean\(row\?\.approvedRank\|\|row\?\.rank\):''/);
  assert.match(backend,/requiresConfirmation:true/);
  assert.match(backend,/name:clean\(other\.name\)/);
- assert.match(backend,/rank:clean\(other\.approvedRank\)/);
+ assert.match(backend,/rank:effectiveRank\(other\)\|\|'未審核'/);
  assert.match(backend,/center:clean\(other\.center\)/);
  assert.match(frontend,/\['姓名',partner\.name\]/);
  assert.match(frontend,/\['獎銜',partner\.rank\]/);
