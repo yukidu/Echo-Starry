@@ -123,6 +123,30 @@ function withPrivacyHeaders(response: Response): Response {
   });
 }
 
+async function withV228SpouseUnlinkCopy(request: Request, response: Response): Promise<Response> {
+  const url = new URL(request.url);
+  if (
+    url.hostname !== 'id.starry.phd' ||
+    request.method.toUpperCase() !== 'GET' ||
+    (url.pathname !== '/' && url.pathname !== '/my-card') ||
+    !(response.headers.get('Content-Type') || '').includes('text/html')
+  ) return response;
+
+  const html = (await response.text())
+    .replace(
+      '解除夫妻關係：按「確定」由你保留原直銷商編號；按「取消」由對方保留。下一步仍需另一方確認。',
+      '解除夫妻關係：按「確定」由你保留原直銷商編號；按「取消」由對方保留。解除後立即生效，不需要另一方確認。'
+    )
+    .replace('已提出解除申請，待另一位會員確認', '夫妻關係已解除');
+  const headers = new Headers(response.headers);
+  headers.delete('Content-Length');
+  return new Response(html, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
 function scheduleStarrySync(ctx: any, env: Env, userId: string, actorUserId: string, reason: string) {
   if (!userId || !(env as any).STARRY_ID_DB) return;
   const task = syncEchoMemberToStarryBestEffort(env as any, userId, actorUserId, reason);
@@ -219,7 +243,8 @@ export default {
         request,
         starryV212Response || starryV211Response
       );
-      return withPrivacyHeaders(enhancedStarryIdResponse);
+      const v228StarryIdResponse = await withV228SpouseUnlinkCopy(request, enhancedStarryIdResponse);
+      return withPrivacyHeaders(v228StarryIdResponse);
     }
 
     // Starry ID owns id.starry.phd only. Keeping privacyCrawlerRouter as the
