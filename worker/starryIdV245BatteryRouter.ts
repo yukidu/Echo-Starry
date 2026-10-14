@@ -1,5 +1,6 @@
 import type { Env } from './index';
 import { sessionContext } from './starryIdProfileDirectoryRouter';
+import { handleStarryIdV230Client } from './starryIdV230ClientRouter';
 import { unitsToBatteries } from '../shared/battery';
 
 const STAR_DOMAIN = 'id.starry.phd';
@@ -33,6 +34,36 @@ function appLabel(appId: unknown) {
 function formatBattery(units: unknown) {
   const amount = unitsToBatteries(Number(units || 0));
   return Number.isInteger(amount) ? String(amount) : amount.toFixed(1).replace(/\.0$/, '');
+}
+
+export function stabilizeStarryIdV230ClientSource(source: string) {
+  return source
+    .replace(
+      "if(display){display.textContent=next||'尚未填寫';display.classList.toggle('empty',!next)}",
+      "if(display){const nextText=next||'尚未填寫';if(display.textContent!==nextText)display.textContent=nextText;const empty=!next;if(display.classList.contains('empty')!==empty)display.classList.toggle('empty',empty)}"
+    )
+    .replace(
+      "async function syncV242ProfileFields(){const emailSource=q('#displayEmail');if(emailSource)emailSource.style.display='none';",
+      "async function syncV242ProfileFields(){const emailSource=q('#displayEmail');if(emailSource&&emailSource.style.display!=='none')emailSource.style.display='none';"
+    )
+    .replace(
+      'let rankTimer=0;function scheduleRank(){clearTimeout(rankTimer);rankTimer=setTimeout(syncRank,260)}',
+      'let rankTimer=0;function scheduleRank(){if(rankTimer)return;rankTimer=setTimeout(()=>{rankTimer=0;void syncRank()},260)}'
+    )
+    .replace(
+      "const observer=new MutationObserver(sync);observer.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['class','hidden']});sync();void syncRank();setInterval(()=>syncBell(true),45000);",
+      "let observerTimer=0;function scheduleSync(){if(observerTimer)return;observerTimer=setTimeout(()=>{observerTimer=0;sync()},32)}const observer=new MutationObserver(scheduleSync);observer.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['class','hidden']});sync();void syncRank();setInterval(()=>syncBell(true),45000);"
+    );
+}
+
+async function stabilizedV230Client(request: Request, env: Env) {
+  const response = await handleStarryIdV230Client(request, env);
+  if (!response) return null;
+  const source = stabilizeStarryIdV230ClientSource(await response.text());
+  const headers = new Headers(response.headers);
+  headers.delete('Content-Length');
+  headers.set('Cache-Control','no-store');
+  return new Response(source,{status:response.status,statusText:response.statusText,headers});
 }
 
 async function ensureSchema(env: Env) {
@@ -176,6 +207,7 @@ const CLIENT_SOURCE = `(()=>{
 export async function handleStarryIdV245Battery(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
   if (url.hostname !== STAR_DOMAIN) return null;
+  if (url.pathname === '/starry-id-v230.js' && request.method === 'GET') return stabilizedV230Client(request, env);
   if (url.pathname === '/starry-id-v245.js' && request.method === 'GET') return new Response(CLIENT_SOURCE,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow'}});
   if (url.pathname === '/battery-ledger' && request.method === 'GET') {
     const session = await sessionContext(request, env);
