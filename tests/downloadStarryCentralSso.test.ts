@@ -88,6 +88,6 @@ test('privacy entry routes central app SSO before generic Starry ID router', asy
   const genericIndex = privacy.indexOf('handleStarryIdCentral(request');
   assert.ok(centralIndex >= 0 && genericIndex > centralIndex);
   assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
-  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,downloadstarry,gostarry,quotes"/);
-  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,downloadstarry,gostarry,quotes"/);
+  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,downloadstarry,gostarry,quotes,boxstarry"/);
+  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,downloadstarry,gostarry,quotes,boxstarry"/);
 });
