@@ -45,3 +45,5 @@ test('privacy entrypoint handles theme API before v211 and enhances final Starry
   assert.match(privacyRouter, /starryV251Direct/);
   assert.match(privacyRouter, /v251StarryIdResponse/);
 });
+
+// v251 regression guard: fixed themes must stay distinct without whole-page mutation watching.
