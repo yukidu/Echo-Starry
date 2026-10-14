@@ -156,13 +156,7 @@ function ledgerPage() {
 const CLIENT_SOURCE = `(()=>{
   if(window.__starryV245)return;window.__starryV245=true;
   const q=(s,r=document)=>r.querySelector(s),qa=(s,r=document)=>Array.from(r.querySelectorAll(s));
-  const APPS=[
-    ['繁星宇宙','https://starry.phd'],['Starry ID','https://id.starry.phd'],['繁星回聲','https://echo.starry.phd'],
-    ['繁星下載','https://download.starry.phd'],['繁星任意門','https://go.starry.phd'],['繁星雞湯','https://quotes.starry.phd'],
-    ['繁星膠囊','https://box.starry.phd'],['美力之星','https://starbeauty.yukidu.workers.dev']
-  ];
   async function api(path,opt={}){const r=await fetch(path,{credentials:'same-origin',...opt,headers:{'Content-Type':'application/json',...(opt.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'操作失敗');return d}
-  function syncMenu(){const menu=q('.v216-menu');if(!menu||menu.dataset.v245==='1')return;menu.dataset.v245='1';for(const a of qa(':scope > a',menu))a.remove();const anchor=q(':scope > button',menu)||menu.firstChild;const frag=document.createDocumentFragment();for(const [name,url] of APPS){const a=document.createElement('a');a.href=url;a.textContent=name;frag.append(a)}const ledger=document.createElement('a');ledger.href='/battery-ledger';ledger.textContent='🔋 電池餘額日誌';frag.append(ledger);menu.insertBefore(frag,anchor)}
   let sessionId='',lastTarget='',loading=false,visibility=null,balanceCache=new Map();
   function targetId(){return q('.member-item.active')?.dataset?.id||sessionId||''}
   function eyeSvg(visible){return visible?'👁':'⊘'}
@@ -171,8 +165,8 @@ const CLIENT_SOURCE = `(()=>{
   async function toggleBatteryEye(button){const before=button.dataset.visible!=='0',next=!before;paintEye(button,next);feedback(button,'電池數量',next);try{const d=await api('/api/card-settings',{method:'PUT',body:JSON.stringify({visibility:{battery:next}})});visibility=d.visibility||visibility}catch(e){paintEye(button,before)}}
   function upsert(root,value,own){let card=q('.field[data-v245-battery="1"]',root);if(!card){card=document.createElement('div');card.className='field readonly v242-readonly';card.dataset.v245Battery='1';card.dataset.field='v245Battery';const l=document.createElement('div');l.className='field-label';l.textContent='電池數量';const v=document.createElement('div');v.className='field-value';const hint=document.createElement('div');hint.className='field-hint';hint.textContent='中央電池餘額，無法手動修改';card.append(l,v,hint);root.append(card)}const v=q('.field-value',card);const nextText=String(value)+' 顆';if(v.textContent!==nextText)v.textContent=nextText;if(v.classList.contains('empty'))v.classList.remove('empty');let eye=q('.v245-battery-eye',card);if(own){const visible=visibility?.battery!==false;if(!eye){eye=document.createElement('button');eye.type='button';eye.className='v241-eye v245-battery-eye';eye.dataset.v241Eye='1';eye.title='控制電池數量是否顯示在公開名片';eye.onclick=e=>{e.preventDefault();e.stopPropagation();toggleBatteryEye(eye)};card.append(eye)}paintEye(eye,visible)}else eye?.remove()}
   async function syncBattery(){const root=q('#fields');const target=targetId();if(!root||!sessionId||!target||loading)return;const own=target===sessionId;if(lastTarget!==target){lastTarget=target;visibility=null}loading=true;try{if(own&&!visibility){const s=await api('/api/card-settings');visibility=s.visibility||{}}let data=balanceCache.get(target);if(!data){data=await api('/api/battery-ledger/summary?targetUserId='+encodeURIComponent(target));balanceCache.set(target,data)}upsert(root,data.balance,own)}catch{}finally{loading=false}}
-  let timer=0;function scheduleBattery(){if(timer)return;timer=setTimeout(()=>{timer=0;void syncBattery()},40)}function sync(){syncMenu();scheduleBattery()}
-  new MutationObserver(mutations=>{const relevant=mutations.some(m=>{const target=m.target instanceof Element?m.target:m.target.parentElement;return !target?.closest?.('[data-v245-battery="1"],.v245-feedback')});if(relevant)sync()}).observe(document.documentElement,{childList:true,subtree:true});
+  let timer=0;function scheduleBattery(){if(timer)return;timer=setTimeout(()=>{timer=0;void syncBattery()},40)}function sync(){scheduleBattery()}
+  new MutationObserver(mutations=>{const relevant=mutations.some(m=>{const target=m.target instanceof Element?m.target:m.target.parentElement;if(target?.closest?.('[data-v245-battery="1"],.v245-feedback,.v216-menu,.topbar'))return false;const nodes=[...m.addedNodes,...m.removedNodes].filter(n=>n instanceof Element);if(nodes.length&&nodes.every(n=>n.matches?.('.v216-menu')||n.closest?.('.v216-menu')))return false;return true});if(relevant)scheduleBattery()}).observe(document.documentElement,{childList:true,subtree:true});
   document.addEventListener('pointerdown',e=>{if(!e.target.closest?.('.v245-battery-eye'))q('.v245-feedback')?.remove()},true);
   api('/api/session').then(d=>{sessionId=d.user?.id||'';sync()}).catch(()=>undefined);sync();
 })();`;
