@@ -108,9 +108,6 @@ async function action(db:any,id:string,input:any,isAdmin=false){
       db.prepare("UPDATE profiles SET amwayId=?,updatedAt=? WHERE userId=?").bind(replacement,now,loser),
       db.prepare("DELETE FROM spouse_links WHERE id=?").bind(l.id),
       db.prepare("DELETE FROM spouse_slots WHERE linkId=?").bind(l.id),
-      db.prepare("DELETE FROM spouse_slots WHERE linkId=?").bind(l.id),
-      db.prepare("DELETE FROM spouse_slots WHERE linkId=?").bind(l.id),
-      db.prepare("DELETE FROM spouse_slots WHERE linkId=?").bind(l.id),
       db.prepare("DELETE FROM non_distributor_ids WHERE userId=?").bind(loser)
     ];
     if(synthetic.test(replacement))statements.push(db.prepare("INSERT INTO non_distributor_ids(userId,number,createdAt) VALUES(?,?,?)").bind(loser,replacement,now));
@@ -129,6 +126,7 @@ async function action(db:any,id:string,input:any,isAdmin=false){
     const statements=[
       db.prepare("UPDATE profiles SET amwayId=?,updatedAt=? WHERE userId=?").bind(replacement,now,loser),
       db.prepare("DELETE FROM spouse_links WHERE id=?").bind(l.id),
+      db.prepare("DELETE FROM spouse_slots WHERE linkId=?").bind(l.id),
       db.prepare("DELETE FROM non_distributor_ids WHERE userId=?").bind(loser)
     ];
     if(synthetic.test(replacement))statements.push(db.prepare("INSERT INTO non_distributor_ids(userId,number,createdAt) VALUES(?,?,?)").bind(loser,replacement,now));
