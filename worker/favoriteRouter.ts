@@ -312,8 +312,10 @@ async function realLeaderboard(db: any) {
   }
 
   const ranked = (counts: Map<string, number>) => [...counts.entries()]
-    .map(([id, count]) => ({ user: userById.get(id), count }))
-    .filter((entry): entry is { user: ReturnType<typeof leaderboardUser>; count: number } => Boolean(entry.user) && entry.count > 0)
+    .flatMap(([id, count]) => {
+      const user = userById.get(id);
+      return user && count > 0 ? [{ user, count }] : [];
+    })
     .sort((a, b) => b.count - a.count || a.user.name.localeCompare(b.user.name, 'zh-Hant'))
     .slice(0, 5);
 
