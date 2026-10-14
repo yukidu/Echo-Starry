@@ -133,12 +133,15 @@ async function withV228SpouseUnlinkCopy(request: Request, response: Response): P
     !(response.headers.get('Content-Type') || '').includes('text/html')
   ) return response;
 
-  const html = (await response.text())
+  let html = (await response.text())
     .replace(
       '解除夫妻關係：按「確定」由你保留原直銷商編號；按「取消」由對方保留。下一步仍需另一方確認。',
       '解除夫妻關係：按「確定」由你保留原直銷商編號；按「取消」由對方保留。解除後立即生效，不需要另一方確認。'
     )
     .replace('已提出解除申請，待另一位會員確認', '夫妻關係已解除');
+  if (!html.includes('/starry-id-v230.js')) {
+    html = html.replace('</body>', '<script src="/starry-id-v230.js"></script></body>');
+  }
   const headers = new Headers(response.headers);
   headers.delete('Content-Length');
   return new Response(html, {
