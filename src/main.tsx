@@ -9,6 +9,7 @@ import './taiwanCrownMenuLink';
 import './v181PreviewProductionReadBridge';
 import './v181HomeToolbarDislike';
 import './v189PlaybackSwitchConfirm';
+import './memberProfileSchemaBridge';
 
 {
   const legacyUrl = new URL(window.location.href);
