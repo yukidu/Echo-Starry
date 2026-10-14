@@ -190,12 +190,12 @@ async function searchDirectory(request: Request, env: Env) {
   const excludeUserId = text(url.searchParams.get('excludeUserId'));
   const like = `%${query}%`;
   const db = (env as any).STARRY_ID_DB;
-  const rows: any = await db.prepare(`SELECT u.id,p.name,p.amwayId,p.avatar,p.googleAvatar,p.rank,p.approvedRank,p.rankApproved
+  const rows: any = await db.prepare(`SELECT u.id,p.name,p.amwayId,p.avatar,p.googleAvatar,p.center,p.rank,p.approvedRank,p.rankApproved
     FROM users u LEFT JOIN profiles p ON p.userId=u.id
     WHERE u.status='active'
       AND (LOWER(COALESCE(p.name,'')) LIKE LOWER(?) OR LOWER(COALESCE(p.amwayId,'')) LIKE LOWER(?))
     ORDER BY LOWER(COALESCE(p.name,'')),LOWER(COALESCE(p.amwayId,''))
-    LIMIT 100`).bind(like, like).all();
+    LIMIT 250`).bind(like, like).all();
   const members = (rows?.results || [])
     .filter((row: any) => !excludeUserId || text(row.id) !== excludeUserId)
     .map((row: any) => ({
@@ -203,11 +203,12 @@ async function searchDirectory(request: Request, env: Env) {
       name: text(row.name),
       amwayId: text(row.amwayId),
       avatar: text(row.avatar || row.googleAvatar),
+      center: text(row.center),
       approvedRank: Number(row.rankApproved || 0) === 1 ? text(row.approvedRank || row.rank) : ''
     }))
     .filter((row: any) => Boolean(row.name || row.amwayId))
     .filter((row: any) => eligibleRank(field, row.approvedRank))
-    .slice(0, 20);
+    .slice(0, 40);
   return json(request, { members });
 }
 
