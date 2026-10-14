@@ -25,7 +25,8 @@ async function status(db:any,id:string){
   const me:any=await member(db,id),l:any=await link(db,id);
   const partnerId=l?(l.userA===id?l.userB:l.userA):'';
   const partner:any=partnerId?await member(db,partnerId):null;
-  return {number:clean(me?.amwayId),nonDistributor:synthetic.test(clean(me?.amwayId)),spouse:l?{status:l.status,partnerId,partnerName:clean(partner?.name),requestedBy:l.requestedBy,unlinkRequestedBy:l.unlinkRequestedBy,keepUserId:l.keepUserId}:null};
+  const visibleStatus=l?.status==='unlink_pending'?'active':l?.status;
+  return {number:clean(me?.amwayId),nonDistributor:synthetic.test(clean(me?.amwayId)),spouse:l?{status:visibleStatus,partnerId,partnerName:clean(partner?.name),requestedBy:l.requestedBy,unlinkRequestedBy:visibleStatus==='active'?null:l.unlinkRequestedBy,keepUserId:visibleStatus==='active'?null:l.keepUserId}:null};
 }
 async function change(db:any,id:string,input:any){
   const me:any=await member(db,id);if(!me)return json({error:'找不到會員'},404);
@@ -99,15 +100,34 @@ async function action(db:any,id:string,input:any,isAdmin=false){
       db.prepare("DELETE FROM non_distributor_ids WHERE userId=?").bind(other)
     ]);await audit(db,other,id,clean(b?.amwayId),num,'spouse-approve');return json({success:true,status:'active'});
   }
-  if(l.status==='active'&&kind==='request-unlink'){
+  if((l.status==='active'||l.status==='unlink_pending')&&(kind==='request-unlink'||kind==='unlink')){
     const keep=clean(input.keepUserId);
     if(keep!==id&&keep!==other)return json({error:'請指定解除後誰保留原編號'},400);
-    const replacement=clean(input.replacement);
-    if(keep!==id&&!replacement)return json({error:'請先選擇自己的新編號或非直銷商'},400);
-    if(replacement&&replacement!=='nonDistributor'&&!numeric.test(replacement))return json({error:'新編號只能是純數字'},400);
-    if(replacement&&replacement!=='nonDistributor'&&await owner(db,replacement,id))return json({error:'新編號已有人使用'},409);
-    await db.prepare("UPDATE spouse_links SET status='unlink_pending',unlinkRequestedBy=?,keepUserId=?,replacement=?,updatedAt=? WHERE id=?").bind(id,keep,replacement,now,l.id).run();
-    return json({success:true,status:'unlink_pending'});
+    const loser=keep===l.userA?l.userB:l.userA;
+    let replacement=clean(input.replacement);
+    const autoAssigned=loser!==id;
+    if(autoAssigned){
+      replacement=await generate(db);
+    }else{
+      if(!replacement)return json({error:'若由對方保留原編號，請先選擇自己的新編號或非直銷商'},400);
+      if(replacement==='nonDistributor')replacement=await generate(db);
+      else if(!numeric.test(replacement))return json({error:'新編號只能是純數字'},400);
+      if(await owner(db,replacement,loser))return json({error:'新編號已有人使用'},409);
+    }
+    const before:any=await member(db,loser);
+    const statements=[
+      db.prepare("UPDATE profiles SET amwayId=?,updatedAt=? WHERE userId=?").bind(replacement,now,loser),
+      db.prepare("DELETE FROM spouse_links WHERE id=?").bind(l.id),
+      db.prepare("DELETE FROM spouse_slots WHERE linkId=?").bind(l.id),
+      db.prepare("DELETE FROM non_distributor_ids WHERE userId=?").bind(loser)
+    ];
+    if(synthetic.test(replacement)){
+      statements.push(db.prepare("INSERT INTO non_distributor_ids(userId,number,createdAt) VALUES(?,?,?)").bind(loser,replacement,now));
+      statements.push(db.prepare("INSERT INTO non_distributor_history(userId,lastNumber,updatedAt) VALUES(?,?,?) ON CONFLICT(userId) DO UPDATE SET lastNumber=excluded.lastNumber,updatedAt=excluded.updatedAt").bind(loser,replacement,now));
+    }
+    await db.batch(statements);
+    await audit(db,loser,id,clean(before?.amwayId),replacement,'spouse-single-unlink');
+    return json({success:true,status:'unlinked',keepUserId:keep,reassignedUserId:loser,replacement,autoAssigned});
   }
   if(l.status==='unlink_pending'&&kind==='cancel-unlink'&&l.unlinkRequestedBy===id){
     await db.prepare("UPDATE spouse_links SET status='active',unlinkRequestedBy=NULL,keepUserId=NULL,replacement=NULL WHERE id=?").bind(l.id).run();return json({success:true,status:'active'});
