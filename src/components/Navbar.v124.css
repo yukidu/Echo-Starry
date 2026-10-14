@@ -228,11 +228,11 @@ header.sticky.top-0 button[data-main-menu='hamburger']:active {
   transform: scale(0.95) !important;
 }
 
-/* 漢堡面板：右上方微縮＋上移＋淡入，19 秒不是持續動畫而是單次 0.19 秒進場。 */
+/* 漢堡面板：右上方微縮＋上移＋淡入，單次 0.19 秒進場。v239 將背景穿透感降低約 50%。 */
 .mobile-menu-panel {
   border-radius: 18px !important;
   border-color: rgb(255 255 255 / 0.42) !important;
-  background: rgb(255 255 255 / 0.76) !important;
+  background: rgb(255 255 255 / 0.88) !important;
   box-shadow: 0 24px 64px rgb(15 23 42 / 0.24), 0 0 0 1px rgb(255 255 255 / 0.18) !important;
   -webkit-backdrop-filter: blur(18px) saturate(150%) !important;
   backdrop-filter: blur(18px) saturate(150%) !important;
@@ -242,7 +242,7 @@ header.sticky.top-0 button[data-main-menu='hamburger']:active {
 
 .dark .mobile-menu-panel {
   border-color: rgb(148 163 184 / 0.20) !important;
-  background: rgb(15 23 42 / 0.78) !important;
+  background: rgb(15 23 42 / 0.89) !important;
   box-shadow: 0 26px 70px rgb(0 0 0 / 0.48), 0 0 0 1px rgb(148 163 184 / 0.10) !important;
 }
 
