@@ -629,6 +629,7 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
       const user = await updateProfile(env, session.member.id, session.member.id, session.appId, changes, session.isSuperAdmin);
       return json(request, { success: true, user });
     } catch (error) {
+      if (error instanceof Error && error.message === 'distributor_number_requires_dedicated_endpoint') return json(request, { error: '請使用非直銷商／夫妻綁定專用欄位修改直銷商編號' }, 409);
       console.warn('Starry ID profile update failed', {
         code: error instanceof Error ? error.message : 'unknown'
       });
@@ -660,6 +661,7 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
       const user = await updateProfile(env, targetUserId, session.member.id, 'starry-id', changes, true);
       return json(request, { success: true, user });
     } catch (error) {
+      if (error instanceof Error && error.message === 'distributor_number_requires_dedicated_endpoint') return json(request, { error: '請使用非直銷商／夫妻綁定專用欄位修改直銷商編號' }, 409);
       console.warn('Starry ID admin profile update failed', {
         code: error instanceof Error ? error.message : 'unknown'
       });
