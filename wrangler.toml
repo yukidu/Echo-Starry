@@ -23,7 +23,7 @@ custom_domain = true
 pattern = "id.starry.phd"
 custom_domain = true
 
-# 保留原本 Cloudflare 建置流程；回歸測試由 GitHub Actions額外把關。
+# 保留原本 Cloudflare 建置流程；回歸測試由 GitHub Actions 額外把關。
 [build]
 command = "npm run build"
 
