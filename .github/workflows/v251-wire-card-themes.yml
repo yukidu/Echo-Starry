@@ -1,0 +1,51 @@
+name: v251 wire card themes
+
+on:
+  push:
+    branches:
+      - safe/v251-card-themes
+    paths:
+      - .github/workflows/v251-wire-card-themes.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: safe/v251-card-themes
+      - name: Wire v251 card theme router and enhancer
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('worker/privacyCrawlerRouter.ts')
+          text = path.read_text()
+          import_needle = "import { handleStarryIdV245Battery, enhanceStarryIdV245Response } from './starryIdV245BatteryRouter';\n"
+          import_line = import_needle + "import { handleStarryIdV251CardTheme, enhanceStarryIdV251CardThemeResponse } from './starryIdV251CardThemes';\n"
+          if 'starryIdV251CardThemes' not in text:
+              assert import_needle in text
+              text = text.replace(import_needle, import_line, 1)
+
+          fetch_needle = "    const url = new URL(request.url);\n\n    // v245 Starry ID battery routes are isolated to id.starry.phd and handled\n"
+          fetch_insert = "    const url = new URL(request.url);\n\n    // v251 public-card visual style API is isolated to Starry ID and must run before v211.\n    const starryV251Direct = await handleStarryIdV251CardTheme(request, env as any);\n    if (starryV251Direct) return withPrivacyHeaders(starryV251Direct);\n\n    // v245 Starry ID battery routes are isolated to id.starry.phd and handled\n"
+          if 'const starryV251Direct' not in text:
+              assert fetch_needle in text
+              text = text.replace(fetch_needle, fetch_insert, 1)
+
+          return_needle = "      const v245StarryIdResponse = await enhanceStarryIdV245Response(request, v228StarryIdResponse, env);\n      return withPrivacyHeaders(v245StarryIdResponse);\n"
+          return_insert = "      const v245StarryIdResponse = await enhanceStarryIdV245Response(request, v228StarryIdResponse, env);\n      const v251StarryIdResponse = await enhanceStarryIdV251CardThemeResponse(\n        request,\n        v245StarryIdResponse,\n        env as any\n      );\n      return withPrivacyHeaders(v251StarryIdResponse);\n"
+          if 'const v251StarryIdResponse' not in text:
+              assert return_needle in text
+              text = text.replace(return_needle, return_insert, 1)
+          path.write_text(text)
+          PY
+          git rm .github/workflows/v251-wire-card-themes.yml
+          git config user.name 'Starry Engineering Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add worker/privacyCrawlerRouter.ts
+          git commit -m 'v251: wire card theme API and response enhancer'
+          git push origin HEAD:safe/v251-card-themes
