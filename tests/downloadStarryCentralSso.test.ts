@@ -37,7 +37,36 @@ test('Go Starry central login uses the same Starry ID ticket flow', async () => 
   assert.match(html, /https:\/\/go\.starry\.phd/);
 });
 
-test('central SSO stores one-time codes in Starry ID D1 for registered apps', async () => {
+test('Quotes central login returns to quotes.starry.phd and uses identity-only flow', async () => {
+  const response = await handleDownloadStarryCentralSso(
+    new Request('https://id.starry.phd/auth/quotes'),
+    {} as any
+  );
+  assert.ok(response);
+  assert.equal(response?.status, 200);
+  const html = await response!.text();
+  assert.match(html, /Starry ID × 繁星語錄/);
+  assert.match(html, /\/api\/google-sync/);
+  assert.match(html, /\/api\/apps\/quotes\/identity/);
+  assert.match(html, /https:\/\/quotes\.starry\.phd/);
+  assert.match(html, /IDENTITY_ONLY=true/);
+});
+
+test('Quotes identity endpoint is credentialed only for the Quotes origin and exposes minimal profile fields', async () => {
+  const source = await read('worker/downloadStarryCentralSso.ts');
+  assert.match(source, /const QUOTES_ORIGIN = 'https:\/\/quotes\.starry\.phd'/);
+  assert.match(source, /Access-Control-Allow-Credentials', 'true'/);
+  assert.match(source, /Access-Control-Allow-Origin', QUOTES_ORIGIN/);
+  assert.match(source, /name: text\(member\.name\)/);
+  assert.match(source, /rank: text\(member\.rank\)/);
+  assert.match(source, /approvedRank: text\(member\.approvedRank\)/);
+  const endpointBlock = source.slice(source.indexOf('async function quotesIdentity'), source.indexOf('async function issueTicket'));
+  assert.doesNotMatch(endpointBlock, /email:/);
+  assert.doesNotMatch(endpointBlock, /phone:/);
+  assert.doesNotMatch(endpointBlock, /birthday:/);
+});
+
+test('central SSO stores one-time codes in Starry ID D1 for ticket-based registered apps', async () => {
   const source = await read('worker/downloadStarryCentralSso.ts');
   assert.match(source, /STARRY_ID_DB/);
   assert.match(source, /starry_app_auth_codes/);
@@ -57,6 +86,6 @@ test('privacy entry routes central app SSO before generic Starry ID router', asy
   const genericIndex = privacy.indexOf('handleStarryIdCentral(request');
   assert.ok(centralIndex >= 0 && genericIndex > centralIndex);
   assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
-  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,downloadstarry,gostarry"/);
-  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,downloadstarry,gostarry"/);
+  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,downloadstarry,gostarry,quotes"/);
+  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,downloadstarry,gostarry,quotes"/);
 });
