@@ -1,4 +1,5 @@
 import type { Env } from './index';
+import { ensureSpouseSchema } from './starryIdSpouseSchema';
 
 const STAR_DOMAIN = 'id.starry.phd';
 const SESSION_COOKIE = 'starry_id_session';
@@ -154,7 +155,7 @@ function configuredSuperAdminEmails(env: Env) {
   return new Set((raw ? raw.split(',') : ['yukidu@gmail.com']).map(item => item.trim().toLowerCase()).filter(Boolean));
 }
 
-async function sessionContext(request: Request, env: Env) {
+export async function sessionContext(request: Request, env: Env) {
   const db = (env as any).STARRY_ID_DB;
   if (!db) return null;
   const token = cookieValue(request, SESSION_COOKIE);
@@ -190,7 +191,9 @@ async function searchDirectory(request: Request, env: Env) {
   const excludeUserId = text(url.searchParams.get('excludeUserId'));
   const like = `%${query}%`;
   const db = (env as any).STARRY_ID_DB;
-  const rows: any = await db.prepare(`SELECT u.id,p.name,p.amwayId,p.avatar,p.googleAvatar,p.center,p.rank,p.approvedRank,p.rankApproved
+  await ensureSpouseSchema(db);
+  const rows: any = await db.prepare(`SELECT u.id,p.name,p.amwayId,p.avatar,p.googleAvatar,p.center,p.rank,p.approvedRank,p.rankApproved,
+      (SELECT pp.name FROM spouse_links sl JOIN profiles pp ON pp.userId=CASE WHEN sl.userA=u.id THEN sl.userB ELSE sl.userA END WHERE sl.status='active' AND (sl.userA=u.id OR sl.userB=u.id) LIMIT 1) AS spouseName
     FROM users u LEFT JOIN profiles p ON p.userId=u.id
     WHERE u.status='active'
       AND (LOWER(COALESCE(p.name,'')) LIKE LOWER(?) OR LOWER(COALESCE(p.amwayId,'')) LIKE LOWER(?))
@@ -201,6 +204,7 @@ async function searchDirectory(request: Request, env: Env) {
     .map((row: any) => ({
       id: text(row.id),
       name: text(row.name),
+      displayName: field === 'sponsor' ? text(row.name) : [text(row.name),text(row.spouseName)].filter(Boolean).join('&'),
       amwayId: text(row.amwayId),
       avatar: text(row.avatar || row.googleAvatar),
       center: text(row.center),
