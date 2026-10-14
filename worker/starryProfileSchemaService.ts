@@ -51,6 +51,21 @@ const FALLBACK_OPTIONS: Record<string, string[]> = {
   ]
 };
 
+// Keep known historical values writable so an existing member can still save
+// an otherwise-valid profile after Starry ID centralizes the current option list.
+// New UI choices continue to come only from the active central schema.
+const LEGACY_OPTION_ALIASES: Record<string, Record<string, string>> = {
+  residence: {
+    '台北': '臺北',
+    '台中': '臺中',
+    '台南': '臺南',
+    '台東': '臺東'
+  },
+  center: {
+    '豐宇台中': '台中'
+  }
+};
+
 const DEFAULT_FIELDS: Array<Omit<ProfileFieldSchema, 'required' | 'userEditable' | 'isActive' | 'validation'> & {
   required: number; userEditable: number; isActive: number; validationJson: string;
 }> = [
@@ -212,7 +227,9 @@ function validateValue(field: ProfileFieldSchema, raw: unknown, options: Record<
   }
   if (field.inputType === 'select' && field.optionCategory) {
     const allowed = options[field.optionCategory] || [];
-    if (allowed.length && !allowed.includes(value)) return `${field.label}請使用中央最新選項`;
+    const canonicalLegacyValue = LEGACY_OPTION_ALIASES[field.optionCategory]?.[value] || '';
+    const acceptedLegacyValue = canonicalLegacyValue && allowed.includes(canonicalLegacyValue);
+    if (allowed.length && !allowed.includes(value) && !acceptedLegacyValue) return `${field.label}請使用中央最新選項`;
   }
   const pattern = text(field.validation.pattern);
   if (pattern && pattern.length <= 200) {
