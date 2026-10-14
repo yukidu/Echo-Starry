@@ -5,9 +5,10 @@ import { readFileSync } from 'node:fs';
 const source = readFileSync('worker/starryIdV245BatteryRouter.ts','utf8');
 
 test('v248 battery client no longer observes the whole Starry ID document', () => {
-  const client = source.split('const CLIENT_SOURCE = `')[1]?.split('`;
-
-export async function handleStarryIdV245Battery')[0] || '';
+  const start = source.indexOf('const CLIENT_SOURCE = `');
+  const end = source.indexOf('export async function handleStarryIdV245Battery');
+  const client = source.slice(start, end);
+  assert.ok(start >= 0 && end > start);
   assert.doesNotMatch(client, /new MutationObserver/);
   assert.doesNotMatch(client, /observe\(document\.documentElement/);
 });
