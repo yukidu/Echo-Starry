@@ -1,6 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/privacyCrawlerRouter.ts"
+main = "worker/starryIdV245Entry.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
@@ -32,8 +32,8 @@ command = "npm run build"
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# 所有請求仍先經過 privacyCrawlerRouter；它只把 id.starry.phd 分流給 Starry ID，
-# 其餘 EchoStars / DownloadStarry 路徑保持原有安全鏈。
+# 所有請求先經 v245 薄層分流；除了 Starry ID 電池頁／資料外，
+# 其餘請求全部原樣交回 privacyCrawlerRouter 的既有安全鏈。
 run_worker_first = ["/*"]
 
 # 1. Cloudflare D1 資料庫 (SQLite)
@@ -43,7 +43,7 @@ database_name = "echoes_db"
 database_id = "e0a696a9-0233-4186-be4d-229435b19a27"
 
 # Starry ID 中央會員資料庫。只同步跨 App 共用的身份與固定基本資料；
-# EchoStars 專屬播放、收藏、學習、徽章與權限仍留在原資料庫。
+# 中央電池帳本亦由此 D1 統一保存；Echo 專屬解鎖等行為資料仍留在 Echo DB。
 [[d1_databases]]
 binding = "STARRY_ID_DB"
 database_name = "starry_id_db"
