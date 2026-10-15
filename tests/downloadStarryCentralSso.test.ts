@@ -101,10 +101,14 @@ test('central SSO stores one-time codes in Starry ID D1 for ticket-based registe
 test('privacy entry routes central app SSO before generic Starry ID router', async () => {
   const privacy = await read('worker/privacyCrawlerRouter.ts');
   const wrangler = await read('wrangler.toml');
+  const inline = await read('worker/starryMainInlineLoginRouter.ts');
+  const battery = await read('worker/starryMainBatteryGameRouter.ts');
   const centralIndex = privacy.indexOf('handleDownloadStarryCentralSso(request');
   const genericIndex = privacy.indexOf('handleStarryIdCentral(request');
   assert.ok(centralIndex >= 0 && genericIndex > centralIndex);
-  assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
-  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,downloadstarry,gostarry,quotes,boxstarry"/);
-  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,downloadstarry,gostarry,quotes,boxstarry"/);
+  assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
+  assert.match(inline, /import appWorker from '\.\/starryMainBatteryGameRouter'/);
+  assert.match(battery, /import appWorker from '\.\/privacyCrawlerRouter'/);
+  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,downloadstarry,gostarry,quotes,boxstarry"/);
+  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,starryphd,downloadstarry,gostarry,quotes,boxstarry"/);
 });
