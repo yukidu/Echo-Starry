@@ -8,6 +8,7 @@ const trackSpeakersById = new Map<string, string>();
 let loadToken = 0;
 let renderQueued = false;
 let trackLoad: Promise<void> | null = null;
+let trackSpeakersLoaded = false;
 
 function isPreviewHost() {
   const host = window.location.hostname;
@@ -168,6 +169,7 @@ function installStyles() {
 }
 
 async function loadTrackSpeakers(force = false) {
+  if (trackSpeakersLoaded && !force) return;
   if (trackLoad && !force) return trackLoad;
   trackLoad = (async () => {
     const response = await fetch('/api/tracks', {
@@ -183,6 +185,7 @@ async function loadTrackSpeakers(force = false) {
       const speaker = String(track?.speaker || '').trim();
       if (id && speaker) trackSpeakersById.set(id, speaker);
     });
+    trackSpeakersLoaded = true;
   })();
   try {
     await trackLoad;
@@ -212,12 +215,7 @@ async function fetchHiddenSpeakerNames(): Promise<string[]> {
 
 async function loadHiddenSpeakers() {
   const token = ++loadToken;
-  const [names] = await Promise.all([
-    fetchHiddenSpeakerNames(),
-    loadTrackSpeakers().catch(error => {
-      console.warn('Failed to load speakers for hidden-track counts:', error);
-    })
-  ]);
+  const names = await fetchHiddenSpeakerNames();
   if (token !== loadToken) return;
   hiddenSpeakers.clear();
   names.forEach(name => hiddenSpeakers.add(name));
@@ -324,6 +322,16 @@ function renderHiddenSpeakerSection() {
   if (!header) return;
 
   const names = Array.from(hiddenSpeakers).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+
+  // The full track list is only needed for hidden-track counts. Do not fetch it
+  // during normal homepage startup; load it lazily when the Favorites panel is open.
+  if (names.length && !trackSpeakersLoaded) {
+    void loadTrackSpeakers().then(renderHiddenSpeakerSection).catch(error => {
+      console.warn('Failed to load speakers for hidden-track counts:', error);
+    });
+    return;
+  }
+
   const combinedNames = names.filter(isCombinedSpeakerName);
   const singleNames = names.filter(name => !isCombinedSpeakerName(name));
   const countSignature = names.map(name => `${name}:${hiddenTrackCount(name)}`).join('\u0001');
