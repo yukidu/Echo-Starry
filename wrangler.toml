@@ -1,6 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/starryMainBatteryGameRouter.ts" # wrapper around legacy entry: main = "worker/privacyCrawlerRouter.ts"
+main = "worker/starryMainInlineLoginRouter.ts" # wrapper: inline login -> battery game -> existing Starry/Echo chain
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
@@ -32,8 +32,7 @@ command = "npm run build"
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# 所有請求仍先經過 Starry main battery game wrapper，再進入原本 privacyCrawlerRouter；
-# Starry ID 電池遊戲 API 只在 id.starry.phd 專用路徑處理，其餘請求維持原安全鏈。
+# 所有請求先經繁星主站登入橋接與電池 wrapper，再進入原本安全鏈。
 run_worker_first = ["/*"]
 
 # 1. Cloudflare D1 資料庫 (SQLite)
@@ -64,5 +63,5 @@ ENVIRONMENT = "production"
 # Google OAuth Client ID 是公開識別碼，不是秘密；Client Secret 不進 GitHub / 前端。
 STARRY_ID_GOOGLE_CLIENT_ID = "661055525630-ndcq5gtr16h7rqqprlqqkkvineea87lc.apps.googleusercontent.com"
 # App 必須先在 Starry ID 登記，不能由瀏覽器任意宣稱 appId 自行取得會員資格。
-STARRY_ID_ALLOWED_APPS = "starry-id,downloadstarry,gostarry,quotes,boxstarry"
-STARRY_ID_SELF_ENROLL_APPS = "starry-id,downloadstarry,gostarry,quotes,boxstarry"
+STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,downloadstarry,gostarry,quotes,boxstarry"
+STARRY_ID_SELF_ENROLL_APPS = "starry-id,starryphd,downloadstarry,gostarry,quotes,boxstarry"
