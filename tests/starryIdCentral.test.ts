@@ -9,36 +9,25 @@ const privacyRouter = readFileSync(join(root, 'worker/privacyCrawlerRouter.ts'),
 const wrangler = readFileSync(join(root, 'wrangler.toml'), 'utf8');
 const schema = readFileSync(join(root, 'starry-id/schema.sql'), 'utf8');
 const verifySchema = readFileSync(join(root, 'starry-id/verify-schema.mjs'), 'utf8');
-
 const STARRY_CLIENT = '661055525630-ndcq5gtr16h7rqqprlqqkkvineea87lc.apps.googleusercontent.com';
 const LEGACY_ECHO_CLIENT = '400699489182-lb412nhvj4s6t1qr5ovkg40hc646dq79.apps.googleusercontent.com';
 
-test('Starry ID keeps the existing EchoStars worker entry point and adds id.starry.phd', () => {
-  assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
-  assert.match(wrangler, /pattern = "echo\.starry\.phd"/);
-  assert.match(wrangler, /pattern = "id\.starry\.phd"/);
-  assert.match(privacyRouter, /handleStarryIdCentral/);
+test('Starry ID keeps the EchoStars safety chain and adds id.starry.phd', () => {
+  assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
+  assert.match(wrangler, /pattern = "echo\.starry\.phd"/); assert.match(wrangler, /pattern = "id\.starry\.phd"/); assert.match(privacyRouter, /handleStarryIdCentral/);
 });
 
 test('Starry ID central backend uses the dedicated Google OAuth client', () => {
-  assert.match(router, new RegExp(STARRY_CLIENT.replaceAll('.', '\\.')));
-  assert.match(wrangler, new RegExp(STARRY_CLIENT.replaceAll('.', '\\.')));
-  assert.doesNotMatch(router, new RegExp(LEGACY_ECHO_CLIENT.replaceAll('.', '\\.')));
+  assert.match(router, new RegExp(STARRY_CLIENT.replaceAll('.', '\\.'))); assert.match(wrangler, new RegExp(STARRY_CLIENT.replaceAll('.', '\\.'))); assert.doesNotMatch(router, new RegExp(LEGACY_ECHO_CLIENT.replaceAll('.', '\\.')));
 });
 
 test('Starry ID only accepts registered app ids for self enrollment', () => {
-  assert.match(router, /STARRY_ID_ALLOWED_APPS/);
-  assert.match(router, /STARRY_ID_SELF_ENROLL_APPS/);
-  assert.match(router, /if \(!allowedApp\(env, appId\)\) throw new Error\('unsupported_app'\)/);
-  assert.match(router, /if \(!membership && !selfEnrollApp\(env, appId\)\) throw new Error\('app_membership_required'\)/);
-  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,downloadstarry,gostarry,quotes,boxstarry"/);
-  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,downloadstarry,gostarry,quotes,boxstarry"/);
+  assert.match(router, /STARRY_ID_ALLOWED_APPS/); assert.match(router, /STARRY_ID_SELF_ENROLL_APPS/);
+  assert.match(router, /if \(!allowedApp\(env, appId\)\) throw new Error\('unsupported_app'\)/); assert.match(router, /if \(!membership && !selfEnrollApp\(env, appId\)\) throw new Error\('app_membership_required'\)/);
+  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,downloadstarry,gostarry,quotes,boxstarry"/);
+  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,starryphd,downloadstarry,gostarry,quotes,boxstarry"/);
 });
 
 test('Starry ID central sessions are persisted as hashed server sessions', () => {
-  assert.match(schema, /CREATE TABLE IF NOT EXISTS auth_sessions/);
-  assert.match(verifySchema, /'auth_sessions'/);
-  assert.match(router, /SHA-256/);
-  assert.match(router, /tokenHash/);
-  assert.doesNotMatch(schema, /rawToken/i);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS auth_sessions/); assert.match(verifySchema, /'auth_sessions'/); assert.match(router, /SHA-256/); assert.match(router, /tokenHash/); assert.doesNotMatch(schema, /rawToken/i);
 });
