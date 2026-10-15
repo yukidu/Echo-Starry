@@ -109,7 +109,7 @@ export async function handleStarryIdV212PublicCardFallback(
 
     // Reuse the complete v211 public-card renderer so all privacy, tracking,
     // zodiac and view-log behaviour remains identical to native v211 cards.
-    const rendered = await handleStarryIdV211(request, env as Env);
+    const rendered = await handleStarryIdV211(request, env);
     return rendered ?? v211Response;
   } catch (error) {
     console.warn('Starry ID v212 public-card fallback:', error);
