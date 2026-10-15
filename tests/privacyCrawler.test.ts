@@ -6,6 +6,8 @@ const router = readFileSync(new URL('../worker/privacyCrawlerRouter.ts', import.
 const robots = readFileSync(new URL('../public/robots.txt', import.meta.url), 'utf8');
 const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const wrangler = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
+const inlineLoginRouter = readFileSync(new URL('../worker/starryMainInlineLoginRouter.ts', import.meta.url), 'utf8');
+const batteryGameRouter = readFileSync(new URL('../worker/starryMainBatteryGameRouter.ts', import.meta.url), 'utf8');
 
 test('site declares global noindex and nofollow directives', () => {
   assert.match(index, /name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex"/);
@@ -15,20 +17,17 @@ test('site declares global noindex and nofollow directives', () => {
 
 test('robots.txt denies all crawlers and explicitly names major AI crawlers', () => {
   assert.match(robots, /User-agent: \*\s+Disallow: \//);
-  for (const agent of ['GPTBot', 'ChatGPT-User', 'OAI-SearchBot', 'Google-Extended', 'ClaudeBot', 'CCBot', 'PerplexityBot', 'Applebot-Extended', 'Bytespider', 'cohere-ai']) {
-    assert.ok(robots.includes(`User-agent: ${agent}`), `${agent} should be explicitly denied`);
-  }
+  for (const agent of ['GPTBot', 'ChatGPT-User', 'OAI-SearchBot', 'Google-Extended', 'ClaudeBot', 'CCBot', 'PerplexityBot', 'Applebot-Extended', 'Bytespider', 'cohere-ai']) assert.ok(robots.includes(`User-agent: ${agent}`), `${agent} should be explicitly denied`);
 });
 
 test('worker blocks known search and AI crawler user agents', () => {
-  for (const token of ['Googlebot', 'Bingbot', 'GPTBot', 'OAI-SearchBot', 'ClaudeBot', 'PerplexityBot', 'Meta-ExternalAgent']) {
-    assert.ok(router.includes(token), `${token} should be blocked at the Worker edge`);
-  }
-  assert.match(router, /status: 403/);
-  assert.match(router, /X-Robots-Tag/);
+  for (const token of ['Googlebot', 'Bingbot', 'GPTBot', 'OAI-SearchBot', 'ClaudeBot', 'PerplexityBot', 'Meta-ExternalAgent']) assert.ok(router.includes(token), `${token} should be blocked at the Worker edge`);
+  assert.match(router, /status: 403/); assert.match(router, /X-Robots-Tag/);
 });
 
-test('all site requests run through privacy crawler router', () => {
-  assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
+test('all site requests keep privacy crawler in the active wrapper chain', () => {
+  assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
+  assert.match(inlineLoginRouter, /import appWorker from '\.\/starryMainBatteryGameRouter'/);
+  assert.match(batteryGameRouter, /import appWorker from '\.\/privacyCrawlerRouter'/);
   assert.match(wrangler, /run_worker_first = \["\/\*"\]/);
 });
