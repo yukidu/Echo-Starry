@@ -9,6 +9,7 @@ const trackSpeakerById = new Map<string, string>();
 let trackSpeakerLoad: Promise<void> | null = null;
 let lastMemberIdentity = '__initial__';
 let observer: MutationObserver | null = null;
+let syncQueued = false;
 
 function isPreviewHost() {
   const host = window.location.hostname;
@@ -33,7 +34,9 @@ function previewStorageKey() {
 function readPreviewHiddenSpeakers() {
   try {
     const parsed = JSON.parse(localStorage.getItem(previewStorageKey()) || '[]');
-    return Array.isArray(parsed) ? parsed.map(String).map(name => name.trim()).filter(Boolean) : [];
+    return Array.isArray(parsed)
+      ? parsed.map(String).map(name => name.trim()).filter(Boolean)
+      : [];
   } catch {
     return [];
   }
@@ -85,6 +88,8 @@ async function loadTrackSpeakerMap(force = false) {
 }
 
 function speakerNameFromCard(card: HTMLElement) {
+  const direct = String(card.dataset.speaker || '').trim();
+  if (direct) return direct;
   const trackId = trackIdFromCard(card);
   return trackId ? String(trackSpeakerById.get(trackId) || '').trim() : '';
 }
@@ -221,7 +226,6 @@ function styledDislikeConfirm(message: string, title: string) {
 
 async function persistDislike(speakerName: string) {
   if (isPreviewHost()) {
-    hiddenSpeakers.add(speakerName);
     writePreviewHiddenSpeakers();
     return;
   }
@@ -234,12 +238,10 @@ async function persistDislike(speakerName: string) {
   const data = await response.json().catch(() => ({}));
   if (response.status === 401) throw new Error('請先登入會員後再使用「不喜歡」。');
   if (!response.ok) throw new Error(data?.error || '設定失敗，請稍後再試。');
-  hiddenSpeakers.add(speakerName);
 }
 
 async function handleDislike(card: HTMLElement, button: HTMLButtonElement) {
   if (button.disabled) return;
-
   if (!isPreviewHost() && !readMemberIdentity()) {
     window.alert('請先登入會員後再使用「不喜歡」。');
     return;
@@ -261,13 +263,19 @@ async function handleDislike(card: HTMLElement, button: HTMLButtonElement) {
   button.disabled = true;
   const label = button.querySelector('span');
   if (label) label.textContent = '處理中…';
+
+  const wasHidden = speakerMatchesAnyHiddenEntry(speakerName, hiddenSpeakers);
+  hiddenSpeakers.add(speakerName);
+  syncAllCards();
+
   try {
     await persistDislike(speakerName);
-    syncAllCards();
     window.dispatchEvent(new CustomEvent('echostars:member-hidden-speakers-changed', {
       detail: { speakerName }
     }));
   } catch (error) {
+    if (!wasHidden) hiddenSpeakers.delete(speakerName);
+    syncAllCards();
     window.alert(error instanceof Error ? error.message : '設定失敗，請稍後再試。');
   } finally {
     button.disabled = false;
@@ -312,6 +320,17 @@ function syncAllCards() {
   });
 }
 
+function queueDomSync() {
+  if (syncQueued) return;
+  syncQueued = true;
+  window.requestAnimationFrame(() => {
+    syncQueued = false;
+    syncAudioPlayingState();
+    syncMemberIdentity();
+    syncAllCards();
+  });
+}
+
 async function loadMemberHiddenSpeakers() {
   hiddenSpeakers.clear();
 
@@ -339,7 +358,11 @@ async function loadMemberHiddenSpeakers() {
     if (!response.ok) throw new Error(`hidden speakers: ${response.status}`);
     const data = await response.json().catch(() => ({}));
     const speakers = Array.isArray(data?.speakers) ? data.speakers : [];
-    speakers.map(String).map((name: string) => name.trim()).filter(Boolean).forEach((name: string) => hiddenSpeakers.add(name));
+    speakers
+      .map(String)
+      .map((name: string) => name.trim())
+      .filter(Boolean)
+      .forEach((name: string) => hiddenSpeakers.add(name));
   } catch (error) {
     console.warn('Failed to load member disliked speakers:', error);
   }
@@ -358,21 +381,19 @@ function startV181HomeControls() {
   syncAudioPlayingState();
   syncMemberIdentity();
   syncAllCards();
-  void loadTrackSpeakerMap().then(syncAllCards).catch(error => {
-    console.warn('Failed to preload track speakers:', error);
-  });
 
   document.addEventListener('play', syncAudioPlayingState, true);
   document.addEventListener('pause', syncAudioPlayingState, true);
   document.addEventListener('ended', syncAudioPlayingState, true);
   document.addEventListener('emptied', syncAudioPlayingState, true);
 
-  observer = new MutationObserver(() => {
-    syncAudioPlayingState();
-    syncMemberIdentity();
-    syncAllCards();
+  observer = new MutationObserver(queueDomSync);
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['aria-expanded']
   });
-  observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-expanded'] });
 
   window.addEventListener('focus', syncMemberIdentity);
   window.addEventListener('storage', syncMemberIdentity);
