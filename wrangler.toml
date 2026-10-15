@@ -1,6 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/privacyCrawlerRouter.ts"
+main = "worker/starryMainBatteryGameRouter.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
@@ -32,8 +32,8 @@ command = "npm run build"
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# 所有請求仍先經過 privacyCrawlerRouter；Starry ID 電池頁由同一安全鏈內部分流，
-# 其餘 EchoStars / DownloadStarry 路徑保持原有安全鏈。
+# 所有請求仍先經過 Starry main battery game wrapper，再進入原本 privacyCrawlerRouter；
+# Starry ID 電池遊戲 API 只在 id.starry.phd 專用路徑處理，其餘請求維持原安全鏈。
 run_worker_first = ["/*"]
 
 # 1. Cloudflare D1 資料庫 (SQLite)
