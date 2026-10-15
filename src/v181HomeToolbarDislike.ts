@@ -90,6 +90,8 @@ function speakerNameFromCard(card: HTMLElement) {
   const mapped = trackId ? String(trackSpeakerById.get(trackId) || '').trim() : '';
   if (mapped) return mapped;
 
+  // AudioCard already renders the speaker name as the portrait alt text. Reuse
+  // that data so a normal dislike click never needs to download /api/tracks first.
   const portrait = card.querySelector<HTMLImageElement>('img[alt]');
   return String(portrait?.alt || '').trim();
 }
@@ -97,6 +99,7 @@ function speakerNameFromCard(card: HTMLElement) {
 async function resolveSpeakerNameFromCard(card: HTMLElement) {
   let speakerName = speakerNameFromCard(card);
   if (speakerName) return speakerName;
+  // Rare fallback for legacy cards without an image/alt value.
   await loadTrackSpeakerMap(true);
   speakerName = speakerNameFromCard(card);
   return speakerName;
@@ -265,6 +268,8 @@ async function handleDislike(card: HTMLElement, button: HTMLButtonElement) {
   const label = button.querySelector('span');
   if (label) label.textContent = '處理中…';
 
+  // Optimistic UI: hide immediately after the user confirms. The server write
+  // continues in the background of this interaction; on failure we restore it.
   const wasHidden = hiddenSpeakers.has(speakerName);
   hiddenSpeakers.add(speakerName);
   syncAllCards();
