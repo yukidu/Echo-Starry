@@ -6,7 +6,7 @@ export function enhanceStarryIdV256UnifiedMenu(html: string): string {
     .v211-menu{display:none!important}
     #v216Menu{appearance:none;border:0;background:transparent;color:var(--text);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;flex:0 0 44px;border-radius:12px;font-size:23px;line-height:1;transition:background-color .15s ease,transform .15s ease,color .15s ease}
     #v216Menu:hover{background:#1c2c49;color:var(--accent)}#v216Menu:active{transform:scale(.95)}
-    .v256-menu-overlay{position:fixed;inset:0;z-index:2100;background:rgba(3,8,18,.5);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+    .v256-menu-overlay{position:fixed;inset:0;z-index:2100;background:rgba(3,8,18,.75);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
     .v256-menu-overlay[hidden],.v256-menu-shell[hidden]{display:none!important}
     .v256-menu-shell{position:fixed;top:70px;right:14px;z-index:2101;width:max-content;max-width:calc(100vw - 28px);pointer-events:none}
     .v256-menu-panel{display:inline-flex;box-sizing:border-box;width:max-content;min-width:250px;max-width:min(22.5rem,calc(100vw - 28px));max-height:calc(100dvh - 90px);overflow-y:auto;flex-direction:column;gap:4px;padding:8px;border:1px solid rgba(111,133,171,.42);border-radius:16px;background:rgba(13,25,45,.985);box-shadow:0 18px 45px rgba(0,0,0,.34);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);pointer-events:auto;-webkit-overflow-scrolling:touch;animation:v256MenuIn .16s ease-out}
