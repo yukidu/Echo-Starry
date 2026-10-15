@@ -1,3 +1,5 @@
+import { enhanceStarryIdV253Navigation } from './starryIdV253NavigationEnhancer';
+
 export function enhanceStarryIdMemberCenterV216(html: string) {
   const style = `<style id="v216-style">
     .v216-member-brand{min-width:0;display:flex;align-items:center;gap:11px}
@@ -53,5 +55,6 @@ export function enhanceStarryIdMemberCenterV216(html: string) {
     decorateToolbar();paintEyes();waitForSession();
   })();</script>`;
 
-  return html.replace('</head>', style + '</head>').replace('</body>', script + '</body>');
+  const enhanced = html.replace('</head>', style + '</head>').replace('</body>', script + '</body>');
+  return enhanceStarryIdV253Navigation(enhanced);
 }
