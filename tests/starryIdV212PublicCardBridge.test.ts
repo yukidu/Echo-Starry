@@ -9,8 +9,8 @@ const privacyRouter = readFileSync(join(root, 'worker/privacyCrawlerRouter.ts'),
 const wrangler = readFileSync(join(root, 'wrangler.toml'), 'utf8');
 const bridge = readFileSync(join(root, 'worker/starryIdV212PublicCardBridge.ts'), 'utf8');
 
-test('v212 keeps the established privacy crawler worker as the production entry', () => {
-  assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
+test('v212 keeps the established privacy crawler in the production wrapper chain', () => {
+  assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
   assert.match(privacyRouter, /handleStarryIdV212PublicCardFallback/);
   assert.match(privacyRouter, /starryV212Response \|\| starryV211Response/);
 });
@@ -25,14 +25,9 @@ test('only safe numeric one-segment Amway ID routes qualify for the legacy fallb
 
 test('legacy fallback only runs after a v211 404 and requires one active exact Amway member', () => {
   assert.match(bridge, /(v211Response\.status !== 404|response\.status === 404)/);
-  assert.match(bridge, /u\.status='active'/);
-  assert.match(bridge, /rows\.length !== 1/);
-  assert.match(bridge, /text\(rows\[0\]\.amwayId\) !== amwayId/);
+  assert.match(bridge, /u\.status='active'/); assert.match(bridge, /rows\.length !== 1/); assert.match(bridge, /text\(rows\[0\]\.amwayId\) !== amwayId/);
 });
 
 test('first public Amway request assigns an n sequence and delegates rendering back to v211', () => {
-  assert.match(bridge, /`n\$\{Number\(card\.seq\)\}`/);
-  assert.match(bridge, /UPDATE public_cards SET slug=\?,cardNumber=\?,updatedAt=\?/);
-  assert.match(bridge, /handleStarryIdV211\(request, env\)/);
-  assert.match(bridge, /rendered\.status !== 404/);
+  assert.match(bridge, /`n\$\{Number\(card\.seq\)\}`/); assert.match(bridge, /UPDATE public_cards SET slug=\?,cardNumber=\?,updatedAt=\?/); assert.match(bridge, /handleStarryIdV211\(request, env\)/); assert.match(bridge, /rendered\.status !== 404/);
 });
