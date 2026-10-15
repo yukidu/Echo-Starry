@@ -43,11 +43,15 @@ test('legacy Echo Download SSO may remain for compatibility but cannot own centr
   const privacy = await read('worker/privacyCrawlerRouter.ts');
   const externalSso = await read('worker/starbeautySsoRouter.ts');
   const wrangler = await read('wrangler.toml');
+  const inline = await read('worker/starryMainInlineLoginRouter.ts');
+  const battery = await read('worker/starryMainBatteryGameRouter.ts');
 
-  assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
+  assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
+  assert.match(inline, /import appWorker from '\.\/starryMainBatteryGameRouter'/);
+  assert.match(battery, /import appWorker from '\.\/privacyCrawlerRouter'/);
   assert.match(wrangler, /binding = "STARRY_ID_DB"/);
-  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,downloadstarry,gostarry,quotes,boxstarry"/);
-  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,downloadstarry,gostarry,quotes,boxstarry"/);
+  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,downloadstarry,gostarry,quotes,boxstarry"/);
+  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,starryphd,downloadstarry,gostarry,quotes,boxstarry"/);
   assert.match(privacy, /handleDownloadStarryCentralSso/);
   assert.match(externalSso, /handleDownloadStarrySso/);
   assert.ok(
