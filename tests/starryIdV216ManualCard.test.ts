@@ -15,13 +15,15 @@ test('member header mirrors Download Starry identity hierarchy with photo, name 
   assert.match(enhancer, /user\.approvedRank\|\|user\.rank\|\|'無'/);
 });
 
-test('retired My Card management page and its menu entry are removed from the active UI', () => {
+test('retired My Card management page and its hamburger source are removed', () => {
   assert.doesNotMatch(router, /pub\.textContent='公開設定'/);
+  assert.doesNotMatch(enhancer, /renderMyCard/);
+  assert.doesNotMatch(enhancer, /v216-card-page/);
+  assert.doesNotMatch(enhancer, /function openMenu/);
+  assert.doesNotMatch(enhancer, /const APPS=/);
+  assert.match(enhancer, /retireLegacyToolbar/);
   assert.match(navigation, /#myCardBtn,#v216Menu\{display:none!important\}/);
-  assert.match(navigation, /q\('#myCardPage'\)\?\.remove\(\)/);
   assert.match(navigation, /history\.replaceState\(null,'','\/'\)/);
-  assert.match(navigation, /label==='我的名片'/);
-  assert.match(navigation, /label==='☰'/);
 });
 
 test('pencil editing requires an explicit checkmark and never saves on blur or Enter', () => {
@@ -46,9 +48,9 @@ test('visibility uses true eye and eye-slash icons instead of prohibition glyph'
   assert.doesNotMatch(enhancer, /⊘/);
 });
 
-test('mobile toolbar and light theme receive dedicated contrast/layout overrides', () => {
+test('mobile toolbar keeps essential admin and logout actions after hamburger retirement', () => {
   assert.match(enhancer, /@media\(max-width:760px\)/);
-  assert.match(enhancer, /\.top-actions #adminBtn,.top-actions #logoutBtn\{display:none!important\}/);
+  assert.doesNotMatch(enhancer, /\.top-actions #adminBtn,.top-actions #logoutBtn\{display:none!important\}/);
   assert.match(enhancer, /html\[data-starry-theme="light"\] \.topbar/);
   assert.match(enhancer, /#14213d/);
 });
