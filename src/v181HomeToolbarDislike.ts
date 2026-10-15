@@ -9,6 +9,7 @@ const trackSpeakerById = new Map<string, string>();
 let trackSpeakerLoad: Promise<void> | null = null;
 let lastMemberIdentity = '__initial__';
 let observer: MutationObserver | null = null;
+let syncQueued = false;
 
 function isPreviewHost() {
   const host = window.location.hostname;
@@ -92,7 +93,7 @@ function speakerNameFromCard(card: HTMLElement) {
 async function resolveSpeakerNameFromCard(card: HTMLElement) {
   let speakerName = speakerNameFromCard(card);
   if (speakerName) return speakerName;
-  await loadTrackSpeakerMap(true);
+  await loadTrackSpeakerMap(false);
   speakerName = speakerNameFromCard(card);
   return speakerName;
 }
@@ -221,7 +222,6 @@ function styledDislikeConfirm(message: string, title: string) {
 
 async function persistDislike(speakerName: string) {
   if (isPreviewHost()) {
-    hiddenSpeakers.add(speakerName);
     writePreviewHiddenSpeakers();
     return;
   }
@@ -234,7 +234,6 @@ async function persistDislike(speakerName: string) {
   const data = await response.json().catch(() => ({}));
   if (response.status === 401) throw new Error('請先登入會員後再使用「不喜歡」。');
   if (!response.ok) throw new Error(data?.error || '設定失敗，請稍後再試。');
-  hiddenSpeakers.add(speakerName);
 }
 
 async function handleDislike(card: HTMLElement, button: HTMLButtonElement) {
@@ -261,13 +260,20 @@ async function handleDislike(card: HTMLElement, button: HTMLButtonElement) {
   button.disabled = true;
   const label = button.querySelector('span');
   if (label) label.textContent = '處理中…';
+
+  const hiddenBefore = new Set(hiddenSpeakers);
+  hiddenSpeakers.add(speakerName);
+  syncAllCards();
+
   try {
     await persistDislike(speakerName);
-    syncAllCards();
     window.dispatchEvent(new CustomEvent('echostars:member-hidden-speakers-changed', {
       detail: { speakerName }
     }));
   } catch (error) {
+    hiddenSpeakers.clear();
+    hiddenBefore.forEach(name => hiddenSpeakers.add(name));
+    syncAllCards();
     window.alert(error instanceof Error ? error.message : '設定失敗，請稍後再試。');
   } finally {
     button.disabled = false;
@@ -309,6 +315,17 @@ function syncAllCards() {
   document.querySelectorAll<HTMLElement>('.audio-card[data-track-id]').forEach(card => {
     syncCardVisibility(card);
     installDislikeButton(card);
+  });
+}
+
+function queueDomSync() {
+  if (syncQueued) return;
+  syncQueued = true;
+  window.requestAnimationFrame(() => {
+    syncQueued = false;
+    syncAudioPlayingState();
+    syncMemberIdentity();
+    syncAllCards();
   });
 }
 
@@ -367,11 +384,7 @@ function startV181HomeControls() {
   document.addEventListener('ended', syncAudioPlayingState, true);
   document.addEventListener('emptied', syncAudioPlayingState, true);
 
-  observer = new MutationObserver(() => {
-    syncAudioPlayingState();
-    syncMemberIdentity();
-    syncAllCards();
-  });
+  observer = new MutationObserver(queueDomSync);
   observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-expanded'] });
 
   window.addEventListener('focus', syncMemberIdentity);
