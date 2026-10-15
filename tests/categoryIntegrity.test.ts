@@ -30,7 +30,7 @@ test('D1 categories is the only category authority, including an empty list', ()
   assert.match(privacyRouter, /import appWorker from '\.\/favoriteRouter'/);
   assert.match(favoriteRouter, /import appWorker from '\.\/adminUserDeleteRouter'/);
   assert.match(adminUserDeleteRouter, /import appWorker from '\.\/categoryIntegrityRouter'/);
-  assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
+  assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
 });
 
 test('browser startup reconciles stale or missing home cache before React mounts', () => {
