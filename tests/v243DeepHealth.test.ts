@@ -47,3 +47,5 @@ test('hidden-speaker full track loading is deferred until favorites counts are v
   assert.doesNotMatch(loadPolicy, /loadTrackSpeakers/);
   assert.match(dislikeFavorites, /if \(names\.length && !trackSpeakersLoaded\)/);
 });
+
+// v256: force a fresh CI run after a runner-start failure; no runtime behavior changes.
