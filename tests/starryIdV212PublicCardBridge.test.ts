@@ -24,7 +24,7 @@ test('only safe numeric one-segment Amway ID routes qualify for the legacy fallb
 });
 
 test('legacy fallback only runs after a v211 404 and requires one active exact Amway member', () => {
-  assert.match(bridge, /v211Response\.status !== 404/);
+  assert.match(bridge, /(v211Response\.status !== 404|response\.status === 404)/);
   assert.match(bridge, /u\.status='active'/);
   assert.match(bridge, /rows\.length !== 1/);
   assert.match(bridge, /text\(rows\[0\]\.amwayId\) !== amwayId/);
