@@ -3,12 +3,23 @@ import appWorker from './starryMainBatteryGameRouter';
 
 const ID_HOST = 'id.starry.phd';
 const LOGIN_PATH = '/starry-main-login';
+const GOOGLE_SYNC_PATH = '/api/google-sync';
 const MAIN_ORIGIN = 'https://starry.phd';
 const DEFAULT_GOOGLE_CLIENT_ID = '661055525630-ndcq5gtr16h7rqqprlqqkkvineea87lc.apps.googleusercontent.com';
 
 function safeClientId(env: Env) {
   const raw = String((env as any).STARRY_ID_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID).trim();
   return /^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/i.test(raw) ? raw : DEFAULT_GOOGLE_CLIENT_ID;
+}
+
+function withMainOriginCredentials(response: Response) {
+  const headers = new Headers(response.headers);
+  headers.set('Access-Control-Allow-Origin', MAIN_ORIGIN);
+  headers.set('Access-Control-Allow-Credentials', 'true');
+  headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  headers.set('Access-Control-Allow-Headers', 'Content-Type');
+  headers.set('Vary', 'Origin');
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
 function loginPage(env: Env) {
@@ -85,16 +96,11 @@ function loginPage(env: Env) {
         callback: onCredential,
         ux_mode: 'popup',
         auto_select: false,
-        cancel_on_tap_outside: false
+        cancel_on_tap_outside: false,
+        itp_support: true
       });
       google.accounts.id.renderButton(document.getElementById('googleButton'), {
-        type: 'standard',
-        theme: 'filled_black',
-        size: 'large',
-        shape: 'pill',
-        text: 'continue_with',
-        width: 300,
-        locale: 'zh_TW'
+        type: 'standard', theme: 'filled_black', size: 'large', shape: 'pill', text: 'continue_with', width: 300, locale: 'zh_TW'
       });
       statusEl.textContent = '請選擇 Google 帳號';
     }
@@ -123,6 +129,16 @@ export default {
       if (request.method.toUpperCase() !== 'GET') return new Response('Method not allowed', { status: 405 });
       return loginPage(env);
     }
+
+    if (
+      url.hostname === ID_HOST &&
+      url.pathname === GOOGLE_SYNC_PATH &&
+      (request.headers.get('Origin') || '') === MAIN_ORIGIN
+    ) {
+      const response = await appWorker.fetch(request, env, ctx);
+      return withMainOriginCredentials(response);
+    }
+
     return appWorker.fetch(request, env, ctx);
   }
 };
