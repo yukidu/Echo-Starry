@@ -4,6 +4,7 @@ import fs from 'node:fs';
 
 const router = fs.readFileSync('worker/starryIdV245BatteryRouter.ts','utf8');
 const menu = fs.readFileSync('worker/starryIdV216Enhancer.ts','utf8');
+const navigation = fs.readFileSync('worker/starryIdV253NavigationEnhancer.ts','utf8');
 const privacy = fs.readFileSync('worker/privacyCrawlerRouter.ts','utf8');
 const wrangler = fs.readFileSync('wrangler.toml','utf8');
 
@@ -26,13 +27,12 @@ test('v245 battery field is readonly and has its own public visibility control',
   assert.match(router, /<div class=\"label\">電池數量<\/div>/);
 });
 
-test('v249 keeps current ecosystem menu links and battery ledger in the single v216 menu owner', () => {
-  for (const expected of [
-    'https://starry.phd','https://id.starry.phd','https://echo.starry.phd','https://download.starry.phd',
-    'https://go.starry.phd','https://quotes.starry.phd','https://box.starry.phd'
-  ]) assert.ok(menu.includes(expected), `missing ${expected}`);
-  assert.doesNotMatch(menu, /美力之星|starbeauty\.yukidu\.workers\.dev/);
-  assert.match(menu, /🔋 電池餘額日誌/);
+test('v255 retires the v216 hamburger menu without removing battery ledger routes', () => {
+  assert.doesNotMatch(menu, /const APPS=/);
+  assert.doesNotMatch(menu, /function openMenu/);
+  assert.doesNotMatch(menu, /🔋 電池餘額日誌/);
+  assert.match(menu, /retireLegacyToolbar/);
+  assert.match(navigation, /#myCardBtn,#v216Menu/);
   assert.doesNotMatch(router, /function syncMenu\(/);
 });
 
