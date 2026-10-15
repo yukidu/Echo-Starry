@@ -18,6 +18,14 @@ test('v256 restores a Go-Starry-style hamburger menu shell with profile, divider
   assert.match(menu, /aria-label','開啟主選單'/);
 });
 
+test('v257 removes the older left ecosystem hamburger and keeps only the right v216 menu button', () => {
+  assert.match(menu, /#topActions button\[title="繁星生態系"\]\{display:none!important\}/);
+  assert.match(menu, /function removeLegacyBurger\(\)/);
+  assert.match(menu, /button\.title==='繁星生態系'\|\|label==='☰'/);
+  assert.match(menu, /if\(button\.id==='v216Menu'\)return/);
+  assert.match(menu, /q\('\.v211-menu'\)\?\.remove\(\)/);
+});
+
 test('v256 top shortcut is My Card while member management remains available to super admins inside the hamburger', () => {
   assert.match(menu, /#adminBtn\{display:none!important\}/);
   assert.match(menu, /card\.id='v256MyCardBtn'/);
@@ -27,10 +35,14 @@ test('v256 top shortcut is My Card while member management remains available to 
   assert.match(menu, /q\('#adminBtn'\)\?\.click\(\)/);
 });
 
-test('v256 My Card shortcut opens the signed-in member public card instead of reviving the retired management page', () => {
-  assert.match(menu, /api\('\/api\/card-settings'\)/);
-  assert.match(menu, /String\(data\?\.url\|\|''\)\.trim\(\)/);
+test('v257 My Card can open immediately from the signed-in Amway ID and only falls back to card-settings when needed', () => {
+  assert.match(menu, /function directCardUrl\(data=session\)/);
+  assert.match(menu, /data\?\.user\?\.amwayId/);
+  assert.match(menu, /location\.origin\+'\/'\+encodeURIComponent\(amwayId\)/);
+  assert.match(menu, /cardUrl=directCardUrl\(session\)/);
+  assert.match(menu, /if\(data\?\.user&&!cardUrl\)void loadCardUrl\(\)/);
   assert.match(menu, /window\.open\(cardUrl,'_blank','noopener'\)/);
+  assert.match(menu, /api\('\/api\/card-settings'\)/);
   assert.match(menu, /tab\.location\.replace\(url\)/);
   assert.doesNotMatch(menu, /renderMyCard/);
   assert.doesNotMatch(menu, /location\.href='\/my-card'/);
