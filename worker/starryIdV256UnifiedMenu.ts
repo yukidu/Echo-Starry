@@ -1,0 +1,54 @@
+export function enhanceStarryIdV256UnifiedMenu(html: string): string {
+  const css = String.raw`<style id="v256-unified-menu-style">
+    #adminBtn{display:none!important}
+    #v256MyCardBtn{white-space:nowrap}
+    #v216Menu{appearance:none;border:0;background:transparent;color:var(--text);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;flex:0 0 44px;border-radius:12px;font-size:23px;line-height:1;transition:background-color .15s ease,transform .15s ease,color .15s ease}
+    #v216Menu:hover{background:#1c2c49;color:var(--accent)}#v216Menu:active{transform:scale(.95)}
+    .v256-menu-overlay{position:fixed;inset:0;z-index:2100;background:rgba(3,8,18,.3);backdrop-filter:blur(1px);-webkit-backdrop-filter:blur(1px)}
+    .v256-menu-overlay[hidden],.v256-menu-shell[hidden]{display:none!important}
+    .v256-menu-shell{position:fixed;top:70px;right:14px;z-index:2101;width:max-content;max-width:calc(100vw - 28px);pointer-events:none}
+    .v256-menu-panel{display:inline-flex;box-sizing:border-box;width:max-content;min-width:250px;max-width:min(22.5rem,calc(100vw - 28px));max-height:calc(100dvh - 90px);overflow-y:auto;flex-direction:column;gap:4px;padding:8px;border:1px solid rgba(111,133,171,.42);border-radius:16px;background:rgba(13,25,45,.985);box-shadow:0 18px 45px rgba(0,0,0,.34);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);pointer-events:auto;-webkit-overflow-scrolling:touch;animation:v256MenuIn .16s ease-out}
+    @keyframes v256MenuIn{from{opacity:0;transform:translateY(-7px) scale(.98)}to{opacity:1;transform:none}}
+    .v256-menu-profile{display:flex;align-items:center;gap:9px;padding:7px 9px 10px;border:0;background:transparent;color:inherit;text-align:left;width:100%;cursor:pointer;border-radius:11px}
+    .v256-menu-profile:hover{background:#1b2c49}.v256-menu-profile img,.v256-menu-avatar-fallback{width:36px;height:36px;flex:0 0 36px;border-radius:50%;object-fit:cover;background:#223250;display:grid;place-items:center;font-weight:900;color:#eef4ff}
+    .v256-menu-profile-copy{min-width:0;line-height:1.08}.v256-menu-name{max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:900;font-size:13px}.v256-menu-rank{margin-top:4px;font-size:11px;color:var(--accent);font-weight:800}
+    .v256-menu-divider{height:1px;background:#263a5a;margin:5px 4px}.v256-menu-item{appearance:none;width:100%;border:0;background:transparent;color:#eef4ff;display:flex;align-items:center;gap:10px;text-align:left;padding:11px 12px;border-radius:11px;font:inherit;font-size:14px;font-weight:800;cursor:pointer;text-decoration:none;transition:background .15s,transform .15s}.v256-menu-item:hover{background:#1b2c49}.v256-menu-item:active{transform:scale(.985)}.v256-menu-item.current{background:#1b2c49;color:#dfe9ff}.v256-menu-icon{width:22px;text-align:center;font-size:17px;flex:0 0 22px}.v256-menu-footer{position:sticky;bottom:-8px;padding:7px 0 0;background:rgba(13,25,45,.985)}
+    html[data-starry-theme="light"] #v216Menu{color:#334155}html[data-starry-theme="light"] #v216Menu:hover{background:#f1f5f9;color:#6f62c7}
+    html[data-starry-theme="light"] .v256-menu-overlay{background:rgba(15,23,42,.12)}html[data-starry-theme="light"] .v256-menu-panel{border-color:rgba(226,232,240,.9);background:rgba(255,255,255,.985);box-shadow:0 18px 45px rgba(15,23,42,.24)}html[data-starry-theme="light"] .v256-menu-item,html[data-starry-theme="light"] .v256-menu-profile{color:#334155}html[data-starry-theme="light"] .v256-menu-item:hover,html[data-starry-theme="light"] .v256-menu-profile:hover,html[data-starry-theme="light"] .v256-menu-item.current{background:#f1f5f9}html[data-starry-theme="light"] .v256-menu-divider{background:#e7e9ef}html[data-starry-theme="light"] .v256-menu-footer{background:rgba(255,255,255,.985)}
+    @media(max-width:760px){#v256MyCardBtn{padding:8px 10px!important}#v216Menu{width:40px;height:40px;flex-basis:40px;font-size:22px}.v256-menu-shell{top:66px;right:10px;max-width:calc(100vw - 20px)}.v256-menu-panel{min-width:min(290px,calc(100vw - 20px));max-width:calc(100vw - 20px);max-height:calc(100dvh - 82px)}}
+  </style>`;
+
+  const script = String.raw`<script id="v256-unified-menu-script">(()=>{
+    const APPS=[
+      ['✦','繁星宇宙','https://starry.phd/'],
+      ['★','Starry ID','https://id.starry.phd/'],
+      ['♪','繁星回聲','https://echo.starry.phd/'],
+      ['⇩','繁星下載','https://download.starry.phd/'],
+      ['↗','繁星任意門','https://go.starry.phd/'],
+      ['❝','繁星雞湯','https://quotes.starry.phd/'],
+      ['▣','繁星膠囊','https://box.starry.phd/']
+    ];
+    const q=(s,r=document)=>r.querySelector(s);
+    let session=null,cardUrl='',cardPromise=null;
+    async function api(path){const r=await fetch(path,{credentials:'same-origin'});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'操作失敗');return d}
+    function toast(message,error=false){const el=q('#toast');if(!el)return;el.textContent=message;el.className='toast'+(error?' error':'');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.add('hidden'),2600)}
+    function closeMenu(){q('#v256MenuShell')?.setAttribute('hidden','');q('#v256MenuOverlay')?.setAttribute('hidden','');q('#v216Menu')?.setAttribute('aria-expanded','false')}
+    function addItem(panel,icon,label,actionOrUrl,current=false){let el;if(typeof actionOrUrl==='string'){el=document.createElement('a');el.href=actionOrUrl}else{el=document.createElement('button');el.type='button';el.addEventListener('click',actionOrUrl)}el.className='v256-menu-item'+(current?' current':'');const i=document.createElement('span');i.className='v256-menu-icon';i.textContent=icon;const t=document.createElement('span');t.textContent=label;el.append(i,t);panel.appendChild(el);return el}
+    async function loadCardUrl(force=false){if(cardUrl&&!force)return cardUrl;if(cardPromise&&!force)return cardPromise;cardPromise=api('/api/card-settings').then(data=>{cardUrl=String(data?.url||'').trim();return cardUrl}).finally(()=>{cardPromise=null});return cardPromise}
+    async function openMyCard(){closeMenu();let tab=null;try{if(cardUrl){window.open(cardUrl,'_blank','noopener');return}tab=window.open('about:blank','_blank');if(tab)tab.opener=null;const url=await loadCardUrl();if(!url)throw Error('找不到名片網址');if(tab)tab.location.replace(url);else location.href=url}catch(error){try{tab?.close()}catch{}toast(error?.message||'無法開啟我的名片',true)}}
+    function memberName(){return session?.user?.name||session?.user?.email||'Starry 會員'}
+    function memberRank(){return session?.user?.approvedRank||session?.user?.rank||''}
+    function memberAvatar(){return String(session?.user?.avatar||session?.user?.googleAvatar||'').trim()}
+    function buildMenu(){q('#v256MenuShell')?.remove();q('#v256MenuOverlay')?.remove();const overlay=document.createElement('div');overlay.id='v256MenuOverlay';overlay.className='v256-menu-overlay';overlay.hidden=true;overlay.addEventListener('click',closeMenu);const shell=document.createElement('div');shell.id='v256MenuShell';shell.className='v256-menu-shell';shell.hidden=true;const panel=document.createElement('div');panel.className='v256-menu-panel';panel.setAttribute('role','menu');const profile=document.createElement('button');profile.type='button';profile.className='v256-menu-profile';profile.addEventListener('click',()=>void openMyCard());const avatarUrl=memberAvatar();if(avatarUrl){const img=document.createElement('img');img.src=avatarUrl;img.alt='會員頭像';img.referrerPolicy='no-referrer';profile.appendChild(img)}else{const fallback=document.createElement('span');fallback.className='v256-menu-avatar-fallback';fallback.textContent=memberName().slice(0,1).toUpperCase();profile.appendChild(fallback)}const copy=document.createElement('span');copy.className='v256-menu-profile-copy';const name=document.createElement('span');name.className='v256-menu-name';name.textContent=memberName();const rank=document.createElement('span');rank.className='v256-menu-rank';rank.textContent=memberRank();if(!rank.textContent)rank.hidden=true;copy.append(name,rank);profile.appendChild(copy);panel.appendChild(profile);let divider=document.createElement('div');divider.className='v256-menu-divider';panel.appendChild(divider);addItem(panel,'★','我的名片',()=>void openMyCard());addItem(panel,'🔋','電池餘額日誌','/battery-ledger');if(session?.isSuperAdmin){addItem(panel,'⚙','會員管理',()=>{closeMenu();q('#adminBtn')?.click()})}divider=document.createElement('div');divider.className='v256-menu-divider';panel.appendChild(divider);for(const [icon,label,url] of APPS)addItem(panel,icon,label,url,location.hostname===new URL(url).hostname);divider=document.createElement('div');divider.className='v256-menu-divider';panel.appendChild(divider);const footer=document.createElement('div');footer.className='v256-menu-footer';addItem(footer,'↪','登出',()=>{closeMenu();q('#logoutBtn')?.click()});panel.appendChild(footer);shell.appendChild(panel);document.body.append(overlay,shell)}
+    function openMenu(){buildMenu();q('#v256MenuShell')?.removeAttribute('hidden');q('#v256MenuOverlay')?.removeAttribute('hidden');q('#v216Menu')?.setAttribute('aria-expanded','true')}
+    function setupToolbar(){const actions=q('#topActions');if(!actions)return;q('#myCardBtn')?.remove();let card=q('#v256MyCardBtn');if(!card){card=document.createElement('button');card.type='button';card.id='v256MyCardBtn';card.className='btn primary';card.textContent='我的名片';card.addEventListener('click',()=>void openMyCard());const admin=q('#adminBtn');actions.insertBefore(card,admin||q('#logoutBtn')||null)}let menu=q('#v216Menu');if(!menu){menu=document.createElement('button');menu.type='button';menu.id='v216Menu';menu.setAttribute('aria-label','開啟主選單');menu.setAttribute('aria-expanded','false');menu.textContent='☰';menu.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();const shell=q('#v256MenuShell');if(shell&&!shell.hasAttribute('hidden'))closeMenu();else openMenu()});actions.appendChild(menu)}}
+    document.addEventListener('keydown',event=>{if(event.key==='Escape')closeMenu()});
+    document.addEventListener('click',event=>{const target=event.target;if(!(target instanceof Element))return;if(target.closest('#v216Menu,#v256MenuShell'))return;if(!q('#v256MenuShell')?.hasAttribute('hidden'))closeMenu()},true);
+    function hydrate(data){session=data||null;setupToolbar();buildMenu();if(data?.user)void loadCardUrl().catch(()=>undefined)}
+    setupToolbar();
+    void api('/api/session').then(hydrate).catch(()=>{session=null;setupToolbar()});
+    for(const delay of [0,100,300,800])setTimeout(setupToolbar,delay);
+  })();</script>`;
+
+  return html.replace('</head>', css + '</head>').replace('</body>', script + '</body>');
+}

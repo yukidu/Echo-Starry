@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const battery = readFileSync('worker/starryIdV245BatteryRouter.ts','utf8');
-const menu = readFileSync('worker/starryIdV216Enhancer.ts','utf8');
-const navigation = readFileSync('worker/starryIdV253NavigationEnhancer.ts','utf8');
+const menu = readFileSync('worker/starryIdV256UnifiedMenu.ts','utf8');
 
 test('v247 battery enhancer no longer owns or rebuilds the main menu', () => {
   assert.doesNotMatch(battery, /function syncMenu\(/);
@@ -21,11 +20,13 @@ test('v248 supersedes the v247 observer exclusions by removing the battery obser
   assert.match(client, /function finiteSync\(force=false\)/);
 });
 
-test('v255 retires the old v216 ecosystem hamburger menu at its source', () => {
-  assert.doesNotMatch(menu, /const APPS=/);
-  assert.doesNotMatch(menu, /function openMenu/);
-  assert.doesNotMatch(menu, /ledger\.href='\/battery-ledger'/);
-  assert.match(menu, /retireLegacyToolbar/);
-  assert.match(navigation, /q\('#v216Menu'\)\?\.remove\(\)/);
-  assert.match(navigation, /label==='☰'/);
+test('v256 unified menu is the single owner of the restored hamburger and ecosystem links', () => {
+  assert.match(menu, /menu\.id='v216Menu'/);
+  assert.match(menu, /function openMenu\(\)/);
+  assert.match(menu, /v256-menu-panel/);
+  assert.match(menu, /電池餘額日誌/);
+  assert.match(menu, /https:\/\/id\.starry\.phd\//);
+  assert.match(menu, /https:\/\/echo\.starry\.phd\//);
+  assert.match(menu, /https:\/\/download\.starry\.phd\//);
+  assert.match(menu, /https:\/\/go\.starry\.phd\//);
 });

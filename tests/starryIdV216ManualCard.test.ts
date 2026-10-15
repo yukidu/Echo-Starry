@@ -7,6 +7,7 @@ const root = process.cwd();
 const enhancer = readFileSync(join(root, 'worker/starryIdV216Enhancer.ts'), 'utf8');
 const router = readFileSync(join(root, 'worker/starryIdV211Router.ts'), 'utf8');
 const navigation = readFileSync(join(root, 'worker/starryIdV253NavigationEnhancer.ts'), 'utf8');
+const unifiedMenu = readFileSync(join(root, 'worker/starryIdV256UnifiedMenu.ts'), 'utf8');
 
 test('member header mirrors Download Starry identity hierarchy with photo, name and rank', () => {
   assert.match(enhancer, /v216-header-avatar/);
@@ -15,15 +16,16 @@ test('member header mirrors Download Starry identity hierarchy with photo, name 
   assert.match(enhancer, /user\.approvedRank\|\|user\.rank\|\|'無'/);
 });
 
-test('retired My Card management page and its hamburger source are removed', () => {
+test('retired My Card management page stays removed while the hamburger and My Card shortcut are restored', () => {
   assert.doesNotMatch(router, /pub\.textContent='公開設定'/);
   assert.doesNotMatch(enhancer, /renderMyCard/);
   assert.doesNotMatch(enhancer, /v216-card-page/);
-  assert.doesNotMatch(enhancer, /function openMenu/);
-  assert.doesNotMatch(enhancer, /const APPS=/);
   assert.match(enhancer, /retireLegacyToolbar/);
-  assert.match(navigation, /#myCardBtn,#v216Menu\{display:none!important\}/);
-  assert.match(navigation, /history\.replaceState\(null,'','\/'\)/);
+  assert.doesNotMatch(navigation, /#myCardBtn,#v216Menu\{display:none!important\}/);
+  assert.match(navigation, /enhanceStarryIdV256UnifiedMenu/);
+  assert.match(unifiedMenu, /menu\.id='v216Menu'/);
+  assert.match(unifiedMenu, /card\.id='v256MyCardBtn'/);
+  assert.match(unifiedMenu, /card\.textContent='我的名片'/);
 });
 
 test('pencil editing requires an explicit checkmark and never saves on blur or Enter', () => {
@@ -48,9 +50,12 @@ test('visibility uses true eye and eye-slash icons instead of prohibition glyph'
   assert.doesNotMatch(enhancer, /⊘/);
 });
 
-test('mobile toolbar keeps essential admin and logout actions after hamburger retirement', () => {
+test('mobile toolbar keeps My Card plus hamburger while member management moves into the menu', () => {
   assert.match(enhancer, /@media\(max-width:760px\)/);
-  assert.doesNotMatch(enhancer, /\.top-actions #adminBtn,.top-actions #logoutBtn\{display:none!important\}/);
+  assert.match(unifiedMenu, /#adminBtn\{display:none!important\}/);
+  assert.match(unifiedMenu, /#v216Menu/);
+  assert.match(unifiedMenu, /會員管理/);
+  assert.match(unifiedMenu, /q\('#adminBtn'\)\?\.click\(\)/);
   assert.match(enhancer, /html\[data-starry-theme="light"\] \.topbar/);
   assert.match(enhancer, /#14213d/);
 });

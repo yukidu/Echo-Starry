@@ -7,10 +7,13 @@ const root = process.cwd();
 const source = readFileSync(join(root, 'worker/starryIdV253NavigationEnhancer.ts'), 'utf8');
 const bridge = readFileSync(join(root, 'worker/starryIdV212PublicCardBridge.ts'), 'utf8');
 const v216 = readFileSync(join(root, 'worker/starryIdV216Enhancer.ts'), 'utf8');
+const unifiedMenu = readFileSync(join(root, 'worker/starryIdV256UnifiedMenu.ts'), 'utf8');
 
-test('v253 remains layered into Starry ID member center', () => {
+test('v253 remains layered into Starry ID member center and hands off to the v256 menu layer', () => {
   assert.match(v216, /enhanceStarryIdV253Navigation/);
   assert.match(v216, /return enhanceStarryIdV253Navigation\(enhanced\)/);
+  assert.match(source, /enhanceStarryIdV256UnifiedMenu/);
+  assert.match(source, /return enhanceStarryIdV256UnifiedMenu\(enhanced\)/);
 });
 
 test('retired My Card management route returns to the member center', () => {
@@ -19,13 +22,12 @@ test('retired My Card management route returns to the member center', () => {
   assert.match(source, /q\('#myCardPage'\)\?\.remove\(\)/);
 });
 
-test('My Card button and hamburger main menu are removed', () => {
-  assert.match(source, /#myCardBtn,#v216Menu/);
-  assert.match(source, /q\('#myCardBtn'\)\?\.remove\(\)/);
-  assert.match(source, /q\('#v216Menu'\)\?\.remove\(\)/);
-  assert.match(source, /q\('\.v216-menu'\)\?\.remove\(\)/);
-  assert.match(source, /label==='我的名片'/);
-  assert.match(source, /label==='☰'/);
+test('v253 no longer removes the restored My Card button or hamburger menu', () => {
+  assert.doesNotMatch(source, /#myCardBtn,#v216Menu\{display:none!important\}/);
+  assert.doesNotMatch(source, /q\('#v216Menu'\)\?\.remove\(\)/);
+  assert.doesNotMatch(source, /label==='☰'/);
+  assert.match(unifiedMenu, /menu\.id='v216Menu'/);
+  assert.match(unifiedMenu, /card\.id='v256MyCardBtn'/);
 });
 
 test('valid-session navigation still cannot flash the login page', () => {
@@ -35,7 +37,7 @@ test('valid-session navigation still cannot flash the login page', () => {
 });
 
 test('card layout and drag editing code has been removed', () => {
-  const combined = source + '\n' + bridge;
+  const combined = source + '\n' + bridge + '\n' + unifiedMenu;
   assert.doesNotMatch(combined, /v252-drag-handle/);
   assert.doesNotMatch(combined, /pointerdown/);
   assert.doesNotMatch(combined, /setAsGlobalDefault/);
