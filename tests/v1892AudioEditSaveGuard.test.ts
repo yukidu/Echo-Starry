@@ -20,8 +20,8 @@ test('v189.2 routes a no-change save through the canonical partial-update path',
   assert.match(stickerRouter, /const functionalKeys = Object\.keys\(cleanBody\)\.filter\(key => key !== 'userEmail'\)/);
 });
 
-test('v189.2 leaves real edits untouched and preserves the original Worker entrypoint', () => {
+test('v189.2 leaves real edits untouched and preserves the current Worker wrapper chain', () => {
   assert.match(privacyRouter, /if \(editableKeys\.length > 0\) return request/);
-  assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
+  assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
   assert.doesNotMatch(wrangler, /audioEditSaveGuardRouter/);
 });
