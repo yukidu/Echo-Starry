@@ -15,10 +15,10 @@ export function enhanceStarryIdV253Navigation(html: string): string {
       q('.v216-menu')?.remove();
       const actions=q('#topActions');
       if(actions){
-        for(const button of Array.from(actions.querySelectorAll('button'))){
+        actions.querySelectorAll('button').forEach(button=>{
           const label=(button.textContent||'').trim();
           if(label==='我的名片'||label==='我的電子名片'||label==='☰')button.remove();
-        }
+        });
       }
     }
     function retireMyCardRoute(){
