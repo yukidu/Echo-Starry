@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const favoriteRouter = readFileSync(new URL('../worker/favoriteRouter.ts', import.meta.url), 'utf8');
 const dislike = readFileSync(new URL('../src/v181HomeToolbarDislike.ts', import.meta.url), 'utf8');
 const dislikeFavorites = readFileSync(new URL('../src/v183DislikeFavoritesPolish.ts', import.meta.url), 'utf8');
+const audioCard = readFileSync(new URL('../src/components/AudioCard.tsx', import.meta.url), 'utf8');
 
 test('leaderboard uses real D1 data and real completed playback memories', () => {
   assert.match(favoriteRouter, /url\.pathname === '\/api\/leaderboard'/);
@@ -27,8 +28,10 @@ test('new tracks do not receive a synthetic five-star rating', () => {
   assert.doesNotMatch(favoriteRouter, /nextBody\.ratingCount\s*=\s*1/);
 });
 
-test('dislike reuses card speaker and hides optimistically before persistence', () => {
-  assert.match(dislike, /querySelector<HTMLImageElement>\('img\[alt\]'\)/);
+test('dislike reuses exact card speaker and hides optimistically before persistence', () => {
+  assert.match(audioCard, /data-speaker=\{track\.speaker\}/);
+  assert.match(dislike, /card\.dataset\.speaker/);
+  assert.doesNotMatch(dislike, /img\[alt\]/);
   assert.doesNotMatch(dislike, /void loadTrackSpeakerMap\(\)\.then/);
   const addIndex = dislike.indexOf('hiddenSpeakers.add(speakerName)');
   const persistIndex = dislike.indexOf('await persistDislike(speakerName)');
