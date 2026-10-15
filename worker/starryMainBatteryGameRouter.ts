@@ -75,6 +75,12 @@ function cleanTargetId(value: unknown) {
   return /^[A-Za-z0-9:_-]{8,128}$/.test(id) ? id : '';
 }
 
+function randomRewardHundredths() {
+  const bytes = new Uint32Array(1);
+  crypto.getRandomValues(bytes);
+  return (bytes[0] % 9) + 1;
+}
+
 async function readExactBalance(db: any, userId: string) {
   const legacy: any = await db.prepare(`SELECT COALESCE(SUM(deltaUnits),0) AS units
     FROM battery_transactions WHERE userId=?`).bind(userId).first();
@@ -165,11 +171,22 @@ async function handleGame(request: Request, env: Env) {
     return json(request, { authenticated: true, success: false, error: '點擊速度太快，請再試一次', ...balance }, 429);
   }
 
+  const rewardHundredths = randomRewardHundredths();
+  const added = Number((rewardHundredths / 100).toFixed(2));
   const uniqueKey = `starryphd:meteor:${session.userId}:${targetId}`;
   const insert: any = await db.prepare(`INSERT OR IGNORE INTO battery_hundredth_transactions
     (id,userId,deltaHundredths,sourceApp,sourceId,description,uniqueKey,createdAt)
-    VALUES(?,?,1,?,?,?, ?,?)`)
-    .bind(crypto.randomUUID(), session.userId, SOURCE_APP, targetId, '繁星主站・成功爆破隕石 +0.01 電池', uniqueKey, now).run();
+    VALUES(?,?,?,?,?,?,?,?)`)
+    .bind(
+      crypto.randomUUID(),
+      session.userId,
+      rewardHundredths,
+      SOURCE_APP,
+      targetId,
+      `繁星主站・成功爆破隕石 +${added.toFixed(2)} 電池`,
+      uniqueKey,
+      now
+    ).run();
 
   const inserted = Number(insert?.meta?.changes || 0) > 0;
   if (!inserted) {
@@ -182,7 +199,7 @@ async function handleGame(request: Request, env: Env) {
   const lifetimeHundredths = Math.max(0, Number(fraction?.hundredths || 0));
   await promoteHundredths(db, session.userId, lifetimeHundredths, now);
   const balance = await readExactBalance(db, session.userId);
-  return json(request, { authenticated: true, success: true, duplicate: false, added: 0.01, ...balance });
+  return json(request, { authenticated: true, success: true, duplicate: false, added, rewardHundredths, ...balance });
 }
 
 export default {
