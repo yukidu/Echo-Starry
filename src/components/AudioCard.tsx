@@ -194,6 +194,7 @@ export const AudioCard: React.FC<AudioCardProps> = ({
   return (
     <div
       data-track-id={track.id}
+      data-speaker={track.speaker}
       onClick={onClick}
       className={`audio-card group relative w-full rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs border transition-all duration-200 cursor-pointer overflow-visible py-2.5 pl-2.5 pr-2.5 sm:py-3 sm:pl-3 sm:pr-3 shadow-2xs hover:shadow-md hover:-translate-y-0.5 ${
         isCurrentTrack
