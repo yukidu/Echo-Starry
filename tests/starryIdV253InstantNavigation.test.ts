@@ -5,49 +5,49 @@ import { join } from 'node:path';
 
 const root = process.cwd();
 const source = readFileSync(join(root, 'worker/starryIdV253NavigationEnhancer.ts'), 'utf8');
+const bridge = readFileSync(join(root, 'worker/starryIdV212PublicCardBridge.ts'), 'utf8');
 const v216 = readFileSync(join(root, 'worker/starryIdV216Enhancer.ts'), 'utf8');
 
-test('v253 is layered into every Starry ID member-center page', () => {
+test('v253 remains layered into Starry ID member center', () => {
   assert.match(v216, /enhanceStarryIdV253Navigation/);
   assert.match(v216, /return enhanceStarryIdV253Navigation\(enhanced\)/);
 });
 
-test('main My Card button immediately opens the signed-in member public card in a new page', () => {
-  assert.match(source, /closest\?\.\('#myCardBtn'\)/);
-  assert.match(source, /openPublicCard\(\)/);
-  assert.match(source, /String\(settingsData\?\.url\|\|''\)\.trim\(\)/);
-  assert.match(source, /window\.open\(ready,'_blank','noopener'\)/);
-  assert.match(source, /window\.open\('about:blank','_blank'\)/);
-  assert.match(source, /tab\.location\.replace\(url\)/);
-  assert.doesNotMatch(source, /if\(card\).*navigate\('\/my-card'\)/s);
+test('retired My Card management route returns to the member center', () => {
+  assert.match(source, /location\.pathname!=='\/my-card'/);
+  assert.match(source, /history\.replaceState\(null,'','\/'\)/);
+  assert.match(source, /q\('#myCardPage'\)\?\.remove\(\)/);
 });
 
-test('public-card URL is warmed in the background so the main button does not wait before reacting', () => {
-  assert.match(source, /void loadSettings\(\)\.catch\(\(\)=>undefined\)/);
-  assert.match(source, /if\(!force&&settingsData\)return Promise\.resolve\(settingsData\)/);
-  assert.match(source, /if\(!force&&settingsPromise\)return settingsPromise/);
+test('My Card button and hamburger main menu are removed', () => {
+  assert.match(source, /#myCardBtn,#v216Menu/);
+  assert.match(source, /q\('#myCardBtn'\)\?\.remove\(\)/);
+  assert.match(source, /q\('#v216Menu'\)\?\.remove\(\)/);
+  assert.match(source, /q\('\.v216-menu'\)\?\.remove\(\)/);
+  assert.match(source, /label==='我的名片'/);
+  assert.match(source, /label==='☰'/);
 });
 
-test('valid-session navigation cannot flash the Starry ID login page', () => {
+test('valid-session navigation still cannot flash the login page', () => {
   assert.match(source, /html:not\(\[data-v253-auth-ready="1"\]\) #loginView\{visibility:hidden!important\}/);
   assert.match(source, /document\.documentElement\.dataset\.v253AuthReady='1'/);
   assert.match(source, /q\('#loginView'\)\?\.classList\.add\('hidden'\)/);
 });
 
-test('direct member-center and My Card management routes still use browser history without full-page reload', () => {
-  assert.match(source, /history\[replace\?'replaceState':'pushState'\]/);
-  assert.match(source, /window\.__starryV253Navigate=navigate/);
-  assert.match(source, /window\.addEventListener\('popstate',route\)/);
-  assert.match(source, /back\.onclick=\(\)=>navigate\('\/'\)/);
-  assert.doesNotMatch(source, /location\.href='\/my-card'/);
+test('card layout and drag editing code has been removed', () => {
+  const combined = source + '\n' + bridge;
+  assert.doesNotMatch(combined, /v252-drag-handle/);
+  assert.doesNotMatch(combined, /pointerdown/);
+  assert.doesNotMatch(combined, /setAsGlobalDefault/);
+  assert.doesNotMatch(combined, /設定為全體預設值/);
+  assert.doesNotMatch(combined, /public_card_layouts/);
+  assert.doesNotMatch(combined, /public_card_layout_defaults/);
+  assert.doesNotMatch(combined, /v252-public-layout/);
 });
 
-test('SPA My Card management keeps v252 layout controls, drag save and global default support', () => {
-  assert.match(source, /v252-drag-handle/);
-  assert.match(source, /手機每列/);
-  assert.match(source, /setAsGlobalDefault/);
-  assert.match(source, /設定為全體預設值/);
-  assert.match(source, /pointerdown/);
-  assert.match(source, /pointermove/);
-  assert.match(source, /pointerup/);
+test('public Amway-ID cards remain supported', () => {
+  assert.match(bridge, /AMWAY_ID_RE/);
+  assert.match(bridge, /findUniqueActiveMember/);
+  assert.match(bridge, /materializeCard/);
+  assert.match(bridge, /handleStarryIdV211/);
 });
