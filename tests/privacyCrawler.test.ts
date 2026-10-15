@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const router = readFileSync(new URL('../worker/privacyCrawlerRouter.ts', import.meta.url), 'utf8');
+const batteryRouter = readFileSync(new URL('../worker/starryMainBatteryGameRouter.ts', import.meta.url), 'utf8');
+const inlineLoginRouter = readFileSync(new URL('../worker/starryMainInlineLoginRouter.ts', import.meta.url), 'utf8');
 const robots = readFileSync(new URL('../public/robots.txt', import.meta.url), 'utf8');
 const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const wrangler = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
@@ -29,6 +31,8 @@ test('worker blocks known search and AI crawler user agents', () => {
 });
 
 test('all site requests run through privacy crawler router', () => {
-  assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
+  assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
+  assert.match(inlineLoginRouter, /import appWorker from '\.\/starryMainBatteryGameRouter'/);
+  assert.match(batteryRouter, /import appWorker from '\.\/privacyCrawlerRouter'/);
   assert.match(wrangler, /run_worker_first = \["\/\*"\]/);
 });

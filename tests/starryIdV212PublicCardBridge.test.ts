@@ -6,11 +6,15 @@ import { v212PublicAmwaySlug } from '../worker/starryIdV212PublicCardBridge';
 
 const root = process.cwd();
 const privacyRouter = readFileSync(join(root, 'worker/privacyCrawlerRouter.ts'), 'utf8');
+const batteryRouter = readFileSync(join(root, 'worker/starryMainBatteryGameRouter.ts'), 'utf8');
+const inlineLoginRouter = readFileSync(join(root, 'worker/starryMainInlineLoginRouter.ts'), 'utf8');
 const wrangler = readFileSync(join(root, 'wrangler.toml'), 'utf8');
 const bridge = readFileSync(join(root, 'worker/starryIdV212PublicCardBridge.ts'), 'utf8');
 
-test('v212 keeps the established privacy crawler worker as the production entry', () => {
-  assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
+test('v212 stays inside the established privacy crawler production chain', () => {
+  assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
+  assert.match(inlineLoginRouter, /import appWorker from '\.\/starryMainBatteryGameRouter'/);
+  assert.match(batteryRouter, /import appWorker from '\.\/privacyCrawlerRouter'/);
   assert.match(privacyRouter, /handleStarryIdV212PublicCardFallback/);
   assert.match(privacyRouter, /starryV212Response \|\| starryV211Response/);
 });
