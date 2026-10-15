@@ -27,7 +27,7 @@ test('v252 my-card supports touch dragging and one to three mobile columns', () 
 
 test('v252 public card mirrors member order and mobile density', () => {
   assert.match(source, /data-v252-key/);
-  assert.match(source, /style=\\"order:/);
+  assert.match(source, /style="order:/);
   assert.match(source, /v252-public-layout/);
   assert.match(source, /grid-template-columns:repeat\(\$\{layout\.mobileColumns\}/);
 });
