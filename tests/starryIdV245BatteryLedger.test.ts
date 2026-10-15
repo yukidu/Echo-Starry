@@ -5,6 +5,8 @@ import fs from 'node:fs';
 const router = fs.readFileSync('worker/starryIdV245BatteryRouter.ts','utf8');
 const menu = fs.readFileSync('worker/starryIdV256UnifiedMenu.ts','utf8');
 const privacy = fs.readFileSync('worker/privacyCrawlerRouter.ts','utf8');
+const batteryRouter = fs.readFileSync('worker/starryMainBatteryGameRouter.ts','utf8');
+const inlineLoginRouter = fs.readFileSync('worker/starryMainInlineLoginRouter.ts','utf8');
 const wrangler = fs.readFileSync('wrangler.toml','utf8');
 
 test('v245 exposes read-only central battery balance and full ledger routes', () => {
@@ -37,6 +39,8 @@ test('v245 stays inside the established privacy router and does not replace the 
   assert.match(privacy, /handleStarryIdV245Battery/);
   assert.match(privacy, /enhanceStarryIdV245Response/);
   assert.match(privacy, /const starryV245Direct = await handleStarryIdV245Battery/);
-  assert.match(wrangler, /main = "worker\/starryMainBatteryGameRouter\.ts"/);
+  assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
+  assert.match(inlineLoginRouter, /import appWorker from '\.\/starryMainBatteryGameRouter'/);
+  assert.match(batteryRouter, /import appWorker from '\.\/privacyCrawlerRouter'/);
   assert.doesNotMatch(wrangler, /starryIdV245Entry/);
 });
