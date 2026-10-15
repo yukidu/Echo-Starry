@@ -1,51 +1,54 @@
 export function enhanceStarryIdV253Navigation(html: string): string {
   const css = String.raw`<style id="v253-navigation-style">
     html:not([data-v253-auth-ready="1"]) #loginView{visibility:hidden!important}
-    .v253-card-loading{min-height:44vh;display:grid;place-items:center;text-align:center;color:var(--muted)}
-    .v253-card-loading strong{display:block;color:var(--text);font-size:18px;margin-bottom:7px}
-    .v253-layout-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0 14px;padding:10px 12px;border:1px solid #314869;border-radius:14px;background:#0d192d}
-    .v253-layout-hint{font-size:13px;color:#b9c8df;margin-right:auto}.v253-layout-bar label{display:flex;align-items:center;gap:7px;font-size:13px}.v253-layout-bar select{border:1px solid #516b93;background:#14243c;color:#fff;border-radius:9px;padding:7px 9px}.v253-default-btn{white-space:nowrap}
-    html[data-starry-theme="light"] .v253-layout-bar{background:#f7faff;border-color:#c5d1e0;color:#14213d}html[data-starry-theme="light"] .v253-layout-bar select{background:#fff;color:#14213d;border-color:#b8c8dd}
-    @media(max-width:760px){.v253-layout-bar{align-items:stretch}.v253-layout-hint{width:100%;margin-right:0}.v253-layout-bar label{flex:1}.v253-layout-bar select{flex:1}}
+    #myCardBtn,#v216Menu{display:none!important}
   </style>`;
 
   const script = String.raw`<script id="v253-navigation-script">(()=>{
-    const INITIAL_PATH=location.pathname;
-    const LEGACY_LAYOUT_ACTIVE=INITIAL_PATH==='/my-card';
     const q=(s,r=document)=>r.querySelector(s);
-    const qa=(s,r=document)=>Array.from(r.querySelectorAll(s));
-    let sessionData=null,sessionPromise=null,settingsData=null,settingsPromise=null,drag=null,dragBusy=false,dragInstalled=false,routeToken=0;
-
-    async function api(path,opt={}){const r=await fetch(path,{credentials:'same-origin',...opt,headers:{'Content-Type':'application/json',...(opt.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'操作失敗');return d}
-    function toast(message,error=false){const t=q('#toast');if(!t)return;t.textContent=message;t.className='toast'+(error?' error':'');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.add('hidden'),2400)}
+    async function api(path){const r=await fetch(path,{credentials:'same-origin'});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'操作失敗');return d}
     function markAuthReady(){document.documentElement.dataset.v253AuthReady='1'}
-    function loadSession(){if(sessionData)return Promise.resolve(sessionData);if(!sessionPromise)sessionPromise=api('/api/session').then(d=>{sessionData=d;markAuthReady();return d}).catch(e=>{markAuthReady();throw e});return sessionPromise}
-    function loadSettings(force=false){if(!force&&settingsData)return Promise.resolve(settingsData);if(!force&&settingsPromise)return settingsPromise;settingsPromise=api('/api/card-settings').then(d=>{settingsData=d;return d}).finally(()=>{settingsPromise=null});return settingsPromise}
-    function hideMemberViews(){q('#memberView')?.classList.add('hidden');q('#loginView')?.classList.add('hidden')}
-    function showMemberCenter(){q('#myCardPage')?.classList.add('hidden');if(sessionData?.user){q('#loginView')?.classList.add('hidden');q('#memberView')?.classList.remove('hidden')}window.dispatchEvent(new CustomEvent('starry:route',{detail:{path:'/'}}))}
-    function ensureCardShell(){hideMemberViews();let page=q('#myCardPage');if(!page){page=document.createElement('section');page.id='myCardPage';page.className='v216-card-page';q('.shell')?.appendChild(page)}page.classList.remove('hidden');if(!page.dataset.v253Ready){page.replaceChildren();const loading=document.createElement('div');loading.className='v253-card-loading';const copy=document.createElement('div');const strong=document.createElement('strong');strong.textContent='我的電子名片';const text=document.createElement('div');text.textContent='正在準備名片…';copy.append(strong,text);loading.appendChild(copy);page.appendChild(loading)}return page}
-    function route(){const token=++routeToken;if(location.pathname==='/my-card'){ensureCardShell();void loadSession().then(d=>{if(token===routeToken&&location.pathname==='/my-card')return renderCard(d.user)}).catch(()=>{if(token!==routeToken)return;q('#myCardPage')?.remove();q('#loginView')?.classList.remove('hidden')})}else if(location.pathname==='/'){showMemberCenter()}}
-    function navigate(path,replace=false){if(path!=='/'&&path!=='/my-card')return false;if(location.pathname!==path){history[replace?'replaceState':'pushState']({starryV253:true},'',path)}route();return true}
-    window.__starryV253Navigate=navigate;
-    function openPublicCard(){const ready=String(settingsData?.url||'').trim();if(ready){window.open(ready,'_blank','noopener');return}const tab=window.open('about:blank','_blank');if(!tab){toast('瀏覽器阻擋了新頁面，請允許開啟新頁面',true);return}try{tab.opener=null;tab.document.title='正在開啟我的名片…';if(tab.document.body)tab.document.body.textContent='正在開啟我的名片…'}catch{}void loadSettings().then(d=>{const url=String(d?.url||'').trim();if(!url)throw Error('找不到名片網址');try{tab.location.replace(url)}catch{tab.location.href=url}}).catch(e=>{try{tab.close()}catch{}toast(e.message||'無法開啟名片',true)})}
-
-    function makeButton(text,className='btn'){const b=document.createElement('button');b.type='button';b.className=className;b.textContent=text;return b}
-    function previewRow(key,label,value){const box=document.createElement('div');box.className='v216-preview-field';box.dataset.v252Key=key==='cardNumber'?'amwayId':key;const l=document.createElement('div');l.className='v216-preview-label';l.textContent=label;const v=document.createElement('div');v.className='v216-preview-value';v.textContent=String(value);box.append(l,v);return box}
-    function orderIndex(settings,key){const order=settings?.layout?.fieldOrder||[];const effective=key==='cardNumber'?'amwayId':key;const i=order.indexOf(effective);return i<0?999:i}
-    function currentOrder(grid,settings){const keys=Array.from(grid.children).map(el=>el.dataset?.v252Key||'').filter(Boolean);const old=settings?.layout?.fieldOrder||[];return keys.concat(old.filter(k=>!keys.includes(k)))}
-    async function saveLayout(grid,settings,asDefault=false){if(dragBusy)return;dragBusy=true;settings.layout=settings.layout||{fieldOrder:[],mobileColumns:1};settings.layout.fieldOrder=currentOrder(grid,settings);try{const d=await api('/api/card-settings',{method:'PUT',body:JSON.stringify({layout:{fieldOrder:settings.layout.fieldOrder,mobileColumns:Number(settings.layout.mobileColumns)||1},setAsGlobalDefault:Boolean(asDefault)})});settingsData=d;settings.layout=d.layout||settings.layout;if(!asDefault)toast('名片版面已同步');return d}finally{dragBusy=false}}
-    function installDragListeners(){if(dragInstalled||LEGACY_LAYOUT_ACTIVE)return;dragInstalled=true;document.addEventListener('pointerdown',e=>{const h=e.target?.closest?.('.v252-drag-handle');if(!h)return;const field=h.closest('.v216-preview-field'),grid=q('.v216-preview-grid','#myCardPage');if(!field||!grid||field.parentElement!==grid)return;e.preventDefault();drag={field,handle:h,pointerId:e.pointerId,grid,settings:settingsData};field.classList.add('v252-dragging');try{h.setPointerCapture(e.pointerId)}catch{}},{capture:true});document.addEventListener('pointermove',e=>{if(!drag)return;e.preventDefault();const target=document.elementFromPoint(e.clientX,e.clientY)?.closest?.('.v216-preview-field');if(!target||target===drag.field||target.parentElement!==drag.grid)return;const r=target.getBoundingClientRect();drag.grid.insertBefore(drag.field,e.clientY<r.top+r.height/2?target:target.nextSibling)},{capture:true});const finish=()=>{if(!drag)return;const current=drag;current.field.classList.remove('v252-dragging');try{current.handle.releasePointerCapture(current.pointerId)}catch{}drag=null;void saveLayout(current.grid,current.settings||settingsData,false).catch(e=>toast(e.message||'版面儲存失敗',true))};document.addEventListener('pointerup',finish,{capture:true});document.addEventListener('pointercancel',finish,{capture:true})}
-    function applyLayout(page,grid,settings){settings.layout=settings.layout||{fieldOrder:[],mobileColumns:1};grid.style.setProperty('--v252-mobile-columns',String(settings.layout.mobileColumns||1));const items=qa('.v216-preview-field',grid);items.sort((a,b)=>orderIndex(settings,a.dataset.v252Key||'')-orderIndex(settings,b.dataset.v252Key||'')).forEach(el=>grid.appendChild(el));for(const field of items){if(q('.v252-drag-handle',field))continue;const h=makeButton('⋮⋮','v252-drag-handle');h.title='拖曳調整欄位位置';h.setAttribute('aria-label','拖曳調整欄位位置');field.prepend(h)}let bar=q('#v252LayoutBar',page);if(!bar){bar=document.createElement('div');bar.id='v252LayoutBar';bar.className='v252-layout-bar v253-layout-bar';const hint=document.createElement('div');hint.className='v252-layout-hint v253-layout-hint';hint.textContent='按住 ⋮⋮ 拖曳欄位，公開名片會同步位置';const label=document.createElement('label');label.append('手機每列');const select=document.createElement('select');select.setAttribute('aria-label','手機每列欄位數');for(const n of [1,2,3]){const o=document.createElement('option');o.value=String(n);o.textContent=n+' 欄';if(Number(settings.layout.mobileColumns)===n)o.selected=true;select.appendChild(o)}select.onchange=()=>{settings.layout.mobileColumns=Number(select.value);grid.style.setProperty('--v252-mobile-columns',select.value);void saveLayout(grid,settings,false).catch(e=>toast(e.message||'版面儲存失敗',true))};label.appendChild(select);bar.append(hint,label);if(settings.isSuperAdmin){const d=makeButton('設定為全體預設值','btn v252-default-btn v253-default-btn');d.onclick=async()=>{d.disabled=true;try{await saveLayout(grid,settings,true);toast('已設定為全體預設值')}catch(e){toast(e.message||'設定失敗',true)}finally{d.disabled=false}};bar.appendChild(d)}grid.parentElement?.insertBefore(bar,grid)}installDragListeners()}
-
-    async function renderCard(user){const page=ensureCardShell();const token=routeToken;let settings;try{settings=await loadSettings()}catch(e){if(token!==routeToken)return;page.dataset.v253Ready='';page.replaceChildren();const loading=document.createElement('div');loading.className='v253-card-loading';loading.textContent=e.message||'名片資料讀取失敗';page.appendChild(loading);return}if(token!==routeToken||location.pathname!=='/my-card')return;page.dataset.v253Ready='1';page.replaceChildren();const head=document.createElement('div');head.className='v216-card-page-head';const copy=document.createElement('div');const h=document.createElement('h2');h.textContent='我的電子名片';const sub=document.createElement('div');sub.className='v216-card-page-sub';sub.textContent='以下內容依目前公開／隱藏設定預覽';copy.append(h,sub);const actions=document.createElement('div');actions.className='v216-card-actions';const back=makeButton('回會員中心','btn');back.dataset.v253Back='1';back.onclick=()=>navigate('/');const open=document.createElement('a');open.href=settings.url||'#';open.target='_blank';open.rel='noopener';open.className='btn primary';open.textContent='查看公開頁';const copyBtn=makeButton('複製連結','btn');copyBtn.onclick=async()=>{try{await navigator.clipboard.writeText(settings.url||'');toast('已複製電子名片連結')}catch{toast('無法自動複製，請長按網址複製',true)}};actions.append(back,open,copyBtn);head.append(copy,actions);
-      const preview=document.createElement('div');preview.className='v216-preview';const phead=document.createElement('div');phead.className='v216-preview-head';const avatarUrl=String(user?.avatar||user?.googleAvatar||'').trim();let avatar;if(settings.visibility?.avatar!==false&&avatarUrl){avatar=document.createElement('img');avatar.className='v216-preview-avatar';avatar.src=avatarUrl;avatar.alt='會員照片';avatar.referrerPolicy='no-referrer'}else{avatar=document.createElement('div');avatar.className='v216-preview-fallback';avatar.textContent='✦'}const pcopy=document.createElement('div');const name=document.createElement('div');name.className='v216-preview-name';name.textContent=user?.name||'繁星會員';pcopy.appendChild(name);const rank=user?.approvedRank||user?.rank||'';if(rank&&settings.visibility?.rank!==false){const r=document.createElement('div');r.className='v216-preview-rank';r.textContent=rank;pcopy.appendChild(r)}phead.append(avatar,pcopy);
-      const grid=document.createElement('div');grid.className='v216-preview-grid';const amwayValue=user?.amwayId||settings.cardNumber||'';const rows=[['name','姓名',user?.name],['amwayId',user?.amwayId?'會員編號 / Amway ID':'電子名片編號',amwayValue],['email','Email',user?.email],['phone','手機',user?.phone],['residence','居住地',user?.residence],['center','中心',user?.center],['rank','獎銜',rank],['joinReason','初次如何認識安麗？',user?.joinReason],['stayReason','什麼原因留在安麗？',user?.stayReason],['birthday','生日',user?.birthday],['motto','座右銘',user?.motto],['zodiac','星座',user?.zodiac],['talentNumber','天賦數',user?.talentNumber],['lifeNumber','生命靈數',user?.lifeNumber],['sponsor','推薦人',user?.sponsor],['platinumUpline','白金上線',user?.platinumUpline],['diamondUpline','鑽石上線',user?.diamondUpline],['spouse','夫妻關係',user?.spouse?.name||user?.spouse]];for(const row of rows){const key=row[0],label=row[1],value=row[2];if(settings.visibility?.[key]===false||value===null||value===undefined||String(value).trim()==='')continue;grid.appendChild(previewRow(key,label,value))}preview.append(phead,grid);page.append(head,preview);applyLayout(page,grid,settings);window.dispatchEvent(new CustomEvent('starry:card-rendered'))}
-
-    document.addEventListener('click',e=>{const card=e.target?.closest?.('#myCardBtn');if(card){e.preventDefault();e.stopImmediatePropagation();openPublicCard();return}const back=e.target?.closest?.('#myCardPage [data-v253-back],#myCardPage a[href="/"]');if(back){e.preventDefault();e.stopImmediatePropagation();navigate('/')}},true);
-    window.addEventListener('popstate',route);
-    void loadSession().then(()=>{if(location.pathname==='/my-card')route()}).catch(()=>undefined);
-    void loadSettings().catch(()=>undefined);
-    if(INITIAL_PATH==='/my-card')route();
+    function removeRetiredUi(){
+      q('#myCardPage')?.remove();
+      q('#myCardBtn')?.remove();
+      q('#v216Menu')?.remove();
+      q('.v216-menu')?.remove();
+      const actions=q('#topActions');
+      if(actions){
+        actions.querySelectorAll('button').forEach(button=>{
+          const label=(button.textContent||'').trim();
+          if(label==='我的名片'||label==='我的電子名片'||label==='☰')button.remove();
+        });
+      }
+    }
+    function retireMyCardRoute(){
+      if(location.pathname!=='/my-card')return false;
+      history.replaceState(null,'','/');
+      removeRetiredUi();
+      return true;
+    }
+    retireMyCardRoute();
+    removeRetiredUi();
+    for(const delay of [0,50,200,500,1000])setTimeout(removeRetiredUi,delay);
+    window.addEventListener('popstate',()=>{retireMyCardRoute();removeRetiredUi()});
+    document.addEventListener('click',event=>{
+      const link=event.target?.closest?.('a[href="/my-card"]');
+      if(!link)return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      retireMyCardRoute();
+      removeRetiredUi();
+    },true);
+    void api('/api/session').then(data=>{
+      markAuthReady();
+      removeRetiredUi();
+      if(data?.user){
+        q('#loginView')?.classList.add('hidden');
+        q('#memberView')?.classList.remove('hidden');
+      }
+    }).catch(()=>{
+      markAuthReady();
+    });
   })();</script>`;
 
   return html.replace('</head>', css + '</head>').replace('</body>', script + '</body>');

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const battery = readFileSync('worker/starryIdV245BatteryRouter.ts','utf8');
 const menu = readFileSync('worker/starryIdV216Enhancer.ts','utf8');
+const navigation = readFileSync('worker/starryIdV253NavigationEnhancer.ts','utf8');
 
 test('v247 battery enhancer no longer owns or rebuilds the main menu', () => {
   assert.doesNotMatch(battery, /function syncMenu\(/);
@@ -20,11 +21,11 @@ test('v248 supersedes the v247 observer exclusions by removing the battery obser
   assert.match(client, /function finiteSync\(force=false\)/);
 });
 
-test('v249 v216 menu remains the single owner of current Starry ecosystem links and battery ledger', () => {
-  for (const url of ['https://starry.phd','https://id.starry.phd','https://echo.starry.phd','https://download.starry.phd','https://go.starry.phd','https://quotes.starry.phd','https://box.starry.phd']) {
-    assert.ok(menu.includes(url), `missing ${url}`);
-  }
-  assert.doesNotMatch(menu, /美力之星|starbeauty\.yukidu\.workers\.dev/);
-  assert.match(menu, /ledger\.href='\/battery-ledger'/);
-  assert.match(menu, /電池餘額日誌/);
+test('v255 retires the old v216 ecosystem hamburger menu at its source', () => {
+  assert.doesNotMatch(menu, /const APPS=/);
+  assert.doesNotMatch(menu, /function openMenu/);
+  assert.doesNotMatch(menu, /ledger\.href='\/battery-ledger'/);
+  assert.match(menu, /retireLegacyToolbar/);
+  assert.match(navigation, /q\('#v216Menu'\)\?\.remove\(\)/);
+  assert.match(navigation, /label==='☰'/);
 });

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 const root = process.cwd();
 const enhancer = readFileSync(join(root, 'worker/starryIdV216Enhancer.ts'), 'utf8');
 const router = readFileSync(join(root, 'worker/starryIdV211Router.ts'), 'utf8');
+const navigation = readFileSync(join(root, 'worker/starryIdV253NavigationEnhancer.ts'), 'utf8');
 
 test('member header mirrors Download Starry identity hierarchy with photo, name and rank', () => {
   assert.match(enhancer, /v216-header-avatar/);
@@ -14,13 +15,15 @@ test('member header mirrors Download Starry identity hierarchy with photo, name 
   assert.match(enhancer, /user\.approvedRank\|\|user\.rank\|\|'無'/);
 });
 
-test('public settings button is removed and My electronic card is a dedicated route', () => {
+test('retired My Card management page and its hamburger source are removed', () => {
   assert.doesNotMatch(router, /pub\.textContent='公開設定'/);
-  assert.match(router, /url\.pathname==='\/my-card'/);
-  assert.match(router, /'my-card'/);
-  assert.match(enhancer, /我的電子名片/);
-  assert.match(enhancer, /renderMyCard/);
-  assert.match(enhancer, /settings\.url/);
+  assert.doesNotMatch(enhancer, /renderMyCard/);
+  assert.doesNotMatch(enhancer, /v216-card-page/);
+  assert.doesNotMatch(enhancer, /function openMenu/);
+  assert.doesNotMatch(enhancer, /const APPS=/);
+  assert.match(enhancer, /retireLegacyToolbar/);
+  assert.match(navigation, /#myCardBtn,#v216Menu\{display:none!important\}/);
+  assert.match(navigation, /history\.replaceState\(null,'','\/'\)/);
 });
 
 test('pencil editing requires an explicit checkmark and never saves on blur or Enter', () => {
@@ -45,10 +48,9 @@ test('visibility uses true eye and eye-slash icons instead of prohibition glyph'
   assert.doesNotMatch(enhancer, /⊘/);
 });
 
-test('mobile toolbar and light theme receive dedicated contrast/layout overrides', () => {
+test('mobile toolbar keeps essential admin and logout actions after hamburger retirement', () => {
   assert.match(enhancer, /@media\(max-width:760px\)/);
-  assert.match(enhancer, /\.top-actions #adminBtn,.top-actions #logoutBtn\{display:none!important\}/);
-  assert.match(enhancer, /v216-menu-toggle/);
+  assert.doesNotMatch(enhancer, /\.top-actions #adminBtn,.top-actions #logoutBtn\{display:none!important\}/);
   assert.match(enhancer, /html\[data-starry-theme="light"\] \.topbar/);
   assert.match(enhancer, /#14213d/);
 });
