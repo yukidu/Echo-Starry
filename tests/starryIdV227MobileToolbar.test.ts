@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 
 const enhancer = readFileSync(new URL('../worker/starryIdV218ResponseEnhancer.ts', import.meta.url), 'utf8');
 const wrangler = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
+const batteryRouter = readFileSync(new URL('../worker/starryMainBatteryGameRouter.ts', import.meta.url), 'utf8');
+const inlineLoginRouter = readFileSync(new URL('../worker/starryMainInlineLoginRouter.ts', import.meta.url), 'utf8');
 
 test('v227 applies the mobile toolbar fix only in the existing Starry ID member-center enhancer', () => {
   assert.match(enhancer, /const STAR_DOMAIN = 'id\.starry\.phd'/);
@@ -23,9 +25,11 @@ test('v227 final override removes viewport translation overflow and preserves ac
   assert.match(enhancer, /@media\(max-width:760px\)/);
 });
 
-test('wrangler keeps the established privacy crawler entrypoint and production Starry ID route', () => {
+test('wrangler keeps the established privacy crawler chain and production Starry ID route', () => {
   assert.match(wrangler, /name = "echostars"/);
-  assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
+  assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
+  assert.match(inlineLoginRouter, /import appWorker from '\.\/starryMainBatteryGameRouter'/);
+  assert.match(batteryRouter, /import appWorker from '\.\/privacyCrawlerRouter'/);
   assert.match(wrangler, /pattern = "id\.starry\.phd"/);
   assert.match(wrangler, /binding = "STARRY_ID_DB"/);
 });
