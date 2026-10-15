@@ -10,6 +10,8 @@ const organizationRouter = readFileSync(new URL('../worker/organizationRouter.ts
 const adminUserDeleteRouter = readFileSync(new URL('../worker/adminUserDeleteRouter.ts', import.meta.url), 'utf8');
 const favoriteRouter = readFileSync(new URL('../worker/favoriteRouter.ts', import.meta.url), 'utf8');
 const privacyRouter = readFileSync(new URL('../worker/privacyCrawlerRouter.ts', import.meta.url), 'utf8');
+const batteryRouter = readFileSync(new URL('../worker/starryMainBatteryGameRouter.ts', import.meta.url), 'utf8');
+const inlineLoginRouter = readFileSync(new URL('../worker/starryMainInlineLoginRouter.ts', import.meta.url), 'utf8');
 const bridge = readFileSync(new URL('../src/googleIdentityBridge.ts', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const wrangler = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
@@ -83,7 +85,9 @@ test('changed local progress is eligible for another safe import instead of a pe
 });
 
 test('playback owner stays in the active privacy/member-delete/category/organization/session/preferences wrapper chain', () => {
-  assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
+  assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
+  assert.match(inlineLoginRouter, /import appWorker from '\.\/starryMainBatteryGameRouter'/);
+  assert.match(batteryRouter, /import appWorker from '\.\/privacyCrawlerRouter'/);
   assert.match(privacyRouter, /import appWorker from '\.\/favoriteRouter'/);
   assert.match(favoriteRouter, /import appWorker from '\.\/adminUserDeleteRouter'/);
   assert.match(adminUserDeleteRouter, /import appWorker from '\.\/categoryIntegrityRouter'/);
