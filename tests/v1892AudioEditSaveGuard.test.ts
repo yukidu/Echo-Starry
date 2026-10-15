@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const privacyRouter = readFileSync(new URL('../worker/privacyCrawlerRouter.ts', import.meta.url), 'utf8');
+const batteryRouter = readFileSync(new URL('../worker/starryMainBatteryGameRouter.ts', import.meta.url), 'utf8');
+const inlineLoginRouter = readFileSync(new URL('../worker/starryMainInlineLoginRouter.ts', import.meta.url), 'utf8');
 const stickerRouter = readFileSync(new URL('../worker/legacyStickerRouter.ts', import.meta.url), 'utf8');
 const wrangler = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
 
@@ -20,8 +22,10 @@ test('v189.2 routes a no-change save through the canonical partial-update path',
   assert.match(stickerRouter, /const functionalKeys = Object\.keys\(cleanBody\)\.filter\(key => key !== 'userEmail'\)/);
 });
 
-test('v189.2 leaves real edits untouched and preserves the original Worker entrypoint', () => {
+test('v189.2 leaves real edits untouched and preserves the original Worker chain', () => {
   assert.match(privacyRouter, /if \(editableKeys\.length > 0\) return request/);
-  assert.match(wrangler, /main = "worker\/privacyCrawlerRouter\.ts"/);
+  assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
+  assert.match(inlineLoginRouter, /import appWorker from '\.\/starryMainBatteryGameRouter'/);
+  assert.match(batteryRouter, /import appWorker from '\.\/privacyCrawlerRouter'/);
   assert.doesNotMatch(wrangler, /audioEditSaveGuardRouter/);
 });
