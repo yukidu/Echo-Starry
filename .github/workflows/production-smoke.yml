@@ -3,10 +3,18 @@ name: Production smoke verification
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.github/dependabot.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: echo-production-smoke
+  cancel-in-progress: true
 
 jobs:
   verify-production:
@@ -18,8 +26,6 @@ jobs:
         run: |
           set -euo pipefail
           user_agent='Mozilla/5.0 StarryProductionSmoke/1.0'
-          echo 'Waiting for the production deployment to settle...'
-          sleep 20
 
           for attempt in $(seq 1 24); do
             echo "Production verification attempt ${attempt}/24"
