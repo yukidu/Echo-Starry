@@ -11,13 +11,8 @@ concurrency:
 
 jobs:
   regression-tests:
-    name: regression-tests (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,54 +27,41 @@ jobs:
             echostars-npm-${{ runner.os }}-
       - name: Install dependencies
         run: npm install --prefer-offline --no-audit --no-fund
-      - name: Run isolated regression shard
+      - name: Run every regression test file safely
         shell: bash
-        env:
-          SHARD_INDEX: ${{ matrix.shard }}
-          SHARD_COUNT: 4
         run: |
           set +e
-          mkdir -p /tmp/regression-output
-          log_file="/tmp/regression-output/shard-${SHARD_INDEX}.log"
-          : > "${log_file}"
-
-          mapfile -t test_files < <(find tests -maxdepth 1 -type f -name '*.test.ts' -print | sort)
-          total=${#test_files[@]}
-          if [ "${total}" -eq 0 ]; then
-            echo "No regression test files found." | tee -a "${log_file}"
-            exit 1
-          fi
-
-          selected=0
           failed=0
-          for index in "${!test_files[@]}"; do
-            if [ $((index % SHARD_COUNT)) -ne "${SHARD_INDEX}" ]; then
-              continue
-            fi
-
-            test_file="${test_files[$index]}"
-            selected=$((selected + 1))
-            echo "" | tee -a "${log_file}"
-            echo "============================================================" | tee -a "${log_file}"
-            echo "TEST FILE: ${test_file}" | tee -a "${log_file}"
-            echo "============================================================" | tee -a "${log_file}"
-            node --import tsx --test "${test_file}" 2>&1 | tee -a "${log_file}"
+          total=0
+          passed=0
+          mkdir -p /tmp/regression-output
+          : > /tmp/regression-output/failures.txt
+          for test_file in tests/*.test.ts; do
+            total=$((total + 1))
+            test_name=$(basename "${test_file}")
+            echo ""
+            echo "============================================================"
+            echo "TEST FILE: ${test_file}"
+            echo "============================================================"
+            node --import tsx --test "${test_file}" 2>&1 | tee "/tmp/regression-output/${test_name}.log"
             status=${PIPESTATUS[0]}
-            if [ "${status}" -ne 0 ]; then
-              failed=1
-              echo "FAIL: ${test_file} (exit ${status})" | tee -a "${log_file}"
+            if [ ${status} -eq 0 ]; then
+              passed=$((passed + 1))
+              echo "PASS: ${test_file}"
             else
-              echo "PASS: ${test_file}" | tee -a "${log_file}"
+              failed=1
+              echo "${test_file}" >> /tmp/regression-output/failures.txt
+              echo "FAIL: ${test_file} (exit ${status})"
             fi
           done
-
-          echo "Shard ${SHARD_INDEX}: ${selected} test files" | tee -a "${log_file}"
-          exit "${failed}"
+          echo ""
+          echo "Regression files passed: ${passed}/${total}" | tee /tmp/regression-output/summary.txt
+          exit ${failed}
       - name: Upload regression failure evidence
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: regression-output-${{ github.sha }}-shard-${{ matrix.shard }}
+          name: regression-output-${{ github.sha }}
           path: /tmp/regression-output
           if-no-files-found: ignore
           retention-days: 1
