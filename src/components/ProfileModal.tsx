@@ -137,16 +137,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [name, setName] = useState(currentUser?.name || '');
   const [amwayId, setAmwayId] = useState(currentUser?.amwayId || '');
   const [phone, setPhone] = useState(currentUser?.phone || '');
-  const [residence, setResidence] = useState(currentUser?.residence || '臺北');
-  const [center, setCenter] = useState(currentUser?.center || '無');
-  const [rank, setRank] = useState<AmwayRank>(currentUser?.rank || '無');
-  const [joinReason, setJoinReason] = useState<JoinReason>(currentUser?.joinReason || '事業');
-  const [stayReason, setStayReason] = useState<StayReason | string>(currentUser?.stayReason || '打造自己的事業與團隊');
+  const [residence, setResidence] = useState(currentUser?.residence || '');
+  const [center, setCenter] = useState(currentUser?.center || '');
+  const [rank, setRank] = useState<AmwayRank>((currentUser?.rank || '') as AmwayRank);
+  const [joinReason, setJoinReason] = useState<JoinReason>((currentUser?.joinReason || '') as JoinReason);
+  const [stayReason, setStayReason] = useState<StayReason | string>(currentUser?.stayReason || '');
   const [sponsor, setSponsor] = useState(currentUser?.sponsor || '');
   const [platinumUpline, setPlatinumUpline] = useState(currentUser?.platinumUpline || '');
   const [diamondUpline, setDiamondUpline] = useState(currentUser?.diamondUpline || '');
   const [birthday, setBirthday] = useState(currentUser?.birthday || '');
   const [avatar, setAvatar] = useState(currentUser?.avatar || '');
+  const [motto, setMotto] = useState(currentUser?.motto || '');
+  const [isLoadingMotto, setIsLoadingMotto] = useState(false);
+  const [mottoStatus, setMottoStatus] = useState('');
 
   // Avatar Crop Modal state
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
@@ -184,7 +187,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   },[isOpen,currentUser?.id]);
   useEffect(()=>{
     if(!isOpen || !forceEdit || !currentUser)return;
-    setName(currentUser.name || '');setAmwayId(currentUser.amwayId || '');setPhone(currentUser.phone || '');setResidence(currentUser.residence || '臺北');setCenter(currentUser.center || '無');setRank(currentUser.rank || '無');setJoinReason(currentUser.joinReason || '事業');setStayReason(currentUser.stayReason || '未填寫');setSponsor(currentUser.sponsor || '');setPlatinumUpline(currentUser.platinumUpline || '');setDiamondUpline(currentUser.diamondUpline || '');setBirthday(currentUser.birthday || '');setAvatar(currentUser.avatar || '');setIsEditing(true);onForceEditHandled?.();
+    setName(currentUser.name || '');setAmwayId(currentUser.amwayId || '');setPhone(currentUser.phone || '');setResidence(currentUser.residence || '');setCenter(currentUser.center || '');setRank((currentUser.rank || '') as AmwayRank);setJoinReason((currentUser.joinReason || '') as JoinReason);setStayReason(currentUser.stayReason || '');setSponsor(currentUser.sponsor || '');setPlatinumUpline(currentUser.platinumUpline || '');setDiamondUpline(currentUser.diamondUpline || '');setBirthday(currentUser.birthday || '');setAvatar(currentUser.avatar || '');setMotto(currentUser.motto || '');setMottoStatus('');setIsEditing(true);onForceEditHandled?.();
   },[isOpen,forceEdit,currentUser?.id]);
 
   // Standard Google OAuth 2.0 Sign In
@@ -322,17 +325,39 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     setName(currentUser.name || '');
     setAmwayId(currentUser.amwayId || '');
     setPhone(currentUser.phone || '');
-    setResidence(currentUser.residence || '臺北');
-    setCenter(currentUser.center || '無');
-    setRank(currentUser.rank || '無');
-    setJoinReason(currentUser.joinReason || '事業');
-    setStayReason(currentUser.stayReason || '未填寫');
+    setResidence(currentUser.residence || '');
+    setCenter(currentUser.center || '');
+    setRank((currentUser.rank || '') as AmwayRank);
+    setJoinReason((currentUser.joinReason || '') as JoinReason);
+    setStayReason(currentUser.stayReason || '');
     setSponsor(currentUser.sponsor || '');
     setPlatinumUpline(currentUser.platinumUpline || '');
     setDiamondUpline(currentUser.diamondUpline || '');
     setBirthday(currentUser.birthday || '');
     setAvatar(currentUser.avatar || '');
+    setMotto(currentUser.motto || '');
+    setMottoStatus('');
     setIsEditing(true);
+  };
+
+  const handleRandomMotto = async () => {
+    if (isLoadingMotto) return;
+    setIsLoadingMotto(true);
+    setMottoStatus('正在抽一句…');
+    try {
+      const response = await fetch(`/api/random-motto?t=${Date.now()}`, {
+        method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' }
+      });
+      const data = await response.json().catch(() => ({}));
+      const nextMotto = String(data?.motto || '').trim();
+      if (!response.ok || !nextMotto) throw new Error(data?.error || '目前無法取得繁星雞湯');
+      setMotto(nextMotto);
+      setMottoStatus('已從繁星雞湯帶入，可再自行修改');
+    } catch (error) {
+      setMottoStatus(error instanceof Error ? error.message : '目前無法取得繁星雞湯');
+    } finally {
+      setIsLoadingMotto(false);
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -352,6 +377,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       rank,
       joinReason,
       stayReason,
+      motto: motto.trim(),
       sponsor: sponsor.trim(),
       platinumUpline: platinumUpline.trim(),
       diamondUpline: diamondUpline.trim(),
@@ -366,8 +392,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
     try {
       await onUpdateProfile(payload);
-      await refreshOrganizationDisplay();
+      setOrganizationDisplayName(name.trim());
       setIsEditing(false);
+      setMottoStatus('');
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : '資料儲存失敗，請重試。');
     } finally { setIsSaving(false); }
@@ -430,7 +457,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     });
 
   return (
-    <div className="profile-page w-full min-h-[70dvh]">
+    <div className={`profile-page w-full min-h-[70dvh] ${isEditing ? 'pb-24' : ''}`}>
       <div className="bg-white dark:bg-slate-900 rounded-2xl w-full overflow-hidden border border-rose-100/60 dark:border-slate-800">
         {saveError && <p role="alert" className="px-4 py-3 text-sm text-red-600 bg-red-50 dark:bg-red-950">{saveError}</p>}
         {/* Header - Requirement 20: 統一底色與麥克風相同色 */}
@@ -449,7 +476,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {currentUser && (isEditing ? <><button disabled={isSaving} onClick={handleSaveProfile} className="px-2 py-2 rounded-lg bg-white/20 text-xs">儲存</button><button disabled={isSaving} onClick={()=>setIsEditing(false)} className="px-2 py-2 text-xs">取消</button></> : <button onClick={handleStartEdit} disabled={currentProfileEditCount>=5} className="px-2 py-2 rounded-lg bg-white/20 text-xs">修改</button>)}
+            {currentUser && (isEditing ? <><button disabled={isSaving} onClick={handleSaveProfile} className="px-4 py-2.5 rounded-xl bg-yellow-300 text-slate-950 text-sm font-black shadow-lg ring-2 ring-white disabled:opacity-60">{isSaving ? '儲存中…' : '儲存'}</button><button disabled={isSaving} onClick={()=>{setMottoStatus('');setIsEditing(false)}} className="px-3 py-2.5 rounded-xl bg-white/15 text-sm font-bold disabled:opacity-60">取消</button></> : <button onClick={handleStartEdit} disabled={currentProfileEditCount>=5} className="px-2 py-2 rounded-lg bg-white/20 text-xs">修改</button>)}
             <button
               onClick={onClose}
               className="p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/20"
@@ -714,6 +741,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         </div>
                       </div>
 
+                      <div className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700" data-profile-motto-readonly="1">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-semibold">座右銘</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words">
+                          {currentUser.motto || '未填寫'}
+                        </span>
+                      </div>
+
                       {/* Instant live 9-grid preview in tab 1 */}
                       <div className="pt-1">
                         <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
@@ -957,6 +991,32 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                           </div>
 
                           <NumerologyGrid birthday={birthday} />
+                        </div>
+                      </div>
+
+                      <div data-profile-motto-primary="1" className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <label htmlFor="profile-motto" className="font-bold text-slate-700 dark:text-slate-300">座右銘</label>
+                          <button
+                            type="button"
+                            onClick={handleRandomMotto}
+                            disabled={isLoadingMotto || isSaving}
+                            className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 font-bold disabled:opacity-50"
+                          >
+                            {isLoadingMotto ? '抽取中…' : '🎲 隨機一句'}
+                          </button>
+                        </div>
+                        <textarea
+                          id="profile-motto"
+                          rows={3}
+                          maxLength={200}
+                          value={motto}
+                          onChange={event => setMotto(event.target.value)}
+                          placeholder="寫下你的座右銘"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-hidden"
+                        />
+                        <div className="text-[10px] text-slate-500 mt-1 min-h-[14px]">
+                          {mottoStatus || '可自行輸入，或從繁星雞湯隨機抽一句；儲存時會直接寫入 Starry ID。'}
                         </div>
                       </div>
                     </div>
@@ -1262,6 +1322,27 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
         )}
       </div>
+
+      {currentUser && isEditing && (
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-3 z-[240] w-[calc(100%-24px)] max-w-2xl rounded-[28px] bg-white/95 dark:bg-slate-900/95 shadow-2xl border border-slate-200 dark:border-slate-700 p-3 grid grid-cols-2 gap-3" data-profile-native-floating-actions="1">
+          <button
+            type="button"
+            onClick={handleSaveProfile}
+            disabled={isSaving}
+            className="min-h-[68px] rounded-2xl bg-emerald-600 text-white text-2xl font-black shadow-lg disabled:opacity-60"
+          >
+            💾 {isSaving ? '儲存中…' : '儲存'}
+          </button>
+          <button
+            type="button"
+            onClick={()=>{setMottoStatus('');setIsEditing(false)}}
+            disabled={isSaving}
+            className="min-h-[68px] rounded-2xl bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white text-2xl font-black shadow-lg disabled:opacity-60"
+          >
+            取消
+          </button>
+        </div>
+      )}
 
       {/* Avatar Crop Modal */}
       <AvatarCropModal
