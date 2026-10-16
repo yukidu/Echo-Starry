@@ -1,6 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/starryMirrorBridgeEntry.ts" # wrapper: Starry Mirror bridge -> inline login -> battery game -> existing Starry/Echo chain
+main = "worker/starryMainInlineLoginRouter.ts" # wrapper: inline login -> battery game -> existing Starry/Echo chain
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
@@ -63,6 +63,5 @@ ENVIRONMENT = "production"
 # Google OAuth Client ID 是公開識別碼，不是秘密；Client Secret 不進 GitHub / 前端。
 STARRY_ID_GOOGLE_CLIENT_ID = "661055525630-ndcq5gtr16h7rqqprlqqkkvineea87lc.apps.googleusercontent.com"
 # App 必須先在 Starry ID 登記，不能由瀏覽器任意宣稱 appId 自行取得會員資格。
-# quotes 保留為既有登入相容別名；starry-mirror 是新正式英文識別。
-STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,downloadstarry,gostarry,quotes,starry-mirror,boxstarry"
-STARRY_ID_SELF_ENROLL_APPS = "starry-id,starryphd,downloadstarry,gostarry,quotes,starry-mirror,boxstarry"
+STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,downloadstarry,gostarry,quotes,boxstarry"
+STARRY_ID_SELF_ENROLL_APPS = "starry-id,starryphd,downloadstarry,gostarry,quotes,boxstarry"
