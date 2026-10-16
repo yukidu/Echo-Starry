@@ -17,15 +17,25 @@ test('Starry Mirror bridge uses short-lived app tokens and internal-only battery
   assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
 });
 
-test('AI context returns useful profile text but excludes direct contact identifiers', () => {
+test('AI context returns useful profile and derived numerology while excluding direct identifiers', () => {
   const contextBlock = bridge.slice(bridge.indexOf('async function aiContext'), bridge.indexOf('async function adjustBattery'));
   assert.match(contextBlock, /profile: identity\.profile/);
+  assert.match(contextBlock, /numerology: identity\.numerology/);
   assert.match(contextBlock, /comments:/);
   assert.match(contextBlock, /listenedTitles:/);
   assert.doesNotMatch(contextBlock, /phone:/);
   assert.doesNotMatch(contextBlock, /primaryEmail:/);
   assert.doesNotMatch(contextBlock, /amwayId:/);
   assert.doesNotMatch(contextBlock, /birthday:/);
+});
+
+test('numerology is derived server-side and exposes missing numbers and connection lines without exposing birthday', () => {
+  assert.match(bridge, /numerologyFromBirthday/);
+  assert.match(bridge, /missingNumbers/);
+  assert.match(bridge, /numberCounts/);
+  assert.match(bridge, /connections/);
+  assert.match(bridge, /destinyNumber/);
+  assert.match(bridge, /talentNumber/);
 });
 
 test('battery writes are centrally identified as Starry Mirror and idempotent', () => {

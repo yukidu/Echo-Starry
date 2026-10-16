@@ -59,6 +59,44 @@ function configuredSuperAdminEmails(env: Env) {
   return new Set((raw ? raw.split(',') : ['yukidu@gmail.com']).map(value => value.trim().toLowerCase()).filter(Boolean));
 }
 
+function reduceNumerologyNumber(value: number) {
+  let current = Math.abs(Math.trunc(value));
+  while (current > 9 && ![11, 22, 33].includes(current)) {
+    current = String(current).split('').reduce((sum, digit) => sum + Number(digit || 0), 0);
+  }
+  return current || null;
+}
+
+function numerologyFromBirthday(birthday: unknown, storedTalent: unknown, storedLife: unknown) {
+  const compact = text(birthday).replace(/\D/g, '');
+  const digits = compact.length >= 8
+    ? compact.slice(0, 8).split('').map(Number).filter(value => value >= 1 && value <= 9)
+    : [];
+  const counts: Record<string, number> = {};
+  for (let value = 1; value <= 9; value++) counts[String(value)] = digits.filter(digit => digit === value).length;
+  const missingNumbers = Object.entries(counts).filter(([, count]) => count === 0).map(([value]) => Number(value));
+  const lineDefs = [
+    [1, 2, 3], [4, 5, 6], [7, 8, 9],
+    [1, 4, 7], [2, 5, 8], [3, 6, 9],
+    [1, 5, 9], [3, 5, 7]
+  ];
+  const connections = lineDefs
+    .filter(line => line.every(value => counts[String(value)] > 0))
+    .map(line => line.join('-'));
+  const calculatedLife = digits.length ? reduceNumerologyNumber(digits.reduce((sum, digit) => sum + digit, 0)) : null;
+  const talentNumber = text(storedTalent) || null;
+  const lifeNumber = text(storedLife) || (calculatedLife == null ? null : String(calculatedLife));
+  const hasData = Boolean(digits.length || talentNumber || lifeNumber);
+  return hasData ? {
+    lifeNumber,
+    destinyNumber: lifeNumber,
+    talentNumber,
+    missingNumbers,
+    numberCounts: counts,
+    connections
+  } : null;
+}
+
 async function ensureSchema(env: Env) {
   const db = (env as any).STARRY_ID_DB;
   if (!db) throw new Error('STARRY_ID_DB not bound');
@@ -98,13 +136,14 @@ async function batteryBalance(db: any, userId: string) {
 async function identityForUser(env: Env, userId: string) {
   const db = (env as any).STARRY_ID_DB;
   const row: any = await db.prepare(`SELECT u.id,u.primaryEmail,u.status,p.name,p.rank,p.approvedRank,p.rankApproved,p.residence,p.center,
-      p.joinReason,p.stayReason,p.motto,p.zodiac,p.talentNumber,p.lifeNumber
+      p.joinReason,p.stayReason,p.motto,p.zodiac,p.talentNumber,p.lifeNumber,p.birthday
     FROM users u LEFT JOIN profiles p ON p.userId=u.id WHERE u.id=? LIMIT 1`).bind(userId).first();
   if (!row || text(row.status) !== 'active') return null;
   const adminMembership: any = await db.prepare(`SELECT 1 AS yes FROM app_memberships
     WHERE userId=? AND status='active' AND role='super-admin' LIMIT 1`).bind(userId).first().catch(() => null);
   const isSuperAdmin = Boolean(adminMembership?.yes) || configuredSuperAdminEmails(env).has(text(row.primaryEmail).toLowerCase());
   const balanceUnits = await batteryBalance(db, userId);
+  const numerology = numerologyFromBirthday(row.birthday, row.talentNumber, row.lifeNumber);
   return {
     userId: text(row.id),
     name: text(row.name),
@@ -113,6 +152,7 @@ async function identityForUser(env: Env, userId: string) {
     rankApproved: Boolean(row.rankApproved),
     isSuperAdmin,
     balanceUnits,
+    numerology,
     profile: {
       name: text(row.name),
       rank: text(row.approvedRank || row.rank),
@@ -166,7 +206,7 @@ async function aiContext(request: Request, env: Env) {
   if (!identity) return json({ error: 'invalid_app_session' }, 401);
   const centralDb = (env as any).STARRY_ID_DB;
   const echoDb = (env as any).DB;
-  if (!echoDb) return json({ identity, profile: identity.profile, comments: [], listenedTitles: [] });
+  if (!echoDb) return json({ identity, profile: identity.profile, numerology: identity.numerology, comments: [], listenedTitles: [] });
 
   const userRow: any = await centralDb.prepare('SELECT primaryEmail FROM users WHERE id=? LIMIT 1').bind(identity.userId).first();
   const legacy: any = await centralDb.prepare(`SELECT sourceUserId FROM legacy_links
@@ -195,6 +235,7 @@ async function aiContext(request: Request, env: Env) {
       balanceUnits: identity.balanceUnits
     },
     profile: identity.profile,
+    numerology: identity.numerology,
     comments: (comments?.results || []).map((row: any) => text(row.content)).filter(Boolean),
     listenedTitles: (listened?.results || []).map((row: any) => text(row.title)).filter(Boolean)
   });
