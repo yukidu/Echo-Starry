@@ -4,6 +4,7 @@ on:
     branches: [refactor/v276-central-profile-source]
     paths:
       - scripts/v276CentralProfileSourcePatch.mjs
+      - .github/workflows/v276-apply-central-profile-source.yml
 permissions:
   contents: write
 jobs:
