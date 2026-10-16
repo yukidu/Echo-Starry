@@ -1,366 +1,231 @@
-const PROFILE_ROOT_SELECTOR = '.profile-page';
-const CURRENT_USER_STORAGE = 'sq_current_user_v1';
-const PRIMARY_ID = 'profile-motto-primary';
-const INPUT_ID = 'profile-motto-input';
-const DICE_ID = 'profile-motto-dice';
-const FLOATING_ACTIONS_ID = 'profile-floating-actions';
+import { setPendingProfileMotto } from './profileMottoSaveBridge';
 
-type StoredUser = {
-  id?: string;
-  email?: string;
-  motto?: string;
-  [key: string]: unknown;
-};
+const EDIT_SECTION_ID = 'profile-motto-edit-v270';
+const DISPLAY_SECTION_ID = 'profile-motto-display-v270';
+const FLOATING_ACTIONS_ID = 'profile-floating-actions-v270';
+const LEGACY_IDS = [
+  'profile-motto-display-v264',
+  'profile-motto-primary',
+  'profile-motto-primary-v264',
+  'profile-motto-edit-v264'
+];
 
-let pendingMotto: string | null = null;
-let saveArmed = false;
-let savingMotto = false;
-let scheduled = false;
-let rendering = false;
 let observer: MutationObserver | null = null;
-let toastTimer = 0;
+let renderScheduled = false;
+let loadingQuote = false;
 
-function readCurrentUser(): StoredUser | null {
+function currentUser() {
   try {
-    const raw = localStorage.getItem(CURRENT_USER_STORAGE);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed as StoredUser : null;
+    return JSON.parse(localStorage.getItem('sq_current_user_v1') || 'null');
   } catch {
     return null;
   }
 }
 
-function mottoStorageKey(user: StoredUser | null) {
-  const identity = String(user?.id || user?.email || '').trim().toLowerCase();
-  return identity ? `echostars-profile-motto:${identity}` : '';
+function currentMotto() {
+  return String(currentUser()?.motto || '').trim();
 }
 
-function readMotto(user = readCurrentUser()) {
-  const key = mottoStorageKey(user);
-  if (key) {
-    const local = localStorage.getItem(key);
-    if (local !== null) return local;
-  }
-  return String(user?.motto || '').trim();
+function removeNode(node: Element | null) {
+  if (node && !node.closest(`#${EDIT_SECTION_ID}`) && !node.closest(`#${DISPLAY_SECTION_ID}`)) node.remove();
 }
 
-function writeLocalMotto(motto: string) {
-  const user = readCurrentUser();
-  if (!user) return;
-  user.motto = motto;
-  localStorage.setItem(CURRENT_USER_STORAGE, JSON.stringify(user));
-  const key = mottoStorageKey(user);
-  if (key) localStorage.setItem(key, motto);
-}
+function removeLegacyMottoUi(page: HTMLElement) {
+  for (const id of LEGACY_IDS) removeNode(document.getElementById(id));
+  page.querySelectorAll<HTMLElement>('[data-starry-extension-field="motto"], [data-starry-field="motto"], [data-profile-motto-primary]')
+    .forEach(node => removeNode(node));
 
-function normalizedText(node: Element) {
-  return (node.textContent || '').replace(/\s+/g, ' ').trim();
-}
-
-function findLabel(root: Element, text: string) {
-  return Array.from(root.querySelectorAll('label,span')).find(element => normalizedText(element).startsWith(text)) || null;
-}
-
-function profileEditGrid(root: HTMLElement) {
-  return findLabel(root, '姓名或暱稱')?.closest('.grid') as HTMLElement | null;
-}
-
-function findNativeAction(root: HTMLElement, label: '儲存' | '取消') {
-  return Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(button => {
-    if (button.closest(`#${FLOATING_ACTIONS_ID}`)) return false;
-    return normalizedText(button) === label;
-  }) || null;
-}
-
-function removeFieldAround(node: Element) {
-  let current = node.parentElement;
-  for (let depth = 0; current && depth < 4; depth += 1, current = current.parentElement) {
-    if (current.id === PRIMARY_ID || current.closest(`#${PRIMARY_ID}`)) return;
-    if (current.dataset.starryExtensionField === 'motto' || current.dataset.starryField === 'motto') {
-      current.remove();
-      return;
-    }
-    const controls = current.querySelectorAll('textarea,input,select');
-    const mottoLabels = Array.from(current.querySelectorAll('label,span')).filter(item => normalizedText(item).startsWith('座右銘'));
-    if (controls.length > 0 && mottoLabels.length === 1) {
-      current.remove();
-      return;
+  for (const label of Array.from(page.querySelectorAll('label'))) {
+    if ((label.textContent || '').replace(/\s+/g, ' ').trim().startsWith('座右銘') && !label.closest(`#${EDIT_SECTION_ID}`)) {
+      const wrapper = label.closest('[data-starry-extension-field], [data-starry-field], .sm\\:col-span-2') || label.parentElement;
+      removeNode(wrapper);
     }
   }
-  const card = node.closest<HTMLElement>('.rounded-xl');
-  if (card && card.id !== PRIMARY_ID && !card.closest(`#${PRIMARY_ID}`)) card.remove();
 }
 
-/**
- * Echo 只允許一套座右銘介面：本檔案的「座右銘＋🎲 隨機一句」。
- * Starry ID 或舊版殘留的顯示卡／編輯器會直接移除，避免三套欄位互相覆寫。
- */
-function removeDuplicateMottoFields(root: HTMLElement) {
-  root.querySelectorAll<HTMLElement>(
-    '[data-starry-extension-field="motto"], [data-starry-field="motto"], #v264-profile-motto-display, #v264-profile-motto-edit'
-  ).forEach(node => {
-    if (node.id !== PRIMARY_ID && !node.closest(`#${PRIMARY_ID}`)) node.remove();
-  });
-
-  const mottoLabels = Array.from(root.querySelectorAll('label,span')).filter(node => normalizedText(node).startsWith('座右銘'));
-  for (const label of mottoLabels) {
-    if (label.closest(`#${PRIMARY_ID}`)) continue;
-    removeFieldAround(label);
-  }
+function findEditCard(page: HTMLElement) {
+  const title = Array.from(page.querySelectorAll('span')).find(node => (node.textContent || '').trim() === '編輯個人基本資料');
+  return title?.closest('.rounded-2xl') as HTMLElement | null;
 }
 
-function showSaveToast(message: string, kind: 'success' | 'error' = 'success') {
-  document.getElementById('profile-save-toast')?.remove();
-  window.clearTimeout(toastTimer);
-  const toast = document.createElement('div');
-  toast.id = 'profile-save-toast';
-  toast.setAttribute('role', kind === 'error' ? 'alert' : 'status');
-  toast.className = `fixed left-1/2 -translate-x-1/2 bottom-[calc(env(safe-area-inset-bottom)+104px)] z-[170] px-5 py-3 rounded-2xl text-sm font-black shadow-2xl border ${kind === 'success' ? 'bg-emerald-600 text-white border-emerald-300' : 'bg-red-600 text-white border-red-300'}`;
-  toast.textContent = message;
-  document.body.appendChild(toast);
-  toastTimer = window.setTimeout(() => toast.remove(), kind === 'success' ? 2200 : 4200);
+function findNativeAction(page: HTMLElement, text: '儲存' | '取消') {
+  return Array.from(page.querySelectorAll<HTMLButtonElement>('button')).find(button =>
+    !button.closest(`#${FLOATING_ACTIONS_ID}`) && (button.textContent || '').replace(/[💾✅]/g, '').trim() === text
+  ) || null;
 }
 
-async function randomMotto(input: HTMLTextAreaElement, button: HTMLButtonElement) {
-  if (button.disabled) return;
+function captureDraft(page: HTMLElement) {
+  const textarea = page.querySelector<HTMLTextAreaElement>(`#${EDIT_SECTION_ID} textarea`);
+  if (textarea) setPendingProfileMotto(textarea.value);
+}
+
+async function rollRandomMotto(button: HTMLButtonElement, textarea: HTMLTextAreaElement, status: HTMLElement) {
+  if (loadingQuote) return;
+  loadingQuote = true;
   button.disabled = true;
-  const original = button.textContent || '🎲 隨機一句';
-  button.textContent = '🎲 抽取中…';
+  status.textContent = '正在抽一句…';
   try {
     const response = await fetch(`/api/random-motto?t=${Date.now()}`, {
-      method: 'GET',
-      credentials: 'same-origin',
-      cache: 'no-store',
-      headers: { Accept: 'application/json' }
+      method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' }
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok || !String(data?.motto || '').trim()) {
-      throw new Error(data?.error || '目前無法取得繁星雞湯語錄');
-    }
-    const motto = String(data.motto).trim();
-    input.value = motto;
-    pendingMotto = motto;
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const motto = String(data?.motto || '').trim();
+    if (!response.ok || !motto) throw new Error(data?.error || '目前無法取得繁星雞湯');
+    textarea.value = motto;
+    setPendingProfileMotto(motto);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    status.textContent = '已從繁星雞湯帶入，可再自行修改';
   } catch (error) {
-    window.alert(error instanceof Error ? error.message : '目前無法取得繁星雞湯語錄');
+    status.textContent = error instanceof Error ? error.message : '目前無法取得繁星雞湯';
   } finally {
+    loadingQuote = false;
     button.disabled = false;
-    button.textContent = original;
   }
 }
 
-function makePrimaryMottoField() {
-  const wrapper = document.createElement('div');
-  wrapper.id = PRIMARY_ID;
-  wrapper.dataset.profileMottoPrimary = '1';
-  wrapper.className = 'sm:col-span-2 bg-white dark:bg-slate-800 p-2.5 rounded-xl border-2 border-amber-200 dark:border-amber-800 shadow-sm';
+function ensureEditSection(page: HTMLElement, editCard: HTMLElement) {
+  document.getElementById(DISPLAY_SECTION_ID)?.remove();
+  let section = document.getElementById(EDIT_SECTION_ID) as HTMLElement | null;
+  if (section && section.previousElementSibling !== editCard) {
+    section.remove();
+    section = null;
+  }
+  if (section) return;
 
-  const header = document.createElement('div');
-  header.className = 'flex items-center justify-between gap-2 mb-1';
+  section = document.createElement('section');
+  section.id = EDIT_SECTION_ID;
+  section.dataset.profileMottoPrimary = '1';
+  section.className = 'mt-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/80 p-4';
 
-  const label = document.createElement('label');
-  label.htmlFor = INPUT_ID;
-  label.className = 'font-black text-slate-800 dark:text-slate-100';
-  label.textContent = '座右銘';
+  const heading = document.createElement('div');
+  heading.className = 'font-bold text-slate-800 dark:text-slate-100 mb-1';
+  heading.textContent = '座右銘';
 
+  const note = document.createElement('div');
+  note.className = 'text-xs text-slate-500 dark:text-slate-400 mb-2';
+  note.textContent = '可自行輸入，或從繁星雞湯隨機抽一句；按上方或下方「儲存」會與個人資料一起同步 Starry ID。';
+
+  const textarea = document.createElement('textarea');
+  textarea.rows = 3;
+  textarea.maxLength = 200;
+  textarea.placeholder = '寫下你的座右銘';
+  textarea.value = currentMotto();
+  textarea.className = 'w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-hidden';
+  textarea.addEventListener('input', () => setPendingProfileMotto(textarea.value));
+
+  const row = document.createElement('div');
+  row.className = 'mt-2 flex items-center gap-2 flex-wrap';
   const dice = document.createElement('button');
-  dice.id = DICE_ID;
   dice.type = 'button';
-  dice.className = 'shrink-0 px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 text-xs font-black shadow-sm active:scale-95 disabled:opacity-50';
-  dice.title = '從繁星雞湯隨機帶入一句話';
+  dice.dataset.profileMottoDice = 'edit-only';
+  dice.className = 'px-4 py-2 rounded-xl border font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100';
   dice.textContent = '🎲 隨機一句';
-
-  const input = document.createElement('textarea');
-  input.id = INPUT_ID;
-  input.rows = 3;
-  input.maxLength = 200;
-  input.value = pendingMotto ?? readMotto();
-  input.placeholder = '寫下你的座右銘，或按骰子從繁星雞湯隨機抽一句';
-  input.className = 'w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 outline-hidden resize-y leading-relaxed';
-  input.addEventListener('input', () => { pendingMotto = input.value; });
-  dice.addEventListener('click', () => void randomMotto(input, dice));
-
-  const hint = document.createElement('p');
-  hint.className = 'mt-1 text-[10px] text-slate-500 dark:text-slate-400';
-  hint.textContent = '語錄來自繁星雞湯 Quotes Starry；按「儲存」後同步到 Starry ID。';
-
-  header.append(label, dice);
-  wrapper.append(header, input, hint);
-  return wrapper;
+  const status = document.createElement('span');
+  status.className = 'text-xs text-slate-500 dark:text-slate-400';
+  dice.addEventListener('click', () => void rollRandomMotto(dice, textarea, status));
+  row.append(dice, status);
+  section.append(heading, note, textarea, row);
+  editCard.insertAdjacentElement('afterend', section);
 }
 
-function ensurePrimaryMottoField(root: HTMLElement) {
-  const grid = profileEditGrid(root);
-  if (!grid || root.querySelector(`#${PRIMARY_ID}`)) return;
-  const field = makePrimaryMottoField();
-  const birthdayLabel = findLabel(grid, '西元生日');
-  let birthdayBlock: Element | null = birthdayLabel;
-  while (birthdayBlock?.parentElement && birthdayBlock.parentElement !== grid) birthdayBlock = birthdayBlock.parentElement;
-  if (birthdayBlock?.parentElement === grid) grid.insertBefore(field, birthdayBlock);
-  else grid.appendChild(field);
-}
+function ensureFloatingActions(page: HTMLElement) {
+  const nativeSave = findNativeAction(page, '儲存');
+  const nativeCancel = findNativeAction(page, '取消');
+  if (!nativeSave || !nativeCancel) return;
+  nativeSave.dataset.profileNativeSave = '1';
+  nativeSave.addEventListener('click', () => captureDraft(page), { once: true });
 
-function styleNativeActions(root: HTMLElement) {
-  const save = findNativeAction(root, '儲存');
-  const cancel = findNativeAction(root, '取消');
-  if (save) {
-    save.type = 'button';
-    save.dataset.profileNativeSave = '1';
-    save.style.background = '#facc15';
-    save.style.color = '#111827';
-    save.style.fontWeight = '900';
-    save.style.fontSize = '14px';
-    save.style.padding = '10px 16px';
-    save.style.borderRadius = '12px';
-    save.style.boxShadow = '0 8px 24px rgba(250, 204, 21, 0.35)';
-    save.style.border = '2px solid rgba(255,255,255,.88)';
-    save.title = '儲存所有個人資料與座右銘';
-  }
-  if (cancel) {
-    cancel.type = 'button';
-    cancel.dataset.profileNativeCancel = '1';
-    cancel.style.fontWeight = '800';
-    cancel.style.padding = '10px 12px';
-    cancel.style.borderRadius = '12px';
-  }
-}
-
-function ensureFloatingActions(root: HTMLElement) {
-  const editGrid = profileEditGrid(root);
-  const existing = document.getElementById(FLOATING_ACTIONS_ID);
-  if (!editGrid) {
-    existing?.remove();
-    root.style.paddingBottom = '';
-    return;
-  }
-
-  styleNativeActions(root);
-  root.style.paddingBottom = '104px';
-  const nativeSave = findNativeAction(root, '儲存');
-  const nativeCancel = findNativeAction(root, '取消');
-  if (!nativeSave || !nativeCancel || existing) return;
-
-  const bar = document.createElement('div');
+  let bar = document.getElementById(FLOATING_ACTIONS_ID) as HTMLElement | null;
+  if (bar) return;
+  bar = document.createElement('div');
   bar.id = FLOATING_ACTIONS_ID;
-  bar.className = 'fixed left-1/2 -translate-x-1/2 bottom-[calc(env(safe-area-inset-bottom)+14px)] z-[160] w-[min(94vw,560px)] flex items-stretch gap-3 rounded-3xl border border-white/70 dark:border-slate-700 bg-white/92 dark:bg-slate-900/92 backdrop-blur-xl shadow-2xl p-2.5';
+  bar.className = 'fixed left-1/2 -translate-x-1/2 bottom-3 z-[240] w-[calc(100%-24px)] max-w-2xl rounded-[28px] bg-white/95 dark:bg-slate-900/95 shadow-2xl border border-slate-200 dark:border-slate-700 p-3 grid grid-cols-2 gap-3';
 
   const save = document.createElement('button');
   save.type = 'button';
   save.dataset.profileFloatingSave = '1';
-  save.className = 'flex-[1.35] min-h-[68px] rounded-2xl bg-emerald-600 text-white text-xl sm:text-2xl font-black shadow-xl active:scale-[0.98]';
+  save.className = 'min-h-[68px] rounded-2xl bg-emerald-600 text-white text-2xl font-black shadow-lg';
   save.textContent = '💾 儲存';
   save.addEventListener('click', () => {
-    const target = findNativeAction(root, '儲存');
-    if (target && !target.disabled) target.click();
+    captureDraft(page);
+    nativeSave.click();
   });
 
   const cancel = document.createElement('button');
   cancel.type = 'button';
   cancel.dataset.profileFloatingCancel = '1';
-  cancel.className = 'flex-1 min-h-[68px] rounded-2xl bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-white text-xl sm:text-2xl font-black shadow-lg active:scale-[0.98]';
+  cancel.className = 'min-h-[68px] rounded-2xl bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white text-2xl font-black shadow-lg';
   cancel.textContent = '取消';
   cancel.addEventListener('click', () => {
-    const target = findNativeAction(root, '取消');
-    if (target && !target.disabled) target.click();
+    setPendingProfileMotto(null);
+    nativeCancel.click();
   });
 
   bar.append(save, cancel);
   document.body.appendChild(bar);
 }
 
-async function persistMotto(motto: string) {
-  if (savingMotto) return;
-  const user = readCurrentUser();
-  const userId = String(user?.id || '').trim();
-  if (!userId) return;
-  savingMotto = true;
-  try {
-    const response = await fetch(`/api/users/${encodeURIComponent(userId)}`, {
-      method: 'PUT',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ motto: motto.trim(), email: String(user?.email || '') })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data?.error || '座右銘儲存失敗');
-    writeLocalMotto(motto.trim());
-    window.dispatchEvent(new CustomEvent('echostars:profile-motto-updated', { detail: { motto: motto.trim() } }));
-    showSaveToast('✅ 個人資料與座右銘已儲存');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '座右銘儲存失敗，請再試一次。';
-    showSaveToast(message, 'error');
-    window.alert(message);
-  } finally {
-    savingMotto = false;
-    pendingMotto = null;
-    saveArmed = false;
+function ensureDisplaySection(page: HTMLElement) {
+  document.getElementById(EDIT_SECTION_ID)?.remove();
+  document.getElementById(FLOATING_ACTIONS_ID)?.remove();
+  // Non-edit mode deliberately has no dice button. It is a read-only motto view.
+  let section = document.getElementById(DISPLAY_SECTION_ID) as HTMLElement | null;
+  if (!section) {
+    section = document.createElement('section');
+    section.id = DISPLAY_SECTION_ID;
+    section.className = 'mt-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/80 p-4';
+    const label = document.createElement('div');
+    label.className = 'text-xs font-bold text-slate-500 dark:text-slate-400 mb-1';
+    label.textContent = '座右銘';
+    const value = document.createElement('div');
+    value.dataset.profileMottoDisplayValue = '1';
+    value.className = 'text-base font-semibold text-slate-800 dark:text-slate-100 whitespace-pre-wrap break-words';
+    section.append(label, value);
+    page.appendChild(section);
   }
+  const value = section.querySelector<HTMLElement>('[data-profile-motto-display-value]');
+  if (value) value.textContent = currentMotto() || '未填寫';
+  section.querySelectorAll('[data-profile-motto-dice], button').forEach(node => node.remove());
 }
 
 function renderNow() {
-  if (rendering) return;
-  rendering = true;
   observer?.disconnect();
   try {
-    const root = document.querySelector<HTMLElement>(PROFILE_ROOT_SELECTOR);
-    if (!root) {
+    const page = document.querySelector('.profile-page') as HTMLElement | null;
+    if (!page) {
       document.getElementById(FLOATING_ACTIONS_ID)?.remove();
-      saveArmed = false;
-      pendingMotto = null;
+      document.getElementById(EDIT_SECTION_ID)?.remove();
+      document.getElementById(DISPLAY_SECTION_ID)?.remove();
+      setPendingProfileMotto(null);
       return;
     }
-
-    removeDuplicateMottoFields(root);
-    const editGrid = profileEditGrid(root);
-    if (editGrid) {
-      ensurePrimaryMottoField(root);
-      ensureFloatingActions(root);
-      return;
-    }
-
-    document.getElementById(FLOATING_ACTIONS_ID)?.remove();
-    root.style.paddingBottom = '';
-    if (saveArmed && pendingMotto !== null) {
-      const motto = pendingMotto;
-      saveArmed = false;
-      void persistMotto(motto);
+    removeLegacyMottoUi(page);
+    const editCard = findEditCard(page);
+    if (editCard) {
+      ensureEditSection(page, editCard);
+      ensureFloatingActions(page);
+    } else {
+      setPendingProfileMotto(null);
+      ensureDisplaySection(page);
     }
   } finally {
-    rendering = false;
     observer?.observe(document.documentElement, { childList: true, subtree: true });
   }
 }
 
 function scheduleRender() {
-  if (scheduled) return;
-  scheduled = true;
-  window.requestAnimationFrame(() => {
-    scheduled = false;
+  if (renderScheduled) return;
+  renderScheduled = true;
+  requestAnimationFrame(() => {
+    renderScheduled = false;
     renderNow();
   });
 }
 
-document.addEventListener('click', event => {
-  const target = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button') : null;
-  if (!target) return;
-  const root = target.closest<HTMLElement>(PROFILE_ROOT_SELECTOR);
-  if (!root) return;
-
-  if (target.dataset.profileNativeSave === '1') {
-    const input = root.querySelector<HTMLTextAreaElement>(`#${INPUT_ID}`);
-    if (input) {
-      pendingMotto = input.value;
-      saveArmed = true;
-    }
-  } else if (target.dataset.profileNativeCancel === '1') {
-    pendingMotto = null;
-    saveArmed = false;
-  }
-}, true);
-
-observer = new MutationObserver(scheduleRender);
-observer.observe(document.documentElement, { childList: true, subtree: true });
-window.addEventListener('starry:profile-schema-updated', scheduleRender);
-window.addEventListener('echostars:profile-motto-updated', scheduleRender);
-scheduleRender();
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  observer = new MutationObserver(scheduleRender);
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  document.addEventListener('click', scheduleRender, true);
+  window.addEventListener('echostars:profile-motto-saved', scheduleRender);
+  scheduleRender();
+}
