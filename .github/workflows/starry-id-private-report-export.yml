@@ -1,0 +1,76 @@
+name: Export Starry ID Duplicate Distributor Report
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'starry-id/exportDuplicateAmwayReport.mjs'
+      - '.github/workflows/starry-id-private-report-export.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  STARRY_ID_D1_ID: 01195c92-555e-4816-bddc-5b8cb2e795db
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  export-encrypted-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate read-only exporter
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check starry-id/exportDuplicateAmwayReport.mjs
+          test -n "${CLOUDFLARE_API_TOKEN:-}"
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
+      - name: Read duplicate distributor groups only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p starry-id/audit-output
+          node starry-id/exportDuplicateAmwayReport.mjs | tee starry-id/audit-output/duplicate-amway-summary.json
+      - name: Encrypt private report and remove plaintext
+        shell: bash
+        run: |
+          set -euo pipefail
+          private='starry-id/audit-output/duplicate-amway-private.json'
+          test -s "$private"
+          {
+            echo '-----BEGIN PUBLIC KEY-----'
+            fold -w64 starry-id/repair-report-public-key.txt
+            echo
+            echo '-----END PUBLIC KEY-----'
+          } > /tmp/report-public.pem
+          openssl pkey -pubin -in /tmp/report-public.pem -noout
+          openssl rand -base64 48 > /tmp/report-passphrase.txt
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
+            -in "$private" \
+            -out starry-id/audit-output/duplicate-amway-private.json.enc \
+            -pass file:/tmp/report-passphrase.txt
+          openssl pkeyutl -encrypt -pubin -inkey /tmp/report-public.pem \
+            -in /tmp/report-passphrase.txt \
+            -out starry-id/audit-output/duplicate-amway-private.key.enc \
+            -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256
+          printf '{"containsPII":true,"plaintextUploaded":false,"encryption":"AES-256-CBC/PBKDF2-200000 + RSA-OAEP-SHA256"}\n' \
+            > starry-id/audit-output/duplicate-amway-private.manifest.json
+          rm -f "$private" /tmp/report-passphrase.txt /tmp/report-public.pem
+          test ! -e "$private"
+      - name: Upload encrypted private report only
+        uses: actions/upload-artifact@v4
+        with:
+          name: starry-id-duplicate-distributor-report
+          path: |
+            starry-id/audit-output/duplicate-amway-summary.json
+            starry-id/audit-output/duplicate-amway-private.json.enc
+            starry-id/audit-output/duplicate-amway-private.key.enc
+            starry-id/audit-output/duplicate-amway-private.manifest.json
+          if-no-files-found: error
+          retention-days: 1
