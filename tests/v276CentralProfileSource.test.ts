@@ -35,7 +35,7 @@ test('v276 removes asynchronous profile sync after Echo saves or logs in', () =>
 test('v276 central writes are audited as echostars and local app identity remains stable', () => {
   assert.match(gateway, /const SOURCE_APP = 'echostars'/);
   assert.match(gateway, /profile_audit_logs/);
-  assert.match(gateway, /merged\.id = echoUser\.id/);
+  assert.match(gateway, /merged\.id\s*=\s*echoTarget\.id/);
   assert.doesNotMatch(gateway, /UPDATE users SET name=/);
 });
 
