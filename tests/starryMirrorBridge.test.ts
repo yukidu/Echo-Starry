@@ -17,6 +17,12 @@ test('Starry Mirror bridge uses short-lived app tokens and internal-only battery
   assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
 });
 
+test('繁星心鏡正式來源與新版 appId 已納入繁星通行證', () => {
+  assert.match(bridge, /https:\/\/mirror\.starry\.phd/);
+  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "[^"]*starry-mirror/);
+  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "[^"]*starry-mirror/);
+});
+
 test('AI context returns useful profile and derived numerology while excluding direct identifiers', () => {
   const contextBlock = bridge.slice(bridge.indexOf('async function aiContext'), bridge.indexOf('async function adjustBattery'));
   assert.match(contextBlock, /profile: identity\.profile/);

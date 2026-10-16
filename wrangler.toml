@@ -14,7 +14,7 @@ preview_urls = true
 previews = { }
 
 # 正式自訂網域：Cloudflare Workers Custom Domain。
-# EchoStars 與 Starry ID 暫時共用同一 Worker，但由 hostname 完全分流。
+# 繁星回聲與繁星通行證暫時共用同一 Worker，但由 hostname 完全分流。
 [[routes]]
 pattern = "echo.starry.phd"
 custom_domain = true
@@ -41,8 +41,8 @@ binding = "DB"
 database_name = "echoes_db"
 database_id = "e0a696a9-0233-4186-be4d-229435b19a27"
 
-# Starry ID 中央會員資料庫。只同步跨 App 共用的身份與固定基本資料；
-# 中央電池帳本亦由此 D1 統一保存；Echo 專屬解鎖等行為資料仍留在 Echo DB。
+# 繁星通行證中央會員資料庫。只同步跨 App 共用的身份與固定基本資料；
+# 中央電池帳本亦由此 D1 統一保存；繁星回聲專屬解鎖等行為資料仍留在 Echo DB。
 [[d1_databases]]
 binding = "STARRY_ID_DB"
 database_name = "starry_id_db"
@@ -62,6 +62,7 @@ id = "a2e345e244cb40b4a804be3f89584b90"
 ENVIRONMENT = "production"
 # Google OAuth Client ID 是公開識別碼，不是秘密；Client Secret 不進 GitHub / 前端。
 STARRY_ID_GOOGLE_CLIENT_ID = "661055525630-ndcq5gtr16h7rqqprlqqkkvineea87lc.apps.googleusercontent.com"
-# App 必須先在 Starry ID 登記，不能由瀏覽器任意宣稱 appId 自行取得會員資格。
-STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry"
-STARRY_ID_SELF_ENROLL_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry"
+# App 必須先在繁星通行證登記，不能由瀏覽器任意宣稱 appId 自行取得會員資格。
+# 舊 appId 暫時保留，確保既有會員資料與已上線 App 不會中斷；新 App 一律使用 starry-* 正式名稱。
+STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry,starry-mirror,starry-eye,starry-ai,starry-sync"
+STARRY_ID_SELF_ENROLL_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry,starry-mirror,starry-eye,starry-ai,starry-sync"

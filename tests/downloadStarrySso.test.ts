@@ -50,8 +50,8 @@ test('legacy Echo Download SSO may remain for compatibility but cannot own centr
   assert.match(inline, /import appWorker from '\.\/starryMainBatteryGameRouter'/);
   assert.match(battery, /import appWorker from '\.\/privacyCrawlerRouter'/);
   assert.match(wrangler, /binding = "STARRY_ID_DB"/);
-  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry"/);
-  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry"/);
+  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry,[^"]*"/);
+  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry,[^"]*"/);
   assert.match(privacy, /handleDownloadStarryCentralSso/);
   assert.match(externalSso, /handleDownloadStarrySso/);
   assert.ok(
