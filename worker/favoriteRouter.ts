@@ -245,6 +245,8 @@ function leaderboardUser(row: any) {
   };
 }
 
+type LeaderboardUser = ReturnType<typeof leaderboardUser>;
+
 async function realLeaderboard(db: any) {
   const [userResult, trackResult, commentResult, finishResult] = await Promise.all([
     db.prepare(`
@@ -276,8 +278,8 @@ async function realLeaderboard(db: any) {
     `).all()
   ]);
 
-  const users = (userResult.results || []).map(leaderboardUser);
-  const userById = new Map(users.map(user => [user.id, user]));
+  const users: LeaderboardUser[] = (userResult.results || []).map(leaderboardUser);
+  const userById = new Map<string, LeaderboardUser>(users.map(user => [user.id, user] as const));
   const identityOwner = new Map<string, string>();
   const uniqueNameOwner = new Map<string, string | null>();
   for (const user of users) {
