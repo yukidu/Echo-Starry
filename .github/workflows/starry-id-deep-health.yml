@@ -6,6 +6,7 @@ on:
       - 'audit/starry-id-deep-health-20261016'
     paths:
       - 'starry-id/deep-health-audit.mjs'
+      - 'starry-id/deep-health-drilldown.mjs'
       - '.github/workflows/starry-id-deep-health.yml'
   workflow_dispatch:
 
@@ -41,12 +42,17 @@ jobs:
           code=${PIPESTATUS[0]}
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           exit 0
-      - name: Upload non-PII health report
+      - name: Run read-only anomaly drilldown
+        shell: bash
+        run: |
+          set -euo pipefail
+          node starry-id/deep-health-drilldown.mjs | tee starry-id/audit-output/deep-health-drilldown.json
+      - name: Upload non-PII health reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: starry-id-deep-health-audit
-          path: starry-id/audit-output/deep-health.json
+          path: starry-id/audit-output/deep-health*.json
           if-no-files-found: error
           retention-days: 7
       - name: Enforce critical health result
