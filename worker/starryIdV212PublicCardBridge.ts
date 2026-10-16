@@ -30,14 +30,33 @@ export function v212PublicAmwaySlug(request: Request) {
   return raw;
 }
 
-async function findUniqueActiveMember(db: any, amwayId: string) {
+async function findCanonicalActiveMember(db: any, amwayId: string) {
   const result: any = await db.prepare(`SELECT u.id,p.amwayId
     FROM users u
     JOIN profiles p ON p.userId=u.id
     WHERE u.status='active' AND TRIM(COALESCE(p.amwayId,''))=?
-    LIMIT 2`).bind(amwayId).all();
+    ORDER BY u.id
+    LIMIT 3`).bind(amwayId).all();
   const rows = result?.results || [];
-  if (rows.length !== 1 || text(rows[0].amwayId) !== amwayId) return null;
+  if (rows.length === 1 && text(rows[0].amwayId) === amwayId) return rows[0];
+  if (rows.length !== 2 || rows.some((row: any) => text(row.amwayId) !== amwayId)) return null;
+
+  const pair: any = await db.prepare(`SELECT id FROM spouse_links
+    WHERE status='active'
+      AND ((userA=? AND userB=?) OR (userA=? AND userB=?))
+    LIMIT 1`).bind(rows[0].id,rows[1].id,rows[1].id,rows[0].id).first().catch(()=>null);
+  if (!pair) return null;
+
+  // A shared distributor number is intentionally one URL. Prefer whichever spouse
+  // already owns that slug, otherwise keep a deterministic existing card owner.
+  const existing: any = await db.prepare(`SELECT userId FROM public_cards
+    WHERE userId IN (?,?)
+    ORDER BY CASE WHEN LOWER(slug)=LOWER(?) THEN 0 ELSE 1 END, seq, userId
+    LIMIT 1`).bind(rows[0].id,rows[1].id,amwayId).first().catch(()=>null);
+  if (existing?.userId) {
+    const chosen = rows.find((row: any) => text(row.id) === text(existing.userId));
+    if (chosen) return chosen;
+  }
   return rows[0];
 }
 
@@ -101,7 +120,7 @@ export async function handleStarryIdV212PublicCardFallback(
   if (!amwayId || !env.STARRY_ID_DB) return v211Response;
 
   try {
-    const member = await findUniqueActiveMember(env.STARRY_ID_DB, amwayId);
+    const member = await findCanonicalActiveMember(env.STARRY_ID_DB, amwayId);
     if (!member) return v211Response;
 
     const ready = await materializeCard(env.STARRY_ID_DB, member, amwayId);
