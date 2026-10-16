@@ -7,7 +7,11 @@ const USER_KEY = 'sq_current_user_v1';
 const SESSION_CHECK_KEY = 'echostars_auth_session_checked_at';
 const MIN_SYNC_INTERVAL_MS = 2500;
 
-const nativeFetch = window.fetch.bind(window);
+const nativeFetch: typeof fetch = (
+  typeof window !== 'undefined' && typeof window.fetch === 'function'
+    ? window.fetch.bind(window)
+    : globalThis.fetch.bind(globalThis)
+) as typeof fetch;
 let syncInFlight: Promise<void> | null = null;
 let lastSyncAt = 0;
 let reloadScheduled = false;
@@ -176,13 +180,15 @@ function installLogoutBridge() {
   }, true);
 }
 
-window.setTimeout(() => {
-  installLogoutBridge();
-  void syncEcosystemSession(true);
-}, 0);
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  window.setTimeout(() => {
+    installLogoutBridge();
+    void syncEcosystemSession(true);
+  }, 0);
 
-window.addEventListener('focus', () => { void syncEcosystemSession(); });
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') void syncEcosystemSession();
-});
-window.addEventListener('online', () => { void syncEcosystemSession(true); });
+  window.addEventListener('focus', () => { void syncEcosystemSession(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void syncEcosystemSession();
+  });
+  window.addEventListener('online', () => { void syncEcosystemSession(true); });
+}
