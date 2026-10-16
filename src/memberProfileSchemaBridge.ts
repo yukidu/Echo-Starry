@@ -32,6 +32,7 @@ type SchemaBundle = {
 
 const CACHE_KEY = 'starry_profile_schema_cache_v1';
 const CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+const ECHO_MANAGED_EXTENSION_FIELDS = new Set(['motto']);
 let activeSchema: SchemaBundle | null = null;
 let refreshPromise: Promise<SchemaBundle | null> | null = null;
 let extensionValues: Record<string,string> | null = null;
@@ -239,7 +240,9 @@ function makeExtensionControl(field: SchemaField, value: string, schema: SchemaB
 }
 
 async function renderExtensionEditor(page: HTMLElement, schema: SchemaBundle) {
-  const extensionFields = schema.fields.filter(field => field.isActive && field.userEditable && field.storageMode === 'extension').sort((a,b)=>a.sortOrder-b.sortOrder);
+  const extensionFields = schema.fields
+    .filter(field => field.isActive && field.userEditable && field.storageMode === 'extension' && !ECHO_MANAGED_EXTENSION_FIELDS.has(field.fieldKey))
+    .sort((a,b)=>a.sortOrder-b.sortOrder);
   if (!extensionFields.length) { page.querySelector('[data-starry-extension-fields]')?.remove(); return; }
   const editTitle = Array.from(page.querySelectorAll('span')).find(node => (node.textContent || '').trim() === '編輯個人基本資料');
   if (!editTitle) return;
@@ -267,7 +270,9 @@ async function renderExtensionEditor(page: HTMLElement, schema: SchemaBundle) {
 }
 
 async function renderExtensionDisplay(page: HTMLElement, schema: SchemaBundle) {
-  const extensionFields=schema.fields.filter(field=>field.isActive&&field.storageMode==='extension').sort((a,b)=>a.sortOrder-b.sortOrder);
+  const extensionFields=schema.fields
+    .filter(field=>field.isActive&&field.storageMode==='extension'&&!ECHO_MANAGED_EXTENSION_FIELDS.has(field.fieldKey))
+    .sort((a,b)=>a.sortOrder-b.sortOrder);
   if(!extensionFields.length || page.querySelector('[data-starry-extension-display]'))return;
   if(Array.from(page.querySelectorAll('span')).some(node=>(node.textContent||'').trim()==='編輯個人基本資料'))return;
   const values=await loadExtensionValues();
@@ -277,7 +282,7 @@ async function renderExtensionDisplay(page: HTMLElement, schema: SchemaBundle) {
   const target=grids.find(grid=>grid.className.includes('grid-cols-2')&&grid.className.includes('gap-2'));
   if(!target||!document.body.contains(target)||page.querySelector('[data-starry-extension-display]'))return;
   const section=document.createElement('div');section.dataset.starryExtensionDisplay='1';section.className='grid grid-cols-2 gap-2';
-  for(const field of visible){const card=document.createElement('div');card.className='bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700';const label=document.createElement('span');label.className='text-[10px] text-slate-500 dark:text-slate-400 block font-semibold';label.textContent=field.label;const value=document.createElement('span');value.className='font-semibold text-slate-800 dark:text-slate-200 break-words';value.textContent=values[field.fieldKey];card.append(label,value);section.appendChild(card)}
+  for(const field of visible){const card=document.createElement('div');card.dataset.starryExtensionField=field.fieldKey;card.className='bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700';const label=document.createElement('span');label.className='text-[10px] text-slate-500 dark:text-slate-400 block font-semibold';label.textContent=field.label;const value=document.createElement('span');value.className='font-semibold text-slate-800 dark:text-slate-200 break-words';value.textContent=values[field.fieldKey];card.append(label,value);section.appendChild(card)}
   target.insertAdjacentElement('afterend',section);
 }
 
@@ -285,6 +290,7 @@ async function syncProfileDom() {
   if (typeof document === 'undefined' || !activeSchema) return;
   const page=document.querySelector('.profile-page') as HTMLElement | null;
   if(!page)return;
+  page.querySelectorAll<HTMLElement>('[data-starry-extension-field="motto"]').forEach(node=>node.remove());
   applyNativeRules(page,activeSchema);
   await renderExtensionEditor(page,activeSchema);
   await renderExtensionDisplay(page,activeSchema);
