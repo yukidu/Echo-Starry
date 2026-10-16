@@ -7,6 +7,7 @@ on:
     paths:
       - 'starry-id/deep-health-audit.mjs'
       - 'starry-id/deep-health-drilldown.mjs'
+      - 'starry-id/capture-time-travel-bookmark.mjs'
       - '.github/workflows/starry-id-deep-health.yml'
   workflow_dispatch:
 
@@ -32,6 +33,12 @@ jobs:
           test -n "${CLOUDFLARE_API_TOKEN:-}"
           test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
           test -n "${STARRY_ID_D1_ID:-}"
+      - name: Capture pre-repair D1 Time Travel backup point
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p starry-id/audit-output
+          node starry-id/capture-time-travel-bookmark.mjs | tee starry-id/audit-output/pre-repair-backup-bookmark.json
       - name: Run read-only deep health audit
         id: audit
         shell: bash
@@ -47,12 +54,12 @@ jobs:
         run: |
           set -euo pipefail
           node starry-id/deep-health-drilldown.mjs | tee starry-id/audit-output/deep-health-drilldown.json
-      - name: Upload non-PII health reports
+      - name: Upload non-PII backup pointer and health reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: starry-id-deep-health-audit
-          path: starry-id/audit-output/deep-health*.json
+          path: starry-id/audit-output/*.json
           if-no-files-found: error
           retention-days: 7
       - name: Enforce critical health result
