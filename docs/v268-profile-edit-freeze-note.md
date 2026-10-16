@@ -1,0 +1,1 @@
+Profile edit freeze hotfix: prevent MutationObserver feedback loops while keeping the v266 floating save/cancel actions.
