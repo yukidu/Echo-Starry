@@ -24,6 +24,9 @@ test('v274 public page accepts cardNumber and shows spouse under the identifier'
   assert.match(publicRouter,/data\.spouseName=text\(partner\?\.name\)/);
   assert.match(publicRouter,/key==='amwayId'\|\|key==='cardNumber'/);
   assert.match(publicRouter,/夫妻綁定：/);
+  assert.match(publicRouter,/rows\.length===2/);
+  assert.match(publicRouter,/spouse_links/);
+  assert.match(publicRouter,/status='active'/);
   assert.doesNotMatch(publicRouter,/\['spouse','夫妻關係'\]/);
 });
 

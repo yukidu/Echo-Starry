@@ -214,14 +214,26 @@ async function publicCard(request: Request, env: StarryEnv, slug: string) {
   let card: any = await db.prepare('SELECT userId,slug,cardNumber FROM public_cards WHERE slug=? LIMIT 1').bind(slug).first();
 if(!card) card = await db.prepare('SELECT userId,slug,cardNumber FROM public_cards WHERE cardNumber=? LIMIT 1').bind(slug).first();
 if(!card && /^[0-9]+$/.test(slug)) {
-  const matches: any = await db.prepare(`SELECT u.id,p.amwayId FROM users u JOIN profiles p ON p.userId=u.id WHERE u.status='active' AND TRIM(COALESCE(p.amwayId,''))=? LIMIT 2`).bind(slug).all();
+  const matches: any = await db.prepare(`SELECT u.id,p.amwayId FROM users u JOIN profiles p ON p.userId=u.id WHERE u.status='active' AND TRIM(COALESCE(p.amwayId,''))=? ORDER BY u.id LIMIT 3`).bind(slug).all();
   const rows = matches?.results || [];
+  let directMember: any = null;
   if(rows.length===1 && text(rows[0].amwayId)===slug) {
-    const directMember: any = await readMember(db,rows[0].id);
-    if(directMember && directMember.status==='active') {
-      await ensureCard(db,directMember);
-      card = await db.prepare('SELECT userId,slug,cardNumber FROM public_cards WHERE slug=? LIMIT 1').bind(slug).first();
+    directMember = await readMember(db,rows[0].id);
+  } else if(rows.length===2 && rows.every((row:any)=>text(row.amwayId)===slug)) {
+    const pair: any = await db.prepare(`SELECT id FROM spouse_links
+      WHERE status='active' AND ((userA=? AND userB=?) OR (userA=? AND userB=?)) LIMIT 1`)
+      .bind(rows[0].id,rows[1].id,rows[1].id,rows[0].id).first().catch(()=>null);
+    if(pair) {
+      const existing: any = await db.prepare(`SELECT userId FROM public_cards WHERE userId IN (?,?)
+        ORDER BY CASE WHEN LOWER(slug)=LOWER(?) THEN 0 ELSE 1 END, seq, userId LIMIT 1`)
+        .bind(rows[0].id,rows[1].id,slug).first().catch(()=>null);
+      const selectedId=text(existing?.userId)||text(rows[0].id);
+      directMember=await readMember(db,selectedId);
     }
+  }
+  if(directMember && directMember.status==='active') {
+    await ensureCard(db,directMember);
+    card = await db.prepare('SELECT userId,slug,cardNumber FROM public_cards WHERE slug=? LIMIT 1').bind(slug).first();
   }
 }
 if(!card) return null;
