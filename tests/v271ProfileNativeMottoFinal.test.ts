@@ -57,8 +57,8 @@ test('unchanged distributor id does not cause an extra spouse lookup', () => {
 });
 
 test('profile save preserves the current Starry ID synchronization contract', () => {
-  assert.match(router, /await\s+syncEchoMemberToStarryBestEffort\(env, updated\)/);
-  assert.match(router, /starryId:\s*saveStarryResult/);
-  assert.match(router, /partner:\s*partnerRefreshResult/);
-  assert.equal(router.includes('const responseStatus = starryResult.ok ? 200 : 503'), false);
+  assert.match(router, /const synced = await syncEchoMemberToStarryBestEffort\(env as any, userId, 'echostars', 'member-profile-update'\)/);
+  assert.match(router, /if \(\(env as any\)\.STARRY_ID_DB && !synced\)/);
+  assert.match(router, /scheduleStarrySync\(ctx, env, userId, 'echostars', 'member-profile-update-retry'\)/);
+  assert.match(router, /Never turn that success into an error/);
 });
