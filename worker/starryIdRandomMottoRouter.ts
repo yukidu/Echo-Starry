@@ -1,4 +1,5 @@
 import { handleStarryIdCentral } from './starryIdCentralRouter';
+import { handleStarryMirrorBridge } from './starryMirrorBridgeRouter';
 import type { Env } from './index';
 
 const ID_HOST = 'id.starry.phd';
@@ -32,7 +33,7 @@ export function extractQuotes(csv: string): string[] {
   const rows = csvRows(csv);
   const headers = rows[0] || [];
   const result = new Set<string>();
-  // Quotes Starry: column 1 contains photos; only columns > 1 with a category
+  // Starry Mirror: column 1 contains photos; only columns > 1 with a category
   // other than "未分類" are selectable quote cards.
   for (let col = 2; col < headers.length; col++) {
     const category = (headers[col] || '').trim();
@@ -60,7 +61,6 @@ async function getQuotes(): Promise<string[]> {
     cache = { quotes, expires: Date.now() + 30 * 60 * 1000 };
     return quotes;
   } catch (error) {
-    // Briefly stale cache is preferable to inventing a quotation.
     if (cache && cache.quotes.length) return cache.quotes;
     throw error;
   }
@@ -77,13 +77,16 @@ function json(data: unknown, status = 200) {
 }
 
 export async function handleStarryIdRandomMotto(request: Request, env: Env): Promise<Response | null> {
+  // Keep the established Worker entry unchanged. Starry Mirror hooks into this
+  // already-global dispatcher before the legacy random-motto route, so every
+  // existing Echo / Starry ID wrapper remains in the exact same order.
+  const mirror = await handleStarryMirrorBridge(request, env);
+  if (mirror) return mirror;
+
   const url = new URL(request.url);
   if (![ID_HOST, ECHO_HOST].includes(url.hostname) || url.pathname !== MOTTO_PATH) return null;
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
 
-  // Starry ID keeps its central-session protection. Echo only requests a public
-  // quotation and exposes no member data, so its same-origin dice endpoint can
-  // be used safely by the member editor without cross-domain cookie problems.
   if (url.hostname === ID_HOST) {
     const sessionRequest = new Request(new URL('/api/session', request.url), {
       headers: { Cookie: request.headers.get('Cookie') || '' }
@@ -101,6 +104,6 @@ export async function handleStarryIdRandomMotto(request: Request, env: Env): Pro
       source: 'https://quotes.starry.phd/'
     });
   } catch {
-    return json({ error: '目前無法讀取繁星雞湯，請稍後再試' }, 503);
+    return json({ error: '目前無法讀取繁星心鏡，請稍後再試' }, 503);
   }
 }
