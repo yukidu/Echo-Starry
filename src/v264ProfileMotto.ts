@@ -93,7 +93,8 @@ function ensureDisplay(root: HTMLElement) {
     grid.appendChild(card);
   }
   const value = card.querySelector<HTMLElement>('[data-v264-motto-value="1"]');
-  if (value) value.textContent = motto || '未填寫';
+  const nextText = motto || '未填寫';
+  if (value && value.textContent !== nextText) value.textContent = nextText;
 }
 
 async function randomMotto(input: HTMLTextAreaElement, button: HTMLButtonElement) {
