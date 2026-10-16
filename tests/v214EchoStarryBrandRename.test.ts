@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-const STARRY_CLIENT_ID = '661055525630-633btocuq7hs6pu7v5gkg3n2fouupubp.apps.googleusercontent.com';
+const STARRY_CLIENT_ID = '661055525630-ndcq5gtr16h7rqqprlqqkkvineea87lc.apps.googleusercontent.com';
 const LEGACY_CLIENT_ID = '400699489182-lb412nhvj4s6t1qr5ovkg40hc646dq79.apps.googleusercontent.com';
 
 test('v214/v219: project brand surfaces stay Echo-Starry while navbar displays 繁星回聲', () => {
