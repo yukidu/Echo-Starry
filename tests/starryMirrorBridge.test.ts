@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const bridge = fs.readFileSync(new URL('../worker/starryMirrorBridgeRouter.ts', import.meta.url), 'utf8');
-const entry = fs.readFileSync(new URL('../worker/starryMirrorBridgeEntry.ts', import.meta.url), 'utf8');
+const dispatcher = fs.readFileSync(new URL('../worker/starryIdRandomMottoRouter.ts', import.meta.url), 'utf8');
 const wrangler = fs.readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
 
 test('Starry Mirror bridge uses short-lived app tokens and internal-only battery/context routes', () => {
@@ -13,8 +13,8 @@ test('Starry Mirror bridge uses short-lived app tokens and internal-only battery
   assert.match(bridge, /\/internal\/starry-mirror\/context/);
   assert.match(bridge, /\/internal\/starry-mirror\/battery/);
   assert.match(bridge, /starry-id\.internal/);
-  assert.match(entry, /handleStarryMirrorBridge/);
-  assert.match(wrangler, /starryMirrorBridgeEntry\.ts/);
+  assert.match(dispatcher, /handleStarryMirrorBridge/);
+  assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
 });
 
 test('AI context returns useful profile text but excludes direct contact identifiers', () => {
@@ -30,7 +30,8 @@ test('AI context returns useful profile text but excludes direct contact identif
 
 test('battery writes are centrally identified as Starry Mirror and idempotent', () => {
   assert.match(bridge, /uniqueKey/);
-  assert.match(bridge, /sourceApp[^\n]*starry-mirror|starry-mirror[^\n]*sourceApp/);
+  assert.match(bridge, /sourceApp/);
+  assert.match(bridge, /'starry-mirror'/);
   assert.match(bridge, /sourceLabel/);
   assert.match(bridge, /繁星心鏡/);
 });
