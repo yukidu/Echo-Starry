@@ -21,7 +21,8 @@ const ECOSYSTEM_ORIGINS = new Set([
 
 const TICKET_APPS = {
   echostars: { origin: 'https://echo.starry.phd', label: '繁星回聲' },
-  gostarry: { origin: 'https://go.starry.phd', label: '繁星任意門' }
+  gostarry: { origin: 'https://go.starry.phd', label: '繁星任意門' },
+  downloadstarry: { origin: 'https://download.starry.phd', label: '繁星捕手' }
 } as const;
 
 type TicketAppId = keyof typeof TICKET_APPS;
@@ -188,7 +189,7 @@ async function ensureTicketSchema(env: Env) {
 }
 
 function ticketAppId(pathname: string): TicketAppId | null {
-  const match = pathname.match(/^\/api\/apps\/(echostars|gostarry)\/ticket$/);
+  const match = pathname.match(/^\/api\/apps\/(echostars|gostarry|downloadstarry)\/ticket$/);
   return match ? match[1] as TicketAppId : null;
 }
 
