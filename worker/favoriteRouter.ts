@@ -54,6 +54,8 @@ async function ensureDatabaseExtensions(db: any) {
         )
       `).run();
       await db.prepare('CREATE INDEX IF NOT EXISTS track_speakers_name ON track_speakers(speakerName)').run();
+      await db.prepare('CREATE INDEX IF NOT EXISTS comments_author_email_created ON comments(authorEmail, createdAt)').run();
+      await db.prepare('CREATE INDEX IF NOT EXISTS playback_completed_member_track ON playback_memories(completed, memberId, trackId)').run();
 
       const migrated = await db.prepare('SELECT name FROM app_migrations WHERE name = ?')
         .bind(MULTI_SPEAKER_MIGRATION)
@@ -102,10 +104,35 @@ function json(data: unknown, status = 200, base?: Response) {
 function parseIds(value: unknown): string[] {
   try {
     const parsed = typeof value === 'string' ? JSON.parse(value) : value;
-    return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [];
+    return Array.isArray(parsed) ? parsed.map(String).map(value => value.trim()).filter(Boolean) : [];
   } catch {
     return [];
   }
+}
+
+function parseRatings(value: unknown): Record<string, number> {
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const next: Record<string, number> = {};
+    for (const [key, rawScore] of Object.entries(parsed as Record<string, unknown>)) {
+      const score = Number(rawScore);
+      if (key.trim() && Number.isFinite(score) && score >= 1 && score <= 5) next[key] = score;
+    }
+    return next;
+  } catch {
+    return {};
+  }
+}
+
+function canonicalRating(value: unknown) {
+  const ratings = parseRatings(value);
+  const scores = Object.values(ratings);
+  const ratingCount = scores.length;
+  const rating = ratingCount
+    ? Math.round((scores.reduce((sum, score) => sum + score, 0) / ratingCount) * 10) / 10
+    : 0;
+  return { ratings, rating, ratingCount };
 }
 
 function identityKeys(body: any) {
@@ -132,21 +159,184 @@ async function trackSpeakerRows(db: any) {
   return map;
 }
 
+async function actualCommentCounts(db: any) {
+  const { results } = await db.prepare(
+    'SELECT trackId, COUNT(*) AS count FROM comments GROUP BY trackId'
+  ).all();
+  const map = new Map<string, number>();
+  for (const row of results || []) {
+    map.set(String((row as any).trackId || ''), Number((row as any).count || 0));
+  }
+  return map;
+}
+
+async function canonicalizeTrackStatistics(tracks: any[], db: any) {
+  const commentCounts = await actualCommentCounts(db);
+  const repairs: any[] = [];
+  const normalized = tracks.map(track => {
+    const likedBy = parseIds(track?.likedBy);
+    const { ratings, rating, ratingCount } = canonicalRating(track?.ratings);
+    const likes = likedBy.length;
+    const commentsCount = commentCounts.get(String(track?.id || '')) || 0;
+
+    if (
+      Number(track?.likes || 0) !== likes ||
+      Number(track?.ratingCount || 0) !== ratingCount ||
+      Number(track?.rating || 0) !== rating ||
+      Number(track?.commentsCount || 0) !== commentsCount
+    ) {
+      repairs.push(
+        db.prepare('UPDATE tracks SET likes = ?, rating = ?, ratingCount = ?, commentsCount = ? WHERE id = ?')
+          .bind(likes, rating, ratingCount, commentsCount, String(track?.id || ''))
+      );
+    }
+
+    return {
+      ...track,
+      likedBy,
+      ratings,
+      likes,
+      rating,
+      ratingCount,
+      commentsCount
+    };
+  });
+
+  if (repairs.length) await runBatches(db, repairs);
+  return normalized;
+}
+
 async function augmentTrackList(response: Response, db: any) {
   if (!response.ok) return response;
   try {
     const tracks: any = await response.clone().json();
     if (!Array.isArray(tracks)) return response;
-    const map = await trackSpeakerRows(db);
-    const next = tracks.map(track => {
+    const [map, canonicalTracks] = await Promise.all([
+      trackSpeakerRows(db),
+      canonicalizeTrackStatistics(tracks, db)
+    ]);
+    const next = canonicalTracks.map(track => {
       const names = map.get(String(track?.id || '').trim()) || normalizeTrackSpeakers(track?.speaker);
       const canonical = speakerDisplay(names) || String(track?.speaker || '').trim();
       return { ...track, speaker: canonical, speakers: names };
     });
     return json(next, response.status, response);
-  } catch {
+  } catch (error) {
+    console.warn('Track statistics health normalization failed:', error);
     return response;
   }
+}
+
+function leaderboardUser(row: any) {
+  return {
+    id: String(row?.id || ''),
+    name: String(row?.name || ''),
+    email: String(row?.email || ''),
+    role: String(row?.role || ''),
+    rank: String(row?.rank || '無'),
+    approvedRank: String(row?.approvedRank || ''),
+    rankApproved: Boolean(row?.rankApproved),
+    avatar: String(row?.avatar || ''),
+    center: String(row?.center || ''),
+    lastActive: String(row?.lastActive || ''),
+    rankUpdatedAt: String(row?.rankUpdatedAt || ''),
+    registerDate: String(row?.registerDate || ''),
+    playCount: Number(row?.playCount || 0)
+  };
+}
+
+type LeaderboardUser = ReturnType<typeof leaderboardUser>;
+
+async function realLeaderboard(db: any) {
+  const [userResult, trackResult, commentResult, finishResult] = await Promise.all([
+    db.prepare(`
+      SELECT id,name,email,role,rank,approvedRank,rankApproved,avatar,center,lastActive,rankUpdatedAt,registerDate,playCount
+      FROM users
+      WHERE COALESCE(isBlocked,0)=0
+        AND email IS NOT NULL AND TRIM(email)<>'' AND LOWER(TRIM(email))<>'guest'
+        AND id<>'guest' AND id NOT LIKE 'guest-%' AND name NOT LIKE '訪客%'
+    `).all(),
+    db.prepare('SELECT id, likedBy FROM tracks').all(),
+    db.prepare(`
+      SELECT LOWER(TRIM(COALESCE(authorEmail,''))) AS emailKey, TRIM(COALESCE(authorName,'')) AS authorName, COUNT(*) AS count
+      FROM comments
+      GROUP BY LOWER(TRIM(COALESCE(authorEmail,''))), TRIM(COALESCE(authorName,''))
+    `).all(),
+    db.prepare(`
+      SELECT u.id AS userId, COUNT(DISTINCT pm.trackId) AS count
+      FROM users u
+      JOIN playback_memories pm
+        ON COALESCE(pm.completed,0)=1
+       AND COALESCE(pm.isDeleted,0)=0
+       AND (
+         pm.memberId=u.id OR
+         pm.userIdentifier=u.id OR
+         (u.email IS NOT NULL AND TRIM(u.email)<>'' AND LOWER(TRIM(pm.userIdentifier))=LOWER(TRIM(u.email)))
+       )
+      WHERE COALESCE(u.isBlocked,0)=0
+      GROUP BY u.id
+    `).all()
+  ]);
+
+  const users: LeaderboardUser[] = (userResult.results || []).map(leaderboardUser);
+  const userById = new Map<string, LeaderboardUser>(users.map(user => [user.id, user] as const));
+  const identityOwner = new Map<string, string>();
+  const uniqueNameOwner = new Map<string, string | null>();
+  for (const user of users) {
+    identityOwner.set(user.id, user.id);
+    if (user.email) identityOwner.set(user.email.toLowerCase().trim(), user.id);
+    const nameKey = user.name.trim();
+    if (nameKey) uniqueNameOwner.set(nameKey, uniqueNameOwner.has(nameKey) ? null : user.id);
+  }
+
+  const likeCounts = new Map<string, number>();
+  for (const track of trackResult.results || []) {
+    const owners = new Set<string>();
+    for (const rawKey of parseIds((track as any).likedBy)) {
+      const key = rawKey.includes('@') ? rawKey.toLowerCase().trim() : rawKey.trim();
+      const owner = identityOwner.get(key);
+      if (owner) owners.add(owner);
+    }
+    owners.forEach(owner => likeCounts.set(owner, (likeCounts.get(owner) || 0) + 1));
+  }
+
+  const commentCounts = new Map<string, number>();
+  for (const row of commentResult.results || []) {
+    const emailKey = String((row as any).emailKey || '').toLowerCase().trim();
+    const authorName = String((row as any).authorName || '').trim();
+    const owner = (emailKey && identityOwner.get(emailKey)) || (authorName ? uniqueNameOwner.get(authorName) : null);
+    if (owner) commentCounts.set(owner, (commentCounts.get(owner) || 0) + Number((row as any).count || 0));
+  }
+
+  const finishCounts = new Map<string, number>();
+  for (const row of finishResult.results || []) {
+    finishCounts.set(String((row as any).userId || ''), Number((row as any).count || 0));
+  }
+
+  const ranked = (counts: Map<string, number>) => [...counts.entries()]
+    .flatMap(([id, count]) => {
+      const user = userById.get(id);
+      return user && count > 0 ? [{ user, count }] : [];
+    })
+    .sort((a, b) => b.count - a.count || a.user.name.localeCompare(b.user.name, 'zh-Hant'))
+    .slice(0, 5);
+
+  return json({
+    source: 'd1-real-data',
+    generatedAt: Date.now(),
+    recentlyUpdated: users.map(user => ({
+      user,
+      value: user.lastActive || user.rankUpdatedAt || user.registerDate || '近期'
+    })),
+    topLikes: ranked(likeCounts),
+    topComments: ranked(commentCounts),
+    topClicks: users
+      .filter(user => user.playCount > 0)
+      .map(user => ({ user, count: user.playCount }))
+      .sort((a, b) => b.count - a.count || a.user.name.localeCompare(b.user.name, 'zh-Hant'))
+      .slice(0, 5),
+    topFinished: ranked(finishCounts)
+  });
 }
 
 function speakerPatchFromBody(body: any, isCreate: boolean) {
@@ -164,12 +354,18 @@ function speakerPatchFromBody(body: any, isCreate: boolean) {
   const names = normalizeTrackSpeakers(raw);
   if (!names.length) throw new Error('至少需要一位演講者');
 
-  // Keep the legacy tracks.speaker column as the canonical display string so
-  // every existing front-end/search/export consumer remains backward-compatible.
-  // The ordered names themselves live in track_speakers; do not forward a new
-  // "speakers" property to the legacy track writer, which avoids schema drift.
   const nextBody = { ...body, speaker: speakerDisplay(names) };
   delete nextBody.speakers;
+  if (isCreate) {
+    const { ratings, rating, ratingCount } = canonicalRating(nextBody.ratings);
+    const likedBy = parseIds(nextBody.likedBy);
+    nextBody.ratings = ratings;
+    nextBody.rating = rating;
+    nextBody.ratingCount = ratingCount;
+    nextBody.likedBy = likedBy;
+    nextBody.likes = likedBy.length;
+    nextBody.commentsCount = 0;
+  }
   return { body: nextBody, names };
 }
 
@@ -233,11 +429,22 @@ async function handleTrackMutation(request: Request, env: Env, method: string, p
     if (!trackId) return json({ error: '音檔已儲存，但演講者關聯缺少音檔編號，請重試' }, 500);
     await syncTrackSpeakers(env.DB, trackId, patched.names);
     const speakers = [...patched.names];
+    const stats = canonicalRating(data?.track?.ratings ?? data?.ratings ?? patched.body.ratings);
     if (data?.track && typeof data.track === 'object') {
-      data.track = { ...data.track, speaker: speakerDisplay(speakers), speakers };
+      data.track = {
+        ...data.track,
+        speaker: speakerDisplay(speakers),
+        speakers,
+        ...(isCreate ? { rating: stats.rating, ratingCount: stats.ratingCount, ratings: stats.ratings, likes: parseIds(patched.body.likedBy).length, commentsCount: 0 } : {})
+      };
       return json(data, response.status, response);
     }
-    return json({ ...data, speaker: speakerDisplay(speakers), speakers }, response.status, response);
+    return json({
+      ...data,
+      speaker: speakerDisplay(speakers),
+      speakers,
+      ...(isCreate ? { rating: stats.rating, ratingCount: stats.ratingCount, ratings: stats.ratings, likes: parseIds(patched.body.likedBy).length, commentsCount: 0 } : {})
+    }, response.status, response);
   } catch (error) {
     console.error('v187 track speaker relation sync failed:', error);
     return json({ error: '音檔已儲存，但共同演講者關聯同步失敗，請再按一次儲存' }, 500);
@@ -250,25 +457,29 @@ export default {
     const method = request.method.toUpperCase();
     const favoriteAction = url.pathname.match(/^\/api\/tracks\/([^/]+)\/favorite$/);
     const trackList = url.pathname === '/api/tracks' && method === 'GET';
+    const leaderboard = url.pathname === '/api/leaderboard' && method === 'GET';
     const trackMutation =
       (url.pathname === '/api/tracks' && method === 'POST') ||
       (/^\/api\/tracks\/[^/]+$/.test(url.pathname) && ['PUT', 'DELETE'].includes(method));
 
-    if (!favoriteAction && !trackList && !trackMutation) return appWorker.fetch(request, env);
+    if (!favoriteAction && !trackList && !leaderboard && !trackMutation) return appWorker.fetch(request, env);
     if (!env.DB) {
       if (favoriteAction) return json({ error: '收藏統計資料庫尚未連線' }, 503);
+      if (leaderboard) return json({ error: '排行榜資料庫尚未連線' }, 503);
       return appWorker.fetch(request, env);
     }
 
     try {
       await ensureDatabaseExtensions(env.DB);
     } catch (error) {
-      console.warn('Favorite/multi-speaker schema setup failed:', error);
+      console.warn('Favorite/leaderboard/multi-speaker schema setup failed:', error);
       if (favoriteAction) return json({ error: '收藏統計暫時無法使用' }, 500);
+      if (leaderboard) return json({ error: '排行榜統計暫時無法使用' }, 500);
       if (trackMutation) return json({ error: '演講者資料庫升級暫時無法完成，請稍後再試' }, 500);
       return appWorker.fetch(request, env);
     }
 
+    if (leaderboard) return realLeaderboard(env.DB);
     if (trackList) return augmentTrackList(await appWorker.fetch(request, env), env.DB);
 
     if (trackMutation) {
