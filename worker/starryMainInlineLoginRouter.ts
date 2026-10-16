@@ -1,5 +1,6 @@
 import type { Env } from './index';
 import appWorker from './starryMainBatteryGameRouter';
+import { handleStarryIdRandomMotto } from './starryIdRandomMottoRouter';
 
 const ID_HOST = 'id.starry.phd';
 const LOGIN_PATH = '/starry-main-login';
@@ -125,6 +126,10 @@ function loginPage(env: Env) {
 export default {
   async fetch(request: Request, env: Env, ctx?: any): Promise<Response> {
     const url = new URL(request.url);
+
+    const randomMottoResponse = await handleStarryIdRandomMotto(request, env);
+    if (randomMottoResponse) return randomMottoResponse;
+
     if (url.hostname === ID_HOST && url.pathname === LOGIN_PATH) {
       if (request.method.toUpperCase() !== 'GET') return new Response('Method not allowed', { status: 405 });
       return loginPage(env);
