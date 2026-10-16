@@ -31,13 +31,13 @@ test('central select validation remains enabled while stale UI choices are disca
   assert.match(bridge, /next = ''/);
 });
 
-test('Echo removes every duplicate motto field and keeps only the Quotes Starry primary editor', () => {
-  assert.match(mottoUi, /removeDuplicateMottoFields/);
+test('Echo removes legacy duplicate motto fields and keeps one separate edit section', () => {
+  assert.match(mottoUi, /removeLegacyMottoUi/);
   assert.match(mottoUi, /data-starry-extension-field=\"motto\"/);
   assert.match(mottoUi, /data-starry-field=\"motto\"/);
   assert.match(mottoUi, /dataset\.profileMottoPrimary = '1'/);
+  assert.match(mottoUi, /editCard\.insertAdjacentElement\('afterend', section\)/);
   assert.match(mottoUi, /🎲 隨機一句/);
   assert.match(mottoUi, /\/api\/random-motto/);
-  assert.doesNotMatch(mottoUi, /function makeDisplayCard/);
-  assert.doesNotMatch(mottoUi, /function ensureDisplay/);
+  assert.doesNotMatch(mottoUi, /persistMotto/);
 });
