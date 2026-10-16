@@ -2,6 +2,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import appWorker from './shareRouter';
 import { syncVerifiedMember, MemberIdentityError, normalizeMember } from './memberRepository';
 import { validateCentralProfilePatch } from './starryProfileSchemaService';
+import { CentralProfileError, ensureCentralEchoMember, overlayEchoJsonResponse, overlayEchoMemberWithCentral, overlayEchoMembersWithCentral, writeEchoProfileToCentral } from './echoCentralProfileGateway';
 import type { Env } from './index';
 
 const GOOGLE_CLIENT_IDS = [
@@ -118,7 +119,7 @@ async function sessionUser(request: Request, env: Env) {
     return null;
   }
   if (row.isBlocked) return null;
-  return row;
+  return overlayEchoMemberWithCentral(env, row);
 }
 
 export async function resolveEchoSessionUser(request: Request, env: Env) {
@@ -171,11 +172,16 @@ async function handleGoogleLogin(request: Request, env: Env) {
     await ensureAuthSchema(env.DB);
 
     const data = await syncVerifiedMember(env.DB, identity);
+    stage = 'central-profile';
+    await ensureCentralEchoMember(env, { ...data.user, googleSubject: identity.subject });
+    const canonicalUser = await overlayEchoMemberWithCentral(env, { ...data.user, googleSubject: identity.subject });
 
     stage = 'session';
     const session = await createSession(env.DB, data.user.id);
     return json({
       ...data,
+      user: canonicalUser,
+      profileSource: 'starry-id-central',
       authToken: session.token,
       sessionExpiresAt: session.expiresAt
     });
@@ -381,7 +387,8 @@ export default {
         const { results } = await env.DB.prepare(
           'SELECT id, name, avatar, rank, approvedRank, rankApproved, center FROM users WHERE COALESCE(isBlocked,0) = 0'
         ).all();
-        return json((results || []).map((member: any) => member.id === user.id ? normalizeMember(user) : member));
+        const members = (results || []).map((member: any) => member.id === user.id ? normalizeMember(user) : member);
+        return json(await overlayEchoMembersWithCentral(env, members));
       }
     }
 
@@ -392,12 +399,32 @@ export default {
       const authorized = await authorizeAndRewrite(request, env, user);
       if (authorized instanceof Response) return authorized;
       nextRequest = authorized;
+
+      const centralProfileWrite = path.match(/^\/api\/users\/([^/]+)$/);
+      if (centralProfileWrite && method === 'PUT') {
+        const targetId = decodeURIComponent(centralProfileWrite[1]);
+        const target: any = await env.DB?.prepare('SELECT * FROM users WHERE id=? LIMIT 1').bind(targetId).first();
+        if (!target) return json({ error: '找不到會員' }, 404);
+        const patch = await requestBody(nextRequest);
+        try {
+          const saved = await writeEchoProfileToCentral(env, user, target, patch);
+          return json({ success: true, user: normalizeMember(saved), profileSource: 'starry-id-central' });
+        } catch (error) {
+          if (error instanceof CentralProfileError) return json({ error: error.message, code: error.code, ...error.extra }, error.status);
+          console.error('Central profile write failed', { targetId, code: error instanceof Error ? error.message : 'unknown' });
+          return json({ error: 'Starry ID 中央會員資料儲存失敗，資料未寫入舊會員資料表', code: 'CENTRAL_PROFILE_WRITE_FAILED' }, 503);
+        }
+      }
     } else {
       const sanitized = await sanitizeCommentIdentity(request, env);
       if (sanitized instanceof Response) return sanitized;
       nextRequest = sanitized;
     }
 
-    return appWorker.fetch(nextRequest, env);
+    const response = await appWorker.fetch(nextRequest, env);
+    if (method === 'GET' && (path === '/api/users' || path === '/api/users/profile' || /^\/api\/users\/[^/]+$/.test(path))) {
+      return overlayEchoJsonResponse(env, response);
+    }
+    return response;
   }
 };
