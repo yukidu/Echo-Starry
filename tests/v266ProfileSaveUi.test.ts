@@ -6,7 +6,7 @@ const mottoUi = readFileSync(new URL('../src/v264ProfileMotto.ts', import.meta.u
 const bridge = readFileSync(new URL('../src/memberProfileSchemaBridge.ts', import.meta.url), 'utf8');
 
 test('profile edit keeps only the primary motto editor', () => {
-  assert.match(mottoUi, /data\.profileMottoPrimary = '1'/);
+  assert.match(mottoUi, /dataset\.profileMottoPrimary = '1'/);
   assert.doesNotMatch(mottoUi, /function makeDisplayCard/);
   assert.doesNotMatch(mottoUi, /function ensureDisplay/);
   assert.match(bridge, /ECHO_MANAGED_EXTENSION_FIELDS = new Set\(\['motto'\]\)/);
