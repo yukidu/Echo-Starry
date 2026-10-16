@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 const mottoUi = readFileSync(new URL('../src/v264ProfileMotto.ts', import.meta.url), 'utf8');
 
 test('profile edit observer is bounded and cannot lock the page', () => {
-  assert.match(mottoUi, /let renderScheduled = false/);
+  assert.match(mottoUi, /let scheduled = false/);
   assert.match(mottoUi, /requestAnimationFrame/);
   assert.match(mottoUi, /observer\?\.disconnect\(\)/);
   assert.match(mottoUi, /observer\?\.observe\(document\.documentElement, \{ childList: true, subtree: true \}\)/);

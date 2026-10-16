@@ -30,9 +30,18 @@ type SchemaBundle = {
   source?: string;
 };
 
+type EchoUser = Record<string, unknown> & {
+  id?: string;
+  rank?: string;
+  rankApproved?: boolean;
+  profileEditCount?: number;
+  auditedAt?: string;
+};
+
 const CACHE_KEY = 'starry_profile_schema_cache_v1';
 const CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 const ECHO_MANAGED_EXTENSION_FIELDS = new Set(['motto']);
+const initializedSelects = new WeakSet<HTMLSelectElement>();
 let activeSchema: SchemaBundle | null = null;
 let refreshPromise: Promise<SchemaBundle | null> | null = null;
 let extensionValues: Record<string,string> | null = null;
@@ -117,11 +126,28 @@ export function refreshMemberProfileSchema() {
   return refreshPromise;
 }
 
-function currentEchoUserId() {
+function currentEchoUser(): EchoUser | null {
   try {
     const user = JSON.parse(localStorage.getItem('sq_current_user_v1') || 'null');
-    return String(user?.id || '');
-  } catch { return ''; }
+    return user && typeof user === 'object' ? user as EchoUser : null;
+  } catch { return null; }
+}
+
+function currentEchoUserId() {
+  return String(currentEchoUser()?.id || '');
+}
+
+function storedNativeValue(fieldKey: string) {
+  const user = currentEchoUser();
+  if (!user) return '';
+  if (
+    fieldKey === 'rank' &&
+    String(user.rank || '') === '無' &&
+    !user.rankApproved &&
+    Number(user.profileEditCount || 0) === 0 &&
+    !String(user.auditedAt || '').trim()
+  ) return '';
+  return String(user[fieldKey] ?? '').trim();
 }
 
 async function loadExtensionValues(force = false) {
@@ -176,21 +202,39 @@ function matchNativeControl(page: HTMLElement, field: SchemaField) {
   return parent?.querySelector('input,textarea,select') as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
 }
 
+function dispatchNativeChange(control: HTMLSelectElement) {
+  control.dispatchEvent(new Event('change',{bubbles:true}));
+}
+
 function syncSelectOptions(control: HTMLSelectElement, field: SchemaField, schema: SchemaBundle) {
   if (!field.optionCategory) return;
   const values = schema.options?.[field.optionCategory];
   if (!Array.isArray(values) || !values.length) return;
-  const current = control.value;
-  const desired = current && !values.includes(current) ? [current,...values] : values;
+
+  const firstSync = !initializedSelects.has(control);
+  const before = control.value;
+  let next = before;
+  if (firstSync) {
+    const stored = storedNativeValue(field.fieldKey);
+    next = stored && values.includes(stored) ? stored : '';
+    initializedSelects.add(control);
+  } else if (next && !values.includes(next)) {
+    next = '';
+  }
+
+  const placeholder = field.placeholder || '請選擇';
+  const desired = ['',...values.filter(value => value !== '')];
   const existing = Array.from(control.options).map(option => option.value);
-  if (existing.length === desired.length && existing.every((value,index) => value === desired[index])) return;
-  control.replaceChildren(...desired.map(value => {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = value;
-    return option;
-  }));
-  control.value = current && desired.includes(current) ? current : desired[0] || '';
+  if (existing.length !== desired.length || !existing.every((value,index) => value === desired[index])) {
+    control.replaceChildren(...desired.map((value,index) => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = index === 0 ? placeholder : value;
+      return option;
+    }));
+  }
+  control.value = next && values.includes(next) ? next : '';
+  if (before !== control.value) dispatchNativeChange(control);
 }
 
 function applyNativeRules(page: HTMLElement, schema: SchemaBundle) {
@@ -215,13 +259,12 @@ function makeExtensionControl(field: SchemaField, value: string, schema: SchemaB
   if (field.inputType === 'select') {
     const select = document.createElement('select');
     const values = schema.options?.[field.optionCategory] || [];
+    const placeholder = document.createElement('option');
+    placeholder.value=''; placeholder.textContent=field.placeholder || '請選擇'; select.appendChild(placeholder);
     for (const item of values) {
       const option = document.createElement('option'); option.value=item; option.textContent=item; select.appendChild(option);
     }
-    if (value && !values.includes(value)) {
-      const option=document.createElement('option'); option.value=value; option.textContent=value; select.prepend(option);
-    }
-    select.value=value || values[0] || '';
+    select.value=value && values.includes(value) ? value : '';
     control=select;
   } else if (field.inputType === 'textarea') {
     const textarea=document.createElement('textarea'); textarea.rows=3; textarea.value=value; control=textarea;

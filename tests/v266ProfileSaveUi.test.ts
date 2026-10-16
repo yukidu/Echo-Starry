@@ -7,6 +7,8 @@ const bridge = readFileSync(new URL('../src/memberProfileSchemaBridge.ts', impor
 
 test('profile edit keeps only the primary motto editor', () => {
   assert.match(mottoUi, /dataset\.profileMottoPrimary = '1'/);
+  assert.match(mottoUi, /removeDuplicateMottoFields/);
+  assert.match(mottoUi, /data-starry-extension-field=\"motto\"/);
   assert.doesNotMatch(mottoUi, /function makeDisplayCard/);
   assert.doesNotMatch(mottoUi, /function ensureDisplay/);
   assert.match(bridge, /ECHO_MANAGED_EXTENSION_FIELDS = new Set\(\['motto'\]\)/);

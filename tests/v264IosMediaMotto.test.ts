@@ -14,8 +14,8 @@ test('Echo member profile keeps one editable motto field with Quotes Starry dice
   assert.match(mottoUi, /dataset\.profileMottoPrimary = '1'/);
   assert.match(mottoUi, /🎲 隨機一句/);
   assert.match(mottoUi, /\/api\/random-motto/);
-  assert.match(mottoUi, /quotes\.starry\.phd/);
-  assert.match(mottoUi, /LEGACY_DISPLAY_ID/);
+  assert.match(mottoUi, /removeDuplicateMottoFields/);
+  assert.match(mottoUi, /data-starry-extension-field=\"motto\"/);
   assert.doesNotMatch(mottoUi, /function makeDisplayCard/);
   assert.doesNotMatch(mottoUi, /function ensureDisplay/);
 });
