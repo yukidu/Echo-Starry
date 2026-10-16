@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  regression:
+  regression-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -27,58 +27,73 @@ jobs:
             echostars-npm-${{ runner.os }}-
       - name: Install dependencies
         run: npm install --prefer-offline --no-audit --no-fund
-
-      - name: Run every regression test file and report all failures
-        id: tests
+      - name: Run all regression test files in parallel
         shell: bash
         run: |
-          set +e
-          failed=0
-          total=0
-          passed=0
           mkdir -p /tmp/regression-output
-          : > /tmp/regression-output/failures.txt
-          for test_file in tests/*.test.ts; do
-            total=$((total + 1))
-            test_name=$(basename "${test_file}")
-            echo ""
-            echo "============================================================"
-            echo "TEST FILE: ${test_file}"
-            echo "============================================================"
-            node --import tsx --test "${test_file}" 2>&1 | tee "/tmp/regression-output/${test_name}.log"
-            status=${PIPESTATUS[0]}
-            if [ ${status} -eq 0 ]; then
-              passed=$((passed + 1))
-              echo "PASS: ${test_file}"
-            else
-              failed=1
-              echo "${test_file}" >> /tmp/regression-output/failures.txt
-              echo "FAIL: ${test_file} (exit ${status})"
-            fi
-          done
-          echo ""
-          echo "Regression files passed: ${passed}/${total}" | tee /tmp/regression-output/summary.txt
-          exit ${failed}
-
+          node --import tsx --test tests/*.test.ts 2>&1 | tee /tmp/regression-output/all-tests.log
       - name: Upload regression failure evidence
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: regression-output-${{ github.sha }}
           path: /tmp/regression-output
+          if-no-files-found: ignore
+          retention-days: 1
+
+  diagnostics-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: echostars-npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            echostars-npm-${{ runner.os }}-
+      - name: Install dependencies
+        run: npm install --prefer-offline --no-audit --no-fund
+      - name: TypeScript diagnostic
+        run: npm run lint
+      - name: Production build
+        run: npm run build
+      - name: Share production build with browser checks
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-dist-${{ github.sha }}
+          path: dist
           if-no-files-found: error
           retention-days: 1
 
-      - name: TypeScript diagnostic
-        if: always()
-        run: npm run lint
-
-      - name: Production build
-        if: always()
-        run: npm run build
-
+  browser-ui:
+    needs: diagnostics-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: echostars-npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            echostars-npm-${{ runner.os }}-
+      - name: Install dependencies
+        run: npm install --prefer-offline --no-audit --no-fund
+      - name: Download production build
+        uses: actions/download-artifact@v4
+        with:
+          name: production-dist-${{ github.sha }}
+          path: dist
       - name: Browser UI check
-        if: always()
         shell: bash
         run: |
           if [ ! -f dist/index.html ]; then
@@ -109,15 +124,12 @@ jobs:
             exit 1
           fi
 
-          # Headless Chrome can very occasionally fail to expose its debug port on a hosted runner.
-          # Retry each real browser check once only; the second failure remains a hard failure.
           if ! node scripts/verifyThemeMenuUi.mjs; then
             echo "Theme browser UI check startup failed once; retrying one final time."
             sleep 2
             node scripts/verifyThemeMenuUi.mjs
           fi
 
-          # v169 keeps category filtering as a direct dropdown and verifies repeated real selections.
           if [ -f scripts/verifyV167CategoryFilterUi.mjs ]; then
             if ! node scripts/verifyV167CategoryFilterUi.mjs; then
               echo "Category dropdown browser UI check startup failed once; retrying one final time."
@@ -167,13 +179,13 @@ jobs:
             sleep 2
             node scripts/verifyV174CrownTruePage.mjs
           fi
-
-      - name: Upload browser UI evidence
-        if: always()
+      - name: Upload browser UI failure evidence
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: browser-ui-${{ github.sha }}
           path: |
+            /tmp/echostars-preview.log
             /tmp/echostars-theme-*
             /tmp/echostars-category-*
             /tmp/echostars-v156-*
