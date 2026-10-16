@@ -27,15 +27,20 @@ function normalizeEmail(value: unknown) { return clean(value).toLowerCase(); }
 function isSuperAdmin(user: any) { return normalizeEmail(user?.email) === SUPER_ADMIN_EMAIL; }
 function centralDb(env: Env) { return (env as any).STARRY_ID_DB as any; }
 function localDb(env: Env) { return (env as any).DB as any; }
-
-async function audit(db: any, userId: string, actorUserId: string, fieldName: string, before: unknown, after: unknown) {
-  const oldValue = before == null ? '' : String(before);
-  const newValue = after == null ? '' : String(after);
-  if (oldValue === newValue) return;
-  await db.prepare(`INSERT INTO profile_audit_logs
+function firstBatchRow(result: any) { return result?.results?.[0] || null; }
+function auditStatement(db:any,userId:string,actorUserId:string,fieldName:string,before:unknown,after:unknown) {
+  const oldValue=before == null ? '' : String(before);
+  const newValue=after == null ? '' : String(after);
+  if(oldValue===newValue)return null;
+  return db.prepare(`INSERT INTO profile_audit_logs
     (id,userId,appId,actorUserId,fieldName,oldValue,newValue,createdAt)
     VALUES (?,?,?,?,?,?,?,?)`)
-    .bind(crypto.randomUUID(), userId, SOURCE_APP, actorUserId || userId, fieldName, oldValue, newValue, Date.now()).run();
+    .bind(crypto.randomUUID(),userId,SOURCE_APP,actorUserId||userId,fieldName,oldValue,newValue,Date.now());
+}
+
+async function audit(db: any, userId: string, actorUserId: string, fieldName: string, before: unknown, after: unknown) {
+  const statement=auditStatement(db,userId,actorUserId,fieldName,before,after);
+  if(statement)await statement.run();
 }
 
 async function centralUserIdForEcho(env: Env, echoUser: any): Promise<string | null> {
@@ -65,33 +70,31 @@ async function centralUserIdForEcho(env: Env, echoUser: any): Promise<string | n
   return null;
 }
 
-async function relationshipLabels(db: any, userId: string) {
-  const rows: any = await db.prepare(`SELECT mr.relationType,mr.legacyLabel,rp.name AS relatedName
-    FROM member_relationships mr
-    LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId
-    WHERE mr.userId=?`).bind(userId).all();
-  const labels: any = { sponsor:'', platinumUpline:'', diamondUpline:'' };
-  for (const row of rows?.results || []) {
-    const value = clean(row.relatedName || row.legacyLabel);
-    if (row.relationType === 'sponsor') labels.sponsor=value;
-    else if (row.relationType === 'platinum_upline') labels.platinumUpline=value;
-    else if (row.relationType === 'diamond_upline') labels.diamondUpline=value;
-  }
-  return labels;
-}
-
 async function centralProfileById(env: Env, centralUserId: string) {
   const db = centralDb(env);
   if (!db || !centralUserId) return null;
-  const row: any = await db.prepare(`SELECT u.id AS centralUserId,u.primaryEmail,u.status,p.*
-    FROM users u JOIN profiles p ON p.userId=u.id WHERE u.id=? LIMIT 1`).bind(centralUserId).first();
+  const [profileResult,relationsResult,spouseResult]:any[]=await db.batch([
+    db.prepare(`SELECT u.id AS centralUserId,u.primaryEmail,u.status,p.*
+      FROM users u JOIN profiles p ON p.userId=u.id WHERE u.id=? LIMIT 1`).bind(centralUserId),
+    db.prepare(`SELECT mr.relationType,mr.legacyLabel,rp.name AS relatedName
+      FROM member_relationships mr
+      LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId
+      WHERE mr.userId=?`).bind(centralUserId),
+    db.prepare(`SELECT p.name FROM spouse_links s
+      JOIN profiles p ON p.userId=CASE WHEN s.userA=? THEN s.userB ELSE s.userA END
+      WHERE s.status='active' AND (s.userA=? OR s.userB=?) LIMIT 1`)
+      .bind(centralUserId,centralUserId,centralUserId)
+  ]);
+  const row:any=firstBatchRow(profileResult);
   if (!row || row.status !== 'active') return null;
-  const relations = await relationshipLabels(db,centralUserId);
-  const spouse: any = await db.prepare(`SELECT p.name FROM spouse_links s
-    JOIN profiles p ON p.userId=CASE WHEN s.userA=? THEN s.userB ELSE s.userA END
-    WHERE s.status='active' AND (s.userA=? OR s.userB=?) LIMIT 1`)
-    .bind(centralUserId,centralUserId,centralUserId).first().catch(()=>null);
-  return { ...row, ...relations, spouseName:clean(spouse?.name) };
+  const labels:any={sponsor:'',platinumUpline:'',diamondUpline:''};
+  for(const relation of relationsResult?.results||[]){
+    const value=clean(relation.relatedName||relation.legacyLabel);
+    if(relation.relationType==='sponsor')labels.sponsor=value;
+    else if(relation.relationType==='platinum_upline')labels.platinumUpline=value;
+    else if(relation.relationType==='diamond_upline')labels.diamondUpline=value;
+  }
+  return {...row,...labels,spouseName:clean(firstBatchRow(spouseResult)?.name)};
 }
 
 export async function ensureCentralEchoMember(env: Env, echoUser: any) {
@@ -103,6 +106,7 @@ export async function ensureCentralEchoMember(env: Env, echoUser: any) {
 
   let userId = await centralUserIdForEcho(env,echoUser);
   const now = Date.now();
+  let created=false;
   if (!userId) {
     userId = echoId;
     const profileValues: any = {};
@@ -122,20 +126,25 @@ export async function ensureCentralEchoMember(env: Env, echoUser: any) {
           VALUES(?,?,'active',?,?,?,?,?,?)`)
           .bind(userId,SOURCE_APP,clean(echoUser.role),owner||echoUser.isAdminUser?1:0,echoUser.isContributor?1:0,echoUser.canUpload?1:0,now,now)
       ]);
+      created=true;
     } catch (error) {
       userId = await centralUserIdForEcho(env,echoUser);
       if (!userId) throw error;
     }
   }
 
-  await db.prepare(`INSERT INTO legacy_links(sourceApp,sourceUserId,userId,sourceEmail,importedAt)
-    VALUES(?,?,?,?,?) ON CONFLICT(sourceApp,sourceUserId) DO UPDATE SET userId=excluded.userId,sourceEmail=excluded.sourceEmail`)
-    .bind(SOURCE_APP,echoId,userId,email,now).run();
-  await db.prepare(`INSERT INTO app_memberships(userId,appId,status,role,isAdminUser,isContributor,canUpload,joinedAt,updatedAt)
-    VALUES(?,?,'active',?,?,?,?,?,?) ON CONFLICT(userId,appId) DO UPDATE SET
-    status='active',role=excluded.role,isAdminUser=excluded.isAdminUser,isContributor=excluded.isContributor,
-    canUpload=excluded.canUpload,updatedAt=excluded.updatedAt`)
-    .bind(userId,SOURCE_APP,clean(echoUser.role),echoUser.isAdminUser?1:0,echoUser.isContributor?1:0,echoUser.canUpload?1:0,now,now).run();
+  if(!created){
+    await db.batch([
+      db.prepare(`INSERT INTO legacy_links(sourceApp,sourceUserId,userId,sourceEmail,importedAt)
+        VALUES(?,?,?,?,?) ON CONFLICT(sourceApp,sourceUserId) DO UPDATE SET userId=excluded.userId,sourceEmail=excluded.sourceEmail`)
+        .bind(SOURCE_APP,echoId,userId,email,now),
+      db.prepare(`INSERT INTO app_memberships(userId,appId,status,role,isAdminUser,isContributor,canUpload,joinedAt,updatedAt)
+        VALUES(?,?,'active',?,?,?,?,?,?) ON CONFLICT(userId,appId) DO UPDATE SET
+        status='active',role=excluded.role,isAdminUser=excluded.isAdminUser,isContributor=excluded.isContributor,
+        canUpload=excluded.canUpload,updatedAt=excluded.updatedAt`)
+        .bind(userId,SOURCE_APP,clean(echoUser.role),echoUser.isAdminUser?1:0,echoUser.isContributor?1:0,echoUser.canUpload?1:0,now,now)
+    ]);
+  }
 
   const subject = clean(echoUser.googleSubject);
   if (subject) {
@@ -164,7 +173,6 @@ export async function overlayEchoMemberWithCentral(env: Env, echoUser: any) {
   merged.platinumUpline = central.platinumUpline || '';
   merged.diamondUpline = central.diamondUpline || '';
   merged.spouseName = central.spouseName || '';
-  // Echo keeps its own stable app user id, roles, permissions and activity data.
   merged.id = echoUser.id;
   return merged;
 }
@@ -182,9 +190,11 @@ async function confirmSpouseFromEchoOrganization(env: Env, centralUserId: string
     .bind(centralUserId,otherCentralId,otherCentralId,centralUserId).first().catch(()=>null);
   if (selfLink) return true;
 
-  const selfLegacy: any = await db.prepare(`SELECT sourceUserId FROM legacy_links WHERE sourceApp=? AND userId=? LIMIT 1`).bind(SOURCE_APP,centralUserId).first();
-  const otherLegacy: any = await db.prepare(`SELECT sourceUserId FROM legacy_links WHERE sourceApp=? AND userId=? LIMIT 1`).bind(SOURCE_APP,otherCentralId).first();
-  const a=clean(selfLegacy?.sourceUserId), b=clean(otherLegacy?.sourceUserId);
+  const [selfLegacyResult,otherLegacyResult]:any[]=await db.batch([
+    db.prepare(`SELECT sourceUserId FROM legacy_links WHERE sourceApp=? AND userId=? LIMIT 1`).bind(SOURCE_APP,centralUserId),
+    db.prepare(`SELECT sourceUserId FROM legacy_links WHERE sourceApp=? AND userId=? LIMIT 1`).bind(SOURCE_APP,otherCentralId)
+  ]);
+  const a=clean(firstBatchRow(selfLegacyResult)?.sourceUserId), b=clean(firstBatchRow(otherLegacyResult)?.sourceUserId);
   if (!a || !b) return false;
   const confirmed: any = await app.prepare(`SELECT g.id FROM organization_groups g
     JOIN organization_members ma ON ma.groupId=g.id AND ma.userId=?
@@ -193,9 +203,11 @@ async function confirmSpouseFromEchoOrganization(env: Env, centralUserId: string
   if (!confirmed) return false;
 
   await ensureSpouseSchema(db);
-  const existingA: any = await db.prepare(`SELECT id FROM spouse_links WHERE (userA=? OR userB=?) AND status IN ('active','pending','unlink_pending') LIMIT 1`).bind(centralUserId,centralUserId).first();
-  const existingB: any = await db.prepare(`SELECT id FROM spouse_links WHERE (userA=? OR userB=?) AND status IN ('active','pending','unlink_pending') LIMIT 1`).bind(otherCentralId,otherCentralId).first();
-  if (existingA || existingB) return false;
+  const [existingAResult,existingBResult]:any[]=await db.batch([
+    db.prepare(`SELECT id FROM spouse_links WHERE (userA=? OR userB=?) AND status IN ('active','pending','unlink_pending') LIMIT 1`).bind(centralUserId,centralUserId),
+    db.prepare(`SELECT id FROM spouse_links WHERE (userA=? OR userB=?) AND status IN ('active','pending','unlink_pending') LIMIT 1`).bind(otherCentralId,otherCentralId)
+  ]);
+  if (firstBatchRow(existingAResult) || firstBatchRow(existingBResult)) return false;
   const users=[centralUserId,otherCentralId].sort(); const linkId=crypto.randomUUID(); const now=Date.now();
   await db.batch([
     db.prepare(`INSERT INTO spouse_links(id,userA,userB,status,requestedBy,createdAt,updatedAt) VALUES(?,?,?,'active',?,?,?)`).bind(linkId,users[0],users[1],centralUserId,now,now),
@@ -234,61 +246,111 @@ async function updateDistributorNumber(env: Env, centralUserId: string, actorUse
   await audit(db,centralUserId,actorUserId,'amwayId',before,requested);
 }
 
-async function updateRelationship(db:any,userId:string,actorUserId:string,field:string,value:unknown) {
-  const relationType=RELATIONS[field]; if(!relationType)return;
-  const before:any=await db.prepare('SELECT legacyLabel FROM member_relationships WHERE userId=? AND relationType=? LIMIT 1').bind(userId,relationType).first();
-  const label=clean(value);
-  if(!label){
-    await db.prepare('DELETE FROM member_relationships WHERE userId=? AND relationType=?').bind(userId,relationType).run();
-  } else {
-    await db.prepare(`INSERT INTO member_relationships(userId,relationType,relatedUserId,legacyLabel,resolutionStatus,updatedAt)
-      VALUES(?,?,NULL,?,'unresolved',?) ON CONFLICT(userId,relationType) DO UPDATE SET
-      relatedUserId=NULL,legacyLabel=excluded.legacyLabel,resolutionStatus='unresolved',updatedAt=excluded.updatedAt`)
-      .bind(userId,relationType,label,Date.now()).run();
-  }
-  await audit(db,userId,actorUserId,field,clean(before?.legacyLabel),label);
+function mergeCentralProfileWithEcho(echoTarget:any,central:any){
+  const merged:any={...echoTarget};
+  for(const key of CENTRAL_PROFILE_FIELDS)if(central?.[key]!==undefined&&central?.[key]!==null)merged[key]=central[key];
+  merged.email=central?.primaryEmail||echoTarget.email;
+  merged.birthday=central?.birthday||'';
+  merged.birthDate=central?.birthday||'';
+  merged.sponsor=central?.sponsor||'';
+  merged.platinumUpline=central?.platinumUpline||'';
+  merged.diamondUpline=central?.diamondUpline||'';
+  merged.spouseName=central?.spouseName||'';
+  merged.id=echoTarget.id;
+  return merged;
 }
 
 export async function writeEchoProfileToCentral(env: Env, echoActor: any, echoTarget: any, patch: any) {
   const db=centralDb(env);
   if(!db) throw new CentralProfileError(503,'CENTRAL_PROFILE_UNAVAILABLE','Starry ID 中央會員服務暫時無法使用，資料未儲存');
-  const targetCentralId=await ensureCentralEchoMember(env,echoTarget);
-  const actorCentralId=await ensureCentralEchoMember(env,echoActor);
   if (!isSuperAdmin(echoActor) && clean(echoActor.id)!==clean(echoTarget.id)) throw new CentralProfileError(403,'PROFILE_FORBIDDEN','只能修改自己的基本資料');
+
+  let targetCentralId=await centralUserIdForEcho(env,echoTarget);
+  if(!targetCentralId)targetCentralId=await ensureCentralEchoMember(env,echoTarget);
+  let actorCentralId=clean(echoActor.id)===clean(echoTarget.id)?targetCentralId:await centralUserIdForEcho(env,echoActor);
+  if(!actorCentralId)actorCentralId=await ensureCentralEchoMember(env,echoActor);
+
   const before=await centralProfileById(env,targetCentralId);
   if(!before) throw new CentralProfileError(404,'CENTRAL_PROFILE_NOT_FOUND','找不到中央會員資料');
   const next:any={...patch};
   if(next.birthDate!==undefined && next.birthday===undefined) next.birthday=next.birthDate;
+  const saved:any={...before};
+  let changedAnything=false;
 
-  if(Object.prototype.hasOwnProperty.call(next,'amwayId')) await updateDistributorNumber(env,targetCentralId,actorCentralId,next.amwayId);
+  if(Object.prototype.hasOwnProperty.call(next,'amwayId')){
+    const requested=clean(next.amwayId);
+    if(requested!==clean(before.amwayId)){
+      await updateDistributorNumber(env,targetCentralId,actorCentralId,requested);
+      saved.amwayId=requested;
+      changedAnything=true;
+    }
+  }
 
-  const updates:string[]=[]; const values:any[]=[]; const changed: Array<[string,unknown,unknown]>=[];
+  const updates:string[]=[]; const values:any[]=[]; const changed:Array<[string,unknown,unknown]>=[];
   for(const key of DIRECT_EDIT_FIELDS){
     if(!Object.prototype.hasOwnProperty.call(next,key))continue;
     const value=next[key] == null ? '' : next[key];
     if(String((before as any)[key] ?? '')===String(value ?? ''))continue;
     updates.push(`${key}=?`); values.push(value); changed.push([key,(before as any)[key],value]);
+    saved[key]=value; changedAnything=true;
   }
+
   if(Object.prototype.hasOwnProperty.call(next,'rank') && String(next.rank)!==String(before.rank||'')){
     const requested=clean(next.rank);
     updates.push('rank=?'); values.push(requested); changed.push(['rank',before.rank,requested]);
+    saved.rank=requested; changedAnything=true;
     if(isSuperAdmin(echoActor)){
+      const auditedAt=new Date().toISOString();
       updates.push('approvedRank=?','rankApproved=1',"rankAuditStatus='approved'",'auditedBy=?','auditedAt=?');
-      values.push(requested,clean(echoActor.email),new Date().toISOString());
+      values.push(requested,clean(echoActor.email),auditedAt);
+      saved.approvedRank=requested;saved.rankApproved=1;saved.rankAuditStatus='approved';saved.auditedBy=clean(echoActor.email);saved.auditedAt=auditedAt;
     }else{
+      const auditType=clean(next.rankAuditType)||(before.rank?'rank_change':'new_register');
+      const rankUpdatedAt=clean(next.rankUpdatedAt)||new Date().toISOString().replace('T',' ').substring(0,16);
       updates.push('rankApproved=0',"rankAuditStatus='pending'",'rankAuditType=?','rankUpdatedAt=?');
-      values.push(clean(next.rankAuditType)|| (before.rank?'rank_change':'new_register'), clean(next.rankUpdatedAt)||new Date().toISOString().replace('T',' ').substring(0,16));
+      values.push(auditType,rankUpdatedAt);
+      saved.rankApproved=0;saved.rankAuditStatus='pending';saved.rankAuditType=auditType;saved.rankUpdatedAt=rankUpdatedAt;
     }
   }
+
+  const statements:any[]=[];
+  const now=Date.now();
   if(updates.length){
-    updates.push('updatedAt=?');values.push(Date.now(),targetCentralId);
-    await db.prepare(`UPDATE profiles SET ${updates.join(',')} WHERE userId=?`).bind(...values).run();
-    for(const [field,oldValue,newValue] of changed) await audit(db,targetCentralId,actorCentralId,field,oldValue,newValue);
+    updates.push('updatedAt=?'); values.push(now,targetCentralId);
+    statements.push(db.prepare(`UPDATE profiles SET ${updates.join(',')} WHERE userId=?`).bind(...values));
+    saved.updatedAt=now;
+    for(const [field,oldValue,newValue] of changed){
+      const statement=auditStatement(db,targetCentralId,actorCentralId,field,oldValue,newValue);
+      if(statement)statements.push(statement);
+    }
   }
-  for(const field of Object.keys(RELATIONS)) if(Object.prototype.hasOwnProperty.call(next,field)) await updateRelationship(db,targetCentralId,actorCentralId,field,next[field]);
-  await db.prepare('UPDATE users SET updatedAt=? WHERE id=?').bind(Date.now(),targetCentralId).run();
-  const fresh=await centralProfileById(env,targetCentralId);
-  return overlayEchoMemberWithCentral(env,{...echoTarget,...fresh,id:echoTarget.id});
+
+  for(const field of Object.keys(RELATIONS)){
+    if(!Object.prototype.hasOwnProperty.call(next,field))continue;
+    const label=clean(next[field]);
+    const oldLabel=clean((before as any)[field]);
+    if(label===oldLabel)continue;
+    const relationType=RELATIONS[field];
+    if(!label){
+      statements.push(db.prepare('DELETE FROM member_relationships WHERE userId=? AND relationType=?').bind(targetCentralId,relationType));
+    }else{
+      statements.push(db.prepare(`INSERT INTO member_relationships(userId,relationType,relatedUserId,legacyLabel,resolutionStatus,updatedAt)
+        VALUES(?,?,NULL,?,'unresolved',?) ON CONFLICT(userId,relationType) DO UPDATE SET
+        relatedUserId=NULL,legacyLabel=excluded.legacyLabel,resolutionStatus='unresolved',updatedAt=excluded.updatedAt`)
+        .bind(targetCentralId,relationType,label,now));
+    }
+    const statement=auditStatement(db,targetCentralId,actorCentralId,field,oldLabel,label);
+    if(statement)statements.push(statement);
+    saved[field]=label; changedAnything=true;
+  }
+
+  if(changedAnything){
+    statements.push(db.prepare('UPDATE users SET updatedAt=? WHERE id=?').bind(now,targetCentralId));
+    saved.updatedAt=now;
+  }
+  if(statements.length)await db.batch(statements);
+
+  return mergeCentralProfileWithEcho(echoTarget,saved);
 }
 
 export async function overlayEchoJsonResponse(env: Env, response: Response) {
