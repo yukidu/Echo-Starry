@@ -13,6 +13,9 @@ const ECOSYSTEM_ORIGINS = new Set([
   'https://echo.starry.phd',
   'https://go.starry.phd',
   'https://download.starry.phd',
+  'https://eye.starry.phd',
+  'https://ai.starry.phd',
+  'https://sync.starry.phd',
   'https://mirror.starry.phd'
 ]);
 
