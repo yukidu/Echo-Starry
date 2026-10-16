@@ -1,5 +1,4 @@
 const MEDIA_PLAYER_SELECTOR = '[data-echostars-media-session="1"]';
-const MEDIA_TOGGLE_SELECTOR = '[data-echostars-media-toggle="1"]';
 const DEFAULT_ARTWORK = '/icon-512.png';
 const APP_TITLE = '繁星回聲';
 const DEFAULT_ARTWORK_PATHS = new Set(['/icon-192.png', '/icon-512.png', '/icon.svg']);
@@ -46,7 +45,6 @@ const getMediaSession = (): any => {
 
 const getAudio = () => document.querySelector<HTMLAudioElement>('audio');
 const getPlayer = () => document.querySelector<HTMLElement>(MEDIA_PLAYER_SELECTOR);
-const getToggle = () => document.querySelector<HTMLButtonElement>(MEDIA_TOGGLE_SELECTOR);
 
 let boundAudio: HTMLAudioElement | null = null;
 let lastPositionSecond = -1;
@@ -111,23 +109,40 @@ function safeSetActionHandler(action: MediaSessionActionName, handler: ((details
   } catch {}
 }
 
-function toggleThroughApp(audio: HTMLAudioElement, desiredState: 'play' | 'pause') {
-  const shouldToggle = desiredState === 'play' ? audio.paused : !audio.paused;
-  if (!shouldToggle) return;
+function grantSystemPlaybackIntent() {
+  // main.tsx deliberately blocks script-driven autoplay. iOS lock-screen / Control
+  // Center playback is a real user action but it is not a DOM click, so explicitly
+  // bridge that trusted system intent before calling HTMLMediaElement.play().
+  window.dispatchEvent(new Event('echostars:grant-playback-intent'));
+}
 
-  const toggle = getToggle();
-  if (toggle) {
-    toggle.click();
+function playFromSystemControl(audio: HTMLAudioElement) {
+  if (!audio.paused && !audio.ended) {
+    setPlaybackState(audio);
     return;
   }
+  if (audio.ended && Number.isFinite(audio.duration) && audio.duration > 0) audio.currentTime = 0;
+  grantSystemPlaybackIntent();
+  void audio.play()
+    .then(() => {
+      setPlaybackState(audio);
+      syncPositionState(audio, true);
+    })
+    .catch(error => {
+      console.warn('System media play failed:', error);
+      setPlaybackState(audio);
+    });
+}
 
-  if (desiredState === 'play') void audio.play().catch(() => {});
-  else audio.pause();
+function pauseFromSystemControl(audio: HTMLAudioElement) {
+  if (!audio.paused) audio.pause();
+  setPlaybackState(audio);
+  syncPositionState(audio, true);
 }
 
 function bindSystemControls(audio: HTMLAudioElement) {
-  safeSetActionHandler('play', () => toggleThroughApp(audio, 'play'));
-  safeSetActionHandler('pause', () => toggleThroughApp(audio, 'pause'));
+  safeSetActionHandler('play', () => playFromSystemControl(audio));
+  safeSetActionHandler('pause', () => pauseFromSystemControl(audio));
   safeSetActionHandler('seekbackward', (details: any) => {
     const offset = Number(details?.seekOffset) || 10;
     audio.currentTime = Math.max(0, audio.currentTime - offset);
