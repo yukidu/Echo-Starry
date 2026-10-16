@@ -45,11 +45,13 @@ test('upline couples are displayed with ampersand, sponsors stay individual',()=
   assert.match(page,/field==='sponsor'\?m\.name:m\.displayName/);
 });
 
-test('spouse profile is read-only, unlink via action, public card opt-in',()=>{
+test('spouse profile is read-only, unlink via action, public card always mirrors spouse under member number',()=>{
   assert.match(page,/已與 .* 綁定夫妻/);
   assert.match(page,/解除夫妻綁定/);
   assert.match(page,/api\/spouse-action/);
-  assert.match(page,/visibility:\{spouse:toggle\.checked\}/);
-  assert.match(publicCard,/DEFAULT_HIDDEN = new Set\(\['phone','birthday','spouse'\]\)/);
-  assert.match(publicCard,/\['spouse','夫妻關係'\]/);
+  assert.doesNotMatch(page,/visibility:\{spouse:toggle\.checked\}/);
+  assert.match(page,/公開電子名片會在會員編號下方同步顯示夫妻綁定對象/);
+  assert.match(publicCard,/data\.spouseName=text\(partner\?\.name\)/);
+  assert.match(publicCard,/key==='amwayId'\|\|key==='cardNumber'/);
+  assert.doesNotMatch(publicCard,/\['spouse','夫妻關係'\]/);
 });

@@ -49,7 +49,7 @@ test('card layout and drag editing code has been removed', () => {
 
 test('public Amway-ID cards remain supported', () => {
   assert.match(bridge, /AMWAY_ID_RE/);
-  assert.match(bridge, /findUniqueActiveMember/);
+  assert.match(bridge, /findCanonicalActiveMember/);
   assert.match(bridge, /materializeCard/);
   assert.match(bridge, /handleStarryIdV211/);
 });

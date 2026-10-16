@@ -4,13 +4,16 @@ import { readFileSync } from 'node:fs';
 
 const router = readFileSync('worker/starryIdV211Router.ts','utf8');
 
-test('v250 resolves a missing numeric public-card slug from the unique active Amway ID', () => {
+test('v250 resolves a missing numeric public-card slug from one member or an active spouse pair', () => {
   assert.match(router, /if\(!card && \/\^\[0-9\]\+\$\/\.test\(slug\)\)/);
   assert.match(router, /TRIM\(COALESCE\(p\.amwayId,''\)\)=\?/);
   assert.match(router, /u\.status='active'/);
-  assert.match(router, /LIMIT 2/);
+  assert.match(router, /LIMIT 3/);
   assert.match(router, /rows\.length===1/);
   assert.match(router, /text\(rows\[0\]\.amwayId\)===slug/);
+  assert.match(router, /rows\.length===2/);
+  assert.match(router, /spouse_links/);
+  assert.match(router, /status='active'/);
 });
 
 test('v250 materializes the member card and retries the requested numeric slug', () => {

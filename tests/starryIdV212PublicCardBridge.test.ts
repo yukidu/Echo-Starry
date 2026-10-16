@@ -27,11 +27,13 @@ test('only safe numeric one-segment Amway ID routes qualify for the legacy fallb
   assert.equal(v212PublicAmwaySlug(new Request('https://id.starry.phd/9845637/extra')), '');
 });
 
-test('legacy fallback only runs after a v211 404 and requires one active exact Amway member', () => {
+test('legacy fallback only runs after a v211 404 and accepts one member or one active spouse pair', () => {
   assert.match(bridge, /(v211Response\.status !== 404|response\.status === 404)/);
   assert.match(bridge, /u\.status='active'/);
-  assert.match(bridge, /rows\.length !== 1/);
-  assert.match(bridge, /text\(rows\[0\]\.amwayId\) !== amwayId/);
+  assert.match(bridge, /rows\.length === 1/);
+  assert.match(bridge, /rows\.length !== 2/);
+  assert.match(bridge, /spouse_links/);
+  assert.match(bridge, /status='active'/);
 });
 
 test('first public Amway request assigns an n sequence and delegates rendering back to v211', () => {

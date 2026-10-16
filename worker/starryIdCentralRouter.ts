@@ -216,7 +216,8 @@ const memberSelect = `SELECT
   COALESCE((SELECT NULLIF(TRIM(rp.name),'')||COALESCE((SELECT '&'||TRIM(sp.name) FROM spouse_links sl JOIN profiles sp ON sp.userId=CASE WHEN sl.userA=rp.userId THEN sl.userB ELSE sl.userA END WHERE sl.status='active' AND (sl.userA=rp.userId OR sl.userB=rp.userId) LIMIT 1),'') FROM member_relationships mr LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId WHERE mr.userId=u.id AND mr.relationType='platinum_upline' LIMIT 1),
            (SELECT mr.legacyLabel FROM member_relationships mr WHERE mr.userId=u.id AND mr.relationType='platinum_upline' LIMIT 1),'') AS platinumUpline,
   COALESCE((SELECT NULLIF(TRIM(rp.name),'')||COALESCE((SELECT '&'||TRIM(sp.name) FROM spouse_links sl JOIN profiles sp ON sp.userId=CASE WHEN sl.userA=rp.userId THEN sl.userB ELSE sl.userA END WHERE sl.status='active' AND (sl.userA=rp.userId OR sl.userB=rp.userId) LIMIT 1),'') FROM member_relationships mr LEFT JOIN profiles rp ON rp.userId=mr.relatedUserId WHERE mr.userId=u.id AND mr.relationType='diamond_upline' LIMIT 1),
-           (SELECT mr.legacyLabel FROM member_relationships mr WHERE mr.userId=u.id AND mr.relationType='diamond_upline' LIMIT 1),'') AS diamondUpline
+           (SELECT mr.legacyLabel FROM member_relationships mr WHERE mr.userId=u.id AND mr.relationType='diamond_upline' LIMIT 1),'') AS diamondUpline,
+  COALESCE((SELECT NULLIF(TRIM(sp.name),'') FROM spouse_links sl JOIN profiles sp ON sp.userId=CASE WHEN sl.userA=u.id THEN sl.userB ELSE sl.userA END WHERE sl.status='active' AND (sl.userA=u.id OR sl.userB=u.id) LIMIT 1),'') AS spouseName
   FROM users u
   LEFT JOIN profiles p ON p.userId=u.id`;
 
@@ -254,7 +255,8 @@ function publicMember(row: any) {
     registerDate: row.registerDate || '',
     sponsor: row.sponsor || '',
     platinumUpline: row.platinumUpline || '',
-    diamondUpline: row.diamondUpline || ''
+    diamondUpline: row.diamondUpline || '',
+    spouseName: row.spouseName || ''
   };
 }
 

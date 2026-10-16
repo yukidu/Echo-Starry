@@ -183,10 +183,9 @@ export function enhanceStarryIdV222MemberCenter(html: string): string {
           });
         }
         if(l?.status==='active'){
-          const label=document.createElement('label');label.className='v224-checkbox';const toggle=document.createElement('input');toggle.type='checkbox';
-          const settings=await api('/api/card-settings');toggle.checked=Boolean(settings.visibility?.spouse);
-          label.append(toggle,document.createTextNode('在公開電子名片顯示夫妻關係'));panel.append(label);
-          toggle.onchange=async()=>{try{await api('/api/card-settings',{method:'PUT',body:JSON.stringify({visibility:{spouse:toggle.checked}})});notify('電子名片顯示設定已儲存')}catch(e){toggle.checked=!toggle.checked;notify(e.message)}};
+          const publicNote=document.createElement('div');publicNote.className='v222-help';
+          publicNote.textContent='公開電子名片會在會員編號下方同步顯示夫妻綁定對象。';
+          panel.append(publicNote);
         }
       }catch{panel.textContent='夫妻關係資料暫時無法讀取'}
     }
