@@ -1,6 +1,6 @@
 {
-  "name": "Echo-Starry",
-  "description": "Echo-Starry - 專為事業團隊培訓與音檔分享打造的全功能音頻知識管理與互動平台。",
+  "name": "繁星回聲",
+  "description": "繁星回聲 - 專為事業團隊培訓與音檔分享打造的全功能音頻知識管理與互動平台。",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
