@@ -11,7 +11,7 @@ const starrySync = readFileSync(new URL('../worker/starryIdSync.ts', import.meta
 
 test('Echo member profile keeps one editable motto field with Quotes Starry dice', () => {
   assert.match(main, /import '\.\/v264ProfileMotto'/);
-  assert.match(mottoUi, /data\.profileMottoPrimary = '1'/);
+  assert.match(mottoUi, /dataset\.profileMottoPrimary = '1'/);
   assert.match(mottoUi, /🎲 隨機一句/);
   assert.match(mottoUi, /\/api\/random-motto/);
   assert.match(mottoUi, /quotes\.starry\.phd/);
