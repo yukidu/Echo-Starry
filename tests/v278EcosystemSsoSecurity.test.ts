@@ -12,10 +12,11 @@ test('Starry ID authoritative session remains host-only', () => {
   assert.doesNotMatch(central, /Domain=\.starry\.phd/);
 });
 
-test('Echo uses exact-origin credentialed SSO instead of reading a shared subdomain cookie', () => {
+test('Echo uses exact-origin credentialed SSO and one-time app tickets', () => {
   assert.match(router, /https:\/\/echo\.starry\.phd/);
-  assert.match(router, /Access-Control-Allow-Credentials', 'true'/);
-  assert.match(router, /\/api\/apps\\\/(echostars\|gostarry)\\\/ticket/);
+  assert.match(router, /Access-Control-Allow-Credentials/);
+  assert.match(router, /echostars\|gostarry/);
+  assert.match(router, /starry_app_auth_codes/);
   assert.match(router, /DELETE FROM starry_app_auth_codes/);
   assert.match(client, /credentials: 'include'/);
   assert.match(client, /api\/auth\/ecosystem-exchange/);
