@@ -341,9 +341,9 @@ export default {
         const userId = decodeURIComponent(directProfileWrite[1]);
         const synced = await syncEchoMemberToStarryBestEffort(env as any, userId, 'echostars', 'member-profile-update');
         if ((env as any).STARRY_ID_DB && !synced) {
-          return withPrivacyHeaders(new Response(JSON.stringify({
-            error: '繁星回聲已暫存本次修改，但 Starry ID 中央同步暫時失敗，請再按一次儲存。'
-          }), { status: 503, headers: { 'Content-Type':'application/json; charset=utf-8', 'Cache-Control':'no-store' } }));
+          // Echo already committed successfully. Never turn that success into an error.
+          // Queue another best-effort central attempt and let the member leave edit mode.
+          scheduleStarrySync(ctx, env, userId, 'echostars', 'member-profile-update-retry');
         }
       } else {
         const membershipWrite = url.pathname.match(/^\/api\/users\/([^/]+)\/(?:contributor|admin-role|block|audit-rank)$/);
