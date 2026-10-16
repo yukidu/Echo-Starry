@@ -1,0 +1,36 @@
+name: Verify v274 production spouse routes
+
+on:
+  push:
+    branches: [verify/v274-production-routes]
+    paths:
+      - '.github/workflows/v274-production-route-verification.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Starry ID root and spouse-shared distributor routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=$(mktemp)
+          curl --fail --silent --show-error --location --max-time 20 https://id.starry.phd/ -o "$root"
+          test -s "$root"
+          for id in 9386705 4810333 6437758; do
+            body=$(mktemp)
+            code=$(curl --silent --show-error --location --max-time 20 --output "$body" --write-out '%{http_code}' "https://id.starry.phd/$id")
+            test "$code" = '200'
+            grep -Fq 'Starry ID 電子名片' "$body"
+            grep -Fq '夫妻綁定：' "$body"
+            if grep -Fq '"error":"Not found"' "$body"; then
+              echo "route $id still returned Not found" >&2
+              exit 1
+            fi
+            echo "route $id: ok"
+          done
+          echo 'root: ok'
+          echo 'v274 production spouse routes: healthy'
