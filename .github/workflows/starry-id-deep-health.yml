@@ -1,0 +1,56 @@
+name: Starry ID Deep Health Audit
+
+on:
+  push:
+    branches:
+      - 'audit/starry-id-deep-health-20261016'
+    paths:
+      - 'starry-id/deep-health-audit.mjs'
+      - '.github/workflows/starry-id-deep-health.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deep-health-audit:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      STARRY_ID_D1_ID: 01195c92-555e-4816-bddc-5b8cb2e795db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify audit credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${CLOUDFLARE_API_TOKEN:-}"
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
+          test -n "${STARRY_ID_D1_ID:-}"
+      - name: Run read-only deep health audit
+        id: audit
+        shell: bash
+        run: |
+          set +e
+          mkdir -p starry-id/audit-output
+          node starry-id/deep-health-audit.mjs | tee starry-id/audit-output/deep-health.json
+          code=${PIPESTATUS[0]}
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload non-PII health report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: starry-id-deep-health-audit
+          path: starry-id/audit-output/deep-health.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Enforce critical health result
+        if: steps.audit.outputs.exit_code != '0'
+        run: |
+          echo "Deep health audit found critical findings or incomplete queries. See uploaded report."
+          exit 1
