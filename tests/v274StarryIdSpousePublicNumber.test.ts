@@ -27,6 +27,7 @@ test('v274 public page accepts cardNumber and shows spouse under the identifier'
   assert.match(publicRouter,/rows\.length===2/);
   assert.match(publicRouter,/spouse_links/);
   assert.match(publicRouter,/status='active'/);
+  assert.match(publicRouter,/LIMIT 3/);
   assert.doesNotMatch(publicRouter,/\['spouse','夫妻關係'\]/);
 });
 
