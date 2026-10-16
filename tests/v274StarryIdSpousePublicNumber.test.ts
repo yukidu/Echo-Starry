@@ -6,6 +6,7 @@ const central=readFileSync('worker/starryIdCentralRouter.ts','utf8');
 const center=readFileSync('worker/starryIdMemberCenterPage.ts','utf8');
 const publicRouter=readFileSync('worker/starryIdV211Router.ts','utf8');
 const bridge=readFileSync('worker/starryIdV212PublicCardBridge.ts','utf8');
+const spouseUi=readFileSync('worker/starryIdV222Enhancer.ts','utf8');
 
 test('v274 central member responses carry the active spouse name',()=>{
   assert.match(central,/AS spouseName/);
@@ -37,4 +38,9 @@ test('v274 shared distributor number is accepted only for exactly two active spo
   assert.match(bridge,/status='active'/);
   assert.match(bridge,/LIMIT 3/);
   assert.match(bridge,/CASE WHEN LOWER\(slug\)=LOWER\(\?\)/);
+});
+
+test('v274 active spouse public display is no longer presented as an optional toggle',()=>{
+  assert.match(spouseUi,/公開電子名片會在會員編號下方同步顯示夫妻綁定對象/);
+  assert.doesNotMatch(spouseUi,/visibility:\{spouse:toggle\.checked\}/);
 });
