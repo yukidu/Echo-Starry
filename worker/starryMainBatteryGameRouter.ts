@@ -1,6 +1,7 @@
 import type { Env } from './index';
 import appWorker from './privacyCrawlerRouter';
 import { sessionContext } from './starryIdProfileDirectoryRouter';
+import { handleStarryEcosystemSso } from './starryEcosystemSsoRouter';
 
 const ID_HOST = 'id.starry.phd';
 const GAME_ORIGIN = 'https://starry.phd';
@@ -214,6 +215,19 @@ export default {
         return json(request, { error: '電池資料暫時無法更新，請稍後再試' }, 503);
       }
     }
+
+    try {
+      const sso = await handleStarryEcosystemSso(
+        request,
+        env,
+        ctx,
+        nextRequest => appWorker.fetch(nextRequest, env, ctx)
+      );
+      if (sso) return sso;
+    } catch (error) {
+      console.error('Starry ecosystem SSO error:', error);
+    }
+
     return appWorker.fetch(request, env, ctx);
   }
 };

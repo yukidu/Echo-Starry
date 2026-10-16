@@ -3,22 +3,9 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
-const echoStarryBrandCompatibility = {
-  name: 'echo-starry-brand-compatibility',
-  enforce: 'pre' as const,
-  transform(code: string, id: string) {
-    if (!id.endsWith('/src/App.tsx') && !id.endsWith('\\src\\App.tsx')) return null;
-    if (!code.includes('繁星回聲')) return null;
-    return {
-      code: code.replaceAll('繁星回聲', 'Echo-Starry'),
-      map: null,
-    };
-  },
-};
-
 export default defineConfig(() => {
   return {
-    plugins: [echoStarryBrandCompatibility, react(), tailwindcss()],
+    plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname, '.'),

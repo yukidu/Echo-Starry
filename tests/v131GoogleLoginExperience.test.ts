@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 const platformUx = readFileSync(new URL('../src/googleIdentityPlatformUx.ts', import.meta.url), 'utf8');
 
 test('Google login panel explains the benefit and keeps profile completion optional', () => {
-  assert.match(platformUx, /登入 Echo-Starry/);
+  assert.match(platformUx, /登入繁星回聲/);
   assert.match(platformUx, /登入後可跨裝置保存學習進度與個人紀錄/);
   assert.match(platformUx, /個人資料可稍後補齊，不會中斷目前瀏覽/);
   assert.match(platformUx, /data-echostars-login-intro/);

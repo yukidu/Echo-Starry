@@ -63,5 +63,5 @@ ENVIRONMENT = "production"
 # Google OAuth Client ID 是公開識別碼，不是秘密；Client Secret 不進 GitHub / 前端。
 STARRY_ID_GOOGLE_CLIENT_ID = "661055525630-ndcq5gtr16h7rqqprlqqkkvineea87lc.apps.googleusercontent.com"
 # App 必須先在 Starry ID 登記，不能由瀏覽器任意宣稱 appId 自行取得會員資格。
-STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,downloadstarry,gostarry,quotes,boxstarry"
-STARRY_ID_SELF_ENROLL_APPS = "starry-id,starryphd,downloadstarry,gostarry,quotes,boxstarry"
+STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry"
+STARRY_ID_SELF_ENROLL_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry"

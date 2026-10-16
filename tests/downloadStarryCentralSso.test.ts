@@ -109,6 +109,6 @@ test('privacy entry routes central app SSO before generic Starry ID router', asy
   assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
   assert.match(inline, /import appWorker from '\.\/starryMainBatteryGameRouter'/);
   assert.match(battery, /import appWorker from '\.\/privacyCrawlerRouter'/);
-  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,downloadstarry,gostarry,quotes,boxstarry"/);
-  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,starryphd,downloadstarry,gostarry,quotes,boxstarry"/);
+  assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry"/);
+  assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry"/);
 });
