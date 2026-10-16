@@ -42,7 +42,8 @@ function profileValue(source: any, field: typeof SHARED_PROFILE_FIELDS[number]) 
  *
  * Safety rules:
  * - EchoStars remains available even if the central database is missing/unavailable.
- * - Stable user IDs are never silently merged by email or Google subject.
+ * - An existing legacy link or verified Google subject may resolve the same person to an older Starry ID id.
+ * - Email alone never silently merges two users.
  * - EchoStars-only roles/permissions are written only to app_memberships.
  * - Source EchoStars data is never deleted.
  */
@@ -53,30 +54,38 @@ export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string,
   if (!source) return false;
 
   const central = env.STARRY_ID_DB;
-  const id = text(source.id);
+  const sourceId = text(source.id);
   const email = lower(source.email);
   const googleSubject = text(source.googleSubject);
-  if (!id || !email) throw new Error('Starry ID sync requires source id and email');
+  if (!sourceId || !email) throw new Error('Starry ID sync requires source id and email');
 
+  const legacyOwner: any = await central.prepare(
+    "SELECT userId FROM legacy_links WHERE sourceApp = 'echostars' AND sourceUserId = ? LIMIT 1"
+  ).bind(sourceId).first();
+  const identityOwner: any = googleSubject ? await central.prepare(
+    "SELECT userId FROM identities WHERE provider = 'google' AND providerSubject = ? LIMIT 1"
+  ).bind(googleSubject).first() : null;
   const emailOwner: any = await central.prepare(
     'SELECT id FROM users WHERE LOWER(TRIM(primaryEmail)) = ? LIMIT 1'
   ).bind(email).first();
-  if (emailOwner && text(emailOwner.id) !== id) {
+
+  const legacyId = text(legacyOwner?.userId);
+  const identityId = text(identityOwner?.userId);
+  const trustedIds = [...new Set([legacyId, identityId].filter(Boolean))];
+  if (trustedIds.length > 1) {
+    throw new Error('Starry ID legacy link and Google identity disagree');
+  }
+
+  // Prefer a durable legacy link or the verified Google subject. This repairs
+  // members that already received a Starry ID id before Echo began dual-write.
+  const centralId = trustedIds[0] || sourceId;
+  if (emailOwner && text(emailOwner.id) !== centralId) {
     throw new Error('Starry ID email belongs to another user');
   }
 
-  if (googleSubject) {
-    const identityOwner: any = await central.prepare(
-      "SELECT userId FROM identities WHERE provider = 'google' AND providerSubject = ? LIMIT 1"
-    ).bind(googleSubject).first();
-    if (identityOwner && text(identityOwner.userId) !== id) {
-      throw new Error('Starry ID Google identity belongs to another user');
-    }
-  }
-
   const now = Date.now();
-  const oldProfile: any = await central.prepare('SELECT * FROM profiles WHERE userId = ? LIMIT 1').bind(id).first();
-  const profileValues: Record<string, unknown> = { userId: id };
+  const oldProfile: any = await central.prepare('SELECT * FROM profiles WHERE userId = ? LIMIT 1').bind(centralId).first();
+  const profileValues: Record<string, unknown> = { userId: centralId };
   for (const field of SHARED_PROFILE_FIELDS) profileValues[field] = profileValue(source, field);
   profileValues.createdAt = now;
   profileValues.updatedAt = now;
@@ -90,7 +99,7 @@ export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string,
     central.prepare(`INSERT INTO users (id,primaryEmail,status,createdAt,updatedAt)
       VALUES (?,?,'active',?,?)
       ON CONFLICT(id) DO UPDATE SET primaryEmail=excluded.primaryEmail,updatedAt=excluded.updatedAt`)
-      .bind(id, email, now, now),
+      .bind(centralId, email, now, now),
     central.prepare(`INSERT INTO profiles (${profileColumns.join(',')})
       VALUES (${profileColumns.map(() => '?').join(',')})
       ON CONFLICT(userId) DO UPDATE SET ${profileUpdates}`)
@@ -102,7 +111,7 @@ export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string,
         status=excluded.status,role=excluded.role,isAdminUser=excluded.isAdminUser,
         isContributor=excluded.isContributor,canUpload=excluded.canUpload,updatedAt=excluded.updatedAt`)
       .bind(
-        id,
+        centralId,
         source.isBlocked ? 'blocked' : 'active',
         text(source.role),
         source.isAdminUser ? 1 : 0,
@@ -115,7 +124,7 @@ export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string,
       VALUES ('echostars',?,?,?,?)
       ON CONFLICT(sourceApp,sourceUserId) DO UPDATE SET
         userId=excluded.userId,sourceEmail=excluded.sourceEmail,importedAt=excluded.importedAt`)
-      .bind(id, id, email, now)
+      .bind(sourceId, centralId, email, now)
   ];
 
   if (googleSubject) {
@@ -124,7 +133,7 @@ export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string,
       VALUES ('google',?,?,?,1,?,?)
       ON CONFLICT(provider,providerSubject) DO UPDATE SET
         userId=excluded.userId,providerEmail=excluded.providerEmail,emailVerified=1,lastSeenAt=excluded.lastSeenAt`)
-      .bind(googleSubject, id, email, now, now));
+      .bind(googleSubject, centralId, email, now, now));
   }
 
   for (const [relationType, sourceField] of RELATIONSHIPS) {
@@ -136,7 +145,7 @@ export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string,
       ON CONFLICT(userId,relationType) DO UPDATE SET
         legacyLabel=excluded.legacyLabel,
         updatedAt=excluded.updatedAt`)
-      .bind(id, relationType, label, now));
+      .bind(centralId, relationType, label, now));
   }
 
   if (oldProfile) {
@@ -148,7 +157,7 @@ export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string,
       statements.push(central.prepare(`INSERT INTO profile_audit_logs
         (id,userId,appId,actorUserId,fieldName,oldValue,newValue,createdAt)
         VALUES (?,?,?,?,?,?,?,?)`)
-        .bind(crypto.randomUUID(), id, 'echostars', actorUserId || id, field, before, after, now));
+        .bind(crypto.randomUUID(), centralId, 'echostars', actorUserId || sourceId, field, before, after, now));
     }
   }
 
