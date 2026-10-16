@@ -8,6 +8,15 @@ const GOOGLE_SYNC_PATH = '/api/google-sync';
 const MAIN_ORIGIN = 'https://starry.phd';
 const DEFAULT_GOOGLE_CLIENT_ID = '661055525630-ndcq5gtr16h7rqqprlqqkkvineea87lc.apps.googleusercontent.com';
 
+const HOME_TRACKS_CACHE_KEY = 'v265:home:tracks';
+const HOME_CATEGORIES_CACHE_KEY = 'v265:home:categories';
+const HOME_CACHE_REVALIDATE_MS = 30_000;
+
+type HomeApiCache = {
+  savedAt: number;
+  body: string;
+};
+
 function safeClientId(env: Env) {
   const raw = String((env as any).STARRY_ID_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID).trim();
   return /^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/i.test(raw) ? raw : DEFAULT_GOOGLE_CLIENT_ID;
@@ -21,6 +30,117 @@ function withMainOriginCredentials(response: Response) {
   headers.set('Access-Control-Allow-Headers', 'Content-Type');
   headers.set('Vary', 'Origin');
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+function homeCacheKey(pathname: string) {
+  if (pathname === '/api/tracks') return HOME_TRACKS_CACHE_KEY;
+  if (pathname === '/api/categories') return HOME_CATEGORIES_CACHE_KEY;
+  return '';
+}
+
+function cachedHomeResponse(body: string, cacheState: 'hit' | 'stale') {
+  return new Response(body, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+      'X-Echo-Home-Cache': cacheState
+    }
+  });
+}
+
+async function readHomeApiCache(env: Env, pathname: string): Promise<HomeApiCache | null> {
+  const key = homeCacheKey(pathname);
+  if (!key || !env.KV) return null;
+  try {
+    const raw = await env.KV.get(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.body !== 'string' || !Number(parsed.savedAt)) return null;
+    return { savedAt: Number(parsed.savedAt), body: parsed.body };
+  } catch (error) {
+    console.warn('Home API cache read failed:', pathname, error);
+    return null;
+  }
+}
+
+async function writeHomeApiCache(env: Env, pathname: string, body: string) {
+  const key = homeCacheKey(pathname);
+  if (!key || !env.KV) return;
+  const value: HomeApiCache = { savedAt: Date.now(), body };
+  await env.KV.put(key, JSON.stringify(value));
+}
+
+function runInBackground(ctx: any, task: Promise<unknown>) {
+  const guarded = task.catch(error => console.warn('Home API background refresh failed:', error));
+  if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(guarded);
+  else void guarded;
+}
+
+async function rebuildHomeApiCache(requestUrl: string, pathname: '/api/tracks' | '/api/categories', env: Env, ctx?: any) {
+  if (!env.KV) return;
+  const url = new URL(requestUrl);
+  url.pathname = pathname;
+  url.search = '';
+  const response = await appWorker.fetch(new Request(url.toString(), {
+    method: 'GET',
+    headers: { Accept: 'application/json' }
+  }), env, ctx);
+  if (!response.ok) return;
+  await writeHomeApiCache(env, pathname, await response.text());
+}
+
+function cacheLiveHomeResponse(response: Response, pathname: '/api/tracks' | '/api/categories', env: Env, ctx?: any) {
+  if (!env.KV || !response.ok) return;
+  const clone = response.clone();
+  runInBackground(ctx, clone.text().then(body => writeHomeApiCache(env, pathname, body)));
+}
+
+function isStructuralTrackMutation(pathname: string, method: string) {
+  if (pathname === '/api/tracks' && method === 'POST') return true;
+  const parts = pathname.split('/').filter(Boolean);
+  return parts.length === 3 && parts[0] === 'api' && parts[1] === 'tracks' && (method === 'PUT' || method === 'DELETE');
+}
+
+function isCategoryMutation(pathname: string, method: string) {
+  return pathname.startsWith('/api/categories') && (method === 'POST' || method === 'PUT' || method === 'DELETE');
+}
+
+async function serveFastHomeApi(request: Request, env: Env, ctx?: any): Promise<Response | null> {
+  const url = new URL(request.url);
+  const method = request.method.toUpperCase();
+  const pathname = url.pathname;
+
+  if (method === 'GET' && (pathname === '/api/tracks' || pathname === '/api/categories')) {
+    const cached = await readHomeApiCache(env, pathname);
+    if (cached) {
+      const stale = Date.now() - cached.savedAt >= HOME_CACHE_REVALIDATE_MS;
+      if (stale) {
+        runInBackground(ctx, rebuildHomeApiCache(request.url, pathname, env, ctx));
+      }
+      return cachedHomeResponse(cached.body, stale ? 'stale' : 'hit');
+    }
+
+    const response = await appWorker.fetch(request, env, ctx);
+    cacheLiveHomeResponse(response, pathname, env, ctx);
+    return response;
+  }
+
+  if (isStructuralTrackMutation(pathname, method) || isCategoryMutation(pathname, method)) {
+    const response = await appWorker.fetch(request, env, ctx);
+    if (response.ok && env.KV) {
+      runInBackground(ctx, rebuildHomeApiCache(request.url, '/api/tracks', env, ctx));
+      if (isCategoryMutation(pathname, method)) {
+        runInBackground(ctx, rebuildHomeApiCache(request.url, '/api/categories', env, ctx));
+      }
+    }
+    return response;
+  }
+
+  return null;
 }
 
 function loginPage(env: Env) {
@@ -143,6 +263,9 @@ export default {
       const response = await appWorker.fetch(request, env, ctx);
       return withMainOriginCredentials(response);
     }
+
+    const fastHomeResponse = await serveFastHomeApi(request, env, ctx);
+    if (fastHomeResponse) return fastHomeResponse;
 
     return appWorker.fetch(request, env, ctx);
   }

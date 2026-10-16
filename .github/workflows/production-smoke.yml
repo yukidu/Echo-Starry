@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify-production:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Verify official Starry production domains
         shell: bash
@@ -53,20 +53,84 @@ jobs:
             echo "echo home=${home_ok}, echo schema=${echo_schema_ok}, id schema=${id_schema_ok}"
             if [ "${home_ok}" = 1 ] && [ "${echo_schema_ok}" = 1 ] && [ "${id_schema_ok}" = 1 ]; then
               echo 'Official production domains verified successfully.'
+              break
+            fi
+
+            if [ "${attempt}" = 24 ]; then
+              echo 'Production verification failed after all retries.' >&2
+              echo '--- echo home (first 500 bytes) ---' >&2
+              head -c 500 /tmp/echo-home.html 2>/dev/null || true
+              echo >&2
+              echo '--- echo schema ---' >&2
+              head -c 1000 /tmp/echo-schema.json 2>/dev/null || true
+              echo >&2
+              echo '--- id schema ---' >&2
+              head -c 1000 /tmp/id-schema.json 2>/dev/null || true
+              echo >&2
+              exit 1
+            fi
+
+            sleep 5
+          done
+
+      - name: Warm and verify homepage playlist cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          user_agent='Mozilla/5.0 StarryProductionSmoke/1.0'
+
+          for attempt in $(seq 1 12); do
+            echo "Homepage cache verification attempt ${attempt}/12"
+            nonce="${GITHUB_SHA}-${attempt}-home"
+            first_timeout=20
+            if [ "${attempt}" = 1 ]; then first_timeout=90; fi
+
+            tracks_ok=0
+            categories_ok=0
+
+            if curl -A "${user_agent}" --connect-timeout 5 --max-time "${first_timeout}" -fsS \
+              -H 'Accept: application/json' \
+              "https://echo.starry.phd/api/tracks?warm=${nonce}" -o /tmp/tracks-first.json; then
+              node -e "const x=JSON.parse(require('fs').readFileSync('/tmp/tracks-first.json','utf8')); if(!Array.isArray(x)) process.exit(1)"
+            fi
+
+            if curl -A "${user_agent}" --connect-timeout 5 --max-time 20 -fsS \
+              -H 'Accept: application/json' \
+              "https://echo.starry.phd/api/categories?warm=${nonce}" -o /tmp/categories-first.json; then
+              node -e "const x=JSON.parse(require('fs').readFileSync('/tmp/categories-first.json','utf8')); if(!Array.isArray(x)) process.exit(1)"
+            fi
+
+            sleep 2
+
+            tracks_time=$(curl -A "${user_agent}" --connect-timeout 5 --max-time 10 -fsS \
+              -D /tmp/tracks-headers.txt -w '%{time_total}' \
+              -H 'Accept: application/json' \
+              "https://echo.starry.phd/api/tracks?verify=${nonce}" -o /tmp/tracks-second.json || true)
+            if [ -n "${tracks_time}" ] && \
+               grep -Eqi '^x-echo-home-cache: (hit|stale)' /tmp/tracks-headers.txt 2>/dev/null && \
+               node -e "const x=JSON.parse(require('fs').readFileSync('/tmp/tracks-second.json','utf8')); if(!Array.isArray(x)) process.exit(1)"; then
+              tracks_ok=1
+            fi
+
+            categories_time=$(curl -A "${user_agent}" --connect-timeout 5 --max-time 10 -fsS \
+              -D /tmp/categories-headers.txt -w '%{time_total}' \
+              -H 'Accept: application/json' \
+              "https://echo.starry.phd/api/categories?verify=${nonce}" -o /tmp/categories-second.json || true)
+            if [ -n "${categories_time}" ] && \
+               grep -Eqi '^x-echo-home-cache: (hit|stale)' /tmp/categories-headers.txt 2>/dev/null && \
+               node -e "const x=JSON.parse(require('fs').readFileSync('/tmp/categories-second.json','utf8')); if(!Array.isArray(x)) process.exit(1)"; then
+              categories_ok=1
+            fi
+
+            echo "tracks cache=${tracks_ok}, time=${tracks_time:-failed}s; categories cache=${categories_ok}, time=${categories_time:-failed}s"
+            if [ "${tracks_ok}" = 1 ] && [ "${categories_ok}" = 1 ]; then
+              node -e "const t=Number(process.argv[1]); const c=Number(process.argv[2]); if(!(t < 5 && c < 5)) process.exit(1)" "${tracks_time}" "${categories_time}"
+              echo 'Homepage playlist APIs are warm and respond within 5 seconds.'
               exit 0
             fi
 
             sleep 5
           done
 
-          echo 'Production verification failed after all retries.' >&2
-          echo '--- echo home (first 500 bytes) ---' >&2
-          head -c 500 /tmp/echo-home.html 2>/dev/null || true
-          echo >&2
-          echo '--- echo schema ---' >&2
-          head -c 1000 /tmp/echo-schema.json 2>/dev/null || true
-          echo >&2
-          echo '--- id schema ---' >&2
-          head -c 1000 /tmp/id-schema.json 2>/dev/null || true
-          echo >&2
+          echo 'Homepage playlist cache verification failed.' >&2
           exit 1
