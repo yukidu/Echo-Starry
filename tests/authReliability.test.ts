@@ -6,7 +6,7 @@ import stickerWorker from '../worker/stickerRouter';
 import { testDatabase } from './helpers/database';
 import { shouldDiscardSession, mergeMemberSession } from '../src/authSessionPolicy';
 import { exchangeGoogleCredential } from '../src/googleCredentialExchange';
-const audience = '400699489182-lb412nhvj4s6pu7v5gkg40hc646dq79.apps.googleusercontent.com';
+const audience = '400699489182-lb412nhvj4s6t1qr5ovkg40hc646dq79.apps.googleusercontent.com';
 let privateKey: CryptoKey;
 const originalFetch = globalThis.fetch;
 before(async () => {
