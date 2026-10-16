@@ -1,6 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/starryMainInlineLoginRouter.ts" # wrapper: inline login -> battery game -> existing Starry/Echo chain
+main = "worker/transcriptModerationRouter.ts" # v281: transcript moderation -> transcript AI -> existing Starry/Echo chain
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
@@ -32,7 +32,7 @@ command = "npm run build"
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# 所有請求先經繁星主站登入橋接與電池 wrapper，再進入原本安全鏈。
+# 所有請求先經逐字稿與登入/電池 wrapper，再進入原本安全鏈。
 run_worker_first = ["/*"]
 
 # 1. Cloudflare D1 資料庫 (SQLite)
@@ -48,7 +48,7 @@ binding = "STARRY_ID_DB"
 database_name = "starry_id_db"
 database_id = "01195c92-555e-4816-bddc-5b8cb2e795db"
 
-# 2. Cloudflare R2 物件儲存桶 (音檔與圖檔直傳)
+# 2. Cloudflare R2 物件儲存桶 (音檔、圖檔與逐字稿 JSON)
 [[r2_buckets]]
 binding = "R2_BUCKET"
 bucket_name = "echoes-audio-bucket"
@@ -57,6 +57,20 @@ bucket_name = "echoes-audio-bucket"
 [[kv_namespaces]]
 binding = "KV"
 id = "a2e345e244cb40b4a804be3f89584b90"
+
+# 4. Cloudflare Workers AI：逐字稿使用 Whisper Large v3 Turbo。
+[ai]
+binding = "AI"
+
+# 5. 長音檔用 Workflow 分段轉錄，避免單一網頁請求卡住。
+[[workflows]]
+name = "echo-transcript-v281"
+binding = "TRANSCRIPT_WORKFLOW"
+class_name = "TranscriptWorkflow"
+
+# 台灣時間每天 08:05 啟動，緊接 Workers AI 每日免費額度重置後處理。
+[triggers]
+crons = ["5 0 * * *"]
 
 [vars]
 ENVIRONMENT = "production"
