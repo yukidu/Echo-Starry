@@ -1831,7 +1831,8 @@ export default function App() {
     if (!currentUser) return;
 
     const requestedDealerId=String(updatedProfile.amwayId ?? currentUser.amwayId ?? '').trim();
-    if(requestedDealerId){
+    const currentDealerId=String(currentUser.amwayId || '').trim();
+    if(requestedDealerId && requestedDealerId !== currentDealerId){
       const candidateResponse=await fetch(`/api/organization/couple-candidate?dealerId=${encodeURIComponent(requestedDealerId)}`);
       const candidateData=await candidateResponse.json().catch(()=>({}));
       if(!candidateResponse.ok) throw new Error(candidateData.error || '無法確認直銷商編號');

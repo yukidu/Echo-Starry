@@ -5,6 +5,7 @@ import iosGoogleRedirectWorker from './iosGoogleRedirectRouter';
 import { handleStarbeautySso } from './starbeautySsoRouter';
 import { handleV192TrackVisibility } from './v192TrackVisibilityRouter';
 import { syncEchoMemberToStarryBestEffort } from './starryIdSync';
+import { syncSavedEchoProfileToStarryId } from './starryIdFastProfileSync';
 import { handleStarryIdV211 } from './starryIdV211Router';
 import { handleStarryIdV212PublicCardFallback } from './starryIdV212PublicCardBridge';
 import { handleStarryIdCentral } from './starryIdCentralRouter';
@@ -339,11 +340,27 @@ export default {
       const directProfileWrite = url.pathname.match(/^\/api\/users\/([^/]+)$/);
       if (directProfileWrite) {
         const userId = decodeURIComponent(directProfileWrite[1]);
-        const synced = await syncEchoMemberToStarryBestEffort(env as any, userId, 'echostars', 'member-profile-update');
-        if ((env as any).STARRY_ID_DB && !synced) {
-          // Echo already committed successfully. Never turn that success into an error.
-          // Queue another best-effort central attempt and let the member leave edit mode.
-          scheduleStarrySync(ctx, env, userId, 'echostars', 'member-profile-update-retry');
+        const savedPayload: any = await response.clone().json().catch(() => null);
+        const savedUser = savedPayload?.user || savedPayload;
+        if (!savedUser?.id) {
+          return withPrivacyHeaders(new Response(JSON.stringify({ error: '繁星回聲已寫入，但無法取得會員資料同步 Starry ID，請再按一次儲存。' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
+          }));
+        }
+        try {
+          await syncSavedEchoProfileToStarryId(env as any, savedUser, userId || 'echostars');
+        } catch (error) {
+          console.warn('Strict Starry ID profile sync failed', {
+            userId,
+            error: error instanceof Error ? error.message : 'unknown'
+          });
+          return withPrivacyHeaders(new Response(JSON.stringify({
+            error: error instanceof Error ? `Starry ID 儲存失敗：${error.message}` : 'Starry ID 儲存失敗，請再按一次儲存。'
+          }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
+          }));
         }
       } else {
         const membershipWrite = url.pathname.match(/^\/api\/users\/([^/]+)\/(?:contributor|admin-role|block|audit-rank)$/);
