@@ -17,6 +17,14 @@ test('profile save actions are prominent and mobile friendly', () => {
   assert.match(mottoUi, /min-h-\[68px\]/);
   assert.match(mottoUi, /profileNativeSave/);
   assert.match(mottoUi, /profileFloatingSave/);
-  assert.match(mottoUi, /⏳ 儲存中…/);
+  assert.match(mottoUi, /💾 儲存/);
   assert.match(mottoUi, /✅ 個人資料與座右銘已儲存/);
+});
+
+test('profile edit DOM observer cannot create a disabled-attribute feedback loop', () => {
+  assert.match(mottoUi, /observer\?\.disconnect\(\)/);
+  assert.match(mottoUi, /requestAnimationFrame/);
+  assert.match(mottoUi, /childList: true, subtree: true/);
+  assert.doesNotMatch(mottoUi, /attributeFilter:\s*\['disabled'\]/);
+  assert.doesNotMatch(mottoUi, /floatingSave\.disabled\s*=\s*nativeSave\.disabled/);
 });

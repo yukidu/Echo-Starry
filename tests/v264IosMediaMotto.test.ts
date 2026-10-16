@@ -32,8 +32,14 @@ test('profile edit mode exposes prominent native save and huge floating save can
   assert.match(mottoUi, /min-h-\[68px\]/);
   assert.match(mottoUi, /💾 儲存/);
   assert.match(mottoUi, /取消/);
-  assert.match(mottoUi, /⏳ 儲存中…/);
   assert.match(mottoUi, /個人資料與座右銘已儲存/);
+});
+
+test('profile edit observer is throttled and does not observe disabled state changes', () => {
+  assert.match(mottoUi, /observer\?\.disconnect\(\)/);
+  assert.match(mottoUi, /requestAnimationFrame/);
+  assert.match(mottoUi, /childList: true, subtree: true/);
+  assert.doesNotMatch(mottoUi, /attributeFilter:\s*\['disabled'\]/);
 });
 
 test('motto save waits for the normal profile save flow then synchronizes through member API', () => {
