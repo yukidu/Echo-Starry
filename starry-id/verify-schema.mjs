@@ -10,7 +10,9 @@ const required = [
   'users', 'identities', 'profiles', 'member_relationships', 'app_memberships',
   'auth_sessions', 'public_cards', 'profile_field_visibility', 'profile_option_values', 'legacy_links',
   'profile_audit_logs', 'migration_batches', 'migration_issues',
-  'profile_field_schema', 'profile_extension_values', 'profile_schema_meta'
+  'profile_field_schema', 'profile_extension_values', 'profile_schema_meta',
+  'starry_notifications', 'card_visit_events', 'starry_push_subscriptions', 'starry_push_vapid',
+  'battery_transactions', 'battery_accounts', 'battery_migration_state', 'battery_hundredth_transactions'
 ];
 const missing = required.filter(name => !names.has(name));
 if (missing.length) throw new Error(`Central schema missing tables: ${missing.join(', ')}`);
