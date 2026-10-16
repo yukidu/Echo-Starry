@@ -208,41 +208,34 @@ function ensureFloatingActions(root: HTMLElement) {
   const nativeCancel = findNativeAction(root, '取消');
   if (!nativeSave || !nativeCancel) return;
 
-  let bar = existing as HTMLDivElement | null;
-  if (!bar) {
-    bar = document.createElement('div');
-    bar.id = FLOATING_ACTIONS_ID;
-    bar.className = 'fixed left-1/2 -translate-x-1/2 bottom-[calc(env(safe-area-inset-bottom)+14px)] z-[160] w-[min(94vw,560px)] flex items-stretch gap-3 rounded-3xl border border-white/70 dark:border-slate-700 bg-white/92 dark:bg-slate-900/92 backdrop-blur-xl shadow-2xl p-2.5';
+  if (existing) return;
 
-    const save = document.createElement('button');
-    save.type = 'button';
-    save.dataset.profileFloatingSave = '1';
-    save.className = 'flex-[1.35] min-h-[68px] rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xl sm:text-2xl font-black shadow-xl active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-wait';
-    save.textContent = '💾 儲存';
-    save.addEventListener('click', () => {
-      const target = findNativeAction(root, '儲存');
-      if (target && !target.disabled) target.click();
-    });
+  const bar = document.createElement('div');
+  bar.id = FLOATING_ACTIONS_ID;
+  bar.className = 'fixed left-1/2 -translate-x-1/2 bottom-[calc(env(safe-area-inset-bottom)+14px)] z-[160] w-[min(94vw,560px)] flex items-stretch gap-3 rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl p-2.5';
 
-    const cancel = document.createElement('button');
-    cancel.type = 'button';
-    cancel.dataset.profileFloatingCancel = '1';
-    cancel.className = 'flex-1 min-h-[68px] rounded-2xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white text-xl sm:text-2xl font-black shadow-lg active:scale-[0.98] transition-all';
-    cancel.textContent = '取消';
-    cancel.addEventListener('click', () => {
-      const target = findNativeAction(root, '取消');
-      if (target && !target.disabled) target.click();
-    });
+  const save = document.createElement('button');
+  save.type = 'button';
+  save.dataset.profileFloatingSave = '1';
+  save.className = 'flex-[1.35] min-h-[68px] rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xl sm:text-2xl font-black shadow-xl active:scale-[0.98] transition-all';
+  save.textContent = '💾 儲存';
+  save.addEventListener('click', () => {
+    const target = findNativeAction(root, '儲存');
+    if (target && !target.disabled) target.click();
+  });
 
-    bar.append(save, cancel);
-    document.body.appendChild(bar);
-  }
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.dataset.profileFloatingCancel = '1';
+  cancel.className = 'flex-1 min-h-[68px] rounded-2xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white text-xl sm:text-2xl font-black shadow-lg active:scale-[0.98] transition-all';
+  cancel.textContent = '取消';
+  cancel.addEventListener('click', () => {
+    const target = findNativeAction(root, '取消');
+    if (target && !target.disabled) target.click();
+  });
 
-  const floatingSave = bar.querySelector<HTMLButtonElement>('[data-profile-floating-save="1"]');
-  if (floatingSave) {
-    floatingSave.disabled = nativeSave.disabled;
-    floatingSave.textContent = nativeSave.disabled ? '⏳ 儲存中…' : '💾 儲存';
-  }
+  bar.append(save, cancel);
+  document.body.appendChild(bar);
 }
 
 async function persistMotto(motto: string) {
@@ -320,7 +313,32 @@ document.addEventListener('click', event => {
   }
 });
 
-const observer = new MutationObserver(render);
-observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled'] });
-window.addEventListener('echostars:profile-motto-updated', render);
-render();
+let observer: MutationObserver | null = null;
+let renderScheduled = false;
+
+function observeProfileDom() {
+  observer?.observe(document.documentElement, { childList: true, subtree: true });
+}
+
+function renderWithoutFeedbackLoop() {
+  observer?.disconnect();
+  try {
+    render();
+  } finally {
+    observeProfileDom();
+  }
+}
+
+function scheduleRender() {
+  if (renderScheduled) return;
+  renderScheduled = true;
+  window.requestAnimationFrame(() => {
+    renderScheduled = false;
+    renderWithoutFeedbackLoop();
+  });
+}
+
+observer = new MutationObserver(scheduleRender);
+observeProfileDom();
+window.addEventListener('echostars:profile-motto-updated', scheduleRender);
+renderWithoutFeedbackLoop();
