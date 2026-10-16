@@ -6,7 +6,7 @@ import stickerWorker from '../worker/stickerRouter';
 import { testDatabase } from './helpers/database';
 import { shouldDiscardSession, mergeMemberSession } from '../src/authSessionPolicy';
 import { exchangeGoogleCredential } from '../src/googleCredentialExchange';
-const audience = '400699489182-lb412nhvj4s6t1qr5ovkg40hc646dq79.apps.googleusercontent.com';
+const audience = '400699489182-lb412nhvj4s6pu7v5gkg40hc646dq79.apps.googleusercontent.com';
 let privateKey: CryptoKey;
 const originalFetch = globalThis.fetch;
 before(async () => {
@@ -124,14 +124,35 @@ test('session policy keeps transient errors and newer sessions and preserves tok
   assert.equal((mergeMemberSession(old,{id:'b',name:'new'}) as any)._authToken,undefined);
 });
 test('both browser login entry points share one exchange, reject a second account, and recover after failure',async()=>{
-  let finish:(r:Response)=>void=()=>{};let calls=0;
-  const fetcher=(async()=>{calls++;return new Promise<Response>(resolve=>{finish=resolve;});}) as typeof fetch;
+  let finishCentral:(r:Response)=>void=()=>{};
+  const calls:string[]=[];
+  const fetcher=(async(input: RequestInfo | URL)=>{
+    calls.push(String(input));
+    if(String(input)==='https://id.starry.phd/api/google-sync') {
+      return new Promise<Response>(resolve=>{finishCentral=resolve;});
+    }
+    return Response.json({user:{id:'one'},authToken:'session'});
+  }) as typeof fetch;
   const one=exchangeGoogleCredential('one',fetcher);const same=exchangeGoogleCredential('one',fetcher);
   await assert.rejects(exchangeGoogleCredential('two',fetcher),/上一個帳號/);
-  assert.equal(calls,1);finish(Response.json({user:{id:'one'},authToken:'session'}));
+  assert.equal(calls.length,1);
+  finishCentral(Response.json({success:true,user:{id:'central-one'}}));
   assert.equal((await one).user.id,'one');assert.equal(await one,await same);
-  await assert.rejects(exchangeGoogleCredential('bad',(async()=>Response.json({error:'invalid'},{status:401})) as typeof fetch),/invalid/);
-  assert.equal((await exchangeGoogleCredential('fresh',(async()=>Response.json({user:{id:'fresh'},authToken:'new'})) as typeof fetch)).user.id,'fresh');
+  assert.deepEqual(calls,[
+    'https://id.starry.phd/api/google-sync',
+    '/api/users/google-sync'
+  ]);
+  await assert.rejects(exchangeGoogleCredential('bad',(async(input: RequestInfo | URL)=>
+    String(input)==='https://id.starry.phd/api/google-sync'
+      ? Response.json({error:'invalid'},{status:401})
+      : Response.json({user:{id:'bad'},authToken:'bad'})
+  ) as typeof fetch),/invalid/);
+  const freshFetcher=(async(input: RequestInfo | URL)=>
+    String(input)==='https://id.starry.phd/api/google-sync'
+      ? Response.json({success:true,user:{id:'central-fresh'}})
+      : Response.json({user:{id:'fresh'},authToken:'new'})
+  ) as typeof fetch;
+  assert.equal((await exchangeGoogleCredential('fresh',freshFetcher)).user.id,'fresh');
 });
 
 test('valid signatures with wrong audience, issuer or expired time cannot create a member', async () => {
