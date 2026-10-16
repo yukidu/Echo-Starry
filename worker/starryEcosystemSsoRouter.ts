@@ -1,4 +1,3 @@
-import appWorker from './starryMainInlineLoginRouter';
 import type { Env } from './index';
 
 const ID_HOST = 'id.starry.phd';
@@ -16,6 +15,8 @@ const ECOSYSTEM_ORIGINS = new Set([
   'https://download.starry.phd',
   'https://mirror.starry.phd'
 ]);
+
+type NextHandler = (request: Request) => Promise<Response>;
 
 function cookieValue(request: Request, name: string) {
   for (const part of (request.headers.get('Cookie') || '').split(';')) {
@@ -48,9 +49,9 @@ function extractSetCookieToken(response: Response) {
   catch { return match[1]; }
 }
 
-function withCookies(response: Response, cookies: string[]) {
+function appendCookies(response: Response, cookies: string[], replace = false) {
   const headers = new Headers(response.headers);
-  headers.delete('Set-Cookie');
+  if (replace) headers.delete('Set-Cookie');
   for (const cookie of cookies.filter(Boolean)) headers.append('Set-Cookie', cookie);
   return new Response(response.body, {
     status: response.status,
@@ -191,7 +192,7 @@ async function createEchoSession(env: Env, userId: string) {
   return token;
 }
 
-async function echoSessionFromCentral(request: Request, env: Env, ctx?: any) {
+async function echoSessionFromCentral(request: Request, env: Env, next: NextHandler) {
   const centralToken = cookieValue(request, CENTRAL_COOKIE);
   const identity = await centralIdentity(env, centralToken);
   if (!identity) return null;
@@ -206,7 +207,7 @@ async function echoSessionFromCentral(request: Request, env: Env, ctx?: any) {
   headers.set('Authorization', `Bearer ${localToken}`);
   headers.delete('Content-Length');
   const delegated = new Request(url.toString(), { method: 'GET', headers });
-  return appWorker.fetch(delegated, env, ctx);
+  return next(delegated);
 }
 
 async function deleteCurrentCentralSession(request: Request, env: Env) {
@@ -217,70 +218,87 @@ async function deleteCurrentCentralSession(request: Request, env: Env) {
   await db.prepare('DELETE FROM auth_sessions WHERE tokenHash=?').bind(tokenHash).run().catch(() => undefined);
 }
 
-async function handleCentralHost(request: Request, env: Env, ctx?: any) {
-  const origin = request.headers.get('Origin') || '';
-  if (request.method.toUpperCase() === 'OPTIONS' && origin) return preflight(request);
-
-  let response = await appWorker.fetch(request, env, ctx);
-  response = withCentralCors(request, response);
+async function finalizeCentralResponse(request: Request, response: Response) {
+  let result = withCentralCors(request, response);
   const url = new URL(request.url);
 
   if (url.pathname === '/api/logout' && request.method.toUpperCase() === 'POST') {
-    return withCookies(response, [clearCentralHostCookie(), clearCentralDomainCookie()]);
+    return appendCookies(result, [clearCentralHostCookie(), clearCentralDomainCookie()], true);
   }
 
-  if (url.pathname === '/api/google-sync' && request.method.toUpperCase() === 'POST' && response.ok) {
-    const issued = extractSetCookieToken(response);
+  if (url.pathname === '/api/google-sync' && request.method.toUpperCase() === 'POST' && result.ok) {
+    const issued = extractSetCookieToken(result);
     if (TOKEN_RE.test(issued)) {
-      return withCookies(response, [clearCentralHostCookie(), centralDomainCookie(issued)]);
+      return appendCookies(result, [clearCentralHostCookie(), centralDomainCookie(issued)], true);
     }
   }
 
-  // Upgrade an existing id.starry.phd-only session into the ecosystem cookie the
-  // next time any Starry app talks to the central service.
   const existing = cookieValue(request, CENTRAL_COOKIE);
-  if (response.ok && TOKEN_RE.test(existing) && ECOSYSTEM_ORIGINS.has(origin)) {
-    return withCookies(response, [clearCentralHostCookie(), centralDomainCookie(existing)]);
+  const origin = request.headers.get('Origin') || '';
+  if (result.ok && TOKEN_RE.test(existing) && ECOSYSTEM_ORIGINS.has(origin)) {
+    result = appendCookies(result, [clearCentralHostCookie(), centralDomainCookie(existing)], true);
   }
-  return response;
+  return result;
 }
 
-export default {
-  async fetch(request: Request, env: Env, ctx?: any): Promise<Response> {
-    const url = new URL(request.url);
-    const method = request.method.toUpperCase();
+async function establishCentralFromEcho(request: Request, next: NextHandler) {
+  const input: any = await request.clone().json().catch(() => ({}));
+  const credential = String(input?.credential || '').trim();
+  if (!credential) return null;
+  const headers = new Headers({
+    'Content-Type': 'application/json',
+    'Origin': 'https://echo.starry.phd'
+  });
+  const existingCookie = request.headers.get('Cookie');
+  if (existingCookie) headers.set('Cookie', existingCookie);
+  const centralRequest = new Request('https://id.starry.phd/api/google-sync', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ credential, appId: 'starryphd' })
+  });
+  const centralRaw = await next(centralRequest);
+  return finalizeCentralResponse(centralRequest, centralRaw);
+}
 
-    if (url.hostname === ID_HOST && url.pathname.startsWith('/api/')) {
-      return handleCentralHost(request, env, ctx);
-    }
+export async function handleStarryEcosystemSso(
+  request: Request,
+  env: Env,
+  ctx: any,
+  next: NextHandler
+): Promise<Response | null> {
+  const url = new URL(request.url);
+  const method = request.method.toUpperCase();
 
-    if (url.hostname === ECHO_HOST && url.pathname === '/api/users/google-sync' && method === 'POST') {
-      // The browser has already exchanged the Google credential with Starry ID.
-      // Reuse the shared HttpOnly ecosystem session to provision the Echo-local
-      // compatibility session without verifying Google a second time.
-      const bridged = await echoSessionFromCentral(request, env, ctx);
-      if (bridged) return bridged;
-      return appWorker.fetch(request, env, ctx);
-    }
-
-    if (url.hostname === ECHO_HOST && url.pathname === '/api/auth/session' && method === 'GET') {
-      const response = await appWorker.fetch(request, env, ctx);
-      if (response.ok) {
-        const data: any = await response.clone().json().catch(() => null);
-        if (data?.authenticated === true && data?.user) return response;
-      }
-      const bridged = await echoSessionFromCentral(request, env, ctx);
-      return bridged || response;
-    }
-
-    if (url.hostname === ECHO_HOST && url.pathname === '/api/auth/logout' && method === 'POST') {
-      await deleteCurrentCentralSession(request, env);
-      const response = await appWorker.fetch(request, env, ctx);
-      const headers = new Headers(response.headers);
-      headers.append('Set-Cookie', clearCentralDomainCookie());
-      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
-    }
-
-    return appWorker.fetch(request, env, ctx);
+  if (url.hostname === ID_HOST && url.pathname.startsWith('/api/')) {
+    const origin = request.headers.get('Origin') || '';
+    if (method === 'OPTIONS' && origin) return preflight(request);
+    return finalizeCentralResponse(request, await next(request));
   }
-};
+
+  if (url.hostname === ECHO_HOST && url.pathname === '/api/users/google-sync' && method === 'POST') {
+    const central = await establishCentralFromEcho(request, next);
+    if (central && !central.ok) return central;
+    const response = await next(request);
+    const centralToken = central ? extractSetCookieToken(central) : '';
+    if (TOKEN_RE.test(centralToken)) return appendCookies(response, [centralDomainCookie(centralToken)]);
+    const setCookie = central?.headers.get('Set-Cookie') || '';
+    return setCookie ? appendCookies(response, [setCookie]) : response;
+  }
+
+  if (url.hostname === ECHO_HOST && url.pathname === '/api/auth/session' && method === 'GET') {
+    const response = await next(request);
+    if (response.ok) {
+      const data: any = await response.clone().json().catch(() => null);
+      if (data?.authenticated === true && data?.user) return response;
+    }
+    const bridged = await echoSessionFromCentral(request, env, next);
+    return bridged || response;
+  }
+
+  if (url.hostname === ECHO_HOST && url.pathname === '/api/auth/logout' && method === 'POST') {
+    await deleteCurrentCentralSession(request, env);
+    return appendCookies(await next(request), [clearCentralDomainCookie()]);
+  }
+
+  return null;
+}
