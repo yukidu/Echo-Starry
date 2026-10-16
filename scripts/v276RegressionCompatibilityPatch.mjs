@@ -9,7 +9,8 @@ regexOnce('worker/authRouter.ts',/    stage = 'central-profile';\n    await ensu
       await ensureCentralEchoMember(env, { ...data.user, googleSubject: identity.subject });
       canonicalUser = await overlayEchoMemberWithCentral(env, { ...data.user, googleSubject: identity.subject });
     }`,'login central compatibility');
-regexOnce('worker/authRouter.ts',/profileSource:\s*'starry-id-central'/,"profileSource: (env as any).STARRY_ID_DB ? 'starry-id-central' : 'echo-local-compat'",'profile source marker');
+regexOnce('worker/authRouter.ts',/user: canonicalUser,\n\s*profileSource:\s*'starry-id-central'/,
+"user: canonicalUser,\n      profileSource: (env as any).STARRY_ID_DB ? 'starry-id-central' : 'echo-local-compat'",'login profile source marker');
 regexOnce('worker/authRouter.ts',/if \(centralProfileWrite && method === 'PUT'\) \{/,
 "if (centralProfileWrite && method === 'PUT' && (env as any).STARRY_ID_DB) {",'central write production gate');
 
