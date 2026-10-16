@@ -315,13 +315,9 @@ export default {
     }
 
     if (url.pathname === '/api/users/google-sync' || url.pathname.startsWith('/api/auth/')) {
-      const response = await sessionWorker.fetch(request, env);
-      if (response.ok && url.pathname === '/api/users/google-sync' && request.method.toUpperCase() === 'POST') {
-        const data: any = await response.clone().json().catch(() => null);
-        const userId = String(data?.user?.id || '');
-        scheduleStarrySync(ctx, env, userId, userId || 'echostars', 'verified-google-login');
-      }
-      return withPrivacyHeaders(response);
+      // Google login now provisions/reads Starry ID directly inside authRouter.
+      // Do not schedule a second profile copy after login.
+      return withPrivacyHeaders(await sessionWorker.fetch(request, env));
     }
 
     if (request.method === 'POST' && url.pathname === '/') {
@@ -336,21 +332,12 @@ export default {
     );
 
     if (response.ok && request.method.toUpperCase() === 'PUT') {
-      const directProfileWrite = url.pathname.match(/^\/api\/users\/([^/]+)$/);
-      if (directProfileWrite) {
-        const userId = decodeURIComponent(directProfileWrite[1]);
-        const synced = await syncEchoMemberToStarryBestEffort(env as any, userId, 'echostars', 'member-profile-update');
-        if ((env as any).STARRY_ID_DB && !synced) {
-          // Echo already committed successfully. Never turn that success into an error.
-          // Queue another best-effort central attempt and let the member leave edit mode.
-          scheduleStarrySync(ctx, env, userId, 'echostars', 'member-profile-update-retry');
-        }
-      } else {
-        const membershipWrite = url.pathname.match(/^\/api\/users\/([^/]+)\/(?:contributor|admin-role|block|audit-rank)$/);
-        if (membershipWrite) {
-          const userId = decodeURIComponent(membershipWrite[1]);
-          scheduleStarrySync(ctx, env, userId, 'echostars', 'member-membership-update');
-        }
+      // Shared member profile PUT is already a direct Starry ID write in authRouter.
+      // Only app-specific membership/permission changes still use the legacy migration bridge.
+      const membershipWrite = url.pathname.match(/^\/api\/users\/([^/]+)\/(?:contributor|admin-role|block|audit-rank)$/);
+      if (membershipWrite) {
+        const userId = decodeURIComponent(membershipWrite[1]);
+        scheduleStarrySync(ctx, env, userId, 'echostars', 'member-membership-update');
       }
     }
 

@@ -56,9 +56,9 @@ test('unchanged distributor id does not cause an extra spouse lookup', () => {
   assert.match(app, /requestedDealerId && requestedDealerId !== currentDealerId/);
 });
 
-test('profile save preserves the current Starry ID synchronization contract', () => {
-  assert.match(router, /const synced = await syncEchoMemberToStarryBestEffort\(env as any, userId, 'echostars', 'member-profile-update'\)/);
-  assert.match(router, /if \(\(env as any\)\.STARRY_ID_DB && !synced\)/);
-  assert.match(router, /scheduleStarrySync\(ctx, env, userId, 'echostars', 'member-profile-update-retry'\)/);
-  assert.match(router, /Never turn that success into an error/);
+test('profile save no longer uses asynchronous Starry ID profile synchronization', () => {
+  assert.doesNotMatch(router, /member-profile-update/);
+  assert.doesNotMatch(router, /member-profile-update-retry/);
+  assert.match(router, /member-membership-update/);
+  assert.match(router, /Shared member profile PUT is already a direct Starry ID write/);
 });
