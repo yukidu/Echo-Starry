@@ -54,14 +54,15 @@ test('Echo profile UI consumes central options without changing existing Profile
   assert.match(bridge,/\/api\/starry\/profile-values/);
 });
 
-test('central validation is enforced but central sync cannot turn a successful Echo save into 503',()=>{
+test('central validation is enforced and production Echo saves write Starry ID directly',()=>{
   assert.match(auth,/validateCentralProfilePatch/);
   assert.match(auth,/schemaVersion: validation\.version/);
+  assert.match(auth,/writeEchoProfileToCentral\(env, user, target, patch\)/);
+  assert.match(auth,/STARRY_ID_DB/);
   assert.match(privacy,/handleStarryProfileSchema/);
-  assert.match(privacy,/member-profile-update/);
-  assert.match(privacy,/member-profile-update-retry/);
-  assert.doesNotMatch(privacy,/Starry ID 中央同步暫時失敗/);
-  assert.match(privacy,/return withPrivacyHeaders\(response\)/);
+  assert.doesNotMatch(privacy,/member-profile-update/);
+  assert.doesNotMatch(privacy,/member-profile-update-retry/);
+  assert.match(privacy,/member-membership-update/);
 });
 
 test('fallback rules validate old clients even when central D1 is not bound in tests/previews',async()=>{

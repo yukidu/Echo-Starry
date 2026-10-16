@@ -173,15 +173,18 @@ async function handleGoogleLogin(request: Request, env: Env) {
 
     const data = await syncVerifiedMember(env.DB, identity);
     stage = 'central-profile';
-    await ensureCentralEchoMember(env, { ...data.user, googleSubject: identity.subject });
-    const canonicalUser = await overlayEchoMemberWithCentral(env, { ...data.user, googleSubject: identity.subject });
+    let canonicalUser = data.user;
+    if ((env as any).STARRY_ID_DB) {
+      await ensureCentralEchoMember(env, { ...data.user, googleSubject: identity.subject });
+      canonicalUser = await overlayEchoMemberWithCentral(env, { ...data.user, googleSubject: identity.subject });
+    }
 
     stage = 'session';
     const session = await createSession(env.DB, data.user.id);
     return json({
       ...data,
       user: canonicalUser,
-      profileSource: 'starry-id-central',
+      profileSource: (env as any).STARRY_ID_DB ? 'starry-id-central' : 'echo-local-compat',
       authToken: session.token,
       sessionExpiresAt: session.expiresAt
     });
@@ -401,7 +404,7 @@ export default {
       nextRequest = authorized;
 
       const centralProfileWrite = path.match(/^\/api\/users\/([^/]+)$/);
-      if (centralProfileWrite && method === 'PUT') {
+      if (centralProfileWrite && method === 'PUT' && (env as any).STARRY_ID_DB) {
         const targetId = decodeURIComponent(centralProfileWrite[1]);
         const target: any = await env.DB?.prepare('SELECT * FROM users WHERE id=? LIMIT 1').bind(targetId).first();
         if (!target) return json({ error: '找不到會員' }, 404);
