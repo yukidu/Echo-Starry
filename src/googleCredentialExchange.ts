@@ -1,3 +1,4 @@
+import './ecosystemSsoClient';
 import { withGoogleLoginDeadline } from './googleLoginDeadline';
 let pending: Promise<any> | null = null;
 let revision = 0;
@@ -19,7 +20,7 @@ export function exchangeGoogleCredential(credential: string, fetcher: typeof fet
     });
     const centralData = await centralResult.json().catch(() => ({}));
     if (!centralResult.ok || !centralData?.success || !centralData?.user?.id) {
-      throw new Error(centralData?.error || 'Starry ID 登入失敗，請稍後重試。');
+      throw new Error(centralData?.error || '繁星通行證登入失敗，請稍後重試。');
     }
 
     const result = await fetcher('/api/users/google-sync', {
@@ -31,7 +32,7 @@ export function exchangeGoogleCredential(credential: string, fetcher: typeof fet
     if (!result.ok || !data?.user?.id || !data?.authToken) {
       throw new Error(data?.error || '繁星回聲登入同步失敗，請稍後重試。');
     }
-    return data;
+    return { ...data, starryUserId: String(centralData.user.id) };
   }).finally(() => { pending = null; pendingCredential = ''; });
   return pending;
 }
