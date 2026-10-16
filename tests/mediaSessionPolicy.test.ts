@@ -34,10 +34,14 @@ test('real speaker portrait is the only artwork candidate so OS cannot prefer ap
   assert.match(policy, /DEFAULT_ARTWORK_PATHS/);
 });
 
-test('system playback controls support play pause and seeking without desyncing React state', () => {
-  assert.match(policy, /toggleThroughApp/);
-  assert.match(policy, /getToggle/);
-  assert.match(policy, /toggle\.click\(\)/);
+test('system playback controls directly control audio and bridge iOS system intent', () => {
+  assert.match(policy, /playFromSystemControl/);
+  assert.match(policy, /pauseFromSystemControl/);
+  assert.match(policy, /echostars:grant-playback-intent/);
+  assert.match(policy, /void audio\.play\(\)/);
+  assert.match(policy, /audio\.pause\(\)/);
+  assert.doesNotMatch(policy, /toggle\.click\(\)/);
+  assert.doesNotMatch(policy, /toggleThroughApp/);
   assert.match(policy, /safeSetActionHandler\('play'/);
   assert.match(policy, /safeSetActionHandler\('pause'/);
   assert.match(policy, /safeSetActionHandler\('seekbackward'/);

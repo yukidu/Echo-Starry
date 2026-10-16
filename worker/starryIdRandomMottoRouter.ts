@@ -1,8 +1,12 @@
 import { handleStarryIdCentral } from './starryIdCentralRouter';
 import type { Env } from './index';
 
-// This is the canonical public CSV used by yukidu/quotes (main/index.html).
-// Starry ID reads it server-side so the member page never depends on Google Sheets CORS.
+const ID_HOST = 'id.starry.phd';
+const ECHO_HOST = 'echo.starry.phd';
+const MOTTO_PATH = '/api/random-motto';
+// This is the canonical public quote dataset used by https://quotes.starry.phd/.
+// Read it server-side so Echo Starry and Starry ID share the same source without
+// exposing the member page to Google Sheets CORS or inventing fallback quotes.
 const QUOTES_CSV = 'https://docs.google.com/spreadsheets/d/1HufZqMwvvZh735nBMvKnDDI-BnZMUuYmFTA0_3B2lCE/export?format=csv';
 let cache: { quotes: string[]; expires: number } | null = null;
 
@@ -28,7 +32,7 @@ export function extractQuotes(csv: string): string[] {
   const rows = csvRows(csv);
   const headers = rows[0] || [];
   const result = new Set<string>();
-  // quotes app: column 1 contains photos; only columns > 1 with a category
+  // Quotes Starry: column 1 contains photos; only columns > 1 with a category
   // other than "未分類" are selectable quote cards.
   for (let col = 2; col < headers.length; col++) {
     const category = (headers[col] || '').trim();
@@ -74,20 +78,29 @@ function json(data: unknown, status = 200) {
 
 export async function handleStarryIdRandomMotto(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
-  if (url.hostname !== 'id.starry.phd' || url.pathname !== '/api/random-motto') return null;
+  if (![ID_HOST, ECHO_HOST].includes(url.hostname) || url.pathname !== MOTTO_PATH) return null;
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
-  // Reuse central session validation; never expose another member's information.
-  const sessionRequest = new Request(new URL('/api/session', request.url), {
-    headers: { Cookie: request.headers.get('Cookie') || '' }
-  });
-  const session = await handleStarryIdCentral(sessionRequest, env as any);
-  if (!session || !session.ok) return json({ error: '請先登入 Starry ID' }, 401);
+
+  // Starry ID keeps its central-session protection. Echo only requests a public
+  // quotation and exposes no member data, so its same-origin dice endpoint can
+  // be used safely by the member editor without cross-domain cookie problems.
+  if (url.hostname === ID_HOST) {
+    const sessionRequest = new Request(new URL('/api/session', request.url), {
+      headers: { Cookie: request.headers.get('Cookie') || '' }
+    });
+    const session = await handleStarryIdCentral(sessionRequest, env as any);
+    if (!session || !session.ok) return json({ error: '請先登入 Starry ID' }, 401);
+  }
+
   try {
     const quotes = await getQuotes();
     const random = new Uint32Array(1);
     crypto.getRandomValues(random);
-    return json({ motto: quotes[random[0] % quotes.length], source: 'yukidu/quotes' });
+    return json({
+      motto: quotes[random[0] % quotes.length],
+      source: 'https://quotes.starry.phd/'
+    });
   } catch {
-    return json({ error: '目前無法讀取人生解答之書，請稍後再試' }, 503);
+    return json({ error: '目前無法讀取繁星雞湯，請稍後再試' }, 503);
   }
 }

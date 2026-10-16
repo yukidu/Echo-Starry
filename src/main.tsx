@@ -11,6 +11,7 @@ import './v181HomeToolbarDislike';
 import './v189PlaybackSwitchConfirm';
 import './memberProfileSchemaBridge';
 import './batteryTerminologyPolicy';
+import './v264ProfileMotto';
 
 {
   const legacyUrl = new URL(window.location.href);
