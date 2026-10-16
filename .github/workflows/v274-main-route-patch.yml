@@ -1,0 +1,35 @@
+name: Apply v274 main public route patch
+
+on:
+  push:
+    branches: [fix/v274-spouse-public-card-number]
+    paths:
+      - 'scripts/v274PatchMainPublicRoute.mjs'
+      - '.github/workflows/v274-main-route-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/v274-spouse-public-card-number
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Patch main public-card route
+        run: node scripts/v274PatchMainPublicRoute.mjs
+      - name: Remove helper and commit product changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm scripts/v274PatchMainPublicRoute.mjs .github/workflows/v274-main-route-patch.yml
+          git add worker/starryIdV211Router.ts tests/starryIdV250AmwayPublicCard.test.ts tests/v274StarryIdSpousePublicNumber.test.ts
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(v274): shared spouse distributor number resolves in main public route'
+          git push origin HEAD:fix/v274-spouse-public-card-number
