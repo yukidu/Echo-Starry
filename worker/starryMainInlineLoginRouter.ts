@@ -1,6 +1,7 @@
 import type { Env } from './index';
 import appWorker from './starryMainBatteryGameRouter';
 import { handleStarryIdRandomMotto } from './starryIdRandomMottoRouter';
+import { handleStarryEcosystemAuthEntry } from './starryEcosystemAuthEntryRouter';
 
 const ID_HOST = 'id.starry.phd';
 const LOGIN_PATH = '/starry-main-login';
@@ -246,6 +247,9 @@ function loginPage(env: Env) {
 export default {
   async fetch(request: Request, env: Env, ctx?: any): Promise<Response> {
     const url = new URL(request.url);
+
+    const ecosystemAuthResponse = handleStarryEcosystemAuthEntry(request, env);
+    if (ecosystemAuthResponse) return ecosystemAuthResponse;
 
     const randomMottoResponse = await handleStarryIdRandomMotto(request, env);
     if (randomMottoResponse) return randomMottoResponse;
