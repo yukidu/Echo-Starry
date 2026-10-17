@@ -27,6 +27,21 @@ export async function transcriptBulkStatus(env: SchedulerEnv) {
     SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) AS pending
     FROM transcript_index`).first();
   const allTracks: any = await env.DB.prepare(`SELECT COUNT(*) AS n FROM tracks WHERE audioUrl IS NOT NULL AND TRIM(audioUrl)<>''`).first();
+  const itemRows: any = await env.DB.prepare(`SELECT
+    t.id AS trackId,
+    COALESCE(i.status,'pending') AS status,
+    i.error AS error,
+    COALESCE(i.updatedAt,0) AS updatedAt
+    FROM tracks t
+    LEFT JOIN transcript_index i ON i.trackId=t.id
+    WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>''
+    ORDER BY COALESCE(t.uploadDate,'') DESC,t.id`).all();
+  const items = (itemRows?.results || []).map((item: any) => ({
+    trackId: text(item.trackId),
+    status: text(item.status) || 'pending',
+    error: text(item.error) || null,
+    updatedAt: Number(item.updatedAt || 0)
+  }));
   return {
     audioTracks: Number(allTracks?.n || 0),
     indexed: Number(row?.total || 0),
@@ -34,7 +49,8 @@ export async function transcriptBulkStatus(env: SchedulerEnv) {
     queued: Number(row?.queued || 0),
     processing: Number(row?.processing || 0),
     failed: Number(row?.failed || 0),
-    pending: Number(row?.pending || 0)
+    pending: Number(row?.pending || 0),
+    items
   };
 }
 
