@@ -1,6 +1,6 @@
 (() => {
-  if (window.__starryTranscriptBatterySettingsV301) return;
-  window.__starryTranscriptBatterySettingsV301 = true;
+  if (window.__starryTranscriptBatterySettingsV302) return;
+  window.__starryTranscriptBatterySettingsV302 = true;
 
   const SECTION_ID = 'v301-transcript-battery-settings';
   let loading = false;
@@ -13,6 +13,7 @@
     #${SECTION_ID} p{margin:0;font-size:.72rem;opacity:.7;line-height:1.45}
     #${SECTION_ID} .v301-setting-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem;font-size:.76rem;font-weight:800}
     #${SECTION_ID} .v301-setting-value{display:flex;align-items:center;gap:.3rem;flex:none}
+    #${SECTION_ID} .v302-setting-hint{display:block;margin-top:.18rem;font-size:.66rem;font-weight:700;opacity:.62;line-height:1.35}
     #${SECTION_ID} input{width:5.5rem;box-sizing:border-box;padding:.52rem .6rem;border:1px solid #cbd5e1;border-radius:.7rem;background:var(--app-surface,#fff);color:inherit;font:inherit;text-align:right}
     .dark #${SECTION_ID} input{background:#0f172a;border-color:#475569;color:#f8fafc}
     #${SECTION_ID} button{width:100%;border:0;border-radius:.75rem;padding:.68rem;background:var(--color-primary,#c06c84);color:#fff;font-weight:900;cursor:pointer}
@@ -32,10 +33,10 @@
     section.id = SECTION_ID;
     section.setAttribute('aria-label', '逐字稿電池設定');
     section.innerHTML = `
-      <div><h3>逐字稿</h3><p>設定解鎖、協助訂正與翻譯功能的電池加減規則。</p></div>
+      <div><h3>逐字稿</h3><p>設定解鎖、協助訂正與瀏覽器翻譯功能的電池加減規則。</p></div>
       <label class="v301-setting-row"><span>解鎖逐字稿的花費</span><span class="v301-setting-value"><input data-v301-unlock type="number" min="0" max="100" step="0.1" inputmode="decimal"> 顆</span></label>
       <label class="v301-setting-row"><span>協助訂正錯字的獎勵</span><span class="v301-setting-value"><input data-v301-reward type="number" min="0" max="10" step="0.1" inputmode="decimal"> 顆</span></label>
-      <label class="v301-setting-row"><span>使用逐字稿翻譯功能的花費</span><span class="v301-setting-value"><input data-v301-translation type="number" min="0" max="100" step="0.1" inputmode="decimal"> 顆</span></label>
+      <label class="v301-setting-row"><span>使用逐字稿瀏覽器翻譯的花費<span class="v302-setting-hint">這是會員使用翻譯按鈕時扣除的電池，不是 Cloudflare AI 費用。</span></span><span class="v301-setting-value"><input data-v301-translation type="number" min="0" max="100" step="0.1" inputmode="decimal"> 顆</span></label>
       <button type="button" data-v301-save>儲存逐字稿規則</button>
       <div data-v301-status role="status">讀取設定中…</div>`;
     section.querySelector('[data-v301-save]').addEventListener('click', () => void save(section));

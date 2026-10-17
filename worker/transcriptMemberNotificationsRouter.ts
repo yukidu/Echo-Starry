@@ -2,10 +2,14 @@ import type { Env } from './index';
 import moderationWorker from './transcriptModerationRouter';
 import { createStarryNotification } from './starryIdNotificationsRouter';
 import { injectTranscriptLedgerSettings } from './transcriptLedgerSettingsInjector';
+import { batteriesToUnits, unitsToBatteries } from '../shared/battery';
 
 const SESSION_COOKIE = 'echostars_session';
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{30,}$/;
 const NOTICE_TYPE = 'transcript-correction-review';
+const DEFAULT_UNLOCK_UNITS = 10;
+const DEFAULT_CORRECTION_REWARD_UNITS = 1;
+const transcriptSettingsSchemaReady = new WeakMap<object, Promise<void>>();
 
 type EchoActor = { id: string; email?: string; name?: string; role?: string; isBlocked?: number; expiresAt?: number };
 
@@ -46,6 +50,9 @@ async function verifiedActor(request: Request, env: Env): Promise<EchoActor | nu
   if (!actor || actor.isBlocked || Number(actor.expiresAt || 0) <= Date.now()) return null;
   return actor as EchoActor;
 }
+function isEchoSuperAdmin(actor: EchoActor | null) {
+  return text(actor?.email).toLowerCase() === 'yukidu@gmail.com' || text(actor?.role) === '超級管理員';
+}
 async function centralUserId(env: Env, localUserId: string) {
   const db = (env as any).STARRY_ID_DB;
   const local = text(localUserId);
@@ -58,6 +65,79 @@ async function centralUserId(env: Env, localUserId: string) {
 }
 function parseMetadata(value: unknown) {
   try { return JSON.parse(text(value) || '{}'); } catch { return {}; }
+}
+
+async function ensureTranscriptSettingsSchema(env: Env) {
+  const db = (env as any).DB;
+  if (!db) throw new Error('DB not bound');
+  const key = db as object;
+  if (!transcriptSettingsSchemaReady.has(key)) {
+    const task = (async () => {
+      await db.prepare(`CREATE TABLE IF NOT EXISTS transcript_settings (
+        key TEXT PRIMARY KEY,valueUnits INTEGER NOT NULL,updatedAt INTEGER NOT NULL,updatedBy TEXT)`).run();
+      const now = Date.now();
+      await db.batch([
+        db.prepare('INSERT OR IGNORE INTO transcript_settings(key,valueUnits,updatedAt,updatedBy) VALUES (?,?,?,?)')
+          .bind('unlock_cost_units', DEFAULT_UNLOCK_UNITS, now, 'system'),
+        db.prepare('INSERT OR IGNORE INTO transcript_settings(key,valueUnits,updatedAt,updatedBy) VALUES (?,?,?,?)')
+          .bind('correction_reward_units', DEFAULT_CORRECTION_REWARD_UNITS, now, 'system')
+      ]);
+    })();
+    transcriptSettingsSchemaReady.set(key, task);
+    task.catch(() => transcriptSettingsSchemaReady.delete(key));
+  }
+  await transcriptSettingsSchemaReady.get(key);
+}
+
+async function echoTranscriptSettingsApi(request: Request, env: Env) {
+  const actor = await verifiedActor(request, env);
+  if (!actor) return json({ error: '請先登入繁星回聲' }, 401);
+  if (!isEchoSuperAdmin(actor)) return json({ error: '只有超級管理員可以修改逐字稿電池設定' }, 403);
+  await ensureTranscriptSettingsSchema(env);
+  const db = (env as any).DB;
+  const method = request.method.toUpperCase();
+  if (method === 'GET') {
+    const rows: any = await db.prepare("SELECT key,valueUnits FROM transcript_settings WHERE key IN ('unlock_cost_units','correction_reward_units')").all();
+    const values: Record<string, number> = {
+      unlock_cost_units: DEFAULT_UNLOCK_UNITS,
+      correction_reward_units: DEFAULT_CORRECTION_REWARD_UNITS
+    };
+    for (const row of rows?.results || []) values[text(row.key)] = Number(row.valueUnits || 0);
+    const counts: any = await db.prepare(`SELECT COUNT(*) AS total,
+      SUM(CASE WHEN status='ready' THEN 1 ELSE 0 END) AS ready,
+      SUM(CASE WHEN status IN ('queued','processing') THEN 1 ELSE 0 END) AS processing,
+      SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed FROM transcript_index`).first().catch(() => ({}));
+    return json({
+      isSuperAdmin: true,
+      unlockCost: unitsToBatteries(values.unlock_cost_units),
+      correctionReward: unitsToBatteries(values.correction_reward_units),
+      counts
+    });
+  }
+  if (method !== 'PUT') return json({ error: 'Method not allowed' }, 405);
+  const body: any = await request.clone().json().catch(() => ({}));
+  const unlockCost = Number(body.unlockCost);
+  const correctionReward = Number(body.correctionReward);
+  const unlockUnits = batteriesToUnits(unlockCost);
+  const rewardUnits = batteriesToUnits(correctionReward);
+  const valid = (number: number, units: number, max: number) =>
+    Number.isFinite(number) && number >= 0 && number <= max && Math.abs(number * 10 - units) < 1e-8;
+  if (!valid(unlockCost, unlockUnits, 100)) return json({ error: '逐字稿解鎖費用需為 0 至 100 顆，最小單位 0.1 顆' }, 400);
+  if (!valid(correctionReward, rewardUnits, 10)) return json({ error: '修正錯字獎勵需為 0 至 10 顆，最小單位 0.1 顆' }, 400);
+  const now = Date.now();
+  await db.batch([
+    db.prepare(`INSERT INTO transcript_settings(key,valueUnits,updatedAt,updatedBy) VALUES ('unlock_cost_units',?,?,?)
+      ON CONFLICT(key) DO UPDATE SET valueUnits=excluded.valueUnits,updatedAt=excluded.updatedAt,updatedBy=excluded.updatedBy`)
+      .bind(unlockUnits, now, actor.id),
+    db.prepare(`INSERT INTO transcript_settings(key,valueUnits,updatedAt,updatedBy) VALUES ('correction_reward_units',?,?,?)
+      ON CONFLICT(key) DO UPDATE SET valueUnits=excluded.valueUnits,updatedAt=excluded.updatedAt,updatedBy=excluded.updatedBy`)
+      .bind(rewardUnits, now, actor.id)
+  ]);
+  return json({
+    success: true,
+    unlockCost: unitsToBatteries(unlockUnits),
+    correctionReward: unitsToBatteries(rewardUnits)
+  });
 }
 
 async function userNotificationApi(request: Request, env: Env) {
@@ -140,6 +220,9 @@ async function notifyMemberAfterReview(env: Env, correctionId: string, action: '
 export default {
   async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === '/api/v281/transcript-settings' && url.hostname.toLowerCase() !== 'id.starry.phd') {
+      return echoTranscriptSettingsApi(request, env);
+    }
     if (url.pathname === '/api/v281/transcript-user-notifications' || url.pathname === '/api/v281/transcript-user-notifications/read') {
       return userNotificationApi(request, env);
     }
