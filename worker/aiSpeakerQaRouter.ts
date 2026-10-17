@@ -122,6 +122,9 @@ async function quota(req:Request,env:Env,u:any,cfg:any){
 }
 function canAccess(u:any,t:any){
   if(isSuper(u))return true;
+  // Keep the existing authorized-only and private VIP fences: a public rank is
+  // not sufficient to make a member-only/private recording usable by guests.
+  if(t.authorizedOnlyVisible&&!u)return false;
   if(t.isPrivateVip)return false; // prevent cross-video VIP leakage
   const required=txt(t.requiredRank);
   if(!required||required==='無'||required==='公開')return true;
