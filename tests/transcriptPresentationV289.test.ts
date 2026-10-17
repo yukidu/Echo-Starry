@@ -32,7 +32,8 @@ test('v290 translation stays non-blocking and uses bilingual Translate control',
   assert.match(presentation, /<span>Translate<\/span>/);
   assert.match(presentation, /\?translate=/);
   assert.match(presentation, /翻譯仍在背景處理/);
-  assert.doesNotMatch(presentation, /button\.disabled = true/);
+  assert.doesNotMatch(presentation, /data-v290-translate[^\n]{0,200}disabled/);
+  assert.doesNotMatch(presentation, /translationController[\s\S]{0,500}button\.disabled\s*=\s*true/);
 });
 
 test('v290 removes transcript title and centers controls with compact X overlay', () => {
