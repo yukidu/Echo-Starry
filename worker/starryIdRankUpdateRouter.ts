@@ -3,6 +3,7 @@ import { PROFILE_OPTIONS } from './starryIdProfileDirectoryRouter';
 import type { Env } from './index';
 
 const STAR_DOMAIN = 'id.starry.phd';
+const RANK_AUDIT_FIELDS = ['rank','approvedRank','rankApproved','rankAuditStatus','rankAuditType','rankUpdatedAt'] as const;
 
 function text(value: unknown) {
   return value == null ? '' : String(value).trim();
@@ -31,6 +32,15 @@ async function sessionData(request: Request, env: Env) {
   return data?.authenticated && data?.user?.id ? data : null;
 }
 
+function rankAuditStatement(db: any, targetUserId: string, actorUserId: string, fieldName: string, oldValue: unknown, newValue: unknown, now: number) {
+  return db.prepare(`INSERT INTO profile_audit_logs
+    (id,userId,appId,actorUserId,fieldName,oldValue,newValue,createdAt)
+    VALUES (?,?,?,?,?,?,?,?)`).bind(
+      crypto.randomUUID(), targetUserId, 'starry-id', actorUserId,
+      fieldName, oldValue == null ? '' : String(oldValue), newValue == null ? '' : String(newValue), now
+    );
+}
+
 export async function handleStarryIdRankUpdate(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
   if (url.hostname !== STAR_DOMAIN) return null;
@@ -54,25 +64,41 @@ export async function handleStarryIdRankUpdate(request: Request, env: Env): Prom
   const db = (env as any).STARRY_ID_DB;
   if (!db) return json({ error: 'Starry ID service unavailable' }, 503);
 
-  const current: any = await db.prepare('SELECT rank,approvedRank,rankApproved FROM profiles WHERE userId=? LIMIT 1').bind(targetUserId).first();
+  const current: any = await db.prepare(`SELECT rank,approvedRank,rankApproved,rankAuditStatus,rankAuditType,rankUpdatedAt
+    FROM profiles WHERE userId=? LIMIT 1`).bind(targetUserId).first();
   if (!current) return json({ error: '找不到會員資料' }, 404);
+
   const now = Date.now();
   const rankUpdatedAt = new Date(now).toISOString();
   const isAdminApproval = Boolean(session.isSuperAdmin);
-  if (isAdminApproval) {
-    await db.prepare(`UPDATE profiles SET rank=?,approvedRank=?,rankApproved=1,rankAuditStatus='approved',rankAuditType='super-admin',rankUpdatedAt=?,updatedAt=? WHERE userId=?`)
-      .bind(value, value, rankUpdatedAt, now, targetUserId).run();
-  } else {
-    await db.prepare(`UPDATE profiles SET
-      approvedRank=CASE WHEN TRIM(COALESCE(approvedRank,''))='' AND COALESCE(rankApproved,0)=1 THEN rank ELSE approvedRank END,
-      rank=?,rankApproved=0,rankAuditStatus='pending',rankAuditType='rank_change',rankUpdatedAt=?,updatedAt=? WHERE userId=?`)
-      .bind(value, rankUpdatedAt, now, targetUserId).run();
-  }
-  await db.prepare(`INSERT INTO profile_audit_logs
-    (id,userId,appId,actorUserId,fieldName,oldValue,newValue,createdAt)
-    VALUES (?,?,?,?,?,?,?,?)`).bind(
-      crypto.randomUUID(), targetUserId, 'starry-id', text(session.user.id), 'rank', text(current.rank), value, now
-    ).run().catch(() => undefined);
+  const preservedApprovedRank = text(current.approvedRank) || (Number(current.rankApproved || 0) === 1 ? text(current.rank) : '');
+  const next: Record<(typeof RANK_AUDIT_FIELDS)[number], unknown> = isAdminApproval ? {
+    rank: value,
+    approvedRank: value,
+    rankApproved: 1,
+    rankAuditStatus: 'approved',
+    rankAuditType: 'super-admin',
+    rankUpdatedAt
+  } : {
+    rank: value,
+    approvedRank: preservedApprovedRank,
+    rankApproved: 0,
+    rankAuditStatus: 'pending',
+    rankAuditType: 'rank_change',
+    rankUpdatedAt
+  };
+
+  const update = isAdminApproval
+    ? db.prepare(`UPDATE profiles SET rank=?,approvedRank=?,rankApproved=1,rankAuditStatus='approved',rankAuditType='super-admin',rankUpdatedAt=?,updatedAt=? WHERE userId=?`)
+      .bind(value, value, rankUpdatedAt, now, targetUserId)
+    : db.prepare(`UPDATE profiles SET approvedRank=?,rank=?,rankApproved=0,rankAuditStatus='pending',rankAuditType='rank_change',rankUpdatedAt=?,updatedAt=? WHERE userId=?`)
+      .bind(preservedApprovedRank, value, rankUpdatedAt, now, targetUserId);
+
+  // v306：獎銜審核是單一交易。正式資料與六個工作流欄位的審計紀錄必須一起成功，避免未來只能看到 rank、無法還原審核狀態。
+  const auditStatements = RANK_AUDIT_FIELDS
+    .filter(field => String(current[field] ?? '') !== String(next[field] ?? ''))
+    .map(field => rankAuditStatement(db, targetUserId, text(session.user.id), field, current[field], next[field], now));
+  await db.batch([update, ...auditStatements]);
 
   if ((env as any).DB) {
     try {
@@ -80,10 +106,8 @@ export async function handleStarryIdRankUpdate(request: Request, env: Env): Prom
         await (env as any).DB.prepare(`UPDATE users SET rank=?,approvedRank=?,rankApproved=1,rankAuditStatus='approved',rankAuditType='super-admin',rankUpdatedAt=? WHERE id=?`)
           .bind(value, value, rankUpdatedAt, targetUserId).run();
       } else {
-        await (env as any).DB.prepare(`UPDATE users SET
-          approvedRank=CASE WHEN TRIM(COALESCE(approvedRank,''))='' AND COALESCE(rankApproved,0)=1 THEN rank ELSE approvedRank END,
-          rank=?,rankApproved=0,rankAuditStatus='pending',rankAuditType='rank_change',rankUpdatedAt=? WHERE id=?`)
-          .bind(value, rankUpdatedAt, targetUserId).run();
+        await (env as any).DB.prepare(`UPDATE users SET approvedRank=?,rank=?,rankApproved=0,rankAuditStatus='pending',rankAuditType='rank_change',rankUpdatedAt=? WHERE id=?`)
+          .bind(preservedApprovedRank, value, rankUpdatedAt, targetUserId).run();
       }
     } catch (error) {
       console.warn('Starry ID rank legacy dual-write skipped', {
@@ -92,12 +116,11 @@ export async function handleStarryIdRankUpdate(request: Request, env: Env): Prom
     }
   }
 
-  const after: any = await db.prepare('SELECT rank,approvedRank,rankApproved,rankAuditStatus FROM profiles WHERE userId=? LIMIT 1').bind(targetUserId).first();
   return json({
     success: true,
-    rank: value,
-    approvedRank: text(after?.approvedRank) || (Number(after?.rankApproved || 0) === 1 ? text(after?.rank) : ''),
-    rankApproved: isAdminApproval,
-    rankAuditStatus: isAdminApproval ? 'approved' : 'pending'
+    rank: text(next.rank),
+    approvedRank: text(next.approvedRank),
+    rankApproved: Boolean(next.rankApproved),
+    rankAuditStatus: text(next.rankAuditStatus)
   });
 }
