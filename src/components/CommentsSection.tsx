@@ -396,7 +396,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
           const rootComments = threads.roots;
           const renderCommentItem = (c: Comment, isReply = false) => {
             const isAuthor = Boolean(c.authorEmail ? currentUser?.email && c.authorEmail.toLowerCase().trim() === currentUser.email.toLowerCase().trim() : c.deviceId && c.deviceId === visitor.deviceId);
-            const isAiSpeaker = c.authorBadge === 'AI_SPEAKER';
+            const isAiSpeaker = c.id.startsWith('qa-') && c.authorBadge === 'AI_SPEAKER';
             const registeredAuthor = isAiSpeaker ? null : getRegisteredAuthor(c);
             const isVisitor = !registeredAuthor && !isAiSpeaker;
             const displayAuthorName = isAiSpeaker ? (c.authorName || speakerName) : (registeredAuthor?.name || c.authorName);
