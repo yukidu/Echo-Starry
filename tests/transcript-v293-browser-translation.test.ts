@@ -60,8 +60,9 @@ test('v293 transcript scheduler runs only one workflow at a time every 15 minute
 test('Chinese transcription still normalizes Chinese to Traditional Chinese before R2 storage', () => {
   assert.match(workflow, /@cf\/openai\/whisper-large-v3-turbo/);
   assert.match(workflow, /TRADITIONAL_MODEL/);
+  assert.match(workflow, /likelyChineseTranscript/);
+  assert.match(workflow, /if \(isChinese\) await traditionalizeSegments/);
   assert.match(workflow, /zh-Hant-TW/);
-  assert.match(workflow, /language\.startsWith\('zh'\)/);
 });
 
 test('v290 playback isolation remains intact', () => {
