@@ -49,7 +49,8 @@ test('Chinese transcript is normalized to Taiwan Traditional before R2 storage',
 test('super admin transcript battery settings are promoted near the top of ledger', () => {
   assert.match(ledger, /逐字稿功能解鎖所需電池/);
   assert.match(ledger, /訂正錯字電池獎勵/);
-  assert.match(ledger, /\/api\/session/);
-  assert.match(ledger, /d&&d\.isSuperAdmin/);
+  assert.match(ledger, /\/api\/v281\/transcript-settings/);
+  assert.match(ledger, /box\.hidden=false/);
+  assert.match(ledger, /box\.hidden=true/);
   assert.match(ledger, /html\.replace\('<div class="tools">'/);
 });
