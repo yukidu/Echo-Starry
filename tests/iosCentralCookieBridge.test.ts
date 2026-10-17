@@ -60,7 +60,7 @@ test('iOS redirect completes central and Echo sessions before publishing identit
 
 test('iOS central error keeps the previous identity and offers safe recovery', async () => {
   const result=await simulate(false);
-  assert.deepEqual(result.requests,['https://id.starry.phd/api/google-sync']);
+  assert.deepEqual(result.requests,['https://id.starry.phd/api/mobile-login/complete']);
   assert.deepEqual(result.redirects,[]);
   assert.equal(JSON.parse(result.local.getItem('sq_current_user_v1')||'{}').id,'echo-a');
   assert.equal(result.retryEl.style.display,'inline-block');
