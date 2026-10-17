@@ -4,28 +4,27 @@ import { readFileSync } from 'node:fs';
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('v296 transcript UI keeps the requested visual and layout rules', () => {
-  const ui = read('public/transcript-ui-v293.js');
+test('v297 transcript UI keeps the requested visual and fixed layout rules', () => {
+  const ui = read('public/transcript-ui-v297.js');
   const index = read('index.html');
 
-  assert.match(index, /transcript-ui-v293\.js\?v=296/);
+  assert.match(index, /transcript-ui-v297\.js\?v=297/);
   assert.match(ui, /放大字幕/);
   assert.match(ui, /\[data-v290-expand\][\s\S]*var\(--color-primary/);
   assert.match(ui, /background:rgba\(0,0,0,\.72\)/);
   assert.match(ui, /height:7\.15rem/);
   assert.match(ui, /function fitOverlayLine/);
-  assert.match(ui, /function moveKeywordsAboveReferences/);
-  assert.match(ui, /網友關鍵字/);
-  assert.match(ui, /參考資料/);
   assert.match(ui, /anchorTranscriptAbovePlayer/);
-  assert.match(ui, /window\.setInterval\(\(\) => \{ void paintFloatingOverlay\(\); \}, 150\)/);
-  assert.match(ui, /data-echostars-media-session/);
+  assert.match(ui, /function placeAudioInfoBelowPlayer/);
+  assert.match(ui, /timeline\.insertAdjacentElement\('afterend', info\)/);
+  assert.doesNotMatch(ui, /moveKeywordsAboveReferences/);
+  assert.doesNotMatch(ui, /paintFloatingOverlay/);
   assert.match(ui, /DISPLAY_END_PUNCTUATION/);
   assert.doesNotMatch(ui, /new Set\([^\n]*['"]？['"]/);
 });
 
-test('v296 translation icon is an original contained SVG without overflowing text glyphs', () => {
-  const ui = read('public/transcript-ui-v293.js');
+test('v297 translation icon is an original contained SVG without overflowing text glyphs', () => {
+  const ui = read('public/transcript-ui-v297.js');
   const iconStart = ui.indexOf('const TRANSLATE_ICON');
   const iconEnd = ui.indexOf('const style', iconStart);
   const icon = ui.slice(iconStart, iconEnd);
@@ -33,6 +32,16 @@ test('v296 translation icon is an original contained SVG without overflowing tex
   assert.match(icon, /<rect/);
   assert.match(icon, /<path/);
   assert.doesNotMatch(icon, /<text/);
+});
+
+test('v297 subtitle guard preserves logical text and performs fitting synchronously', () => {
+  const ui = read('public/transcript-ui-v297.js');
+  assert.match(ui, /let logicalValue = initialRaw/);
+  assert.match(ui, /get\(\) \{ return logicalValue; \}/);
+  assert.match(ui, /nativeTextContent\.set\.call\(this, displaySubtitleText\(logicalValue\)\)/);
+  assert.match(ui, /fitOverlayLine\(this, true\)/);
+  assert.match(ui, /fitTranscriptLine\(this, true\)/);
+  assert.match(ui, /v297FitSignature/);
 });
 
 test('v296 backend enforces sentence-sized transcript responses and preserves correction mapping', () => {
