@@ -261,6 +261,36 @@ export async function handleQaRequest(req:Request,env:Env):Promise<Response|null
       return json({enabled:cfg.enabled&&!q.reason,reason:q.reason,tier:q.tier,label:q.label,daily:q.daily,free:q.free,freeLeft:q.freeLeft,left:q.left,cost:q.cost});
     }
     if(!admin)return json({error:'只有超級管理員可以管理逐字稿與問答設定'},403);
+    if(path==='/api/qa/search'&&method==='GET'){
+      // Admin-triggered search only: NEVER scan cloud files on each keystroke.
+      const term=txt(url.searchParams.get('q')).slice(0,80);
+      const speaker=txt(url.searchParams.get('speaker')).toLowerCase();
+      if(term.length<2)return json({error:'關鍵字至少輸入兩個字'},400);
+      const indexed:any=await env.DB.prepare("SELECT t.id,t.title,t.speaker,i.r2Key FROM transcript_index i JOIN tracks t ON t.id=i.trackId WHERE i.status='ready' AND i.r2Key IS NOT NULL ORDER BY t.uploadDate DESC").all();
+      const candidates=(indexed.results||[]).filter((row:any)=>!speaker||splitSpeakerNames(row.speaker).some(n=>n.toLowerCase()===speaker));
+      const hits:any[]=[];
+      for(const row of candidates.slice(0,100)){
+        const object=await env.R2_BUCKET?.get(row.r2Key);
+        if(!object)continue;
+        let file:any;try{file=JSON.parse(await object.text());}catch{continue;}
+        for(const seg of Array.isArray(file.segments)?file.segments:[]){
+          const line=txt(seg.text),at=line.toLowerCase().indexOf(term.toLowerCase());
+          if(at>=0){
+            hits.push({trackId:row.id,title:row.title,speaker:row.speaker,start:Number(seg.start||0),text:line.slice(Math.max(0,at-50),at+term.length+130)});
+            if(hits.length>=100)break;
+          }
+        }
+        if(hits.length>=100)break;
+      }
+      return json({matches:hits,scanned:Math.min(candidates.length,100),partial:candidates.length>100||hits.length>=100});
+    }
+    if(path==='/api/qa/retry'&&method==='POST'){
+      const body:any=await req.json().catch(()=>({}));
+      const id=txt(body.trackId);
+      if(!id||id.length>128)return json({error:'請指定正確音檔'},400);
+      const result=await env.DB.prepare("UPDATE transcript_index SET status='pending',error=NULL,updatedAt=? WHERE trackId=? AND status='failed'").bind(Date.now(),id).run();
+      return json({success:!!result.meta?.changes,message:result.meta?.changes?'已重新排隊，系統會接續處理':'此音檔目前不是異常狀態'});
+    }
     if(path==='/api/qa/admin'&&method==='GET'){
       const rows=await env.DB.prepare("SELECT t.id,t.title,t.speaker,t.speakerRank,t.requiredRank,COALESCE(i.status,'pending') status,i.error,i.updatedAt,i.segmentCount,i.wordCount,i.durationSeconds FROM tracks t LEFT JOIN transcript_index i ON i.trackId=t.id WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>'' ORDER BY t.uploadDate DESC,t.id").all();
       const items=rows.results||[];
