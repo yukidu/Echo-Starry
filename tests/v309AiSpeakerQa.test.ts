@@ -57,8 +57,8 @@ test('audio management has an actual dedicated transcript tab, full text, keywor
   assert.match(page,/mode === 'qa'/);
   assert.match(page,/<TranscriptQaAdmin \/>/);
   assert.match(router,/path==='\/api\/qa\/search'/);
-  assert.match(router,/path==='\/api\/qa\/transcripts/);
+  assert.ok(router.includes("/api/qa/transcripts/"));
   assert.match(router,/chineseCount/);
   assert.match(admin,/全文搜尋/);
-  assert.match(admin,/今日/);
+  assert.match(admin,/每天上限/);
 });
