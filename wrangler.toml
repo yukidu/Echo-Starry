@@ -1,6 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/starryMainInlineLoginRouter.ts" # wrapper: inline login -> battery game -> existing Starry/Echo chain
+main = "worker/starryMainInlineLoginRouter.ts" # wrapper: same-page Google login shell -> battery game -> existing Starry/Echo chain
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
@@ -32,7 +32,7 @@ command = "npm run build"
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# 所有請求先經繁星主站登入橋接與電池 wrapper，再進入原本安全鏈。
+# 保留既有 Worker 安全鏈；生態系 SSO 由鏈內路由統一處理。
 run_worker_first = ["/*"]
 
 # 1. Cloudflare D1 資料庫 (SQLite)
