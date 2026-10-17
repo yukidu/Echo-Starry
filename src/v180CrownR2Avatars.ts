@@ -1,11 +1,11 @@
-const CROWN_R2_ORIGIN = 'https://echostars.yukidu.workers.dev';
+const CROWN_R2_ORIGIN = ''; // Same-origin Worker endpoint
 const CROWN_R2_FOLDER = 'Success_Crown';
-const CROWN_R2_CACHE_BUSTER = '20261011-2';
+const CROWN_R2_CACHE_BUSTER = '20261018-1';
 const AMWAY_MEMBER_RE = /\/member\/member(\d+)\.html(?:$|[?#])/i;
 const R2_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'JPG', 'JPEG', 'PNG', 'WEBP'];
 
 function r2AvatarUrl(id: string, ext: string) {
-  const key = `${CROWN_R2_FOLDER}/${id}.${ext}`;
+  const key = `${CROWN_R2_FOLDER}/${id.padStart(2, '0')}.${ext}`;
   return `${CROWN_R2_ORIGIN}/api/r2/file/${encodeURIComponent(key)}?v=${CROWN_R2_CACHE_BUSTER}`;
 }
 
@@ -40,6 +40,9 @@ async function syncCrownR2Avatar(card: Element) {
   if (!img) return;
 
   const id = match[1];
+  // Fresh cards already use the exact R2 object as their first image source.
+  // Do not probe a second time: it wastes R2 reads and may overwrite fallback.
+  if ((img.getAttribute('src') || '').startsWith('/api/r2/file/Success_Crown%2F')) return;
   if (img.dataset.crownR2Status === `ready:${id}` || img.dataset.crownR2Status === `loading:${id}`) return;
 
   // Keep the already-working original image visible while we verify the R2 object.

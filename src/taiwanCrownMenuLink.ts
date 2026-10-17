@@ -47,6 +47,13 @@ const AMBASSADORS: Ambassador[] = [
 
 const IMAGE_BASE = 'https://raw.githubusercontent.com/yukidu/amway_crown/main/img/';
 
+// R2 objects use two-digit member IDs (01.jpg ... 13.jpg).
+// Read through this site's Worker so the portraits work on mobile without
+// depending on GitHub's image host or the retired workers.dev hostname.
+function crownR2AvatarUrl(id: string) {
+  return `/api/r2/file/${encodeURIComponent(`Success_Crown/${id.padStart(2, '0')}.jpg`)}`;
+}
+
 function parseStoredJson<T>(key: string): T | null {
   try {
     const raw = localStorage.getItem(key);
@@ -170,7 +177,7 @@ function getGreeting() {
   return '夜深了 明天邀約幾場了呢？';
 }
 
-function appendAvatar(container: HTMLElement, source: string | undefined, fallbackText: string) {
+function appendAvatar(container: HTMLElement, source: string | undefined, fallbackText: string, fallbackSource?: string) {
   container.replaceChildren();
   const value = String(source || '').trim();
   if (value && /^(?:https?:|data:|blob:|\/)/i.test(value)) {
@@ -178,10 +185,18 @@ function appendAvatar(container: HTMLElement, source: string | undefined, fallba
     img.src = value;
     img.alt = fallbackText;
     img.loading = 'lazy';
+    // Only show the surname after BOTH the first-party R2 photo and its
+    // original GitHub backup fail. Keep the existing animated avatar ring.
+    let triedFallback = false;
     img.addEventListener('error', () => {
+      if (fallbackSource && !triedFallback) {
+        triedFallback = true;
+        img.src = fallbackSource;
+        return;
+      }
       container.replaceChildren();
       container.textContent = Array.from(fallbackText.trim())[0] || '★';
-    }, { once: true });
+    });
     container.append(img);
     return;
   }
@@ -201,7 +216,7 @@ function createStoryCard(person: Ambassador, index: number) {
   ring.className = 'taiwan-crown-avatar-ring';
   const avatar = document.createElement('div');
   avatar.className = 'taiwan-crown-avatar';
-  appendAvatar(avatar, `${IMAGE_BASE}${person.id}.jpg`, person.name);
+  appendAvatar(avatar, crownR2AvatarUrl(person.id), person.name, `${IMAGE_BASE}${person.id}.jpg`);
   ring.append(avatar);
 
   const content = document.createElement('div');

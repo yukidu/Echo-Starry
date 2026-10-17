@@ -4,11 +4,12 @@ import { readFileSync } from 'node:fs';
 
 const ts = readFileSync(new URL('../src/v180CrownR2Avatars.ts', import.meta.url), 'utf8');
 const entry = readFileSync(new URL('../src/v174CrownTruePage.ts', import.meta.url), 'utf8');
+const crown = readFileSync(new URL('../src/taiwanCrownMenuLink.ts', import.meta.url), 'utf8');
 
-test('v180 maps crown member ids to the Success_Crown R2 folder on production origin', () => {
-  assert.match(ts, /const CROWN_R2_ORIGIN = 'https:\/\/echostars\.yukidu\.workers\.dev'/);
-  assert.match(ts, /const CROWN_R2_FOLDER = 'Success_Crown'/);
-  assert.match(ts, /member\(\\d\+\)/);
+test('v180 uses zero-padded Success_Crown keys on the current site', () => {
+  assert.ok(ts.includes("const CROWN_R2_ORIGIN = '';"));
+  assert.ok(ts.includes("const CROWN_R2_FOLDER = 'Success_Crown';"));
+  assert.match(ts, /id\.padStart\(2, '0'\)/);
 });
 
 test('v180 verifies several supported image extensions before replacing the working avatar', () => {
@@ -26,4 +27,13 @@ test('v180 adds a cache-busting query for replaced R2 objects', () => {
 
 test('v180 is loaded after v179', () => {
   assert.match(entry, /import '\.\/v179CrownPolish';[\s\S]*import '\.\/v180CrownR2Avatars';/);
+});
+
+test('crown portraits load via local Worker before falling back to the original image', () => {
+  assert.match(crown, /function crownR2AvatarUrl\(id: string\)/);
+  assert.match(crown, /Success_Crown/);
+  assert.match(crown, /id\.padStart\(2, '0'\)/);
+  assert.ok(crown.includes('appendAvatar(avatar, crownR2AvatarUrl(person.id), person.name,'));
+  assert.ok(crown.includes('if (fallbackSource && !triedFallback)'));
+  assert.ok(ts.includes("startsWith('/api/r2/file/Success_Crown%2F')"));
 });
