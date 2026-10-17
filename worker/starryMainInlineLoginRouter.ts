@@ -3,7 +3,7 @@ import appWorker from './starryMainBatteryGameRouter';
 import { handleStarryIdRandomMotto } from './starryIdRandomMottoRouter';
 
 // Workflow class 必須由正式 Worker 入口匯出；保留既有安全入口同時掛載逐字稿 Workflow。
-export { TranscriptWorkflow } from './transcriptRouter';
+export { TranscriptWorkflow } from './transcriptWorkflowV281';
 
 const ID_HOST = 'id.starry.phd';
 const LOGIN_PATH = '/starry-main-login';
@@ -251,6 +251,8 @@ function isTranscriptV281Path(pathname: string) {
     pathname === '/api/v281/transcript-corrections' ||
     pathname === '/api/v281/transcript-user-notifications' ||
     pathname === '/api/v281/transcript-user-notifications/read' ||
+    pathname === '/api/v281/transcripts/bulk-start' ||
+    pathname === '/api/v281/transcripts/bulk-status' ||
     /^\/api\/v281\/transcript-corrections\/[^/]+\/(accept|revoke|supplement)$/.test(pathname) ||
     /^\/api\/v281\/transcripts\/[^/]+$/.test(pathname) ||
     /^\/api\/v281\/transcripts\/[^/]+\/unlock$/.test(pathname) ||
@@ -262,7 +264,7 @@ export default {
     const url = new URL(request.url);
 
     if (isTranscriptV281Path(url.pathname)) {
-      const transcript = await import('./transcriptMemberNotificationsRouter');
+      const transcript = await import('./transcriptV281Gateway');
       return transcript.default.fetch(request, env as any, ctx as any);
     }
 
