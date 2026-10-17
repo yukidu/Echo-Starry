@@ -7,7 +7,7 @@ const client = readFileSync('public/transcript-client-v290.js', 'utf8');
 const html = readFileSync('index.html', 'utf8');
 const gateway = readFileSync('worker/transcriptV281Gateway.ts', 'utf8');
 const scheduler = readFileSync('worker/transcriptSequentialSchedulerV293.ts', 'utf8');
-const entry = readFileSync('worker/starryMainV293Router.ts', 'utf8');
+const entry = readFileSync('worker/starryMainInlineLoginRouter.ts', 'utf8');
 const wrangler = readFileSync('wrangler.toml', 'utf8');
 const workflow = readFileSync('worker/transcriptWorkflowV282.ts', 'utf8');
 
@@ -48,12 +48,13 @@ test('v293 keeps centered tools original translation icon and two-line auto fit'
   assert.match(ui, /while \(size > minPx && line\.scrollHeight > availableHeight \+ 1\)/);
 });
 
-test('v293 transcript scheduler runs only one workflow at a time every 15 minutes', () => {
+test('v293 transcript scheduler runs only one workflow at a time every 15 minutes without replacing the audited entry', () => {
   assert.match(scheduler, /status IN \('queued','processing'\)/);
   assert.match(scheduler, /LIMIT 1/);
   assert.match(scheduler, /instances:\s*\[\{ id: instanceId, params: \{ trackId: row\.id \} \}\]/);
   assert.match(entry, /queueNextTranscriptV293/);
-  assert.match(wrangler, /main = "worker\/starryMainV293Router\.ts"/);
+  assert.match(entry, /ctx\.waitUntil\(queueNextTranscriptV293\(env as any\)\)/);
+  assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
   assert.match(wrangler, /crons = \["\*\/15 \* \* \* \*"\]/);
 });
 
