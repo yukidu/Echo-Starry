@@ -14,12 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Cache npm downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.npm
           key: echostars-npm-${{ runner.os }}-${{ hashFiles('package.json') }}
@@ -59,7 +59,7 @@ jobs:
           exit ${failed}
       - name: Upload regression failure evidence
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: regression-output-${{ github.sha }}
           path: /tmp/regression-output
@@ -70,12 +70,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Cache npm downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.npm
           key: echostars-npm-${{ runner.os }}-${{ hashFiles('package.json') }}
@@ -88,7 +88,7 @@ jobs:
       - name: Production build
         run: npm run build
       - name: Share production build with browser checks
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: production-dist-${{ github.sha }}
           path: dist
@@ -100,12 +100,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Cache npm downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.npm
           key: echostars-npm-${{ runner.os }}-${{ hashFiles('package.json') }}
@@ -114,7 +114,7 @@ jobs:
       - name: Install dependencies
         run: npm install --prefer-offline --no-audit --no-fund
       - name: Download production build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: production-dist-${{ github.sha }}
           path: dist
@@ -206,7 +206,7 @@ jobs:
           fi
       - name: Upload browser UI failure evidence
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: browser-ui-${{ github.sha }}
           path: |
