@@ -13,9 +13,9 @@ const entry = readFileSync('worker/starryMainInlineLoginRouter.ts', 'utf8');
 const wrangler = readFileSync('wrangler.toml', 'utf8');
 const workflow = readFileSync('worker/transcriptWorkflowV282.ts', 'utf8');
 
-test('v294 loads one consolidated transcript client and one UI layer', () => {
+test('v295 loads one consolidated transcript client and refreshed UI layer', () => {
   assert.doesNotThrow(() => new Function(ui));
-  assert.match(html, /transcript-client-v290\.js\?v=293[\s\S]*transcript-ui-v293\.js\?v=294/);
+  assert.match(html, /transcript-client-v290\.js\?v=293[\s\S]*transcript-ui-v293\.js\?v=295/);
   assert.doesNotMatch(html, /transcript-ui-v292|transcript-presentation-v28[4589]|transcript-client\.js/);
 });
 
@@ -48,21 +48,32 @@ test('v294 audio management list exposes four transcript progress labels without
   assert.match(bulkScheduler, /items/);
 });
 
-test('v293 allows browser page translation instead of blocking it', () => {
+test('v295 automatically uses the browser Translator API for the whole page when supported', () => {
   assert.doesNotMatch(html, /translate="no"/);
   assert.doesNotMatch(html, /name="google"\s+content="notranslate"/);
-  assert.match(ui, /Browser Translate/);
-  assert.match(ui, /Chrome.*翻譯/);
-  assert.match(ui, /Safari.*翻譯網站/);
+  assert.match(ui, /globalThis\.Translator/);
+  assert.match(ui, /TranslatorApi\.availability/);
+  assert.match(ui, /TranslatorApi\.create/);
+  assert.match(ui, /translator\.translate\(core\)/);
+  assert.match(ui, /collectTextNodes\(document\.body\)/);
+  assert.match(ui, /watchDynamicPageTranslation/);
+  assert.match(ui, /瀏覽器整頁翻譯/);
 });
 
-test('v293 browser translation prompt treats selected language labels as text only', () => {
+test('v295 falls back to the browser full-page translation UI when direct launch is unavailable', () => {
+  assert.match(ui, /Safari 不允許網站直接按下內建翻譯/);
+  assert.match(ui, /瀏覽器選單「翻譯」/);
+  assert.match(ui, /if \(!automatic\)/);
+  assert.match(ui, /browserInstruction\(label\)/);
+});
+
+test('browser translation prompt treats selected language labels as text only', () => {
   assert.match(ui, /instruction\.textContent = String\(value \|\| ''\)/);
   assert.doesNotMatch(ui, /instruction\.innerHTML/);
   assert.doesNotMatch(ui, /innerHTML\s*=\s*browserInstruction/);
 });
 
-test('v293 disables paid foreign-language Cloudflare AI translation', () => {
+test('paid foreign-language Cloudflare AI translation remains disabled', () => {
   assert.doesNotMatch(gateway, /handleTranscriptTranslationV285/);
   assert.match(gateway, /aiTranslationDisabled:\s*true/);
   assert.match(gateway, /外語 AI 翻譯目前已停用/);
@@ -70,10 +81,13 @@ test('v293 disables paid foreign-language Cloudflare AI translation', () => {
   assert.doesNotMatch(ui, /\/api\/v281\/transcripts\/.*translate/);
 });
 
-test('v293 permanently orders transcript then player then keywords', () => {
-  assert.match(ui, /root\.insertBefore\(timeline, panel\.nextSibling\)/);
-  assert.match(ui, /root\.insertBefore\(keyword, timeline\.nextSibling\)/);
-  assert.match(ui, /永久順序：逐字稿 → 播放器 → 網友關鍵字/);
+test('v295 permanently anchors transcript immediately above player without moving unrelated blocks', () => {
+  assert.match(ui, /function anchorTranscriptAbovePlayer/);
+  assert.match(ui, /timeline\.insertAdjacentElement\('beforebegin', panel\)/);
+  assert.match(ui, /panel\.nextElementSibling !== timeline/);
+  assert.doesNotMatch(ui, /function findKeywordBlock/);
+  assert.doesNotMatch(ui, /root\.insertBefore\(timeline/);
+  assert.doesNotMatch(ui, /root\.insertBefore\(keyword/);
 });
 
 test('v294 keeps centered tools original translation icon and normal two-line auto fit', () => {
@@ -85,15 +99,16 @@ test('v294 keeps centered tools original translation icon and normal two-line au
   assert.match(ui, /while \(size > minPx && line\.scrollHeight > availableHeight \+ 1\)/);
 });
 
-test('latest main keeps the sequential scheduler code but does not register a production cron trigger', () => {
+test('v295 restores the sequential production transcript scheduler every 15 minutes', () => {
   assert.match(scheduler, /status IN \('queued','processing'\)/);
   assert.match(scheduler, /LIMIT 1/);
   assert.match(scheduler, /instances:\s*\[\{ id: instanceId, params: \{ trackId: row\.id \} \}\]/);
   assert.match(entry, /queueNextTranscriptV293/);
   assert.match(entry, /ctx\.waitUntil\(queueNextTranscriptV293\(env as any\)\)/);
   assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
-  assert.doesNotMatch(wrangler, /\[triggers\]/);
-  assert.doesNotMatch(wrangler, /crons\s*=/);
+  assert.match(wrangler, /\[triggers\]/);
+  assert.match(wrangler, /crons\s*=\s*\["\*\/15 \* \* \* \*"\]/);
+  assert.match(wrangler, /只用於產生繁體中文逐字稿，不做外語翻譯/);
 });
 
 test('Chinese transcription still normalizes Chinese to Traditional Chinese before R2 storage', () => {
