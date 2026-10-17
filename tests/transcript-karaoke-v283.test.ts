@@ -5,6 +5,10 @@ import { readFileSync } from 'node:fs';
 const client = readFileSync('public/transcript-client.js', 'utf8');
 const html = readFileSync('index.html', 'utf8');
 
+test('v283 transcript client remains valid JavaScript', () => {
+  assert.doesNotThrow(() => new Function(client));
+});
+
 test('v283 transcript uses karaoke two-line presentation', () => {
   assert.match(client, /MAX_LYRIC_CHARS = 15/);
   assert.match(client, /v283-lyric-current/);
