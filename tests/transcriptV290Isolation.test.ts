@@ -5,12 +5,14 @@ import fs from 'node:fs';
 const index = fs.readFileSync('index.html', 'utf8');
 const client = fs.readFileSync('public/transcript-client-v290.js', 'utf8');
 const translation = fs.readFileSync('worker/transcriptTranslationV285.ts', 'utf8');
+const gateway = fs.readFileSync('worker/transcriptV281Gateway.ts', 'utf8');
 
-test('v292 loads the consolidated transcript core without legacy presentation layers', () => {
-  assert.match(index, /transcript-client-v290\.js\?v=292/);
-  assert.match(index, /transcript-ui-v292\.js\?v=292/);
+test('v293 loads the consolidated transcript core without legacy presentation layers', () => {
+  assert.match(index, /transcript-client-v290\.js\?v=293/);
+  assert.match(index, /transcript-ui-v293\.js\?v=293/);
   assert.doesNotMatch(index, /transcript-client\.js\?v=283/);
   assert.doesNotMatch(index, /transcript-presentation-v28[4589]/);
+  assert.doesNotMatch(index, /transcript-ui-v292/);
 });
 
 test('v290 identifies tracks safely and clears stale transcript state on track changes', () => {
@@ -33,22 +35,12 @@ test('v290 sentence display breaks only at comma period and exclamation punctuat
   assert.doesNotMatch(client, /MAX_LYRIC_CHARS/);
 });
 
-test('v290 Translate always recovers from slow requests and keeps native language labels', () => {
-  assert.match(client, /Promise\.race/);
-  assert.match(client, /15000/);
-  assert.match(client, /state\.translateBusy=false/);
-  assert.match(client, /buttonHtml\('Translate'\)/);
-  assert.match(client, /\['vi','Tiếng Việt'\]/);
-  assert.match(client, /\['id','Bahasa Indonesia'\]/);
-  assert.match(client, /\['ja','日本語'\]/);
-  assert.match(client, /\['ko','한국어'\]/);
-  assert.match(client, /\['hi','हिन्दी'\]/);
-});
-
-test('translation backend runs bounded concurrent batches and preserves cache', () => {
+test('legacy AI translation code remains dormant for future budget re-enable but gateway blocks it now', () => {
   assert.match(translation, /const concurrency = Math\.min\(3/);
   assert.match(translation, /Promise\.all\(Array\.from/);
   assert.match(translation, /translations\/\$\{encodeURIComponent\(language\)\}\.json/);
+  assert.doesNotMatch(gateway, /handleTranscriptTranslationV285/);
+  assert.match(gateway, /aiTranslationDisabled:\s*true/);
 });
 
 test('v290 browser script is valid JavaScript', () => {
