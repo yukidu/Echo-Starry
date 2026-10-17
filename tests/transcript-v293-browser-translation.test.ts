@@ -112,10 +112,11 @@ test('v297 keeps centered tools original translation icon and normal two-line au
   assert.match(ui, /while \(size > minPx && line\.scrollHeight > availableHeight \+ 1\)/);
 });
 
-test('sequential production transcript scheduler remains every 15 minutes', () => {
+test('v299 production transcript scheduler keeps five-way concurrency with a 15-minute watchdog', () => {
+  assert.match(scheduler, /MAX_CONCURRENT_TRANSCRIPTS\s*=\s*5/);
   assert.match(scheduler, /status IN \('queued','processing'\)/);
-  assert.match(scheduler, /LIMIT 1/);
-  assert.match(scheduler, /instances:\s*\[\{ id: instanceId, params: \{ trackId: row\.id \} \}\]/);
+  assert.match(scheduler, /LIMIT \(SELECT MAX\(0, \? - COUNT\(\*\)\) FROM transcript_index WHERE status IN \('queued','processing'\)\)/);
+  assert.match(scheduler, /instances:\s*\[\{ id: instanceId, params: \{ trackId \} \}\]/);
   assert.match(entry, /queueNextTranscriptV293/);
   assert.match(entry, /ctx\.waitUntil\(queueNextTranscriptV293\(env as any\)\)/);
   assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);

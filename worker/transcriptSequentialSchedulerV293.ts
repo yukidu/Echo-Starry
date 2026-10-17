@@ -1,5 +1,6 @@
 const TRANSCRIPT_MODEL = '@cf/openai/whisper-large-v3-turbo';
 const STALE_ACTIVE_MS = 3 * 60 * 60 * 1000;
+const MAX_CONCURRENT_TRANSCRIPTS = 5;
 
 type SchedulerEnv = {
   DB: any;
@@ -32,41 +33,77 @@ export async function queueNextTranscriptV293(env: SchedulerEnv, options: QueueN
     WHERE status IN ('queued','processing') AND updatedAt < ?`)
     .bind(now, now - STALE_ACTIVE_MS).run();
 
-  const active: any = await env.DB.prepare(`SELECT trackId,status FROM transcript_index
-    WHERE status IN ('queued','processing') ORDER BY updatedAt DESC LIMIT 1`).first();
-  if (active) return { queued: 0, active: text(active.trackId), status: text(active.status) };
+  // 先把所有有音檔、但尚未建立逐字稿索引的錄音補進 pending。
+  // INSERT OR IGNORE 不會改動已 ready / processing / failed 的既有狀態。
+  await env.DB.prepare(`INSERT OR IGNORE INTO transcript_index(
+      trackId,status,r2Key,model,chunkCount,segmentCount,wordCount,durationSeconds,error,createdAt,updatedAt)
+    SELECT t.id,'pending',NULL,?,0,0,0,COALESCE(t.durationSeconds,0),NULL,?,?
+    FROM tracks t
+    WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>''`)
+    .bind(TRANSCRIPT_MODEL, now, now).run();
 
-  // 一次只跑一份，避免多份長音檔同時搶 AudioSegmenter Container。
-  // 自動接棒只處理未完成/待處理；每 15 分鐘 watchdog 才會把 failed 放最後重試。
+  // v299：永遠補滿到最多 5 份同時處理。
+  // 用「單一 UPDATE + 子查詢」同時算剩餘名額與搶位；D1 會序列化寫入，
+  // 所以多個 Workflow 幾乎同時完成並接棒時，後一個寫入會看到前一個已搶到的 queued 名額，避免超過 5。
   const eligible = includeFailed
-    ? `(i.trackId IS NULL OR i.status IN ('pending','failed'))`
-    : `(i.trackId IS NULL OR i.status='pending')`;
-  const row: any = await env.DB.prepare(`SELECT t.id,t.durationSeconds,i.status
-    FROM tracks t LEFT JOIN transcript_index i ON i.trackId=t.id
-    WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>''
-      AND ${eligible}
-    ORDER BY CASE WHEN i.status='failed' THEN 2 WHEN i.status='pending' THEN 1 ELSE 0 END,
-      COALESCE(t.uploadDate,'') DESC,t.id
-    LIMIT 1`).first();
-  if (!row?.id) return { queued: 0, done: true };
+    ? `i.status IN ('pending','failed')`
+    : `i.status='pending'`;
+  const claimedResult: any = await env.DB.prepare(`UPDATE transcript_index
+    SET status='queued',error=NULL,model=?,updatedAt=?
+    WHERE trackId IN (
+      SELECT i.trackId
+      FROM transcript_index i JOIN tracks t ON t.id=i.trackId
+      WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>''
+        AND ${eligible}
+      ORDER BY CASE WHEN i.status='failed' THEN 2 WHEN i.status='pending' THEN 1 ELSE 0 END,
+        COALESCE(t.uploadDate,'') DESC,t.id
+      LIMIT (SELECT MAX(0, ? - COUNT(*)) FROM transcript_index WHERE status IN ('queued','processing'))
+    )
+    RETURNING trackId,durationSeconds`)
+    .bind(TRANSCRIPT_MODEL, now, MAX_CONCURRENT_TRANSCRIPTS).all();
 
-  await env.DB.prepare(`INSERT INTO transcript_index(trackId,status,r2Key,model,chunkCount,segmentCount,wordCount,durationSeconds,error,createdAt,updatedAt)
-    VALUES (?,'queued',NULL,?,0,0,0,?,NULL,?,?)
-    ON CONFLICT(trackId) DO UPDATE SET status='queued',error=NULL,updatedAt=excluded.updatedAt`)
-    .bind(row.id, TRANSCRIPT_MODEL, Number(row.durationSeconds || 0), now, now).run();
+  const claimed: any[] = Array.isArray(claimedResult?.results) ? claimedResult.results : [];
+  const started: Array<{ trackId: string; instanceId: string }> = [];
+  const failures: Array<{ trackId: string; error: string }> = [];
 
-  const safeId = text(row.id).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 42);
-  const instanceId = `echo-v298-auto-${safeId}-${now}`;
-  try {
-    const result: any = await env.TRANSCRIPT_WORKFLOW.createBatch({
-      instances: [{ id: instanceId, params: { trackId: row.id } }]
-    });
-    const error = Array.isArray(result?.errors) ? result.errors[0] : null;
-    if (error) throw new Error(text(error.message || error.code || 'Workflow queue error'));
-    return { queued: 1, trackId: row.id, instanceId };
-  } catch (error) {
-    await env.DB.prepare(`UPDATE transcript_index SET status='pending',error=?,updatedAt=? WHERE trackId=?`)
-      .bind(text((error as any)?.message || 'Workflow queue error'), Date.now(), row.id).run();
-    throw error;
+  // 每個被搶到的名額各自建立 Workflow；單一建立失敗只退回該音檔，不影響其他四份。
+  for (let index = 0; index < claimed.length; index++) {
+    const trackId = text(claimed[index]?.trackId);
+    if (!trackId) continue;
+    const safeId = trackId.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 42);
+    const instanceId = `echo-v299-auto-${safeId}-${now}-${index + 1}`;
+    try {
+      const result: any = await env.TRANSCRIPT_WORKFLOW.createBatch({
+        instances: [{ id: instanceId, params: { trackId } }]
+      });
+      const error = Array.isArray(result?.errors) ? result.errors[0] : null;
+      if (error) throw new Error(text(error.message || error.code || 'Workflow queue error'));
+      started.push({ trackId, instanceId });
+    } catch (error) {
+      const message = text((error as any)?.message || 'Workflow queue error');
+      failures.push({ trackId, error: message });
+      await env.DB.prepare(`UPDATE transcript_index SET status='pending',error=?,updatedAt=?
+        WHERE trackId=? AND status='queued'`)
+        .bind(message, Date.now(), trackId).run().catch(() => null);
+    }
   }
+
+  const active: any = await env.DB.prepare(`SELECT COUNT(*) AS n FROM transcript_index
+    WHERE status IN ('queued','processing')`).first();
+  const activeCount = Math.max(0, Number(active?.n || 0));
+  const remaining: any = await env.DB.prepare(`SELECT COUNT(*) AS n
+    FROM transcript_index i JOIN tracks t ON t.id=i.trackId
+    WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>''
+      AND i.status IN ('pending','failed')`).first();
+  const remainingCount = Math.max(0, Number(remaining?.n || 0));
+
+  return {
+    queued: started.length,
+    active: activeCount,
+    targetConcurrency: MAX_CONCURRENT_TRANSCRIPTS,
+    remaining: remainingCount,
+    failures,
+    started,
+    done: activeCount === 0 && remainingCount === 0
+  };
 }
