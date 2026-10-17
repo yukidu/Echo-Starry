@@ -60,7 +60,7 @@ interface DetailViewProps {
   onToggleLike: () => Promise<void>;
   onShare: () => void;
   onChangeSpeed: (rate: number) => void;
-  onAddComment: (content: string, replyToId?: string, replyToAuthor?: string) => Promise<void>;
+  onAddComment: (content: string, replyToId?: string, replyToAuthor?: string, trackIdOverride?: string, qaMode?: 'current' | 'all' | 'off') => Promise<void>;
   onDeleteComment: (commentId: string) => Promise<void>;
   onEditComment: (commentId: string, newContent: string) => Promise<void>;
   onOpenBwExport: (mode: 'comments' | 'rated') => void;
@@ -1070,11 +1070,14 @@ export const DetailView: React.FC<DetailViewProps> = ({
         <CommentsSection
           commentStickerReward={track.commentStickerReward}
           trackId={track.id}
+          speakerName={track.speaker}
+          speakerRank={track.speakerRank}
+          speakerAvatar={track.speakerAvatar}
           comments={comments}
           visitor={visitor}
           currentUser={currentUser}
           isAdmin={isAdmin}
-          onAddComment={onAddComment}
+          onAddComment={(content, replyId, replyAuthor, mode) => onAddComment(content, replyId, replyAuthor, undefined, mode)}
           onDeleteComment={onDeleteComment}
           onEditComment={onEditComment}
           onViewMember={onViewMember}
