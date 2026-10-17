@@ -414,7 +414,7 @@ function parseVtt(vtt: string): { start: number; end: number; text: string }[] {
   return result;
 }
 
-function normalizeAiSegments(result: any) {
+function normalizeAiSegments(result: any): { start: number; end: number; text: string }[] {
   const raw = Array.isArray(result?.transcription_info?.segments) ? result.transcription_info.segments : (Array.isArray(result?.segments) ? result.segments : []);
   const segments = raw.map((seg: any) => ({ start: Number(seg.start || 0), end: Number(seg.end || 0), text: text(seg.text) })).filter((seg: any) => seg.text);
   if (segments.length) return segments;
