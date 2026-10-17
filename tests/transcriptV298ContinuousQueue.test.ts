@@ -18,7 +18,8 @@ test('v299 workflow immediately hands off after success or failure', () => {
 test('v299 scheduler keeps at most five transcript workflows active and fills empty slots atomically', () => {
   const scheduler = read('worker/transcriptSequentialSchedulerV293.ts');
   assert.match(scheduler, /MAX_CONCURRENT_TRANSCRIPTS\s*=\s*5/);
-  assert.match(scheduler, /INSERT INTO transcript_index/);
+  assert.match(scheduler, /INSERT OR IGNORE INTO transcript_index/);
+  assert.match(scheduler, /UPDATE transcript_index[\s\S]*SET status='queued'/);
   assert.match(scheduler, /LIMIT \(SELECT MAX\(0, \? - COUNT\(\*\)\) FROM transcript_index WHERE status IN \('queued','processing'\)\)/);
   assert.match(scheduler, /RETURNING trackId,durationSeconds/);
   assert.match(scheduler, /echo-v299-auto-/);
