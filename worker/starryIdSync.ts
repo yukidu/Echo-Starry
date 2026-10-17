@@ -37,15 +37,41 @@ function profileValue(source: any, field: typeof SHARED_PROFILE_FIELDS[number]) 
   return text(source[field]);
 }
 
+function auditStatement(
+  central: any,
+  centralId: string,
+  actorUserId: string,
+  fieldName: string,
+  oldValue: unknown,
+  newValue: unknown,
+  now: number
+) {
+  return central.prepare(`INSERT INTO profile_audit_logs
+    (id,userId,appId,actorUserId,fieldName,oldValue,newValue,createdAt)
+    VALUES (?,?,?,?,?,?,?,?)`)
+    .bind(
+      crypto.randomUUID(),
+      centralId,
+      'echostars',
+      actorUserId || 'system',
+      fieldName,
+      oldValue == null ? '' : String(oldValue),
+      newValue == null ? '' : String(newValue),
+      now
+    );
+}
+
 /**
- * EchoStars -> Starry ID durable profile synchronization.
+ * EchoStars -> Starry ID compatibility synchronization.
  *
- * Safety rules:
- * - EchoStars remains available even if the central database is missing/unavailable.
- * - An existing legacy link or verified Google subject may resolve the same person to an older Starry ID id.
+ * v305 source-of-truth rules:
+ * - Starry ID central profiles are the ONLY authoritative personal-profile source.
+ * - Legacy Echo profile fields may seed a profile ONLY when the central profile does not exist yet.
+ * - Once a central profile exists, Echo may update app_memberships / identity links only.
+ * - A legacy rank-approval event may approve an already-pending CENTRAL rank, but the rank value
+ *   always comes from the central pending profile; a stale Echo rank can never replace it.
+ * - Existing central relationships are never rewritten from legacy Echo labels.
  * - Email alone never silently merges two users.
- * - EchoStars-only roles/permissions are written only to app_memberships.
- * - Source EchoStars data is never deleted.
  */
 export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string, actorUserId = 'system') {
   if (!env.DB || !env.STARRY_ID_DB || !userId) return false;
@@ -72,12 +98,9 @@ export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string,
   const legacyId = text(legacyOwner?.userId);
   const identityId = text(identityOwner?.userId);
   const trustedIds = [...new Set([legacyId, identityId].filter(Boolean))];
-  if (trustedIds.length > 1) {
-    throw new Error('Starry ID legacy link and Google identity disagree');
-  }
+  if (trustedIds.length > 1) throw new Error('Starry ID legacy link and Google identity disagree');
 
-  // Prefer a durable legacy link or the verified Google subject. This repairs
-  // members that already received a Starry ID id before Echo began dual-write.
+  // Prefer a durable link / verified Google subject. Never merge by email alone.
   const centralId = trustedIds[0] || sourceId;
   if (emailOwner && text(emailOwner.id) !== centralId) {
     throw new Error('Starry ID email belongs to another user');
@@ -85,25 +108,11 @@ export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string,
 
   const now = Date.now();
   const oldProfile: any = await central.prepare('SELECT * FROM profiles WHERE userId = ? LIMIT 1').bind(centralId).first();
-  const profileValues: Record<string, unknown> = { userId: centralId };
-  for (const field of SHARED_PROFILE_FIELDS) profileValues[field] = profileValue(source, field);
-  profileValues.createdAt = now;
-  profileValues.updatedAt = now;
-
-  const profileColumns = ['userId', ...SHARED_PROFILE_FIELDS, 'createdAt', 'updatedAt'];
-  const profileUpdates = [...SHARED_PROFILE_FIELDS, 'updatedAt']
-    .map(field => `${field}=excluded.${field}`)
-    .join(',');
-
   const statements: any[] = [
     central.prepare(`INSERT INTO users (id,primaryEmail,status,createdAt,updatedAt)
       VALUES (?,?,'active',?,?)
-      ON CONFLICT(id) DO UPDATE SET primaryEmail=excluded.primaryEmail,updatedAt=excluded.updatedAt`)
+      ON CONFLICT(id) DO UPDATE SET updatedAt=excluded.updatedAt`)
       .bind(centralId, email, now, now),
-    central.prepare(`INSERT INTO profiles (${profileColumns.join(',')})
-      VALUES (${profileColumns.map(() => '?').join(',')})
-      ON CONFLICT(userId) DO UPDATE SET ${profileUpdates}`)
-      .bind(...profileColumns.map(column => profileValues[column])),
     central.prepare(`INSERT INTO app_memberships
       (userId,appId,status,role,isAdminUser,isContributor,canUpload,joinedAt,updatedAt)
       VALUES (?,'echostars',?,?,?,?,?,?,?)
@@ -136,32 +145,75 @@ export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string,
       .bind(googleSubject, centralId, email, now, now));
   }
 
-  for (const [relationType, sourceField] of RELATIONSHIPS) {
-    const label = text(source[sourceField]);
-    if (!label) continue;
-    statements.push(central.prepare(`INSERT INTO member_relationships
-      (userId,relationType,relatedUserId,legacyLabel,resolutionStatus,updatedAt)
-      VALUES (?,?,NULL,?,'unresolved',?)
-      ON CONFLICT(userId,relationType) DO UPDATE SET
-        legacyLabel=excluded.legacyLabel,
-        updatedAt=excluded.updatedAt`)
-      .bind(centralId, relationType, label, now));
-  }
+  if (!oldProfile) {
+    // Migration/provisioning only: legacy values can seed a brand-new central profile.
+    const profileValues: Record<string, unknown> = { userId: centralId };
+    for (const field of SHARED_PROFILE_FIELDS) profileValues[field] = profileValue(source, field);
+    profileValues.createdAt = now;
+    profileValues.updatedAt = now;
+    const profileColumns = ['userId', ...SHARED_PROFILE_FIELDS, 'createdAt', 'updatedAt'];
+    statements.push(central.prepare(`INSERT INTO profiles (${profileColumns.join(',')})
+      VALUES (${profileColumns.map(() => '?').join(',')})`)
+      .bind(...profileColumns.map(column => profileValues[column])));
 
-  if (oldProfile) {
-    for (const field of SHARED_PROFILE_FIELDS) {
-      const before = oldProfile[field] == null ? '' : String(oldProfile[field]);
-      const afterValue = profileValues[field];
-      const after = afterValue == null ? '' : String(afterValue);
-      if (before === after) continue;
-      statements.push(central.prepare(`INSERT INTO profile_audit_logs
-        (id,userId,appId,actorUserId,fieldName,oldValue,newValue,createdAt)
-        VALUES (?,?,?,?,?,?,?,?)`)
-        .bind(crypto.randomUUID(), centralId, 'echostars', actorUserId || sourceId, field, before, after, now));
+    // Legacy relationship labels are import hints only. They never overwrite an existing central relationship.
+    for (const [relationType, sourceField] of RELATIONSHIPS) {
+      const label = text(source[sourceField]);
+      if (!label) continue;
+      statements.push(central.prepare(`INSERT OR IGNORE INTO member_relationships
+        (userId,relationType,relatedUserId,legacyLabel,resolutionStatus,updatedAt)
+        VALUES (?,?,NULL,?,'unresolved',?)`)
+        .bind(centralId, relationType, label, now));
+    }
+  } else {
+    // Rank approval compatibility bridge:
+    // legacy Echo can signal that an approval happened, but CENTRAL pending rank is the request being approved.
+    const centralPending = text(oldProfile.rankAuditStatus) === 'pending' && !Number(oldProfile.rankApproved || 0);
+    const legacyApproved = text(source.rankAuditStatus) === 'approved' && Boolean(source.rankApproved);
+    const pendingRank = text(oldProfile.rank);
+
+    if (centralPending && legacyApproved && pendingRank) {
+      const nextAuditType = text(source.rankAuditType) || 'echostars-review';
+      const rankUpdatedAt = text(source.rankUpdatedAt) || new Date(now).toISOString();
+      const nextValues: Record<string, unknown> = {
+        rank: pendingRank,
+        approvedRank: pendingRank,
+        rankApproved: 1,
+        rankAuditStatus: 'approved',
+        rankAuditType: nextAuditType,
+        rankUpdatedAt
+      };
+
+      statements.push(central.prepare(`UPDATE profiles SET
+        rank=?,approvedRank=?,rankApproved=1,rankAuditStatus='approved',rankAuditType=?,rankUpdatedAt=?,updatedAt=?
+        WHERE userId=?`)
+        .bind(pendingRank, pendingRank, nextAuditType, rankUpdatedAt, now, centralId));
+
+      for (const [field, next] of Object.entries(nextValues)) {
+        const before = oldProfile[field];
+        if (String(before ?? '') === String(next ?? '')) continue;
+        statements.push(auditStatement(central, centralId, actorUserId, field, before, next, now));
+      }
     }
   }
 
   await central.batch(statements);
+
+  // Keep the legacy Echo row compatible only AFTER central writes succeed.
+  // When a central pending rank was approved, mirror that approved central rank back to Echo.
+  if (oldProfile) {
+    const centralPending = text(oldProfile.rankAuditStatus) === 'pending' && !Number(oldProfile.rankApproved || 0);
+    const legacyApproved = text(source.rankAuditStatus) === 'approved' && Boolean(source.rankApproved);
+    const pendingRank = text(oldProfile.rank);
+    if (centralPending && legacyApproved && pendingRank) {
+      await env.DB.prepare(`UPDATE users SET
+        rank=?,approvedRank=?,rankApproved=1,rankAuditStatus='approved',rankAuditType=?,rankUpdatedAt=?
+        WHERE id=?`)
+        .bind(pendingRank, pendingRank, text(source.rankAuditType) || 'echostars-review', text(source.rankUpdatedAt) || new Date(now).toISOString(), sourceId)
+        .run();
+    }
+  }
+
   return true;
 }
 
@@ -175,8 +227,8 @@ export async function syncEchoMemberToStarryBestEffort(
   try {
     return await syncEchoMemberToStarry(env, userId, actorUserId);
   } catch (error) {
-    // No PII in logs. Central outages/conflicts must never break EchoStars login/profile saves.
-    console.warn('Starry ID sync skipped', {
+    // No PII in logs. Central outages/conflicts must never break EchoStars app-specific actions.
+    console.warn('Starry ID compatibility sync skipped', {
       reason,
       userId,
       error: error instanceof Error ? error.message : 'unknown'
