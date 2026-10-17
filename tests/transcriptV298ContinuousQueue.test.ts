@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('v298 workflow immediately hands off to the next transcript after success or failure', () => {
+test('v299 workflow immediately hands off after success or failure', () => {
   const workflow = read('worker/transcriptWorkflowV282.ts');
   assert.match(workflow, /queueNextTranscriptV293/);
   assert.match(workflow, /queueFollowingTranscript/);
@@ -15,18 +15,26 @@ test('v298 workflow immediately hands off to the next transcript after success o
   assert.match(workflow, /status='failed'/);
 });
 
-test('v298 scheduler stays single-file and lets watchdog retry failed recordings', () => {
+test('v299 scheduler keeps at most five transcript workflows active and fills empty slots atomically', () => {
+  const scheduler = read('worker/transcriptSequentialSchedulerV293.ts');
+  assert.match(scheduler, /MAX_CONCURRENT_TRANSCRIPTS\s*=\s*5/);
+  assert.match(scheduler, /INSERT INTO transcript_index/);
+  assert.match(scheduler, /LIMIT \(SELECT MAX\(0, \? - COUNT\(\*\)\) FROM transcript_index WHERE status IN \('queued','processing'\)\)/);
+  assert.match(scheduler, /RETURNING trackId,durationSeconds/);
+  assert.match(scheduler, /echo-v299-auto-/);
+  assert.match(scheduler, /targetConcurrency:\s*MAX_CONCURRENT_TRANSCRIPTS/);
+});
+
+test('v299 automatic handoff skips failed recordings while watchdog may retry them', () => {
   const scheduler = read('worker/transcriptSequentialSchedulerV293.ts');
   assert.match(scheduler, /type QueueNextOptions/);
   assert.match(scheduler, /includeFailed\?: boolean/);
   assert.match(scheduler, /options\.includeFailed !== false/);
-  assert.match(scheduler, /status IN \('queued','processing'\)/);
-  assert.match(scheduler, /LIMIT 1/);
   assert.match(scheduler, /i\.status IN \('pending','failed'\)/);
   assert.match(scheduler, /i\.status='pending'/);
 });
 
-test('v298 keeps the 15-minute cron only as the recovery watchdog', () => {
+test('v299 keeps the 15-minute cron as recovery watchdog', () => {
   const wrangler = read('wrangler.toml');
   assert.match(wrangler, /crons\s*=\s*\["\*\/15 \* \* \* \*"\]/);
 });
