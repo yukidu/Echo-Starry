@@ -1,6 +1,6 @@
 (() => {
-  if (window.__starryTranscriptUiV297) return;
-  window.__starryTranscriptUiV297 = true;
+  if (window.__starryTranscriptUiV301) return;
+  window.__starryTranscriptUiV301 = true;
 
   const DISPLAY_END_PUNCTUATION = new Set(['、','，','！','。',',','!','.']);
   const nativeTextContent = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
@@ -17,15 +17,17 @@
     </svg>`;
 
   const style = document.createElement('style');
-  style.id = 'starry-transcript-ui-v297-style';
+  style.id = 'starry-transcript-ui-v301-style';
   style.textContent = `
     #v290-transcript-panel .v290-title{display:none!important}
     #v290-transcript-panel .v290-head{justify-content:center!important;align-items:center!important;margin-bottom:.5rem!important}
-    #v290-transcript-panel .v290-tools{margin-left:0!important;width:100%!important;justify-content:center!important;gap:.55rem!important}
+    #v290-transcript-panel .v290-tools{margin-left:0!important;width:100%!important;justify-content:center!important;gap:.55rem!important;flex-wrap:wrap!important}
     #v290-transcript-panel .v290-menu{right:auto!important;left:50%!important;transform:translateX(-50%)!important}
     #v290-transcript-panel .v290-btn{min-height:2.5rem!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:.38rem!important}
     #v290-transcript-panel [data-v290-expand]{background:var(--color-primary,#c06c84)!important;border-color:var(--color-primary,#c06c84)!important;color:#fff!important;box-shadow:0 7px 18px color-mix(in srgb,var(--color-primary,#c06c84) 30%,transparent)!important;font-weight:950!important}
     #v290-transcript-panel [data-v290-expand]:active{transform:scale(.97)}
+    #v290-transcript-panel [data-v301-collapse]{background:transparent!important;border-color:transparent!important;box-shadow:none!important;color:var(--color-primary,#c06c84)!important;padding-inline:.35rem!important;font-weight:900!important;min-width:auto!important}
+    #v290-transcript-panel [data-v301-collapse]:hover{text-decoration:underline}
     #v290-transcript-panel .v290-stage{height:4.65rem!important;min-height:4.65rem!important;max-height:4.65rem!important;padding:.34rem .62rem!important;box-sizing:border-box!important;overflow:hidden!important}
     #v290-transcript-panel .v290-line{line-height:1.22!important;max-height:100%!important;overflow:hidden!important;white-space:normal!important;word-break:break-word!important;overflow-wrap:anywhere!important}
     #v290-transcript-panel .v290-meta{padding-top:.3rem!important}
@@ -39,7 +41,7 @@
     .v297-translate-dialog{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(15,23,42,.52);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
     .v297-translate-dialog[hidden]{display:none!important}.v297-translate-card{width:min(25rem,94vw);border-radius:1.25rem;padding:1.1rem;background:#fff;color:#0f172a;box-shadow:0 24px 80px rgba(15,23,42,.32);font:700 1rem/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.dark .v297-translate-card{background:#172033;color:#f8fafc}
     .v297-translate-card h3{margin:0 0 .45rem;font-size:1.15rem;font-weight:950}.v297-translate-card p{margin:.35rem 0}.v297-translate-note{font-size:.84rem;opacity:.72}.v297-translate-close{width:100%;margin-top:.75rem;border:0;border-radius:.85rem;padding:.72rem;background:var(--color-primary,#c06c84);color:#fff;font-weight:900;cursor:pointer}
-    @media(max-width:420px){#v290-transcript-panel .v290-tools{gap:.4rem!important}#v290-transcript-panel .v290-btn{padding:.5rem .66rem!important}#v290-transcript-panel .v290-stage{height:4.4rem!important;min-height:4.4rem!important;max-height:4.4rem!important;padding:.3rem .48rem!important}#v290-overlay.v290-overlay{height:7rem!important;min-height:7rem!important;max-height:7rem!important;padding:.4rem 3.15rem .4rem .58rem!important}#v290-overlay .v290-overlay-line{left:.58rem!important;right:3.15rem!important;max-height:calc(100% - .8rem)!important}#v290-overlay .v290-overlay-close{width:2.5rem!important;height:2.5rem!important;font-size:1.7rem!important}}
+    @media(max-width:420px){#v290-transcript-panel .v290-tools{gap:.4rem!important}#v290-transcript-panel .v290-btn{padding:.5rem .66rem!important}#v290-transcript-panel [data-v301-collapse]{padding-inline:.2rem!important}#v290-transcript-panel .v290-stage{height:4.4rem!important;min-height:4.4rem!important;max-height:4.4rem!important;padding:.3rem .48rem!important}#v290-overlay.v290-overlay{height:7rem!important;min-height:7rem!important;max-height:7rem!important;padding:.4rem 3.15rem .4rem .58rem!important}#v290-overlay .v290-overlay-line{left:.58rem!important;right:3.15rem!important;max-height:calc(100% - .8rem)!important}#v290-overlay .v290-overlay-close{width:2.5rem!important;height:2.5rem!important;font-size:1.7rem!important}}
   `;
   document.head.appendChild(style);
 
@@ -92,25 +94,71 @@
     button.setAttribute('aria-label', '使用瀏覽器整頁翻譯');
   }
 
-  function anchorTranscriptAbovePlayer(panel) {
-    const timeline = document.getElementById('audio-timeline');
-    if (!timeline || !panel || !timeline.parentElement) return;
-    if (panel.parentElement !== timeline.parentElement || panel.nextElementSibling !== timeline) timeline.insertAdjacentElement('beforebegin', panel);
+  function findDetailKeywordBlock(root, timeline) {
+    if (!root) return null;
+    let block = root.querySelector(':scope > [data-v301-keywords-block="1"]');
+    if (block) return block;
+    block = [...root.children].find(element => {
+      if (element === timeline || element.id === 'v290-transcript-panel') return false;
+      return String(element.textContent || '').includes('網友關鍵字') && Boolean(element.querySelector('button[aria-expanded]'));
+    }) || null;
+    if (block) block.setAttribute('data-v301-keywords-block', '1');
+    return block;
   }
 
-  function placeAudioInfoBelowPlayer() {
+  function findAudioInfoCard(root, timeline, keywordBlock) {
+    if (!root) return null;
+    let info = root.querySelector(':scope > [data-v301-audio-info-card="1"]');
+    if (info) return info;
+    info = [...root.children].find(element => {
+      if (element === timeline || element === keywordBlock || element.id === 'v290-transcript-panel') return false;
+      return element.matches?.('.relative.rounded-3xl') && Boolean(element.querySelector('h1'));
+    }) || null;
+    if (info) info.setAttribute('data-v301-audio-info-card', '1');
+    return info;
+  }
+
+  // v301：詳細頁只保留這一個版面排序器。禁止再各自搬播放器、資訊卡、關鍵字，避免 React 重繪後互相搶位置。
+  function stabilizeDetailLayout(panel) {
     const timeline = document.getElementById('audio-timeline');
     const root = timeline?.parentElement;
-    if (!timeline || !root) return;
-    let info = root.querySelector(':scope > [data-v297-audio-info-card="1"]');
-    if (!info) {
-      info = [...root.children].find(element => {
-        if (element === timeline || element.id === 'v290-transcript-panel') return false;
-        return element.matches?.('.relative.rounded-3xl') && Boolean(element.querySelector('h1'));
-      }) || null;
-      if (info) info.setAttribute('data-v297-audio-info-card', '1');
+    if (!timeline || !root || !panel) return;
+    if (panel.parentElement !== root || panel.nextElementSibling !== timeline) timeline.insertAdjacentElement('beforebegin', panel);
+    const keywordBlock = findDetailKeywordBlock(root, timeline);
+    const info = findAudioInfoCard(root, timeline, keywordBlock);
+    if (keywordBlock && timeline.nextElementSibling !== keywordBlock) timeline.insertAdjacentElement('afterend', keywordBlock);
+    const infoAnchor = keywordBlock || timeline;
+    if (info && infoAnchor.nextElementSibling !== info) infoAnchor.insertAdjacentElement('afterend', info);
+  }
+
+  function setTranscriptExpanded(panel, expanded) {
+    panel.dataset.v301Expanded = expanded ? '1' : '0';
+    for (const selector of ['[data-v290-body]','[data-v290-toast-host]','[data-v290-editor]']) {
+      const element = panel.querySelector(selector);
+      if (element) element.hidden = !expanded;
     }
-    if (info && timeline.nextElementSibling !== info) timeline.insertAdjacentElement('afterend', info);
+    const button = panel.querySelector('[data-v301-collapse]');
+    if (button) {
+      button.textContent = expanded ? '▲收起' : '▼展開';
+      button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      button.setAttribute('aria-label', expanded ? '收起逐字稿' : '展開逐字稿');
+    }
+  }
+
+  function ensureTranscriptCollapse(panel) {
+    if (!panel) return;
+    let button = panel.querySelector('[data-v301-collapse]');
+    const expand = panel.querySelector('[data-v290-expand]');
+    if (!button && expand) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'v290-btn';
+      button.setAttribute('data-v301-collapse', '1');
+      expand.insertAdjacentElement('afterend', button);
+      button.addEventListener('click', () => setTranscriptExpanded(panel, panel.dataset.v301Expanded === '0'));
+    }
+    if (!panel.dataset.v301Expanded) panel.dataset.v301Expanded = '1';
+    setTranscriptExpanded(panel, panel.dataset.v301Expanded !== '0');
   }
 
   function fitTranscriptLine(line, force = false) {
@@ -357,12 +405,12 @@
       if (!translateButton?.dataset.v297Ready) redrawTranslateButton(translateButton);
       const expand = panel.querySelector('[data-v290-expand]');
       if (expand) { expand.textContent = '放大字幕'; expand.setAttribute('aria-label', '放大字幕'); }
-      anchorTranscriptAbovePlayer(panel);
+      ensureTranscriptCollapse(panel);
+      stabilizeDetailLayout(panel);
       const line = panel.querySelector('[data-v290-line]');
       guardSubtitleDisplay(line);
-      fitTranscriptLine(line);
+      if (panel.dataset.v301Expanded !== '0') fitTranscriptLine(line);
     }
-    placeAudioInfoBelowPlayer();
     const overlay = document.getElementById('v290-overlay');
     if (overlay) {
       const overlayLine = overlay.querySelector('[data-v290-overlay-line]');
