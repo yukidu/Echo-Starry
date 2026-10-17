@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runInNewContext } from 'node:vm';
+import { readFileSync } from 'node:fs';
 import { successPage } from '../worker/iosGoogleRedirectRouter';
 
 async function simulate(centralOk: boolean, echoOk = true) {
@@ -71,4 +72,18 @@ test('iOS Echo cookie refresh failure does not publish a partly completed identi
   assert.deepEqual(result.redirects,[]);
   assert.equal(JSON.parse(result.local.getItem('sq_current_user_v1')||'{}').id,'echo-a');
   assert.equal(result.retryEl.style.display,'inline-block');
+});
+
+test('iOS central handoff is short-lived, consumed once and bound to Echo origin',()=>{
+  const central=readFileSync(new URL('../worker/starryIdCentralRouter.ts',import.meta.url),'utf8');
+  const redirect=readFileSync(new URL('../worker/iosGoogleRedirectRouter.ts',import.meta.url),'utf8');
+  assert.match(central,/IOS_HANDOFF_TTL_MS = 90 \* 1000/);
+  assert.match(central,/issueEchoIosLoginHandoff/);
+  assert.match(central,/verifyGoogleCredential\(env, credential\)/);
+  assert.match(central,/syncVerifiedIdentity\(env, identity, 'echostars'\)/);
+  assert.match(central,/DELETE FROM ios_login_handoffs[\s\S]*?RETURNING userId/);
+  assert.match(central,/request\.headers\.get\('Origin'\) !== IOS_HANDOFF_ORIGIN/);
+  assert.match(central,/Set-Cookie': sessionCookie\(session\.token, session\.expiresAt\)/);
+  assert.match(redirect,/issueEchoIosLoginHandoff\(env, credential\)/);
+  assert.doesNotMatch(redirect,/serializedCredential/);
 });
