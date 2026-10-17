@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer';
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 import type { WorkflowEvent, WorkflowStep } from 'cloudflare:workers';
+import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
 
 const MODEL = '@cf/openai/whisper-large-v3-turbo';
 const TRADITIONAL_MODEL = '@cf/openai/gpt-oss-20b';
@@ -11,6 +12,7 @@ type Env = {
   R2_BUCKET: any;
   AI: any;
   AUDIO_SEGMENTER: any;
+  TRANSCRIPT_WORKFLOW: any;
 };
 
 type Segment = { id: string; start: number; end: number; text: string };
@@ -220,33 +222,47 @@ async function cleanupAudio(env: Env, trackId: string, ext: string) {
   }).catch(() => null);
 }
 
+async function queueFollowingTranscript(env: Env, step: WorkflowStep, stepName: string) {
+  try {
+    return await step.do(
+      stepName,
+      { retries: { limit: 3, delay: '2 seconds', backoff: 'exponential' }, timeout: '2 minutes' },
+      async () => queueNextTranscriptV293(env, { includeFailed: false })
+    );
+  } catch (error) {
+    // 接棒失敗不能把剛完成的逐字稿改成 failed；15 分鐘 watchdog 會自動補救。
+    return { queued: 0, watchdogFallback: true, error: text(error instanceof Error ? error.message : error) };
+  }
+}
+
 export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: string }> {
   async run(event: WorkflowEvent<{ trackId: string }>, step: WorkflowStep) {
     const trackId = eventTrackId(event.payload);
     if (!trackId) throw new Error('Missing trackId');
     await ensureIndex(this.env);
 
-    const info: any = await step.do('load-track', async () => {
-      const track: any = await this.env.DB.prepare('SELECT id,title,speaker,speakerRank,audioUrl,durationSeconds FROM tracks WHERE id=? LIMIT 1')
-        .bind(trackId).first();
-      if (!track) throw new Error('Track not found');
-      const key = audioR2Key(track.audioUrl);
-      if (!key) throw new Error('Audio R2 key not found');
-      const object = await this.env.R2_BUCKET.head(key);
-      if (!object) throw new Error('Audio object not found');
-      const now = Date.now();
-      await this.env.DB.prepare(`INSERT INTO transcript_index(trackId,status,r2Key,model,chunkCount,segmentCount,wordCount,durationSeconds,error,createdAt,updatedAt)
-        VALUES (?,'processing',NULL,?,0,0,0,?,NULL,?,?)
-        ON CONFLICT(trackId) DO UPDATE SET status='processing',error=NULL,updatedAt=excluded.updatedAt`)
-        .bind(trackId, MODEL, Number(track.durationSeconds || 0), now, now).run();
-      return { track, key, size: Number(object.size || 0), ext: audioExtension(key) };
-    });
-
-    const duration = Math.max(1, Number(info.track.durationSeconds || 1));
-    const chunks = Math.max(1, Math.ceil(duration / SEGMENT_SECONDS));
-    const segments: Segment[] = [];
-
+    let info: any = null;
     try {
+      info = await step.do('load-track', async () => {
+        const track: any = await this.env.DB.prepare('SELECT id,title,speaker,speakerRank,audioUrl,durationSeconds FROM tracks WHERE id=? LIMIT 1')
+          .bind(trackId).first();
+        if (!track) throw new Error('Track not found');
+        const key = audioR2Key(track.audioUrl);
+        if (!key) throw new Error('Audio R2 key not found');
+        const object = await this.env.R2_BUCKET.head(key);
+        if (!object) throw new Error('Audio object not found');
+        const now = Date.now();
+        await this.env.DB.prepare(`INSERT INTO transcript_index(trackId,status,r2Key,model,chunkCount,segmentCount,wordCount,durationSeconds,error,createdAt,updatedAt)
+          VALUES (?,'processing',NULL,?,0,0,0,?,NULL,?,?)
+          ON CONFLICT(trackId) DO UPDATE SET status='processing',error=NULL,updatedAt=excluded.updatedAt`)
+          .bind(trackId, MODEL, Number(track.durationSeconds || 0), now, now).run();
+        return { track, key, size: Number(object.size || 0), ext: audioExtension(key) };
+      });
+
+      const duration = Math.max(1, Number(info.track.durationSeconds || 1));
+      const chunks = Math.max(1, Math.ceil(duration / SEGMENT_SECONDS));
+      const segments: Segment[] = [];
+
       await step.do('prepare-audio-container', { retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' } }, async () => {
         await loadAudio(this.env, trackId, info.key, info.ext);
         return { ok: true, bytes: info.size };
@@ -330,11 +346,13 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
       });
 
       await cleanupAudio(this.env, trackId, info.ext);
-      return { trackId, chunks, segments: segments.length, language: storedLanguage, jsonKey, txtKey, vttKey };
+      const next = await queueFollowingTranscript(this.env, step, 'queue-next-transcript');
+      return { trackId, chunks, segments: segments.length, language: storedLanguage, jsonKey, txtKey, vttKey, next };
     } catch (error) {
-      await cleanupAudio(this.env, trackId, info.ext);
+      if (info?.ext) await cleanupAudio(this.env, trackId, info.ext);
       await this.env.DB.prepare("UPDATE transcript_index SET status='failed',error=?,updatedAt=? WHERE trackId=?")
         .bind(error instanceof Error ? error.message.slice(0,1000) : String(error).slice(0,1000), Date.now(), trackId).run().catch(() => null);
+      await queueFollowingTranscript(this.env, step, 'queue-next-after-failure');
       throw error;
     }
   }

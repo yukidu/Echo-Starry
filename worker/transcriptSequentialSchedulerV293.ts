@@ -6,6 +6,11 @@ type SchedulerEnv = {
   TRANSCRIPT_WORKFLOW: any;
 };
 
+type QueueNextOptions = {
+  // 排程守門員可重試 failed；工作流程自動接棒時關閉，避免壞檔無限重試卡住整批。
+  includeFailed?: boolean;
+};
+
 function text(value: unknown) { return value == null ? '' : String(value).trim(); }
 
 async function ensureIndex(env: SchedulerEnv) {
@@ -16,9 +21,10 @@ async function ensureIndex(env: SchedulerEnv) {
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS transcript_index_status ON transcript_index(status,updatedAt)').run();
 }
 
-export async function queueNextTranscriptV293(env: SchedulerEnv) {
+export async function queueNextTranscriptV293(env: SchedulerEnv, options: QueueNextOptions = {}) {
   await ensureIndex(env);
   const now = Date.now();
+  const includeFailed = options.includeFailed !== false;
 
   // 防止異常中斷永久卡住：超過 3 小時仍 queued/processing 才釋放重排。
   await env.DB.prepare(`UPDATE transcript_index
@@ -31,11 +37,14 @@ export async function queueNextTranscriptV293(env: SchedulerEnv) {
   if (active) return { queued: 0, active: text(active.trackId), status: text(active.status) };
 
   // 一次只跑一份，避免多份長音檔同時搶 AudioSegmenter Container。
-  // 尚未處理/待處理優先，failed 放最後，避免單一壞檔阻塞整批。
+  // 自動接棒只處理未完成/待處理；每 15 分鐘 watchdog 才會把 failed 放最後重試。
+  const eligible = includeFailed
+    ? `(i.trackId IS NULL OR i.status IN ('pending','failed'))`
+    : `(i.trackId IS NULL OR i.status='pending')`;
   const row: any = await env.DB.prepare(`SELECT t.id,t.durationSeconds,i.status
     FROM tracks t LEFT JOIN transcript_index i ON i.trackId=t.id
     WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>''
-      AND (i.trackId IS NULL OR i.status IN ('pending','failed'))
+      AND ${eligible}
     ORDER BY CASE WHEN i.status='failed' THEN 2 WHEN i.status='pending' THEN 1 ELSE 0 END,
       COALESCE(t.uploadDate,'') DESC,t.id
     LIMIT 1`).first();
@@ -47,7 +56,7 @@ export async function queueNextTranscriptV293(env: SchedulerEnv) {
     .bind(row.id, TRANSCRIPT_MODEL, Number(row.durationSeconds || 0), now, now).run();
 
   const safeId = text(row.id).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 42);
-  const instanceId = `echo-v293-auto-${safeId}-${now}`;
+  const instanceId = `echo-v298-auto-${safeId}-${now}`;
   try {
     const result: any = await env.TRANSCRIPT_WORKFLOW.createBatch({
       instances: [{ id: instanceId, params: { trackId: row.id } }]
