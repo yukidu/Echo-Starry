@@ -1,7 +1,7 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/starryMainInlineLoginRouter.ts" # v281: 保留既有安全入口；逐字稿由原入口分流掛載
-compatibility_date = "2024-09-23"
+main = "worker/starryMainAudioSegmenterEntry.ts" # v281: 安全入口 + 完整音檔切片 Container + 逐字稿 Workflow
+compatibility_date = "2026-10-16"
 compatibility_flags = ["nodejs_compat"]
 
 # 保留原本 workers.dev 正式備援入口與 PR Preview URL。
@@ -67,6 +67,22 @@ binding = "AI"
 name = "echo-transcript-v281"
 binding = "TRANSCRIPT_WORKFLOW"
 class_name = "TranscriptWorkflow"
+
+# 6. 長音檔先由 ffmpeg 依時間切成完整 MP3，再送 Whisper，避免 M4A/MP3 位元硬切損毀。
+[[containers]]
+class_name = "AudioSegmenterContainer"
+scheduling_policy = "durable_object"
+
+[containers.images.base]
+dockerfile = "./container/audio-segmenter/Dockerfile"
+
+[[durable_objects.bindings]]
+name = "AUDIO_SEGMENTER"
+class_name = "AudioSegmenterContainer"
+
+[exports.AudioSegmenterContainer]
+type = "durable-object"
+storage = "sqlite"
 
 # 台灣時間每天 08:05 啟動，緊接 Workers AI 每日免費額度重置後處理。
 [triggers]
