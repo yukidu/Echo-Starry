@@ -89,11 +89,10 @@ test('iOS verified redirect defers first-party cookie until central sign-in and 
   const make = (cookie: string) => new Request('https://test.example/', { method:'POST', headers:{Cookie:cookie},body });
   assert.equal((await worker.fetch(make('g_csrf_token=wrong'),{DB:db})).status,403);
   const response = await worker.fetch(make('g_csrf_token=csrf'),{DB:db});
-  assert.equal(response.status,200); assert.equal(response.headers.has('Set-Cookie'),false);
-  const page = await response.text();
-  assert.match(page,/登入完成/);
-  assert.match(page,/https:\/\/id\.starry\.phd\/api\/google-sync/);
-  assert.match(page,/fetch\('\/api\/auth\/session'/);
+  // Without a bound central DB, an iOS login must fail closed rather than
+  // publish an Echo-only cookie that can conflict with an older central ID.
+  assert.equal(response.status,503); assert.equal(response.headers.has('Set-Cookie'),false);
+  assert.match(await response.text(),/繁星通行證暫時無法完成登入/);
 });
 test('member directory and profiles protect contact fields and Google subject', async () => {
   const db = testDatabase(); const data:any=await (await login(db,await credential())).json();
