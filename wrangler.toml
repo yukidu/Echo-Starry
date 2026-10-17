@@ -1,6 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/starryMainInlineLoginRouter.ts" # wrapper: same-page Google login shell -> battery game -> existing Starry/Echo chain
+main = "worker/starryEcosystemAuthEntryRouter.ts" # 最外層：中央登入入口 -> 既有登入/電池/Starry/Echo 安全鏈
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
