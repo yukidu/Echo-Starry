@@ -22,4 +22,15 @@ declare module 'cloudflare:workers' {
     constructor(ctx: unknown, env: Env);
     run(event: WorkflowEvent<Params>, step: WorkflowStep): Promise<unknown>;
   }
+
+  export class DurableObject<Env = unknown> {
+    protected env: Env;
+    protected ctx: {
+      container?: any;
+      storage?: any;
+      waitUntil?(promise: Promise<unknown>): void;
+      blockConcurrencyWhile?<T>(callback: () => Promise<T>): Promise<T>;
+    };
+    constructor(ctx: unknown, env: Env);
+  }
 }
