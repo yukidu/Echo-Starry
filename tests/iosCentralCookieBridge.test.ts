@@ -8,7 +8,7 @@ async function simulate(centralOk: boolean, echoOk = true) {
   const html = await successPage({
     id: 'echo-b', email: 'b@example.com', _authToken: 'b'.repeat(43), _sessionExpiresAt: 12345
   }, 'one-time-handoff-code').text();
-  const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  const script = html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(script);
   const storage = (initial: Record<string,string> = {}) => {
     const map = new Map(Object.entries(initial));
