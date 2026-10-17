@@ -966,7 +966,16 @@ app.post('/api/tracks/:id/rate', (req, res) => {
 
 // GET /api/comments (Requirement 6 v2.4: 取得全站所有錄音檔心得，提供通知頁面即時呈現 @ 標記)
 app.get('/api/comments', (_req, res) => {
-  const enriched = comments.map(c => {
+  const mention = typeof _req.query.mention === 'string' ? _req.query.mention.trim().slice(0, 80) : null;
+  const source = mention === null ? comments : mention
+    ? comments.filter(c => {
+        const content = String(c.content || '').toLowerCase();
+        const name = mention.toLowerCase();
+        return content.includes(`@${name}`) || content.includes(`＠${name}`) ||
+          String(c.replyToAuthor || '').trim().toLowerCase() === name;
+      }).sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)).slice(0, 120)
+    : [];
+  const enriched = source.map(c => {
     let matchedUser: UserProfile | undefined;
     if (c.authorEmail && c.authorEmail !== 'guest' && !c.authorEmail.startsWith('guest-')) {
       matchedUser = users.find(u => u.email && u.email.toLowerCase() === c.authorEmail?.toLowerCase());
