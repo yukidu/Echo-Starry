@@ -13,9 +13,9 @@ test('v299 scheduler is capped at five concurrent transcript workflows', () => {
 
 test('v299 atomically reserves only the remaining concurrency slots', () => {
   const scheduler = read('worker/transcriptSequentialSchedulerV293.ts');
-  assert.match(scheduler, /INSERT INTO transcript_index/);
+  assert.match(scheduler, /INSERT OR IGNORE INTO transcript_index/);
+  assert.match(scheduler, /UPDATE transcript_index[\s\S]*SET status='queued'/);
   assert.match(scheduler, /LIMIT \(SELECT MAX\(0, \? - COUNT\(\*\)\) FROM transcript_index WHERE status IN \('queued','processing'\)\)/);
-  assert.match(scheduler, /ON CONFLICT\(trackId\) DO UPDATE SET/);
   assert.match(scheduler, /RETURNING trackId,durationSeconds/);
 });
 
