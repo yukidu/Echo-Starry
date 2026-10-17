@@ -6,7 +6,7 @@ import { successPage } from '../worker/iosGoogleRedirectRouter';
 async function simulate(centralOk: boolean, echoOk = true) {
   const html = await successPage({
     id: 'echo-b', email: 'b@example.com', _authToken: 'b'.repeat(43), _sessionExpiresAt: 12345
-  }, 'google.credential.signed').text();
+  }, 'one-time-handoff-code').text();
   const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
   assert.ok(script);
   const storage = (initial: Record<string,string> = {}) => {
@@ -45,7 +45,7 @@ async function simulate(centralOk: boolean, echoOk = true) {
 
 test('iOS redirect completes central and Echo sessions before publishing identity', async () => {
   const result=await simulate(true);
-  assert.deepEqual(result.requests,['https://id.starry.phd/api/google-sync','/api/auth/session']);
+  assert.deepEqual(result.requests,['https://id.starry.phd/api/mobile-login/complete','/api/auth/session']);
   assert.deepEqual(result.redirects,['/track/2']);
   const user=JSON.parse(result.local.getItem('sq_current_user_v1')||'{}');
   assert.equal(user.id,'echo-b');
@@ -53,6 +53,8 @@ test('iOS redirect completes central and Echo sessions before publishing identit
   assert.ok(result.session.getItem('echostars_auth_restore_v1'));
   assert.equal(result.session.getItem('echostars_auth_return_v1'),null);
   assert.doesNotMatch(result.html,/\/auth\/callback\?code=/);
+  assert.doesNotMatch(result.html,/google\.credential\.signed/);
+  assert.match(result.html,/one-time-handoff-code/);
 });
 
 test('iOS central error keeps the previous identity and offers safe recovery', async () => {
