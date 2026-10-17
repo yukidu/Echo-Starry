@@ -13,9 +13,9 @@ const entry = readFileSync('worker/starryMainInlineLoginRouter.ts', 'utf8');
 const wrangler = readFileSync('wrangler.toml', 'utf8');
 const workflow = readFileSync('worker/transcriptWorkflowV282.ts', 'utf8');
 
-test('v295 loads one consolidated transcript client and refreshed UI layer', () => {
+test('v296 loads one consolidated transcript client and refreshed UI layer', () => {
   assert.doesNotThrow(() => new Function(ui));
-  assert.match(html, /transcript-client-v290\.js\?v=293[\s\S]*transcript-ui-v293\.js\?v=295/);
+  assert.match(html, /transcript-client-v290\.js\?v=293[\s\S]*transcript-ui-v293\.js\?v=296/);
   assert.doesNotMatch(html, /transcript-ui-v292|transcript-presentation-v28[4589]|transcript-client\.js/);
 });
 
