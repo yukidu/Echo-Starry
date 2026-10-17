@@ -64,11 +64,15 @@ test('v297 subtitle guard preserves logical text and performs fitting synchronou
   assert.match(ui, /v297FitSignature/);
 });
 
-test('v296 backend enforces sentence-sized transcript responses and preserves correction mapping', () => {
+test('v300 backend uses semantic punctuation, Whisper VAD pauses, then a 12-character fallback while preserving correction mapping', () => {
   const gateway = read('worker/transcriptV281Gateway.ts');
   assert.match(gateway, /MAX_SENTENCE_CHARS = 12/);
+  assert.match(gateway, /PAUSE_BREAK_SECONDS = 0\.35/);
   assert.match(gateway, /hardBreaks: '。！？!\?；;'/);
-  assert.match(gateway, /softBreaks: '，,、'/);
+  assert.match(gateway, /softBreaks: '，,、：:'/);
+  assert.match(gateway, /order:\s*\['semantic-punctuation','whisper-vad-pause-boundary','12-character-fallback'\]/);
+  assert.match(gateway, /語意標點優先/);
+  assert.match(gateway, /sourcePauseBoundary/);
   assert.match(gateway, /sourceSegmentId/);
   assert.match(gateway, /remapDerivedCorrection/);
   assert.match(gateway, /sentencePolicy/);
