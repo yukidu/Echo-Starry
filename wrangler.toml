@@ -1,6 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/transcriptModerationRouter.ts" # v281: transcript moderation -> transcript AI -> existing Starry/Echo chain
+main = "worker/starryMainInlineLoginRouter.ts" # v281: 保留既有安全入口；逐字稿由原入口分流掛載
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
@@ -32,7 +32,7 @@ command = "npm run build"
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# 所有請求先經逐字稿與登入/電池 wrapper，再進入原本安全鏈。
+# 所有請求先經既有安全入口，再由入口分流逐字稿功能。
 run_worker_first = ["/*"]
 
 # 1. Cloudflare D1 資料庫 (SQLite)
