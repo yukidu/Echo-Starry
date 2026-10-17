@@ -39,7 +39,7 @@ test('comment time, badge, actions and body follow the compact mobile layout', (
   assert.match(comments, /className="text-base[^\n]*whitespace-pre-wrap mt-1\.5 break-words"/);
   assert.match(comments, /text-\[8px\][^\n]*font-mono leading-\[1\.05\]/);
   assert.match(comments, /stripLegacyAutoReplyMention/);
-  assert.match(comments, /await onAddComment\(inputText\.trim\(\), replyingTo\?\.id\);/);
+  assert.match(comments, /await onAddComment\(inputText\.trim\(\), replyingTo\?\.id,/);
   assert.match(comments, /renderFormattedContent\(displayContent\)/);
   assert.doesNotMatch(comments, /setInputText\(`@\$\{displayAuthorName\} `\)/);
   assert.doesNotMatch(comments, /回覆 @\$\{replyingTo\.authorName\}/);
