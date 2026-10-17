@@ -452,7 +452,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                         <textarea maxLength={2000} value={editContent} onChange={e => setEditContent(e.target.value)} className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/60 text-sm text-slate-800 dark:text-slate-100 outline-hidden" rows={2} />
                         <p className="text-xs leading-snug text-amber-700 dark:text-amber-300"><Bot className="inline w-4 h-4" aria-label="人工智慧"/> <span className="rainbow-admin-text font-bold">{speakerName}</span>並無法知道你曾編輯此留言，如果要重新發問，請重新發起一篇新留言</p>
                         <div className="flex justify-end gap-1.5">
-                          <button onClick={() => setEditingId(null) className="px-2 py-1 rounded-lg text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-1 cursor-pointer"><X className="w-3 h-3" /> 取消</button>
+                          <button onClick={() => setEditingId(null)} className="px-2 py-1 rounded-lg text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-1 cursor-pointer"><X className="w-3 h-3" /> 取消</button>
                           <button onClick={() => handleSaveEdit(c.id)} className="px-2.5 py-1 rounded-lg text-xs bg-rose-600 text-white flex items-center gap-1 shadow-2xs font-bold cursor-pointer"><Check className="w-3 h-3" /> 儲存修改</button>
                         </div>
                       </div>
