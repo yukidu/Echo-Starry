@@ -30,7 +30,6 @@ export class AudioSegmenterContainer extends DurableObject<SegmenterEnv> {
     const container: any = this.ctx.container;
     if (!container) throw new Error('Audio segmenter container is unavailable');
 
-    await container.setInactivityTimeout(INACTIVITY_MS);
     if (!container.running) {
       container.start({
         image: container.images.base,
@@ -39,10 +38,18 @@ export class AudioSegmenterContainer extends DurableObject<SegmenterEnv> {
       });
     }
 
-    const port = container.getTcpPort(PORT);
+    // start() 只表示已送出啟動命令；先等到真正 running，避免過早呼叫 getTcpPort。
+    for (let attempt = 0; attempt < 120 && !container.running; attempt++) {
+      await sleep(250);
+    }
+    if (!container.running) throw new Error('Audio segmenter container did not start');
+
+    await container.setInactivityTimeout(INACTIVITY_MS);
+
     let lastError: unknown = null;
     for (let attempt = 0; attempt < 120; attempt++) {
       try {
+        const port = container.getTcpPort(PORT);
         const response = await port.fetch('http://container/health', {
           signal: AbortSignal.timeout(1000)
         });
