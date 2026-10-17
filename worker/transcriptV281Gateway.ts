@@ -7,8 +7,9 @@ const SESSION_COOKIE = 'echostars_session';
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{30,}$/;
 const TRANSLATION_SETTING_KEY = 'translation_cost_units';
 const DEFAULT_TRANSLATION_COST_UNITS = 0;
-const MAX_SENTENCE_CHARS = 28;
-const MIN_SOFT_BREAK_CHARS = 10;
+const MAX_SENTENCE_CHARS = 12;
+const MIN_SOFT_BREAK_CHARS = 5;
+const PAUSE_BREAK_SECONDS = 0.35;
 const sentenceSettingReady = new WeakMap<object, Promise<void>>();
 
 function text(value: unknown) { return value == null ? '' : String(value).trim(); }
@@ -86,7 +87,7 @@ function sentenceSlices(value: unknown) {
   const chars = Array.from(String(value == null ? '' : value));
   const slices: Array<{ from: number; to: number; text: string }> = [];
   const hard = new Set(['。','！','？','!','?','；',';']);
-  const soft = new Set(['，',',','、']);
+  const soft = new Set(['，',',','、','：',':']);
   let cursor = 0;
   while (cursor < chars.length) {
     while (cursor < chars.length && /\s/u.test(chars[cursor])) cursor += 1;
@@ -94,9 +95,14 @@ function sentenceSlices(value: unknown) {
     const remaining = chars.length - cursor;
     let cut = -1;
     const hardLimit = Math.min(chars.length, cursor + MAX_SENTENCE_CHARS);
+
+    // 1. 語意標點優先：完整句號、問號、驚嘆號、分號最優先。
     for (let i = cursor; i < hardLimit; i += 1) {
       if (hard.has(chars[i])) { cut = i + 1; break; }
     }
+
+    // 2. 單一 Whisper/VAD 語音停頓區段如果仍超過 12 字，先找自然弱標點。
+    // 3. 仍找不到任何自然切點，才使用 12 字上限作最後保險。
     if (cut < 0 && remaining > MAX_SENTENCE_CHARS) {
       for (let i = hardLimit - 1; i >= cursor + MIN_SOFT_BREAK_CHARS; i -= 1) {
         if (soft.has(chars[i])) { cut = i + 1; break; }
@@ -121,13 +127,24 @@ function sentenceSlices(value: unknown) {
 
 function applySentencePolicy(data: any) {
   if (!data || !Array.isArray(data.segments) || !data.segments.length) return data;
+  const sourceSegments = data.segments;
   const next: any[] = [];
-  for (const segment of data.segments) {
+  for (let segmentIndex = 0; segmentIndex < sourceSegments.length; segmentIndex += 1) {
+    const segment = sourceSegments[segmentIndex];
+    const following = sourceSegments[segmentIndex + 1];
     const sourceText = String(segment?.text || '');
     const chars = Array.from(sourceText);
     const slices = sentenceSlices(sourceText);
+    const sourceEnd = Number(segment?.end || segment?.start || 0);
+    const nextStart = following ? Number(following?.start || sourceEnd) : sourceEnd;
+    const pauseAfterSeconds = Math.max(0, nextStart - sourceEnd);
+    const pauseBoundary = !following || pauseAfterSeconds >= PAUSE_BREAK_SECONDS;
     if (slices.length <= 1) {
-      next.push(segment);
+      next.push({
+        ...segment,
+        sourcePauseAfterSeconds: Number(pauseAfterSeconds.toFixed(3)),
+        sourcePauseBoundary: pauseBoundary
+      });
       continue;
     }
     const start = Number(segment?.start || 0);
@@ -143,7 +160,9 @@ function applySentencePolicy(data: any) {
         sourceTo: slice.to,
         text: slice.text,
         start: Number((start + duration * (slice.from / total)).toFixed(3)),
-        end: Number((start + duration * (slice.to / total)).toFixed(3))
+        end: Number((start + duration * (slice.to / total)).toFixed(3)),
+        sourcePauseAfterSeconds: slice.to >= total ? Number(pauseAfterSeconds.toFixed(3)) : 0,
+        sourcePauseBoundary: slice.to >= total ? pauseBoundary : false
       });
     }
   }
@@ -151,11 +170,13 @@ function applySentencePolicy(data: any) {
     ...data,
     segments: next,
     sentencePolicy: {
-      version: 1,
+      version: 2,
+      order: ['semantic-punctuation','whisper-vad-pause-boundary','12-character-fallback'],
       maxCharacters: MAX_SENTENCE_CHARS,
+      pauseBreakSeconds: PAUSE_BREAK_SECONDS,
       hardBreaks: '。！？!?；;',
-      softBreaks: '，,、',
-      fallback: '長句沒有標點時仍會依長度切句，避免整段字幕塞在同一畫面'
+      softBreaks: '，,、：:',
+      fallback: '語意標點優先，保留 Whisper/VAD 的真實語音停頓時間邊界；單一停頓區段仍超過 12 字時，先找逗號等自然弱標點，最後才硬切 12 字'
     }
   };
 }
