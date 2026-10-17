@@ -284,6 +284,10 @@ export async function handleQaRequest(req:Request,env:Env):Promise<Response|null
       const trackId=txt(url.searchParams.get('trackId'));
       const track:any=trackId?await env.DB.prepare('SELECT * FROM tracks WHERE id=?').bind(trackId).first():null;
       if(trackId&&(!track||!await mayUseTranscript(env,u,track)))q.reason='沒有此音檔的問答權限';
+      else if(trackId&&!q.reason){
+        const index:any=await env.DB.prepare("SELECT status FROM transcript_index WHERE trackId=? LIMIT 1").bind(trackId).first().catch(()=>null);
+        if(index?.status!=='ready')q.reason='本場演講逐字稿尚未完成';
+      }
       return json({enabled:cfg.enabled&&!q.reason,reason:q.reason,tier:q.tier,label:q.label,daily:q.daily,free:q.free,freeLeft:q.freeLeft,left:q.left,cost:q.cost});
     }
     if(!admin)return json({error:'只有超級管理員可以管理逐字稿與問答設定'},403);
@@ -320,7 +324,8 @@ export async function handleQaRequest(req:Request,env:Env):Promise<Response|null
     if(path==='/api/qa/admin'&&method==='GET'){
       const rows=await env.DB.prepare("SELECT t.id,t.title,t.speaker,t.speakerRank,t.requiredRank,COALESCE(i.status,'pending') status,i.error,i.updatedAt,i.segmentCount,i.wordCount,i.durationSeconds FROM tracks t LEFT JOIN transcript_index i ON i.trackId=t.id WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>'' ORDER BY t.uploadDate DESC,t.id").all();
       const items=rows.results||[];
-      return json({items,models:MODELS,policies:cfg.policies.map((p:any,i:number)=>({tier:i+1,label:LABELS[i],daily:p.daily,free:p.free,cost:units(p.cost)})),model:cfg.model,enabled:cfg.enabled,globalDaily:cfg.globalDaily});
+      const history=await env.DB.prepare("SELECT q.commentId,q.createdAt,q.mode,q.status,q.error,t.title,c.authorName FROM qa_claims q LEFT JOIN tracks t ON t.id=q.trackId LEFT JOIN comments c ON c.id=q.commentId ORDER BY q.createdAt DESC LIMIT 50").all();
+      return json({items,history:history.results||[],models:MODELS,policies:cfg.policies.map((p:any,i:number)=>({tier:i+1,label:LABELS[i],daily:p.daily,free:p.free,cost:units(p.cost)})),model:cfg.model,enabled:cfg.enabled,globalDaily:cfg.globalDaily});
     }
     if(path==='/api/qa/settings'&&method==='PUT'){
       const body:any=await req.json().catch(()=>null);
