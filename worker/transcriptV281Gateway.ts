@@ -1,7 +1,6 @@
 import type { Env } from './index';
 import transcriptWorker from './transcriptMemberNotificationsRouter';
 import { queueAllPendingTranscripts, transcriptBulkStatus } from './transcriptBulkScheduler';
-import { handleTranscriptTranslationV285 } from './transcriptTranslationV285';
 
 const SESSION_COOKIE = 'echostars_session';
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{30,}$/;
@@ -10,7 +9,7 @@ function text(value: unknown) { return value == null ? '' : String(value).trim()
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options':'nosniff' }
   });
 }
 function bearerToken(request: Request) {
@@ -59,7 +58,11 @@ export default {
     const item = url.pathname.match(/^\/api\/v281\/transcripts\/([^/]+)$/);
     const translate = text(url.searchParams.get('translate'));
     if (item && translate && request.method.toUpperCase() === 'POST') {
-      return handleTranscriptTranslationV285(request, env, ctx, decodeURIComponent(item[1]), translate);
+      return json({
+        error: '外語 AI 翻譯目前已停用，請使用瀏覽器的整頁翻譯功能',
+        aiTranslationDisabled: true,
+        futureReenableReady: true
+      }, 410);
     }
     return transcriptWorker.fetch(request, env, ctx);
   }
