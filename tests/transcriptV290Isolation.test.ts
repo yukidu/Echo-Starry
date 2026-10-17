@@ -7,12 +7,13 @@ const client = fs.readFileSync('public/transcript-client-v290.js', 'utf8');
 const translation = fs.readFileSync('worker/transcriptTranslationV285.ts', 'utf8');
 const gateway = fs.readFileSync('worker/transcriptV281Gateway.ts', 'utf8');
 
-test('v296 loads the consolidated transcript core without legacy presentation layers', () => {
+test('v297 loads the consolidated transcript core without legacy presentation layers', () => {
   assert.match(index, /transcript-client-v290\.js\?v=293/);
-  assert.match(index, /transcript-ui-v293\.js\?v=296/);
+  assert.match(index, /transcript-ui-v297\.js\?v=297/);
   assert.doesNotMatch(index, /transcript-client\.js\?v=283/);
   assert.doesNotMatch(index, /transcript-presentation-v28[4589]/);
   assert.doesNotMatch(index, /transcript-ui-v292/);
+  assert.doesNotMatch(index, /transcript-ui-v293\.js\?v=296/);
 });
 
 test('v290 identifies tracks safely and clears stale transcript state on track changes', () => {
