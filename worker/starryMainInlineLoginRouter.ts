@@ -292,12 +292,12 @@ export default {
     const fastHomeResponse = await serveFastHomeApi(request, env, ctx);
     if (fastHomeResponse) return fastHomeResponse;
 
-    const response = await appWorker.fetch(request, env, ctx);
     if (url.hostname === ID_HOST && url.pathname === '/battery-ledger') {
+      const response = await appWorker.fetch(request, env, ctx);
       const ledger = await import('./transcriptLedgerSettingsInjector');
       return ledger.injectTranscriptLedgerSettings(response);
     }
-    return response;
+    return appWorker.fetch(request, env, ctx);
   },
   async scheduled(controller: any, env: Env, ctx: any) {
     const transcript = await import('./transcriptRouter');
