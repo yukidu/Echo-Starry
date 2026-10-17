@@ -9,6 +9,7 @@ on:
       - 'starry-id/capture-time-travel-bookmark.mjs'
       - 'starry-id/repair-report-public-key.txt'
       - 'starry-id/migrations/20261016_central_health_guards.sql'
+      - 'starry-id/migrations/20261017_profile_semantic_guards.sql'
       - '.github/workflows/starry-id-health-repair.yml'
   workflow_dispatch:
 
@@ -56,11 +57,12 @@ jobs:
         run: |
           set -euo pipefail
           node starry-id/repairCentralHealth.mjs | tee starry-id/audit-output/repair-console.json
-      - name: Install central relationship protection
+      - name: Install central database protections
         shell: bash
         run: |
           set -euo pipefail
           npx wrangler d1 execute starry_id_db --remote --file=starry-id/migrations/20261016_central_health_guards.sql --yes
+          npx wrangler d1 execute starry_id_db --remote --file=starry-id/migrations/20261017_profile_semantic_guards.sql --yes
       - name: Deep verify repaired central database
         shell: bash
         run: |
@@ -72,29 +74,26 @@ jobs:
           set -euo pipefail
           private='starry-id/audit-output/duplicate-amway-private.json'
           test -s "$private"
-          {
-            echo '-----BEGIN PUBLIC KEY-----'
-            fold -w64 starry-id/repair-report-public-key.txt
-            echo '-----END PUBLIC KEY-----'
-          } > /tmp/report-public.pem
+          base64 --decode starry-id/repair-report-public-key.txt > /tmp/report-public.der
+          openssl pkey -pubin -inform DER -in /tmp/report-public.der -noout
           openssl rand -base64 48 > /tmp/report-passphrase.txt
           openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
             -in "$private" \
             -out starry-id/audit-output/duplicate-amway-private.json.enc \
             -pass file:/tmp/report-passphrase.txt
-          openssl pkeyutl -encrypt -pubin -inkey /tmp/report-public.pem \
+          openssl pkeyutl -encrypt -pubin -keyform DER -inkey /tmp/report-public.der \
             -in /tmp/report-passphrase.txt \
             -out starry-id/audit-output/duplicate-amway-private.key.enc \
             -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256
           printf '{"containsPII":true,"plaintextUploaded":false,"encryption":"AES-256-CBC/PBKDF2-200000 + RSA-OAEP-SHA256"}\n' \
             > starry-id/audit-output/duplicate-amway-private.manifest.json
-          rm -f "$private" /tmp/report-passphrase.txt /tmp/report-public.pem
+          rm -f "$private" /tmp/report-passphrase.txt /tmp/report-public.der
           test ! -e "$private"
       - name: Upload repair evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: starry-id-v271-health-repair
+          name: starry-id-v307-health-repair
           path: |
             starry-id/audit-output/pre-repair-backup-bookmark.json
             starry-id/audit-output/repair-public.json
