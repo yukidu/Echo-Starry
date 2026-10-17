@@ -79,7 +79,7 @@ async function actor(req:Request,env:Env){
   return row&&!row.isBlocked&&Number(row.expiresAt)>Date.now()?row:null;
 }
 const isSuper=(u:any)=>Boolean(u&&(txt(u.email).toLowerCase()==='yukidu@gmail.com'||u.role==='超級管理員'));
-function tier(u:any){
+export function tier(u:any){
   if(!u)return 0;
   if(!u.rankApproved)return 1;
   const r=txt(u.approvedRank||u.rank);
