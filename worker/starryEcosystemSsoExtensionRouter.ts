@@ -9,11 +9,11 @@ const GOOGLE_CLIENT_ID = '661055525630-ndcq5gtr16h7rqqprlqqkkvineea87lc.apps.goo
 
 const APPS = {
   boxstarry: { origin: 'https://eye.starry.phd', label: '繁星視界', loginAliases: ['/auth/boxstarry', '/auth/starry-eye'] },
-  'starry-sync': { origin: 'https://sync.starry.phd', label: '繁星共振', loginAliases: ['/auth/starry-sync'] }
+  'starry-sync': { origin: 'https://sync.starry.phd', label: '繁星共振', loginAliases: ['/auth/starry-sync'] },
+  'starry-ai': { origin: 'https://ai.starry.phd', label: '繁星副官', loginAliases: ['/auth/starry-ai'] }
 } as const;
 
 type AppId = keyof typeof APPS;
-
 type CentralIdentity = { userId:string; email:string; name:string; avatar:string; rank:string };
 
 function cookieValue(request: Request, name: string) {
@@ -44,7 +44,7 @@ async function hashToken(token: string) {
 }
 
 function appFromTicketPath(pathname: string): AppId | null {
-  const match = pathname.match(/^\/api\/apps\/(boxstarry|starry-sync)\/ticket$/);
+  const match = pathname.match(/^\/api\/apps\/(boxstarry|starry-sync|starry-ai)\/ticket$/);
   return match ? match[1] as AppId : null;
 }
 
