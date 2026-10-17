@@ -84,13 +84,16 @@ test('anonymous or expired session response cannot clear a concurrent new login 
     assert.equal(response.status, 401); assert.equal(response.headers.has('Set-Cookie'), false);
   }
 });
-test('iOS verified redirect propagates first-party cookie and rejects CSRF mismatch', async () => {
+test('iOS verified redirect defers first-party cookie until central sign-in and rejects CSRF mismatch', async () => {
   const db = testDatabase(); const body = new URLSearchParams({ g_csrf_token:'csrf',credential:await credential() });
   const make = (cookie: string) => new Request('https://test.example/', { method:'POST', headers:{Cookie:cookie},body });
   assert.equal((await worker.fetch(make('g_csrf_token=wrong'),{DB:db})).status,403);
   const response = await worker.fetch(make('g_csrf_token=csrf'),{DB:db});
-  assert.equal(response.status,200); assert.match(response.headers.get('Set-Cookie') || '', /echostars_session=/);
-  assert.match(await response.text(),/登入完成/);
+  assert.equal(response.status,200); assert.equal(response.headers.has('Set-Cookie'),false);
+  const page = await response.text();
+  assert.match(page,/登入完成/);
+  assert.match(page,/https:\/\/id\.starry\.phd\/api\/google-sync/);
+  assert.match(page,/fetch\('\/api\/auth\/session'/);
 });
 test('member directory and profiles protect contact fields and Google subject', async () => {
   const db = testDatabase(); const data:any=await (await login(db,await credential())).json();

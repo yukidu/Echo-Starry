@@ -45,7 +45,7 @@ function html(body: string, status = 200) {
       'Pragma': 'no-cache',
       'Referrer-Policy': 'no-referrer',
       'X-Content-Type-Options': 'nosniff',
-      'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
+      'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' https://id.starry.phd; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
     }
   });
 }
@@ -65,8 +65,9 @@ function failurePage(message: string, status = 400) {
 </html>`, status);
 }
 
-function successPage(user: any) {
+export function successPage(user: any, credential: string) {
   const serializedUser = safeJson(user);
+  const serializedCredential = safeJson(credential);
   return html(`<!doctype html>
 <html lang="zh-Hant-TW">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>登入完成</title></head>
@@ -74,12 +75,41 @@ function successPage(user: any) {
   <main style="width:min(92vw,420px);background:#fff;border:1px solid #e2e8f0;border-radius:24px;padding:24px;text-align:center;box-shadow:0 16px 50px rgba(15,23,42,.12)">
     <div style="font-size:42px">✓</div>
     <h1 style="font-size:20px;margin:12px 0 8px">Google 登入完成</h1>
-    <p style="font-size:14px;line-height:1.7;color:#64748b;margin:0">正在回到繁星回聲…</p>
+    <p id="login-progress" style="font-size:14px;line-height:1.7;color:#64748b;margin:0">正在同步繁星通行證…</p>
+    <p id="login-error" role="alert" style="color:#b91c1c;font-size:14px;line-height:1.7;margin-top:12px"></p>
+    <a id="login-retry" href="https://id.starry.phd/auth/echostars?choose=1" style="display:none;margin-top:12px;color:#0f8b83;font-weight:bold">改用繁星通行證重新登入</a>
   </main>
   <script>
-    (function () {
+    (async function () {
       try {
         var user = ${serializedUser};
+        // First create the host-only ID cookie. Do not write cached identity
+        // before both central and Echo authenticate the same Google account.
+        var centralResponse = await fetch('https://id.starry.phd/api/google-sync', {
+          method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: ${serializedCredential}, appId: 'echostars' })
+        });
+        var centralData = await centralResponse.json().catch(function () { return {}; });
+        if (!centralResponse.ok || !centralData.success || !centralData.user || !centralData.user.id) {
+          throw new Error('中央會員登入尚未完成，請重新登入。');
+        }
+        if (String(centralData.user.email || '').toLowerCase() !== String(user.email || '').toLowerCase()) {
+          throw new Error('兩個網站的 Google 會員身分不一致，請重新登入。');
+        }
+        // Refresh Echo's first-party HttpOnly cookie only after ID succeeds.
+        var echoResponse = await fetch('/api/auth/session', {
+          credentials: 'include',
+          cache: 'no-store',
+          headers: { Authorization: 'Bearer ' + user._authToken }
+        });
+        var echoData = await echoResponse.json().catch(function () { return {}; });
+        if (!echoResponse.ok || !echoData.authenticated || !echoData.user || String(echoData.user.id) !== String(user.id)) {
+          throw new Error('繁星回聲登入確認尚未完成，請重新登入。');
+        }
+        user._starryUserId = String(centralData.user.id);
         localStorage.setItem(${safeJson(USER_KEY)}, JSON.stringify(user));
         sessionStorage.setItem(${safeJson(SESSION_CHECK_KEY)}, String(Date.now()));
         var returnRaw = sessionStorage.getItem(${safeJson(AUTH_RETURN_KEY)}) || '';
@@ -96,8 +126,11 @@ function successPage(user: any) {
           } catch (_) {}
         }
         window.location.replace(target);
-      } catch (_) {
-        window.location.replace('/');
+      } catch (error) {
+        document.getElementById('login-progress').textContent = '登入尚未完成';
+        document.getElementById('login-error').textContent = error && error.message
+          ? String(error.message) : '登入暫時無法完成，請重新登入。';
+        document.getElementById('login-retry').style.display = 'inline-block';
       }
     })();
   </script>
@@ -134,14 +167,13 @@ async function handleGoogleRedirect(request: Request, env: Env) {
     return failurePage(data?.error || 'Google 登入驗證失敗，請重新選擇 Google 帳號。', response.status || 401);
   }
 
-  const success = successPage({
+  // The return page installs Echo's cookie after central ID succeeds.
+  // Do not publish an Echo-only cookie on a half-completed iOS login.
+  return successPage({
     ...data.user,
     _authToken: data.authToken,
     _sessionExpiresAt: data.sessionExpiresAt
-  });
-  const cookie = response.headers.get('Set-Cookie');
-  if (cookie) success.headers.set('Set-Cookie', cookie);
-  return success;
+  }, credential);
 }
 
 export default {
