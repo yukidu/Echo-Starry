@@ -33,25 +33,34 @@ export async function queueNextTranscriptV293(env: SchedulerEnv, options: QueueN
     WHERE status IN ('queued','processing') AND updatedAt < ?`)
     .bind(now, now - STALE_ACTIVE_MS).run();
 
-  // v299：永遠補滿到 5 份同時處理。
-  // 這個 INSERT ... SELECT 會在同一個 D1 寫入敘述內計算剩餘名額並搶位，
-  // 即使多個 Workflow 幾乎同時完成，也不會因為「先查數量、再寫入」的競爭而排超過 5 份。
-  const eligible = includeFailed
-    ? `(i.trackId IS NULL OR i.status IN ('pending','failed'))`
-    : `(i.trackId IS NULL OR i.status='pending')`;
-  const claimedResult: any = await env.DB.prepare(`INSERT INTO transcript_index(
+  // 先把所有有音檔、但尚未建立逐字稿索引的錄音補進 pending。
+  // INSERT OR IGNORE 不會改動已 ready / processing / failed 的既有狀態。
+  await env.DB.prepare(`INSERT OR IGNORE INTO transcript_index(
       trackId,status,r2Key,model,chunkCount,segmentCount,wordCount,durationSeconds,error,createdAt,updatedAt)
-    SELECT t.id,'queued',NULL,?,0,0,0,COALESCE(t.durationSeconds,0),NULL,?,?
-    FROM tracks t LEFT JOIN transcript_index i ON i.trackId=t.id
-    WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>''
-      AND ${eligible}
-    ORDER BY CASE WHEN i.status='failed' THEN 2 WHEN i.status='pending' THEN 1 ELSE 0 END,
-      COALESCE(t.uploadDate,'') DESC,t.id
-    LIMIT (SELECT MAX(0, ? - COUNT(*)) FROM transcript_index WHERE status IN ('queued','processing'))
-    ON CONFLICT(trackId) DO UPDATE SET
-      status='queued',error=NULL,model=excluded.model,durationSeconds=excluded.durationSeconds,updatedAt=excluded.updatedAt
+    SELECT t.id,'pending',NULL,?,0,0,0,COALESCE(t.durationSeconds,0),NULL,?,?
+    FROM tracks t
+    WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>''`)
+    .bind(TRANSCRIPT_MODEL, now, now).run();
+
+  // v299：永遠補滿到最多 5 份同時處理。
+  // 用「單一 UPDATE + 子查詢」同時算剩餘名額與搶位；D1 會序列化寫入，
+  // 所以多個 Workflow 幾乎同時完成並接棒時，後一個寫入會看到前一個已搶到的 queued 名額，避免超過 5。
+  const eligible = includeFailed
+    ? `i.status IN ('pending','failed')`
+    : `i.status='pending'`;
+  const claimedResult: any = await env.DB.prepare(`UPDATE transcript_index
+    SET status='queued',error=NULL,model=?,updatedAt=?
+    WHERE trackId IN (
+      SELECT i.trackId
+      FROM transcript_index i JOIN tracks t ON t.id=i.trackId
+      WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>''
+        AND ${eligible}
+      ORDER BY CASE WHEN i.status='failed' THEN 2 WHEN i.status='pending' THEN 1 ELSE 0 END,
+        COALESCE(t.uploadDate,'') DESC,t.id
+      LIMIT (SELECT MAX(0, ? - COUNT(*)) FROM transcript_index WHERE status IN ('queued','processing'))
+    )
     RETURNING trackId,durationSeconds`)
-    .bind(TRANSCRIPT_MODEL, now, now, MAX_CONCURRENT_TRANSCRIPTS).all();
+    .bind(TRANSCRIPT_MODEL, now, MAX_CONCURRENT_TRANSCRIPTS).all();
 
   const claimed: any[] = Array.isArray(claimedResult?.results) ? claimedResult.results : [];
   const started: Array<{ trackId: string; instanceId: string }> = [];
@@ -83,9 +92,9 @@ export async function queueNextTranscriptV293(env: SchedulerEnv, options: QueueN
     WHERE status IN ('queued','processing')`).first();
   const activeCount = Math.max(0, Number(active?.n || 0));
   const remaining: any = await env.DB.prepare(`SELECT COUNT(*) AS n
-    FROM tracks t LEFT JOIN transcript_index i ON i.trackId=t.id
+    FROM transcript_index i JOIN tracks t ON t.id=i.trackId
     WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>''
-      AND (i.trackId IS NULL OR i.status IN ('pending','failed'))`).first();
+      AND i.status IN ('pending','failed')`).first();
   const remainingCount = Math.max(0, Number(remaining?.n || 0));
 
   return {
