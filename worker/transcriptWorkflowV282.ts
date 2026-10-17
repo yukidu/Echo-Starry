@@ -3,6 +3,7 @@ import { WorkflowEntrypoint } from 'cloudflare:workers';
 import type { WorkflowEvent, WorkflowStep } from 'cloudflare:workers';
 
 const MODEL = '@cf/openai/whisper-large-v3-turbo';
+const TRADITIONAL_MODEL = '@cf/openai/gpt-oss-20b';
 const SEGMENT_SECONDS = 180;
 
 type Env = {
@@ -17,6 +18,7 @@ type TranscriptFile = {
   version: number;
   trackId: string;
   model: string;
+  language: string;
   createdAt: number;
   durationSeconds: number;
   text: string;
@@ -91,6 +93,60 @@ function normalizeSegments(result: any): { start: number; end: number; text: str
   return content ? [{ start: 0, end: seconds, text: content }] : [];
 }
 
+function aiText(result: any) {
+  if (typeof result === 'string') return result;
+  if (typeof result?.response === 'string') return result.response;
+  if (typeof result?.output_text === 'string') return result.output_text;
+  if (typeof result?.choices?.[0]?.message?.content === 'string') return result.choices[0].message.content;
+  if (Array.isArray(result?.output)) {
+    const parts: string[] = [];
+    for (const item of result.output) {
+      if (typeof item?.content === 'string') parts.push(item.content);
+      if (Array.isArray(item?.content)) for (const part of item.content) if (typeof part?.text === 'string') parts.push(part.text);
+    }
+    if (parts.length) return parts.join('\n');
+  }
+  return '';
+}
+
+function parseStringArray(raw: string, count: number) {
+  const source = String(raw || '').trim();
+  const start = source.indexOf('['), end = source.lastIndexOf(']');
+  if (start < 0 || end <= start) throw new Error('Traditional Chinese normalization returned invalid JSON');
+  const value = JSON.parse(source.slice(start, end + 1));
+  if (!Array.isArray(value) || value.length !== count || value.some(item => typeof item !== 'string')) {
+    throw new Error('Traditional Chinese normalization segment count mismatch');
+  }
+  return value.map(item => item.trim());
+}
+
+async function traditionalizeBatch(env: Env, values: string[]) {
+  if (!values.length) return [];
+  const result: any = await env.AI.run(TRADITIONAL_MODEL, {
+    messages: [
+      {
+        role: 'system',
+        content: `Convert every JSON array item to Taiwan Traditional Chinese (繁體中文／台灣用字). Return ONLY one JSON array of exactly ${values.length} strings in the same order. Do not merge, split, number, explain, summarize or add notes. Preserve meaning, names, Amway terminology, ranks, punctuation and spoken style. Never output Simplified Chinese characters when a Traditional form exists.`
+      },
+      { role: 'user', content: JSON.stringify(values) }
+    ]
+  });
+  return parseStringArray(aiText(result), values.length);
+}
+
+async function traditionalizeSegments(env: Env, step: WorkflowStep, segments: Segment[]) {
+  const batchSize = 32;
+  for (let offset = 0; offset < segments.length; offset += batchSize) {
+    const batch = segments.slice(offset, offset + batchSize);
+    const normalized: string[] = await step.do(
+      `traditionalize-${String(Math.floor(offset / batchSize) + 1).padStart(3, '0')}`,
+      { retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' }, timeout: '10 minutes' },
+      async () => traditionalizeBatch(env, batch.map(item => item.text))
+    );
+    normalized.forEach((value, index) => { batch[index].text = value || batch[index].text; });
+  }
+}
+
 function vttTime(seconds: number) {
   const ms = Math.max(0, Math.round(seconds * 1000));
   const h = Math.floor(ms / 3600000);
@@ -162,7 +218,6 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
     const duration = Math.max(1, Number(info.track.durationSeconds || 1));
     const chunks = Math.max(1, Math.ceil(duration / SEGMENT_SECONDS));
     const segments: Segment[] = [];
-    const textParts: string[] = [];
 
     try {
       await step.do('prepare-audio-container', { retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' } }, async () => {
@@ -185,7 +240,7 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
               language: 'zh',
               vad_filter: true,
               condition_on_previous_text: true,
-              initial_prompt: `繁體中文演講逐字稿。講者：${text(info.track.speaker)}。獎銜：${text(info.track.speakerRank)}。常見詞：安麗、白金、鑽石、翡翠、皇冠。`
+              initial_prompt: `請輸出繁體中文（台灣用字）逐字稿，不使用簡體中文。講者：${text(info.track.speaker)}。獎銜：${text(info.track.speakerRank)}。常見詞：安麗、白金、鑽石、翡翠、皇冠。`
             });
           }
         );
@@ -201,8 +256,6 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
             text: seg.text
           });
         }
-        const part = text(output?.text || output?.transcription_info?.text || local.map((seg: any) => seg.text).join(' '));
-        if (part) textParts.push(part);
       }
 
       segments.sort((a, b) => a.start - b.start);
@@ -211,11 +264,14 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
         seg.start = Number(seg.start.toFixed(3));
         seg.end = Number(Math.min(duration, Math.max(seg.start + 0.2, seg.end)).toFixed(3));
       });
-      const fullText = textParts.join('\n') || segments.map(seg => seg.text).join('\n');
+
+      await traditionalizeSegments(this.env, step, segments);
+      const fullText = segments.map(seg => seg.text).join('\n');
       const file: TranscriptFile = {
-        version: 2,
+        version: 3,
         trackId,
         model: MODEL,
+        language: 'zh-Hant-TW',
         createdAt: Date.now(),
         durationSeconds: duration,
         text: fullText,
@@ -230,15 +286,15 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
         await Promise.all([
           this.env.R2_BUCKET.put(jsonKey, JSON.stringify(file), {
             httpMetadata: { contentType: 'application/json; charset=utf-8' },
-            customMetadata: { trackId, model: MODEL, format: 'json' }
+            customMetadata: { trackId, model: MODEL, format: 'json', language: 'zh-Hant-TW' }
           }),
           this.env.R2_BUCKET.put(txtKey, fullText, {
             httpMetadata: { contentType: 'text/plain; charset=utf-8' },
-            customMetadata: { trackId, model: MODEL, format: 'txt' }
+            customMetadata: { trackId, model: MODEL, format: 'txt', language: 'zh-Hant-TW' }
           }),
           this.env.R2_BUCKET.put(vttKey, toVtt(segments), {
             httpMetadata: { contentType: 'text/vtt; charset=utf-8' },
-            customMetadata: { trackId, model: MODEL, format: 'vtt' }
+            customMetadata: { trackId, model: MODEL, format: 'vtt', language: 'zh-Hant-TW' }
           })
         ]);
         await this.env.DB.prepare(`UPDATE transcript_index SET status='ready',r2Key=?,model=?,chunkCount=?,segmentCount=?,wordCount=?,durationSeconds=?,error=NULL,updatedAt=? WHERE trackId=?`)
@@ -246,7 +302,7 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
       });
 
       await cleanupAudio(this.env, trackId, info.ext);
-      return { trackId, chunks, segments: segments.length, jsonKey, txtKey, vttKey };
+      return { trackId, chunks, segments: segments.length, language: 'zh-Hant-TW', jsonKey, txtKey, vttKey };
     } catch (error) {
       await cleanupAudio(this.env, trackId, info.ext);
       await this.env.DB.prepare("UPDATE transcript_index SET status='failed',error=?,updatedAt=? WHERE trackId=?")
