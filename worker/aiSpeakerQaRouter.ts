@@ -109,12 +109,14 @@ async function quota(req:Request,env:Env,u:any,cfg:any){
   const t=tier(u),policy=cfg.policies[t],key=await identity(req,u),today=day();
   const row:any=await env.DB.prepare('SELECT used FROM qa_daily WHERE identity=? AND day=?').bind(key,today).first();
   const total=Number(row?.used||0),freeLeft=Math.max(0,policy.free-total),left=Math.max(0,policy.daily-total);
+  const global:any=cfg.enabled?await env.DB.prepare("SELECT used FROM qa_daily WHERE identity='__global__' AND day=?").bind(today).first():null;
   let reason='';
   if(!cfg.enabled)reason='管理員尚未開啟問答';
+  else if(Number(global?.used||0)>=cfg.globalDaily)reason='今日全站問答免費資源已達上限';
   else if(!left)reason='今日使用次數已達上限';
   else if(!freeLeft){
     if(!u)reason='訪客今日免費次數已用完';
-    else {const b:any=await balance(env,u);if(b?.units<policy.cost)reason='電池不足，無法繼續召喚';}
+    else {const b:any=await balance(env,u);if(!b?.userId||b.units<policy.cost)reason='電池不足，無法繼續召喚';}
   }
   return {tier:t+1,label:LABELS[t],key,today,total,freeLeft,left,daily:policy.daily,free:policy.free,cost:freeLeft?0:units(policy.cost),costUnits:freeLeft?0:policy.cost,reason,enabled:cfg.enabled};
 }
