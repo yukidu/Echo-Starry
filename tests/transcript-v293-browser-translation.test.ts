@@ -25,6 +25,12 @@ test('v293 allows browser page translation instead of blocking it', () => {
   assert.match(ui, /Safari.*翻譯網站/);
 });
 
+test('v293 browser translation prompt treats selected language labels as text only', () => {
+  assert.match(ui, /instruction\.textContent = String\(value \|\| ''\)/);
+  assert.doesNotMatch(ui, /instruction\.innerHTML/);
+  assert.doesNotMatch(ui, /innerHTML\s*=\s*browserInstruction/);
+});
+
 test('v293 disables paid foreign-language Cloudflare AI translation', () => {
   assert.doesNotMatch(gateway, /handleTranscriptTranslationV285/);
   assert.match(gateway, /aiTranslationDisabled:\s*true/);
