@@ -1,6 +1,6 @@
 (() => {
-  if (window.__starryTranscriptUiV293) return;
-  window.__starryTranscriptUiV293 = true;
+  if (window.__starryTranscriptUiV295) return;
+  window.__starryTranscriptUiV295 = true;
 
   const TRANSLATE_ICON = `
     <svg class="v293-translate-icon" viewBox="0 0 28 24" aria-hidden="true" focusable="false">
@@ -13,6 +13,16 @@
     </svg>`;
   const DISPLAY_END_PUNCTUATION = new Set(['、','，','！','。',',','!','.']);
   const nativeTextContent = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
+  const PAGE_TRANSLATE_SKIP = 'script,style,noscript,textarea,input,select,option,.v293-translate-dialog,[translate="no"],[data-v293-no-page-translate]';
+  const pageTranslation = {
+    translator: null,
+    target: '',
+    generation: 0,
+    observer: null,
+    nodes: new Map(),
+    queued: new Set(),
+    timer: 0
+  };
 
   const style = document.createElement('style');
   style.textContent = `
@@ -67,38 +77,22 @@
     if (visible !== current) element.textContent = visible;
   }
 
-  function redrawTranslateButton(button) {
-    if (!button || button.dataset.v293Ready === '1') return;
+  function redrawTranslateButton(button, label = 'Translate') {
+    if (!button) return;
     button.dataset.v293Ready = '1';
     button.disabled = false;
-    button.innerHTML = `${TRANSLATE_ICON}<span>Translate</span><span aria-hidden="true">▾</span>`;
+    button.innerHTML = `${TRANSLATE_ICON}<span>${String(label || 'Translate')}</span><span aria-hidden="true">▾</span>`;
     button.setAttribute('aria-label', 'Translate whole page with browser');
   }
 
-  function findKeywordBlock(root, panel) {
-    if (!root) return null;
-    const known = root.querySelector(':scope > [data-v293-keywords="1"]');
-    if (known) return known;
-    const keyword = Array.from(root.children).find((el) => {
-      if (el === panel) return false;
-      return (el.textContent || '').replace(/\s+/g, '').includes('網友關鍵字') && Boolean(el.querySelector('button'));
-    });
-    if (keyword) keyword.dataset.v293Keywords = '1';
-    return keyword || null;
-  }
-
-  function enforcePermanentLayout(panel) {
+  // 唯一的永久版面規則：逐字稿永遠直接放在播放器前面。
+  // 不再搬動播放器、關鍵字或其他 React 區塊，避免重新渲染後位置被蓋回去。
+  function anchorTranscriptAbovePlayer(panel) {
     const timeline = document.getElementById('audio-timeline');
-    if (!timeline || !panel) return;
-    const root = timeline.closest('.max-w-2xl') || timeline.parentElement;
-    if (!root || timeline.parentElement !== root) return;
-    if (panel.parentElement !== root) root.insertBefore(panel, root.firstChild);
-    const keyword = findKeywordBlock(root, panel);
-
-    // 永久順序：逐字稿 → 播放器 → 網友關鍵字。
-    if (root.firstElementChild !== panel) root.insertBefore(panel, root.firstChild);
-    if (panel.nextElementSibling !== timeline) root.insertBefore(timeline, panel.nextSibling);
-    if (keyword && timeline.nextElementSibling !== keyword) root.insertBefore(keyword, timeline.nextSibling);
+    if (!timeline || !panel || !timeline.parentElement) return;
+    if (panel.parentElement !== timeline.parentElement || panel.nextElementSibling !== timeline) {
+      timeline.insertAdjacentElement('beforebegin', panel);
+    }
   }
 
   function fitTranscriptLine(line) {
@@ -152,18 +146,19 @@
     dialog.id = 'v293-browser-translate-dialog';
     dialog.className = 'v293-translate-dialog';
     dialog.hidden = true;
+    dialog.setAttribute('translate', 'no');
 
     const card = document.createElement('div');
     card.className = 'v293-translate-card';
     card.setAttribute('role', 'dialog');
     card.setAttribute('aria-modal', 'true');
     const title = document.createElement('h3');
-    title.textContent = '🌐 Browser Translate';
+    title.textContent = '🌐 瀏覽器整頁翻譯';
     const instruction = document.createElement('p');
     instruction.dataset.v293Instruction = '1';
     const note = document.createElement('p');
     note.className = 'v293-translate-note';
-    note.textContent = '這是瀏覽器的整頁翻譯，不使用繁星回聲的 Cloudflare AI，因此不會產生外語 AI 翻譯費。';
+    note.textContent = '優先使用瀏覽器內建翻譯；不使用繁星回聲的 Cloudflare AI 外語翻譯。';
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'v293-translate-close';
@@ -180,8 +175,8 @@
     const safeLabel = String(label || '').trim();
     const ua = navigator.userAgent || '';
     const safari = /Safari/i.test(ua) && !/Chrome|CriOS|Chromium|Android/i.test(ua);
-    if (safari) return `目標語言：${safeLabel}\n請點 Safari 網址列的「頁面選單／aA」→「翻譯網站」→ 選擇這個語言。`;
-    return `目標語言：${safeLabel}\n請點 Chrome 的「⋮」選單 →「翻譯」→ 選擇這個語言。`;
+    if (safari) return `目標語言：${safeLabel}\nSafari 不允許網站直接按下內建翻譯。請點網址列「頁面選單／aA」→「翻譯網站」→ 選擇這個語言，Safari 會翻譯整頁。`;
+    return `目標語言：${safeLabel}\n目前這台瀏覽器不開放網站直接啟動整頁翻譯。請點瀏覽器選單「翻譯」並選擇這個語言，即可翻譯整頁。`;
   }
 
   function setDialogInstruction(dialog, value) {
@@ -192,29 +187,169 @@
     }
   }
 
-  function requestBrowserPageTranslation(option) {
+  function stopAutomaticPageTranslation() {
+    pageTranslation.generation += 1;
+    pageTranslation.observer?.disconnect();
+    pageTranslation.observer = null;
+    clearTimeout(pageTranslation.timer);
+    pageTranslation.timer = 0;
+    pageTranslation.queued.clear();
+    for (const [node, saved] of pageTranslation.nodes.entries()) {
+      if (node?.isConnected && node.nodeValue === saved.translated) node.nodeValue = saved.original;
+    }
+    pageTranslation.nodes.clear();
+    try { pageTranslation.translator?.destroy?.(); } catch {}
+    pageTranslation.translator = null;
+    pageTranslation.target = '';
+    document.documentElement.lang = 'zh-Hant-TW';
+  }
+
+  function shouldTranslateTextNode(node) {
+    if (!node || node.nodeType !== Node.TEXT_NODE) return false;
+    const raw = String(node.nodeValue || '');
+    if (!raw.trim() || !/[\p{L}\p{Script=Han}]/u.test(raw)) return false;
+    const parent = node.parentElement;
+    if (!parent || parent.closest(PAGE_TRANSLATE_SKIP)) return false;
+    return true;
+  }
+
+  function collectTextNodes(root) {
+    const nodes = [];
+    if (!root) return nodes;
+    if (root.nodeType === Node.TEXT_NODE) return shouldTranslateTextNode(root) ? [root] : [];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) if (shouldTranslateTextNode(node)) nodes.push(node);
+    return nodes;
+  }
+
+  async function translateTextNode(node, translator, generation) {
+    if (!shouldTranslateTextNode(node) || generation !== pageTranslation.generation) return;
+    const raw = String(node.nodeValue || '');
+    const previous = pageTranslation.nodes.get(node);
+    if (previous && raw === previous.translated) return;
+    const match = raw.match(/^(\s*)([\s\S]*?)(\s*)$/);
+    const prefix = match?.[1] || '';
+    const core = match?.[2] || '';
+    const suffix = match?.[3] || '';
+    if (!core.trim()) return;
+    try {
+      const translatedCore = await translator.translate(core);
+      if (generation !== pageTranslation.generation || !node.isConnected) return;
+      const translated = `${prefix}${translatedCore}${suffix}`;
+      pageTranslation.nodes.set(node, { original: raw, translated });
+      node.nodeValue = translated;
+    } catch {}
+  }
+
+  async function translateNodes(nodes, generation = pageTranslation.generation) {
+    const translator = pageTranslation.translator;
+    if (!translator || generation !== pageTranslation.generation) return;
+    const unique = [...new Set(nodes)].filter(shouldTranslateTextNode);
+    for (let index = 0; index < unique.length; index += 6) {
+      if (generation !== pageTranslation.generation) return;
+      await Promise.all(unique.slice(index, index + 6).map(node => translateTextNode(node, translator, generation)));
+    }
+  }
+
+  function queueDynamicTranslation(nodes) {
+    if (!pageTranslation.translator) return;
+    nodes.forEach(node => pageTranslation.queued.add(node));
+    clearTimeout(pageTranslation.timer);
+    pageTranslation.timer = window.setTimeout(() => {
+      const queued = [...pageTranslation.queued];
+      pageTranslation.queued.clear();
+      void translateNodes(queued);
+    }, 80);
+  }
+
+  function watchDynamicPageTranslation() {
+    pageTranslation.observer?.disconnect();
+    pageTranslation.observer = new MutationObserver(records => {
+      const nodes = [];
+      for (const record of records) {
+        if (record.type === 'characterData') nodes.push(record.target);
+        for (const added of record.addedNodes || []) nodes.push(...collectTextNodes(added));
+      }
+      queueDynamicTranslation(nodes);
+    });
+    pageTranslation.observer.observe(document.body, { childList:true, subtree:true, characterData:true });
+  }
+
+  function browserTranslatorTarget(code) {
+    if (code === 'zh-Hans') return 'zh';
+    return code;
+  }
+
+  async function tryAutomaticBrowserPageTranslation(code, label, dialog) {
+    const TranslatorApi = globalThis.Translator;
+    if (!TranslatorApi?.availability || !TranslatorApi?.create) return false;
+    const targetLanguage = browserTranslatorTarget(code);
+    try {
+      const options = { sourceLanguage: 'zh-Hant', targetLanguage };
+      const availability = await TranslatorApi.availability(options);
+      if (availability === 'unavailable') return false;
+      stopAutomaticPageTranslation();
+      const generation = pageTranslation.generation;
+      setDialogInstruction(dialog, `目標語言：${label}\n正在啟動瀏覽器內建翻譯，整頁內容會一起翻譯…`);
+      dialog.hidden = false;
+      const translator = await TranslatorApi.create({
+        ...options,
+        monitor(monitor) {
+          monitor.addEventListener('downloadprogress', event => {
+            const percent = Math.max(0, Math.min(100, Math.round(Number(event.loaded || 0) * 100)));
+            setDialogInstruction(dialog, `目標語言：${label}\n第一次使用需下載瀏覽器語言包：${percent}%`);
+          });
+        }
+      });
+      if (generation !== pageTranslation.generation) {
+        try { translator.destroy?.(); } catch {}
+        return true;
+      }
+      pageTranslation.translator = translator;
+      pageTranslation.target = targetLanguage;
+      document.documentElement.lang = targetLanguage;
+      await translateNodes(collectTextNodes(document.body), generation);
+      watchDynamicPageTranslation();
+      setDialogInstruction(dialog, `目標語言：${label}\n已使用瀏覽器內建功能完成整頁翻譯；後續畫面新出現的文字也會自動翻譯。`);
+      return true;
+    } catch {
+      stopAutomaticPageTranslation();
+      return false;
+    }
+  }
+
+  async function requestBrowserPageTranslation(option) {
     const code = option.dataset.language || '';
     const label = (option.textContent || '').trim() || code;
     const menu = option.closest('[data-v290-menu]');
     if (menu) menu.hidden = true;
+    option.parentElement?.querySelectorAll('.v290-option').forEach(el => el.classList.toggle('is-active', el === option));
+    redrawTranslateButton(document.querySelector('[data-v290-translate]'), code === 'zh-Hant' ? 'Translate' : label);
     const dialog = ensureDialog();
     if (code === 'zh-Hant') {
-      setDialogInstruction(dialog, '目前網站原文就是繁體中文。如果瀏覽器已翻譯，可使用瀏覽器的「顯示原文」。');
+      stopAutomaticPageTranslation();
+      setDialogInstruction(dialog, '已恢復網站原本的繁體中文。若先前是 Safari／Chrome 選單啟動的翻譯，請在瀏覽器選擇「顯示原文」。');
       dialog.hidden = false;
       return;
     }
     document.documentElement.setAttribute('translate', 'yes');
-    setDialogInstruction(dialog, browserInstruction(label));
+    setDialogInstruction(dialog, `目標語言：${label}\n正在檢查這台瀏覽器能否自動使用內建整頁翻譯…`);
     dialog.hidden = false;
+    const automatic = await tryAutomaticBrowserPageTranslation(code, label, dialog);
+    if (!automatic) {
+      setDialogInstruction(dialog, browserInstruction(label));
+      dialog.hidden = false;
+    }
   }
 
-  // 用捕捉階段攔截舊 AI 翻譯事件，確保不會送出任何 Cloudflare AI 外語翻譯請求。
+  // 捕捉舊翻譯選單事件：不再送 Cloudflare AI 翻譯 API，改成瀏覽器端整頁翻譯。
   document.addEventListener('click', (event) => {
     const option = event.target && event.target.closest ? event.target.closest('.v290-option[data-language]') : null;
     if (!option) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    requestBrowserPageTranslation(option);
+    void requestBrowserPageTranslation(option);
   }, true);
 
   function polish() {
@@ -222,10 +357,11 @@
     if (panel) {
       const title = panel.querySelector('.v290-title');
       if (title) title.remove();
-      redrawTranslateButton(panel.querySelector('[data-v290-translate]'));
+      const translateButton = panel.querySelector('[data-v290-translate]');
+      if (!translateButton?.dataset.v293Ready) redrawTranslateButton(translateButton);
       const expand = panel.querySelector('[data-v290-expand]');
       if (expand) { expand.textContent = '放大'; expand.setAttribute('aria-label', '放大逐字稿'); }
-      enforcePermanentLayout(panel);
+      anchorTranscriptAbovePlayer(panel);
       const line = panel.querySelector('[data-v290-line]');
       guardSubtitleDisplay(line);
       fitTranscriptLine(line);
