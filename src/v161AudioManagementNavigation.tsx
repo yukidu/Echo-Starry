@@ -13,6 +13,12 @@ const originalInputClick = HTMLInputElement.prototype.click;
 const originalScrollIntoView = Element.prototype.scrollIntoView;
 
 type ManageMode = 'mine' | 'community';
+type TranscriptProgressItem = {
+  trackId: string;
+  status: string;
+  error?: string | null;
+  updatedAt?: number;
+};
 
 function normalize(value: string | null | undefined) {
   return String(value || '').replace(/\s+/g, ' ').trim();
@@ -20,6 +26,21 @@ function normalize(value: string | null | undefined) {
 
 function lower(value: string | null | undefined) {
   return normalize(value).toLocaleLowerCase('zh-Hant');
+}
+
+function transcriptProgressPresentation(item?: TranscriptProgressItem) {
+  switch (item?.status) {
+    case 'processing':
+      return { label: '正在撰寫逐字稿', className: 'is-processing' };
+    case 'ready':
+      return { label: '已完成逐字稿', className: 'is-ready' };
+    case 'failed':
+      return { label: '逐字稿異常', className: 'is-failed' };
+    case 'queued':
+    case 'pending':
+    default:
+      return { label: '排隊中逐字稿', className: 'is-queued' };
+  }
 }
 
 function readUser(): UserProfile | null {
@@ -112,6 +133,15 @@ function installStyles() {
     .dark .v161-track-title { color:rgb(241 245 249); }
     .v161-track-meta { margin-top:.06rem; font-size:.68rem; line-height:1.05rem; color:rgb(100 116 139); }
     .dark .v161-track-meta { color:rgb(148 163 184); }
+    .v161-transcript-status { display:inline-flex; align-items:center; margin-top:.22rem; border-radius:999px; padding:.18rem .48rem; font-size:.66rem; line-height:1rem; font-weight:900; }
+    .v161-transcript-status.is-processing { background:rgb(254 243 199); color:rgb(146 64 14); }
+    .v161-transcript-status.is-ready { background:rgb(209 250 229); color:rgb(4 120 87); }
+    .v161-transcript-status.is-failed { background:rgb(254 226 226); color:rgb(190 24 93); }
+    .v161-transcript-status.is-queued { background:rgb(219 234 254); color:rgb(29 78 216); }
+    .dark .v161-transcript-status.is-processing { background:rgb(120 53 15 / .45); color:rgb(253 230 138); }
+    .dark .v161-transcript-status.is-ready { background:rgb(6 78 59 / .5); color:rgb(167 243 208); }
+    .dark .v161-transcript-status.is-failed { background:rgb(127 29 29 / .5); color:rgb(254 202 202); }
+    .dark .v161-transcript-status.is-queued { background:rgb(30 58 138 / .5); color:rgb(191 219 254); }
     .v161-actions { display:flex; gap:.28rem; align-items:center; }
     .v161-action { display:inline-flex; align-items:center; justify-content:center; gap:.2rem; min-height:1.9rem; padding:.3rem .48rem; border-radius:.6rem; font-size:.7rem; font-weight:850; white-space:nowrap; }
     .v161-edit { background:color-mix(in srgb,var(--color-primary,#c06c84) 12%,white); color:var(--color-primary,#c06c84); }
@@ -145,6 +175,8 @@ function TrackManagement() {
   const [error, setError] = useState('');
   const [editingTrack, setEditingTrack] = useState<Track | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [transcriptStatuses, setTranscriptStatuses] = useState<Record<string, TranscriptProgressItem>>({});
+  const [transcriptStatusesReady, setTranscriptStatusesReady] = useState(false);
   const returnScrollRef = useRef(0);
 
   useEffect(() => {
@@ -161,6 +193,40 @@ function TrackManagement() {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (!superAdmin) return;
+    let cancelled = false;
+    const loadTranscriptStatuses = async () => {
+      try {
+        const response = await fetch('/api/v281/transcripts/bulk-status', {
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { Accept: 'application/json' }
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        const next: Record<string, TranscriptProgressItem> = {};
+        for (const item of Array.isArray(data?.items) ? data.items : []) {
+          const trackId = normalize(item?.trackId);
+          if (!trackId) continue;
+          next[trackId] = {
+            trackId,
+            status: normalize(item?.status) || 'pending',
+            error: normalize(item?.error) || null,
+            updatedAt: Number(item?.updatedAt || 0)
+          };
+        }
+        if (!cancelled) {
+          setTranscriptStatuses(next);
+          setTranscriptStatusesReady(true);
+        }
+      } catch {}
+    };
+    void loadTranscriptStatuses();
+    const timer = window.setInterval(() => { void loadTranscriptStatuses(); }, 15000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [superAdmin]);
 
   useEffect(() => {
     if (!superAdmin) return;
@@ -273,11 +339,23 @@ function TrackManagement() {
           {visibleTracks.map(track => {
             const permission = !track.requiredRank || track.requiredRank === '無' ? '公開' : track.requiredRank;
             const speakerRank = normalize(track.speakerRank) && track.speakerRank !== '無' ? ` ${track.speakerRank}` : '';
+            const transcriptItem = transcriptStatuses[track.id];
+            const transcriptBadge = superAdmin && transcriptStatusesReady && normalize(track.audioUrl)
+              ? transcriptProgressPresentation(transcriptItem)
+              : null;
             return (
               <div className="v161-track-row" key={track.id}>
                 <div className="min-w-0">
                   <div className="v161-track-title">{track.title || '未命名音檔'}</div>
                   <div className="v161-track-meta">{track.speaker || '未設定講者'}{speakerRank} · {permission} · 上傳 {formatDate(track.uploadDate)}</div>
+                  {transcriptBadge && (
+                    <div
+                      className={`v161-transcript-status ${transcriptBadge.className}`}
+                      title={transcriptItem?.error || transcriptBadge.label}
+                    >
+                      {transcriptBadge.label}
+                    </div>
+                  )}
                   {superAdmin && mode === 'community' && <div className="v161-track-meta inline-flex items-center gap-1"><UserRound className="h-3 w-3" />網友：{memberNameFor(track)}</div>}
                 </div>
                 <div className="v161-actions">
