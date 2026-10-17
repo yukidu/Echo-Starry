@@ -1,6 +1,7 @@
 import type { Env } from './index';
 import appWorker from './starryMainBatteryGameRouter';
 import { handleStarryIdRandomMotto } from './starryIdRandomMottoRouter';
+import { handleStarryEcosystemAuthEntry } from './starryEcosystemAuthEntryRouter';
 
 // Workflow class 必須由正式 Worker 入口匯出；保留既有安全入口同時掛載逐字稿 Workflow。
 export { TranscriptWorkflow } from './transcriptWorkflowV281';
@@ -262,6 +263,9 @@ function isTranscriptV281Path(pathname: string) {
 export default {
   async fetch(request: Request, env: Env, ctx?: any): Promise<Response> {
     const url = new URL(request.url);
+
+    const ecosystemAuthResponse = handleStarryEcosystemAuthEntry(request, env);
+    if (ecosystemAuthResponse) return ecosystemAuthResponse;
 
     if (isTranscriptV281Path(url.pathname)) {
       const transcript = await import('./transcriptV281Gateway');
