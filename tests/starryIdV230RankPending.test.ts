@@ -6,10 +6,13 @@ const rank = readFileSync('worker/starryIdRankUpdateRouter.ts', 'utf8');
 const client = readFileSync('worker/starryIdV230ClientRouter.ts', 'utf8');
 const notifications = readFileSync('worker/starryIdNotificationsRouter.ts', 'utf8');
 
-test('v230 snapshots the last approved rank before a member submits a new rank', () => {
-  assert.match(rank, /approvedRank=CASE WHEN TRIM\(COALESCE\(approvedRank,''\)\)='' AND COALESCE\(rankApproved,0\)=1 THEN rank ELSE approvedRank END/);
-  assert.match(rank, /rankApproved=0,rankAuditStatus='pending'/);
-  assert.match(rank, /approvedRank: text\(after\?\.approvedRank\)/);
+test('v306 preserves the last approved rank before a member submits a new rank', () => {
+  assert.match(rank, /const preservedApprovedRank = text\(current\.approvedRank\) \|\| \(Number\(current\.rankApproved \|\| 0\) === 1 \? text\(current\.rank\) : ''\)/);
+  assert.match(rank, /approvedRank: preservedApprovedRank/);
+  assert.match(rank, /rankApproved: 0/);
+  assert.match(rank, /rankAuditStatus: 'pending'/);
+  assert.match(rank, /UPDATE profiles SET approvedRank=\?,rank=\?,rankApproved=0,rankAuditStatus='pending'/);
+  assert.match(rank, /await db\.batch\(\[update, \.\.\.auditStatements\]\)/);
 });
 
 test('v230 displays the exact pending-review message below the rank field', () => {
