@@ -1,5 +1,6 @@
 import appWorker from './adminUserDeleteRouter';
 import sessionWorker from './sessionCookieRouter';
+import { issueEchoIosLoginHandoff } from './starryIdCentralRouter';
 import type { Env } from './index';
 
 const LOGIN_PATH = '/';
@@ -65,9 +66,9 @@ function failurePage(message: string, status = 400) {
 </html>`, status);
 }
 
-export function successPage(user: any, credential: string) {
+export function successPage(user: any, ticket: string) {
   const serializedUser = safeJson(user);
-  const serializedCredential = safeJson(credential);
+  const serializedTicket = safeJson(ticket);
   return html(`<!doctype html>
 <html lang="zh-Hant-TW">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>登入完成</title></head>
@@ -83,14 +84,14 @@ export function successPage(user: any, credential: string) {
     (async function () {
       try {
         var user = ${serializedUser};
-        // First create the host-only ID cookie. Do not write cached identity
-        // before both central and Echo authenticate the same Google account.
-        var centralResponse = await fetch('https://id.starry.phd/api/google-sync', {
+        // A short-lived server-issued one-time ticket creates the ID cookie.
+        // Google credentials remain on the server and never enter this page.
+        var centralResponse = await fetch('https://id.starry.phd/api/mobile-login/complete', {
           method: 'POST',
           credentials: 'include',
           cache: 'no-store',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ credential: ${serializedCredential}, appId: 'echostars' })
+          body: JSON.stringify({ ticket: ${serializedTicket} })
         });
         var centralData = await centralResponse.json().catch(function () { return {}; });
         if (!centralResponse.ok || !centralData.success || !centralData.user || !centralData.user.id) {
@@ -167,13 +168,26 @@ async function handleGoogleRedirect(request: Request, env: Env) {
     return failurePage(data?.error || 'Google 登入驗證失敗，請重新選擇 Google 帳號。', response.status || 401);
   }
 
-  // The return page installs Echo's cookie after central ID succeeds.
-  // Do not publish an Echo-only cookie on a half-completed iOS login.
+  // No Echo-only cookie should be published on a half-completed login.
+  // Only a one-time, 90-second handoff code reaches the browser, never
+  // the submitted Google ID token.
+  let handoff: { code: string; email: string };
+  try {
+    handoff = await issueEchoIosLoginHandoff(env, credential);
+  } catch (error) {
+    console.warn('iOS central login handoff failed', {
+      code: error instanceof Error ? error.message : 'unknown'
+    });
+    return failurePage('繁星通行證暫時無法完成登入，請稍後重試。', 503);
+  }
+  if (handoff.email !== String(data.user.email || '').trim().toLowerCase()) {
+    return failurePage('會員身分不一致，請重新登入。', 409);
+  }
   return successPage({
     ...data.user,
     _authToken: data.authToken,
     _sessionExpiresAt: data.sessionExpiresAt
-  }, credential);
+  }, handoff.code);
 }
 
 export default {
