@@ -102,18 +102,44 @@
     dialog.id = 'v293-browser-translate-dialog';
     dialog.className = 'v293-translate-dialog';
     dialog.hidden = true;
-    dialog.innerHTML = '<div class="v293-translate-card" role="dialog" aria-modal="true"><h3>🌐 Browser Translate</h3><p data-v293-instruction></p><p class="v293-translate-note">這是瀏覽器的整頁翻譯，不使用繁星回聲的 Cloudflare AI，因此不會產生外語 AI 翻譯費。</p><button type="button" class="v293-translate-close">知道了</button></div>';
+
+    const card = document.createElement('div');
+    card.className = 'v293-translate-card';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-modal', 'true');
+    const title = document.createElement('h3');
+    title.textContent = '🌐 Browser Translate';
+    const instruction = document.createElement('p');
+    instruction.dataset.v293Instruction = '1';
+    const note = document.createElement('p');
+    note.className = 'v293-translate-note';
+    note.textContent = '這是瀏覽器的整頁翻譯，不使用繁星回聲的 Cloudflare AI，因此不會產生外語 AI 翻譯費。';
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'v293-translate-close';
+    close.textContent = '知道了';
+    card.append(title, instruction, note, close);
+    dialog.appendChild(card);
     document.body.appendChild(dialog);
-    dialog.querySelector('.v293-translate-close').onclick = () => { dialog.hidden = true; };
+    close.onclick = () => { dialog.hidden = true; };
     dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.hidden = true; });
     return dialog;
   }
 
   function browserInstruction(label) {
+    const safeLabel = String(label || '').trim();
     const ua = navigator.userAgent || '';
     const safari = /Safari/i.test(ua) && !/Chrome|CriOS|Chromium|Android/i.test(ua);
-    if (safari) return `目標語言：<span class="v293-translate-target">${label}</span><br>請點 Safari 網址列的「頁面選單／aA」→「翻譯網站」→ 選擇這個語言。`;
-    return `目標語言：<span class="v293-translate-target">${label}</span><br>請點 Chrome 的「⋮」選單 →「翻譯」→ 選擇這個語言。`;
+    if (safari) return `目標語言：${safeLabel}\n請點 Safari 網址列的「頁面選單／aA」→「翻譯網站」→ 選擇這個語言。`;
+    return `目標語言：${safeLabel}\n請點 Chrome 的「⋮」選單 →「翻譯」→ 選擇這個語言。`;
+  }
+
+  function setDialogInstruction(dialog, value) {
+    const instruction = dialog.querySelector('[data-v293-instruction]');
+    if (instruction) {
+      instruction.textContent = String(value || '');
+      instruction.style.whiteSpace = 'pre-line';
+    }
   }
 
   function requestBrowserPageTranslation(option) {
@@ -121,15 +147,14 @@
     const label = (option.textContent || '').trim() || code;
     const menu = option.closest('[data-v290-menu]');
     if (menu) menu.hidden = true;
+    const dialog = ensureDialog();
     if (code === 'zh-Hant') {
-      const dialog = ensureDialog();
-      dialog.querySelector('[data-v293-instruction]').innerHTML = '目前網站原文就是 <span class="v293-translate-target">繁體中文</span>。如果瀏覽器已翻譯，可使用瀏覽器的「顯示原文」。';
+      setDialogInstruction(dialog, '目前網站原文就是繁體中文。如果瀏覽器已翻譯，可使用瀏覽器的「顯示原文」。');
       dialog.hidden = false;
       return;
     }
     document.documentElement.setAttribute('translate', 'yes');
-    const dialog = ensureDialog();
-    dialog.querySelector('[data-v293-instruction]').innerHTML = browserInstruction(label);
+    setDialogInstruction(dialog, browserInstruction(label));
     dialog.hidden = false;
   }
 
