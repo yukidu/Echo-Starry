@@ -3,6 +3,7 @@ import appWorker from './starryMainBatteryGameRouter';
 import { handleStarryIdRandomMotto } from './starryIdRandomMottoRouter';
 import { handleStarryEcosystemAuthEntry } from './starryEcosystemAuthEntryRouter';
 import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
+import { handleQaRequest, processQaAfterComment } from './aiSpeakerQaRouter';
 
 // Workflow / Container named handlers 必須由正式安全入口匯出，不改既有網站路由。
 export { TranscriptWorkflow } from './transcriptWorkflowV282';
@@ -271,6 +272,26 @@ export default {
     if (isTranscriptV281Path(url.pathname)) {
       const transcript = await import('./transcriptV281Gateway');
       return transcript.default.fetch(request, env as any, ctx as any);
+    }
+
+    // First-party transcript QA management and public quota status.
+    if (url.pathname.startsWith('/api/qa/')) {
+      const qa = await handleQaRequest(request, env as any);
+      if (qa) return qa;
+    }
+
+    // Community comments remain the source of truth. Trigger AI only after
+    // the real comment POST succeeded; never on edited/replayed comments.
+    if (url.hostname === 'echo.starry.phd' &&
+        request.method.toUpperCase() === 'POST' &&
+        /^\/api\/tracks\/[^/]+\/comments$/.test(url.pathname)) {
+      const payload: any = await request.clone().json().catch(() => ({}));
+      const response = await appWorker.fetch(request, env, ctx);
+      if (response.ok && (payload.qaMode === 'current' || payload.qaMode === 'all')) {
+        const saved: any = await response.clone().json().catch(() => null);
+        if (saved?.id) await processQaAfterComment(request, env as any, ctx, saved, payload.qaMode);
+      }
+      return response;
     }
 
     const randomMottoResponse = await handleStarryIdRandomMotto(request, env);

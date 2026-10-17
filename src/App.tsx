@@ -1610,7 +1610,7 @@ export default function App() {
   };
 
   // Add Comment (Requirement 3 & 6: 支持最大化視窗與通知頁直接快速回覆留言)
-  const handleAddComment = async (content: string, replyToId?: string, replyToAuthor?: string, trackIdOverride?: string) => {
+  const handleAddComment = async (content: string, replyToId?: string, replyToAuthor?: string, trackIdOverride?: string, qaMode?: 'current' | 'all' | 'off') => {
     const targetTrackId = trackIdOverride || (selectedDetailTrack || currentTrack)?.id;
     if (!targetTrackId) return;
     if (currentTrack?.id === targetTrackId) await syncPlaybackToCloud(true);
@@ -1633,7 +1633,8 @@ export default function App() {
       content,
       replyToId,
       replyToAuthor,
-      vipPassword: vipPasswordForTrack(targetTrackId)
+      vipPassword: vipPasswordForTrack(targetTrackId),
+      qaMode: qaMode && qaMode !== 'off' ? qaMode : undefined
     };
 
     const res = await fetch(`/api/tracks/${targetTrackId}/comments`, {
@@ -1652,6 +1653,17 @@ export default function App() {
     window.dispatchEvent(new CustomEvent('echostars:sticker-changed'));
     if (activeCommentsTrackIdRef.current === targetTrackId) setComments(prev => [newComment, ...prev]);
     setAllComments(prev => [newComment, ...prev]);
+    // Background reply may finish after the original comment POST.
+    // Refresh only this active discussion twice, not the whole comment database.
+    if (qaMode && qaMode !== 'off') {
+      for (const wait of [6500, 16000]) {
+        window.setTimeout(() => {
+          if (activeCommentsTrackIdRef.current !== targetTrackId) return;
+          void apiJson('/api/tracks/' + encodeURIComponent(targetTrackId) + '/comments')
+            .then(list => { if (Array.isArray(list)) setComments(list); }).catch(() => {});
+        }, wait);
+      }
+    }
 
     setTracks(prev =>
       prev.map(t =>
