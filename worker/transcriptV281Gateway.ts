@@ -1,6 +1,7 @@
 import type { Env } from './index';
 import transcriptWorker from './transcriptMemberNotificationsRouter';
 import { queueAllPendingTranscripts, transcriptBulkStatus } from './transcriptBulkScheduler';
+import { handleTranscriptTranslationV285 } from './transcriptTranslationV285';
 
 const SESSION_COOKIE = 'echostars_session';
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{30,}$/;
@@ -54,6 +55,11 @@ export default {
       const actor = await superAdmin(request, env);
       if (!actor) return json({ error: '只有超級管理員可以查看整批逐字稿狀態' }, 403);
       return json({ success: true, ...(await transcriptBulkStatus(env as any)) });
+    }
+    const item = url.pathname.match(/^\/api\/v281\/transcripts\/([^/]+)$/);
+    const translate = text(url.searchParams.get('translate'));
+    if (item && translate && request.method.toUpperCase() === 'POST') {
+      return handleTranscriptTranslationV285(request, env, ctx, decodeURIComponent(item[1]), translate);
     }
     return transcriptWorker.fetch(request, env, ctx);
   }
