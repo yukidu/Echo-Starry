@@ -5,10 +5,10 @@ import { readFileSync } from 'node:fs';
 const wrangler = readFileSync('wrangler.toml', 'utf8');
 const workflow = readFileSync('worker/transcriptWorkflowV282.ts', 'utf8');
 const server = readFileSync('container/audio-segmenter/server.mjs', 'utf8');
-const entry = readFileSync('worker/starryMainAudioSegmenterEntry.ts', 'utf8');
+const entry = readFileSync('worker/starryMainInlineLoginRouter.ts', 'utf8');
 
-test('v282 keeps the original safe router as default entry', () => {
-  assert.match(entry, /export \{ default \} from '\.\/starryMainInlineLoginRouter'/);
+test('v282 keeps the audited safe router as the production entry', () => {
+  assert.match(wrangler, /main\s*=\s*"worker\/starryMainInlineLoginRouter\.ts"/);
 });
 
 test('v282 uses ffmpeg time-based segments instead of byte slicing', () => {
@@ -19,11 +19,11 @@ test('v282 uses ffmpeg time-based segments instead of byte slicing', () => {
   assert.match(workflow, /SEGMENT_SECONDS = 180/);
 });
 
-test('v282 binds a durable-object container and new transcript workflow entry', () => {
+test('v282 binds a durable-object container and new transcript workflow through safe entry', () => {
   assert.match(wrangler, /AUDIO_SEGMENTER/);
   assert.match(wrangler, /AudioSegmenterContainer/);
-  assert.match(wrangler, /worker\/starryMainAudioSegmenterEntry\.ts/);
   assert.match(entry, /TranscriptWorkflow.*transcriptWorkflowV282/);
+  assert.match(entry, /AudioSegmenterContainer.*audioSegmenterContainer/);
 });
 
 test('v282 stores json txt and vtt transcript formats', () => {
