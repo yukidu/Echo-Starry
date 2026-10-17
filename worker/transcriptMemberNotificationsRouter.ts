@@ -1,6 +1,7 @@
 import type { Env } from './index';
 import moderationWorker from './transcriptModerationRouter';
 import { createStarryNotification } from './starryIdNotificationsRouter';
+import { injectTranscriptLedgerSettings } from './transcriptLedgerSettingsInjector';
 
 const SESSION_COOKIE = 'echostars_session';
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{30,}$/;
@@ -144,13 +145,16 @@ export default {
     }
 
     const action = reviewAction(url.pathname);
-    const response = await moderationWorker.fetch(request, env as any, ctx as any);
+    let response = await moderationWorker.fetch(request, env as any, ctx as any);
     if (action && response.ok) {
       const task = notifyMemberAfterReview(env, action.correctionId, action.action).catch(error => {
         console.warn('Transcript member notification failed:', error);
       });
       if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(task);
       else await task;
+    }
+    if (url.hostname.toLowerCase() === 'id.starry.phd' && url.pathname === '/battery-ledger') {
+      response = await injectTranscriptLedgerSettings(response);
     }
     return response;
   }

@@ -1,54 +1,45 @@
 (() => {
-  if (window.__starryTranscriptUiV295) return;
-  window.__starryTranscriptUiV295 = true;
+  if (window.__starryTranscriptUiV296) return;
+  window.__starryTranscriptUiV296 = true;
 
-  const TRANSLATE_ICON = `
-    <svg class="v293-translate-icon" viewBox="0 0 28 24" aria-hidden="true" focusable="false">
-      <rect x="2" y="3" width="15" height="15" rx="4" class="v293-icon-back"></rect>
-      <rect x="11" y="7" width="15" height="15" rx="4" class="v293-icon-front"></rect>
-      <text x="9.5" y="13.6" text-anchor="middle" class="v293-icon-zh">文</text>
-      <text x="18.5" y="18.1" text-anchor="middle" class="v293-icon-en">A</text>
-      <path d="M6.2 19.1c2.6 1.7 5.6 2.2 8.7 1.4" class="v293-icon-arrow"></path>
-      <path d="M6 19.2l2.9-.2-1.2 2.6" class="v293-icon-arrow"></path>
-    </svg>`;
   const DISPLAY_END_PUNCTUATION = new Set(['、','，','！','。',',','!','.']);
   const nativeTextContent = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
-  const PAGE_TRANSLATE_SKIP = 'script,style,noscript,textarea,input,select,option,.v293-translate-dialog,[translate="no"],[data-v293-no-page-translate]';
-  const pageTranslation = {
-    translator: null,
-    target: '',
-    generation: 0,
-    observer: null,
-    nodes: new Map(),
-    queued: new Set(),
-    timer: 0
-  };
+  const PAGE_TRANSLATE_SKIP = 'script,style,noscript,textarea,input,select,option,.v296-translate-dialog,[translate="no"],[data-v296-no-page-translate]';
+  const floating = { trackId:'', segments:[], loading:false, generation:0, tracks:null };
+  const pageTranslation = { translator:null, generation:0, observer:null, nodes:new Map(), queued:new Set(), timer:0 };
+
+  const TRANSLATE_ICON = `
+    <svg class="v296-translate-icon" viewBox="0 0 30 26" aria-hidden="true" focusable="false">
+      <rect x="2.2" y="2.2" width="17" height="17" rx="5" class="v296-icon-back"/>
+      <path d="M6.1 10.7h9.2M10.7 6.1v9.2M6.9 15.3c2.4-1.2 4.2-3.2 5.1-5.9M14.8 15.3c-2.3-1.2-4-3.2-4.9-5.9" class="v296-icon-mark"/>
+      <rect x="10.8" y="6.8" width="17" height="17" rx="5" class="v296-icon-front"/>
+      <path d="M15.1 18.7l3.7-7.5 3.7 7.5M16.4 16.2h4.8" class="v296-icon-a"/>
+    </svg>`;
 
   const style = document.createElement('style');
+  style.id = 'starry-transcript-ui-v296-style';
   style.textContent = `
     #v290-transcript-panel .v290-title{display:none!important}
     #v290-transcript-panel .v290-head{justify-content:center!important;align-items:center!important;margin-bottom:.5rem!important}
     #v290-transcript-panel .v290-tools{margin-left:0!important;width:100%!important;justify-content:center!important;gap:.55rem!important}
     #v290-transcript-panel .v290-menu{right:auto!important;left:50%!important;transform:translateX(-50%)!important}
-    #v290-transcript-panel .v290-btn{min-height:2.35rem!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:.38rem!important}
-    #v290-transcript-panel .v290-btn:disabled{opacity:.72!important}
+    #v290-transcript-panel .v290-btn{min-height:2.5rem!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:.38rem!important}
+    #v290-transcript-panel [data-v290-expand]{background:var(--color-primary,#c06c84)!important;border-color:var(--color-primary,#c06c84)!important;color:#fff!important;box-shadow:0 7px 18px color-mix(in srgb,var(--color-primary,#c06c84) 30%,transparent)!important;font-weight:950!important}
+    #v290-transcript-panel [data-v290-expand]:active{transform:scale(.97)}
     #v290-transcript-panel .v290-stage{height:4.65rem!important;min-height:4.65rem!important;max-height:4.65rem!important;padding:.34rem .62rem!important;box-sizing:border-box!important;overflow:hidden!important}
     #v290-transcript-panel .v290-line{line-height:1.22!important;max-height:100%!important;overflow:hidden!important;white-space:normal!important;word-break:break-word!important;overflow-wrap:anywhere!important}
     #v290-transcript-panel .v290-meta{padding-top:.3rem!important}
-    .v293-translate-icon{width:1.72rem;height:1.48rem;display:block;overflow:visible;flex:none}
-    .v293-icon-back{fill:#eef5ff;stroke:#3276d2;stroke-width:1.35}.v293-icon-front{fill:#fff;stroke:#7b61d1;stroke-width:1.35}
-    .dark .v293-icon-back{fill:#172554;stroke:#7db5ff}.dark .v293-icon-front{fill:#312e81;stroke:#c4b5fd}
-    .v293-icon-zh,.v293-icon-en{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-weight:900;fill:#245da8;font-size:7px;dominant-baseline:middle}
-    .v293-icon-en{fill:#6d4bc2;font-size:7.5px}.dark .v293-icon-zh{fill:#bfdbfe}.dark .v293-icon-en{fill:#ddd6fe}
-    .v293-icon-arrow{fill:none;stroke:#5f6f86;stroke-width:1.25;stroke-linecap:round;stroke-linejoin:round}.dark .v293-icon-arrow{stroke:#cbd5e1}
-    #v290-overlay.v290-overlay{height:8.8rem!important;min-height:8.8rem!important;max-height:8.8rem!important;padding:.55rem 3.35rem .55rem .7rem!important;border-radius:.9rem!important;background:rgba(0,0,0,.48)!important;box-sizing:border-box!important;overflow:hidden!important}
-    #v290-overlay .v290-overlay-line{position:absolute!important;left:.7rem!important;right:3.35rem!important;top:50%!important;transform:translateY(-50%)!important;width:auto!important;display:block!important;max-height:calc(100% - 1.1rem)!important;overflow:hidden!important;white-space:normal!important;word-break:break-word!important;overflow-wrap:anywhere!important;text-align:center!important;line-height:1.08!important}
-    #v290-overlay .v290-overlay-close{right:.38rem!important;top:50%!important;transform:translateY(-50%)!important;width:2.7rem!important;height:2.7rem!important;font-size:1.85rem!important;line-height:1!important;background:rgba(255,255,255,.18)!important}
-    .v293-translate-dialog{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(15,23,42,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
-    .v293-translate-dialog[hidden]{display:none!important}.v293-translate-card{width:min(25rem,94vw);border-radius:1.25rem;padding:1.1rem;background:#fff;color:#0f172a;box-shadow:0 24px 80px rgba(15,23,42,.32);font:700 1rem/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.dark .v293-translate-card{background:#172033;color:#f8fafc}
-    .v293-translate-card h3{margin:0 0 .45rem;font-size:1.15rem;font-weight:950}.v293-translate-card p{margin:.35rem 0}.v293-translate-target{font-size:1.1rem;font-weight:950;color:#6d4bc2}.dark .v293-translate-target{color:#ddd6fe}
-    .v293-translate-note{font-size:.84rem;opacity:.72}.v293-translate-close{width:100%;margin-top:.75rem;border:0;border-radius:.85rem;padding:.72rem;background:#334155;color:#fff;font-weight:900;cursor:pointer}
-    @media(max-width:420px){#v290-transcript-panel .v290-tools{gap:.4rem!important}#v290-transcript-panel .v290-btn{padding:.48rem .6rem!important}#v290-transcript-panel .v290-stage{height:4.4rem!important;min-height:4.4rem!important;max-height:4.4rem!important;padding:.3rem .48rem!important}#v290-overlay.v290-overlay{height:6.6rem!important;min-height:6.6rem!important;max-height:6.6rem!important;padding:.32rem 3.1rem .32rem .55rem!important}#v290-overlay .v290-overlay-line{left:.55rem!important;right:3.1rem!important;max-height:calc(100% - .64rem)!important}#v290-overlay .v290-overlay-close{width:2.5rem!important;height:2.5rem!important;font-size:1.7rem!important}}
+    .v296-translate-icon{width:1.75rem;height:1.52rem;display:block;overflow:hidden;flex:none}
+    .v296-icon-back{fill:color-mix(in srgb,var(--color-primary,#c06c84) 13%,#fff);stroke:color-mix(in srgb,var(--color-primary,#c06c84) 86%,#315a9b);stroke-width:1.4}
+    .v296-icon-front{fill:#fff;stroke:color-mix(in srgb,var(--color-primary,#c06c84) 72%,#6250a4);stroke-width:1.4}
+    .dark .v296-icon-front{fill:#172033}.v296-icon-mark,.v296-icon-a{fill:none;stroke:var(--color-primary,#c06c84);stroke-width:1.45;stroke-linecap:round;stroke-linejoin:round}.v296-icon-a{stroke-width:1.7}
+    #v290-overlay.v290-overlay{height:7.15rem!important;min-height:7.15rem!important;max-height:7.15rem!important;padding:.46rem 3.4rem .46rem .72rem!important;border-radius:1rem!important;background:rgba(0,0,0,.72)!important;box-sizing:border-box!important;overflow:hidden!important;box-shadow:0 12px 34px rgba(0,0,0,.34)!important}
+    #v290-overlay .v290-overlay-line{position:absolute!important;left:.72rem!important;right:3.4rem!important;top:50%!important;transform:translateY(-50%)!important;width:auto!important;display:block!important;max-height:calc(100% - .92rem)!important;overflow:hidden!important;white-space:normal!important;word-break:break-word!important;overflow-wrap:anywhere!important;text-align:center!important;line-height:1.08!important}
+    #v290-overlay .v290-overlay-close{right:.4rem!important;top:50%!important;transform:translateY(-50%)!important;width:2.7rem!important;height:2.7rem!important;font-size:1.85rem!important;line-height:1!important;background:rgba(255,255,255,.2)!important}
+    .v296-translate-dialog{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(15,23,42,.52);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+    .v296-translate-dialog[hidden]{display:none!important}.v296-translate-card{width:min(25rem,94vw);border-radius:1.25rem;padding:1.1rem;background:#fff;color:#0f172a;box-shadow:0 24px 80px rgba(15,23,42,.32);font:700 1rem/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.dark .v296-translate-card{background:#172033;color:#f8fafc}
+    .v296-translate-card h3{margin:0 0 .45rem;font-size:1.15rem;font-weight:950}.v296-translate-card p{margin:.35rem 0}.v296-translate-note{font-size:.84rem;opacity:.72}.v296-translate-close{width:100%;margin-top:.75rem;border:0;border-radius:.85rem;padding:.72rem;background:var(--color-primary,#c06c84);color:#fff;font-weight:900;cursor:pointer}
+    @media(max-width:420px){#v290-transcript-panel .v290-tools{gap:.4rem!important}#v290-transcript-panel .v290-btn{padding:.5rem .66rem!important}#v290-transcript-panel .v290-stage{height:4.4rem!important;min-height:4.4rem!important;max-height:4.4rem!important;padding:.3rem .48rem!important}#v290-overlay.v290-overlay{height:7rem!important;min-height:7rem!important;max-height:7rem!important;padding:.4rem 3.15rem .4rem .58rem!important}#v290-overlay .v290-overlay-line{left:.58rem!important;right:3.15rem!important;max-height:calc(100% - .8rem)!important}#v290-overlay .v290-overlay-close{width:2.5rem!important;height:2.5rem!important;font-size:1.7rem!important}}
   `;
   document.head.appendChild(style);
 
@@ -61,8 +52,8 @@
   }
 
   function guardSubtitleDisplay(element) {
-    if (!element || element.dataset.v294DisplayGuard === '1') return;
-    element.dataset.v294DisplayGuard = '1';
+    if (!element || element.dataset.v296DisplayGuard === '1') return;
+    element.dataset.v296DisplayGuard = '1';
     if (nativeTextContent?.get && nativeTextContent?.set) {
       try {
         Object.defineProperty(element, 'textContent', {
@@ -79,20 +70,33 @@
 
   function redrawTranslateButton(button, label = 'Translate') {
     if (!button) return;
-    button.dataset.v293Ready = '1';
+    button.dataset.v296Ready = '1';
     button.disabled = false;
     button.innerHTML = `${TRANSLATE_ICON}<span>${String(label || 'Translate')}</span><span aria-hidden="true">▾</span>`;
-    button.setAttribute('aria-label', 'Translate whole page with browser');
+    button.setAttribute('aria-label', '使用瀏覽器整頁翻譯');
   }
 
-  // 唯一的永久版面規則：逐字稿永遠直接放在播放器前面。
-  // 不再搬動播放器、關鍵字或其他 React 區塊，避免重新渲染後位置被蓋回去。
   function anchorTranscriptAbovePlayer(panel) {
     const timeline = document.getElementById('audio-timeline');
     if (!timeline || !panel || !timeline.parentElement) return;
-    if (panel.parentElement !== timeline.parentElement || panel.nextElementSibling !== timeline) {
-      timeline.insertAdjacentElement('beforebegin', panel);
-    }
+    if (panel.parentElement !== timeline.parentElement || panel.nextElementSibling !== timeline) timeline.insertAdjacentElement('beforebegin', panel);
+  }
+
+  function findRoundedBlockByText(label, partial = false) {
+    const nodes = [...document.querySelectorAll('span,h2,h3,h4,button')];
+    const hit = nodes.find(node => {
+      const value = String(node.textContent || '').replace(/\s+/g,' ').trim();
+      return partial ? value.includes(label) : value === label;
+    });
+    if (!hit) return null;
+    return hit.closest('.rounded-2xl') || hit.closest('section') || hit.parentElement;
+  }
+
+  function moveKeywordsAboveReferences() {
+    const keyword = findRoundedBlockByText('網友關鍵字', true);
+    const reference = findRoundedBlockByText('參考資料');
+    if (!keyword || !reference || keyword === reference || !reference.parentElement) return;
+    if (keyword.parentElement === reference.parentElement && keyword.nextElementSibling !== reference) reference.parentElement.insertBefore(keyword, reference);
   }
 
   function fitTranscriptLine(line) {
@@ -102,11 +106,10 @@
     const computed = getComputedStyle(stage);
     const availableHeight = Math.max(20, stage.clientHeight - parseFloat(computed.paddingTop || '0') - parseFloat(computed.paddingBottom || '0'));
     const maxPx = window.innerWidth <= 420 ? 21.5 : 24.8;
-    const minPx = 7.5;
+    const minPx = 8;
     let size = maxPx;
     line.style.fontSize = `${size}px`;
     line.style.maxHeight = 'none';
-    line.style.display = 'block';
     line.style.overflow = 'visible';
     while (size > minPx && line.scrollHeight > availableHeight + 1) {
       size -= .5;
@@ -124,8 +127,8 @@
     const computed = getComputedStyle(overlay);
     const availableHeight = Math.max(20, overlay.clientHeight - parseFloat(computed.paddingTop || '0') - parseFloat(computed.paddingBottom || '0'));
     const availableWidth = Math.max(40, overlay.clientWidth - parseFloat(computed.paddingLeft || '0') - parseFloat(computed.paddingRight || '0'));
-    const maxPx = window.innerWidth <= 420 ? 42 : 56;
-    const minPx = 8;
+    const maxPx = window.innerWidth <= 420 ? 43 : 57;
+    const minPx = 9;
     let size = maxPx;
     line.style.fontSize = `${size}px`;
     line.style.maxHeight = 'none';
@@ -140,51 +143,30 @@
   }
 
   function ensureDialog() {
-    let dialog = document.getElementById('v293-browser-translate-dialog');
+    let dialog = document.getElementById('v296-browser-translate-dialog');
     if (dialog) return dialog;
     dialog = document.createElement('div');
-    dialog.id = 'v293-browser-translate-dialog';
-    dialog.className = 'v293-translate-dialog';
+    dialog.id = 'v296-browser-translate-dialog';
+    dialog.className = 'v296-translate-dialog';
     dialog.hidden = true;
     dialog.setAttribute('translate', 'no');
-
-    const card = document.createElement('div');
-    card.className = 'v293-translate-card';
-    card.setAttribute('role', 'dialog');
-    card.setAttribute('aria-modal', 'true');
-    const title = document.createElement('h3');
-    title.textContent = '🌐 瀏覽器整頁翻譯';
-    const instruction = document.createElement('p');
-    instruction.dataset.v293Instruction = '1';
-    const note = document.createElement('p');
-    note.className = 'v293-translate-note';
-    note.textContent = '優先使用瀏覽器內建翻譯；不使用繁星回聲的 Cloudflare AI 外語翻譯。';
-    const close = document.createElement('button');
-    close.type = 'button';
-    close.className = 'v293-translate-close';
-    close.textContent = '知道了';
-    card.append(title, instruction, note, close);
-    dialog.appendChild(card);
+    dialog.innerHTML = '<div class="v296-translate-card" role="dialog" aria-modal="true"><h3>瀏覽器整頁翻譯</h3><p data-v296-instruction></p><p class="v296-translate-note">不使用 Cloudflare AI 外語翻譯；逐字稿仍只在雲端產生原文／繁體中文版本。</p><button type="button" class="v296-translate-close">知道了</button></div>';
     document.body.appendChild(dialog);
-    close.onclick = () => { dialog.hidden = true; };
-    dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.hidden = true; });
+    dialog.querySelector('.v296-translate-close').onclick = () => { dialog.hidden = true; };
+    dialog.addEventListener('click', event => { if (event.target === dialog) dialog.hidden = true; });
     return dialog;
   }
 
-  function browserInstruction(label) {
-    const safeLabel = String(label || '').trim();
-    const ua = navigator.userAgent || '';
-    const safari = /Safari/i.test(ua) && !/Chrome|CriOS|Chromium|Android/i.test(ua);
-    if (safari) return `目標語言：${safeLabel}\nSafari 不允許網站直接按下內建翻譯。請點網址列「頁面選單／aA」→「翻譯網站」→ 選擇這個語言，Safari 會翻譯整頁。`;
-    return `目標語言：${safeLabel}\n目前這台瀏覽器不開放網站直接啟動整頁翻譯。請點瀏覽器選單「翻譯」並選擇這個語言，即可翻譯整頁。`;
+  function setDialogInstruction(dialog, value) {
+    const instruction = dialog.querySelector('[data-v296-instruction]');
+    if (instruction) { instruction.textContent = String(value || ''); instruction.style.whiteSpace = 'pre-line'; }
   }
 
-  function setDialogInstruction(dialog, value) {
-    const instruction = dialog.querySelector('[data-v293-instruction]');
-    if (instruction) {
-      instruction.textContent = String(value || '');
-      instruction.style.whiteSpace = 'pre-line';
-    }
+  function browserInstruction(label) {
+    const ua = navigator.userAgent || '';
+    const safari = /Safari/i.test(ua) && !/Chrome|CriOS|Chromium|Android/i.test(ua);
+    if (safari) return `目標語言：${label}\n請點 Safari 網址列的「頁面選單／aA」→「翻譯網站」→ 選擇語言，Safari 會翻譯整頁。`;
+    return `目標語言：${label}\n這台瀏覽器目前不允許網站直接按下內建翻譯。請開啟瀏覽器選單「翻譯」並選擇語言，即可翻譯整頁。`;
   }
 
   function stopAutomaticPageTranslation() {
@@ -192,15 +174,11 @@
     pageTranslation.observer?.disconnect();
     pageTranslation.observer = null;
     clearTimeout(pageTranslation.timer);
-    pageTranslation.timer = 0;
     pageTranslation.queued.clear();
-    for (const [node, saved] of pageTranslation.nodes.entries()) {
-      if (node?.isConnected && node.nodeValue === saved.translated) node.nodeValue = saved.original;
-    }
+    for (const [node, saved] of pageTranslation.nodes.entries()) if (node?.isConnected && node.nodeValue === saved.translated) node.nodeValue = saved.original;
     pageTranslation.nodes.clear();
     try { pageTranslation.translator?.destroy?.(); } catch {}
     pageTranslation.translator = null;
-    pageTranslation.target = '';
     document.documentElement.lang = 'zh-Hant-TW';
   }
 
@@ -209,61 +187,36 @@
     const raw = String(node.nodeValue || '');
     if (!raw.trim() || !/[\p{L}\p{Script=Han}]/u.test(raw)) return false;
     const parent = node.parentElement;
-    if (!parent || parent.closest(PAGE_TRANSLATE_SKIP)) return false;
-    return true;
+    return Boolean(parent && !parent.closest(PAGE_TRANSLATE_SKIP));
   }
 
   function collectTextNodes(root) {
-    const nodes = [];
-    if (!root) return nodes;
+    if (!root) return [];
     if (root.nodeType === Node.TEXT_NODE) return shouldTranslateTextNode(root) ? [root] : [];
+    const nodes = [];
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     let node;
     while ((node = walker.nextNode())) if (shouldTranslateTextNode(node)) nodes.push(node);
     return nodes;
   }
 
-  async function translateTextNode(node, translator, generation) {
-    if (!shouldTranslateTextNode(node) || generation !== pageTranslation.generation) return;
-    const raw = String(node.nodeValue || '');
-    const previous = pageTranslation.nodes.get(node);
-    if (previous && raw === previous.translated) return;
-    const match = raw.match(/^(\s*)([\s\S]*?)(\s*)$/);
-    const prefix = match?.[1] || '';
-    const core = match?.[2] || '';
-    const suffix = match?.[3] || '';
-    if (!core.trim()) return;
-    try {
-      const translatedCore = await translator.translate(core);
-      if (generation !== pageTranslation.generation || !node.isConnected) return;
-      const translated = `${prefix}${translatedCore}${suffix}`;
-      pageTranslation.nodes.set(node, { original: raw, translated });
-      node.nodeValue = translated;
-    } catch {}
-  }
-
   async function translateNodes(nodes, generation = pageTranslation.generation) {
     const translator = pageTranslation.translator;
     if (!translator || generation !== pageTranslation.generation) return;
-    const unique = [...new Set(nodes)].filter(shouldTranslateTextNode);
-    for (let index = 0; index < unique.length; index += 6) {
-      if (generation !== pageTranslation.generation) return;
-      await Promise.all(unique.slice(index, index + 6).map(node => translateTextNode(node, translator, generation)));
+    for (const node of [...new Set(nodes)].filter(shouldTranslateTextNode)) {
+      const raw = String(node.nodeValue || '');
+      const previous = pageTranslation.nodes.get(node);
+      if (previous && raw === previous.translated) continue;
+      try {
+        const translated = await translator.translate(raw);
+        if (generation !== pageTranslation.generation || !node.isConnected) return;
+        pageTranslation.nodes.set(node, { original: raw, translated });
+        node.nodeValue = translated;
+      } catch {}
     }
   }
 
-  function queueDynamicTranslation(nodes) {
-    if (!pageTranslation.translator) return;
-    nodes.forEach(node => pageTranslation.queued.add(node));
-    clearTimeout(pageTranslation.timer);
-    pageTranslation.timer = window.setTimeout(() => {
-      const queued = [...pageTranslation.queued];
-      pageTranslation.queued.clear();
-      void translateNodes(queued);
-    }, 80);
-  }
-
-  function watchDynamicPageTranslation() {
+  function watchDynamicTranslation() {
     pageTranslation.observer?.disconnect();
     pageTranslation.observer = new MutationObserver(records => {
       const nodes = [];
@@ -271,52 +224,127 @@
         if (record.type === 'characterData') nodes.push(record.target);
         for (const added of record.addedNodes || []) nodes.push(...collectTextNodes(added));
       }
-      queueDynamicTranslation(nodes);
+      nodes.forEach(node => pageTranslation.queued.add(node));
+      clearTimeout(pageTranslation.timer);
+      pageTranslation.timer = window.setTimeout(() => {
+        const queued = [...pageTranslation.queued];
+        pageTranslation.queued.clear();
+        void translateNodes(queued);
+      }, 90);
     });
     pageTranslation.observer.observe(document.body, { childList:true, subtree:true, characterData:true });
-  }
-
-  function browserTranslatorTarget(code) {
-    if (code === 'zh-Hans') return 'zh';
-    return code;
   }
 
   async function tryAutomaticBrowserPageTranslation(code, label, dialog) {
     const TranslatorApi = globalThis.Translator;
     if (!TranslatorApi?.availability || !TranslatorApi?.create) return false;
-    const targetLanguage = browserTranslatorTarget(code);
+    const targetLanguage = code === 'zh-Hans' ? 'zh' : code;
     try {
-      const options = { sourceLanguage: 'zh-Hant', targetLanguage };
+      const options = { sourceLanguage:'zh-Hant', targetLanguage };
       const availability = await TranslatorApi.availability(options);
       if (availability === 'unavailable') return false;
       stopAutomaticPageTranslation();
       const generation = pageTranslation.generation;
-      setDialogInstruction(dialog, `目標語言：${label}\n正在啟動瀏覽器內建翻譯，整頁內容會一起翻譯…`);
+      setDialogInstruction(dialog, `目標語言：${label}\n正在使用瀏覽器內建翻譯，整頁內容會一起翻譯…`);
       dialog.hidden = false;
-      const translator = await TranslatorApi.create({
-        ...options,
-        monitor(monitor) {
-          monitor.addEventListener('downloadprogress', event => {
-            const percent = Math.max(0, Math.min(100, Math.round(Number(event.loaded || 0) * 100)));
-            setDialogInstruction(dialog, `目標語言：${label}\n第一次使用需下載瀏覽器語言包：${percent}%`);
-          });
-        }
-      });
-      if (generation !== pageTranslation.generation) {
-        try { translator.destroy?.(); } catch {}
-        return true;
-      }
+      const translator = await TranslatorApi.create(options);
+      if (generation !== pageTranslation.generation) { try { translator.destroy?.(); } catch {} return true; }
       pageTranslation.translator = translator;
-      pageTranslation.target = targetLanguage;
       document.documentElement.lang = targetLanguage;
       await translateNodes(collectTextNodes(document.body), generation);
-      watchDynamicPageTranslation();
-      setDialogInstruction(dialog, `目標語言：${label}\n已使用瀏覽器內建功能完成整頁翻譯；後續畫面新出現的文字也會自動翻譯。`);
+      watchDynamicTranslation();
+      setDialogInstruction(dialog, `目標語言：${label}\n已使用瀏覽器內建功能完成整頁翻譯。`);
       return true;
-    } catch {
-      stopAutomaticPageTranslation();
-      return false;
+    } catch { stopAutomaticPageTranslation(); return false; }
+  }
+
+  async function getTracks() {
+    if (floating.tracks) return floating.tracks;
+    try {
+      const response = await fetch('/api/tracks', { credentials:'same-origin', cache:'force-cache' });
+      const data = await response.json();
+      floating.tracks = Array.isArray(data) ? data : (data.tracks || data.data || []);
+    } catch { floating.tracks = []; }
+    return floating.tracks;
+  }
+
+  async function detectTrackId() {
+    const mini = document.querySelector('[data-echostars-media-session="1"][data-media-track-id]');
+    const miniId = mini?.getAttribute('data-media-track-id') || '';
+    if (miniId) return miniId;
+    const timeline = document.getElementById('audio-timeline');
+    if (!timeline) return floating.trackId;
+    const root = timeline.closest('.max-w-2xl') || timeline.parentElement || document.body;
+    const title = String(root.querySelector('h1')?.textContent || '').trim();
+    if (!title) return floating.trackId;
+    const tracks = await getTracks();
+    const same = tracks.filter(item => String(item?.title || '').trim() === title);
+    return same.length ? String(same[0].id || '') : floating.trackId;
+  }
+
+  function parseClock(value) {
+    const parts = String(value || '').trim().split(':').map(Number);
+    if (parts.some(Number.isNaN)) return NaN;
+    if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
+    if (parts.length === 2) return parts[0]*60 + parts[1];
+    return Number(parts[0] || 0);
+  }
+
+  function currentPlaybackTime() {
+    const audio = [...document.querySelectorAll('audio')].find(item => Number.isFinite(item.currentTime) && item.currentTime > 0) || document.querySelector('audio');
+    if (audio && Number.isFinite(audio.currentTime)) return Number(audio.currentTime || 0);
+    const mini = document.querySelector('[data-echostars-media-session="1"]');
+    const match = String(mini?.textContent || '').match(/(\d{1,2}:\d{2}(?::\d{2})?)\s*\/\s*\d/);
+    return match ? parseClock(match[1]) : 0;
+  }
+
+  async function loadFloatingTranscript(trackId) {
+    if (!trackId || floating.loading) return;
+    floating.loading = true;
+    const generation = ++floating.generation;
+    try {
+      const response = await fetch('/api/v281/transcripts/' + encodeURIComponent(trackId), { credentials:'same-origin', cache:'no-store' });
+      const data = await response.json().catch(() => ({}));
+      if (generation !== floating.generation) return;
+      floating.trackId = trackId;
+      floating.segments = Array.isArray(data.segments) ? data.segments.map(segment => ({ start:Number(segment.start||0), end:Number(segment.end||0), text:String(segment.text||'') })) : [];
+    } catch { if (generation === floating.generation) floating.segments = []; }
+    finally { if (generation === floating.generation) floating.loading = false; }
+  }
+
+  function activeFloatingSegment(time) {
+    if (!floating.segments.length) return null;
+    let prior = floating.segments[0];
+    for (const segment of floating.segments) {
+      if (time >= segment.start && time < segment.end) return segment;
+      if (segment.start <= time) prior = segment;
+      else break;
     }
+    return prior;
+  }
+
+  async function paintFloatingOverlay() {
+    const overlay = document.getElementById('v290-overlay');
+    if (!overlay || overlay.hidden) return;
+    const trackId = await detectTrackId();
+    if (trackId && trackId !== floating.trackId) await loadFloatingTranscript(trackId);
+    if (!floating.segments.length) return;
+    const segment = activeFloatingSegment(currentPlaybackTime());
+    const line = overlay.querySelector('[data-v290-overlay-line]');
+    if (line && segment) {
+      const next = displaySubtitleText(segment.text);
+      if (line.textContent !== next) line.textContent = next;
+      fitOverlayLine(line);
+    }
+  }
+
+  async function chargeTranslation(trackId) {
+    if (!trackId) return { success:false, error:'目前無法辨識正在播放的音檔，請重新進入詳細頁後再使用翻譯。' };
+    try {
+      const response = await fetch('/api/v281/transcripts/' + encodeURIComponent(trackId) + '/translation-use', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:'{}' });
+      const data = await response.json().catch(() => ({}));
+      return response.ok ? { success:true, ...data } : { success:false, error:data.error || '翻譯功能目前無法使用' };
+    } catch { return { success:false, error:'翻譯功能目前無法連線，請稍後再試。' }; }
   }
 
   async function requestBrowserPageTranslation(option) {
@@ -329,23 +357,27 @@
     const dialog = ensureDialog();
     if (code === 'zh-Hant') {
       stopAutomaticPageTranslation();
-      setDialogInstruction(dialog, '已恢復網站原本的繁體中文。若先前是 Safari／Chrome 選單啟動的翻譯，請在瀏覽器選擇「顯示原文」。');
+      setDialogInstruction(dialog, '已恢復繁體中文。若先前由 Safari／Chrome 選單啟動翻譯，請在瀏覽器選擇「顯示原文」。');
       dialog.hidden = false;
       return;
     }
-    document.documentElement.setAttribute('translate', 'yes');
-    setDialogInstruction(dialog, `目標語言：${label}\n正在檢查這台瀏覽器能否自動使用內建整頁翻譯…`);
+    const trackId = await detectTrackId();
+    const charge = await chargeTranslation(trackId);
+    if (!charge.success) {
+      setDialogInstruction(dialog, charge.error);
+      dialog.hidden = false;
+      return;
+    }
+    const charged = Number(charge.charged || 0);
+    if (charged > 0) window.dispatchEvent(new CustomEvent('echostars:battery-changed'));
+    setDialogInstruction(dialog, `目標語言：${label}${charged > 0 ? `\n已扣除 ${charged} 顆電池。` : ''}\n正在檢查瀏覽器內建整頁翻譯…`);
     dialog.hidden = false;
     const automatic = await tryAutomaticBrowserPageTranslation(code, label, dialog);
-    if (!automatic) {
-      setDialogInstruction(dialog, browserInstruction(label));
-      dialog.hidden = false;
-    }
+    if (!automatic) setDialogInstruction(dialog, `${charged > 0 ? `已扣除 ${charged} 顆電池。\n` : ''}${browserInstruction(label)}`);
   }
 
-  // 捕捉舊翻譯選單事件：不再送 Cloudflare AI 翻譯 API，改成瀏覽器端整頁翻譯。
-  document.addEventListener('click', (event) => {
-    const option = event.target && event.target.closest ? event.target.closest('.v290-option[data-language]') : null;
+  document.addEventListener('click', event => {
+    const option = event.target?.closest?.('.v290-option[data-language]');
     if (!option) return;
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -355,30 +387,31 @@
   function polish() {
     const panel = document.getElementById('v290-transcript-panel');
     if (panel) {
-      const title = panel.querySelector('.v290-title');
-      if (title) title.remove();
+      panel.querySelector('.v290-title')?.remove();
       const translateButton = panel.querySelector('[data-v290-translate]');
-      if (!translateButton?.dataset.v293Ready) redrawTranslateButton(translateButton);
+      if (!translateButton?.dataset.v296Ready) redrawTranslateButton(translateButton);
       const expand = panel.querySelector('[data-v290-expand]');
-      if (expand) { expand.textContent = '放大'; expand.setAttribute('aria-label', '放大逐字稿'); }
+      if (expand) { expand.textContent = '放大字幕'; expand.setAttribute('aria-label', '放大字幕'); }
       anchorTranscriptAbovePlayer(panel);
       const line = panel.querySelector('[data-v290-line]');
       guardSubtitleDisplay(line);
       fitTranscriptLine(line);
     }
+    moveKeywordsAboveReferences();
     const overlay = document.getElementById('v290-overlay');
     if (overlay) {
       const overlayLine = overlay.querySelector('[data-v290-overlay-line]');
       guardSubtitleDisplay(overlayLine);
       fitOverlayLine(overlayLine);
       const close = overlay.querySelector('[data-v290-overlay-close]');
-      if (close) { close.textContent = '✕'; close.setAttribute('aria-label', '關閉放大逐字稿'); }
+      if (close) { close.textContent = '✕'; close.setAttribute('aria-label', '關閉放大字幕'); }
     }
   }
 
-  let timer = 0;
-  const schedule = () => { clearTimeout(timer); timer = window.setTimeout(polish, 16); };
+  let polishTimer = 0;
+  const schedule = () => { clearTimeout(polishTimer); polishTimer = window.setTimeout(polish, 20); };
   new MutationObserver(schedule).observe(document.body, { childList:true, subtree:true, characterData:true });
   window.addEventListener('resize', schedule);
+  window.setInterval(() => { void paintFloatingOverlay(); }, 150);
   polish();
 })();
