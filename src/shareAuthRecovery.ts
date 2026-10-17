@@ -30,7 +30,8 @@ function storeRecoveredSession(data: any) {
     localStorage.setItem(USER_KEY, JSON.stringify({
       ...data.user,
       _authToken: data.authToken,
-      _sessionExpiresAt: data.sessionExpiresAt
+      _sessionExpiresAt: data.sessionExpiresAt,
+      ...(data.starryUserId ? { _starryUserId: String(data.starryUserId) } : {})
     }));
     sessionStorage.setItem(SESSION_CHECK_KEY, String(Date.now()));
     sessionStorage.removeItem(EXPLICIT_LOGOUT_KEY);

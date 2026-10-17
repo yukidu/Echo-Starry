@@ -15,6 +15,15 @@ const nativeFetch: typeof fetch = (
 let syncInFlight: Promise<void> | null = null;
 let lastSyncAt = 0;
 let reloadScheduled = false;
+// Prevent the background SSO exchange from overwriting an explicitly chosen
+// Google account, even when a previous background request finishes afterward.
+let interactiveGoogleLoginActive = false;
+let interactiveLoginGeneration = 0;
+
+export function setInteractiveGoogleLoginActive(active: boolean) {
+  if (active && !interactiveGoogleLoginActive) interactiveLoginGeneration += 1;
+  interactiveGoogleLoginActive = active;
+}
 
 function readCachedUser(): any | null {
   try {
@@ -93,6 +102,9 @@ async function clearLocalSession(user: any) {
 }
 
 async function performSync() {
+  if (interactiveGoogleLoginActive) return;
+  const generation = interactiveLoginGeneration;
+  const interruptedByLogin = () => interactiveGoogleLoginActive || generation !== interactiveLoginGeneration;
   const cached = readCachedUser();
   let state: any;
   try {
@@ -101,6 +113,8 @@ async function performSync() {
     // Offline or temporary Starry ID failures must not sign a member out.
     return;
   }
+
+  if (interruptedByLogin()) return;
 
   if (!state?.authenticated || !state?.user?.id) {
     // Only identities that have already joined central SSO are cleared here.
@@ -118,6 +132,9 @@ async function performSync() {
   try {
     const code = await requestTicket();
     const data = await exchangeTicket(code);
+    if (interruptedByLogin()) return;
+    // A concurrent Google sign-in can change the cached identity mid-request.
+    // Only the current, uninterrupted SSO attempt may write its result.
     writeCachedUser({
       ...data.user,
       _authToken: data.authToken,
@@ -131,6 +148,7 @@ async function performSync() {
 }
 
 function syncEcosystemSession(force = false) {
+  if (interactiveGoogleLoginActive) return syncInFlight || Promise.resolve();
   const now = Date.now();
   if (!force && now - lastSyncAt < MIN_SYNC_INTERVAL_MS) return syncInFlight || Promise.resolve();
   if (syncInFlight) return syncInFlight;
