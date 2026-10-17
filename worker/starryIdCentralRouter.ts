@@ -370,8 +370,12 @@ export async function issueEchoIosLoginHandoff(env: StarryEnv, credential: strin
   )`).run();
   const code = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
   const codeHash = await hashToken(code);
-  await db.prepare('INSERT INTO ios_login_handoffs (codeHash,userId,expiresAt) VALUES (?,?,?)')
-    .bind(codeHash, String(synced.user.id), Date.now() + IOS_HANDOFF_TTL_MS).run();
+  const now = Date.now();
+  await db.batch([
+    db.prepare('DELETE FROM ios_login_handoffs WHERE expiresAt<=?').bind(now),
+    db.prepare('INSERT INTO ios_login_handoffs (codeHash,userId,expiresAt) VALUES (?,?,?)')
+      .bind(codeHash, String(synced.user.id), now + IOS_HANDOFF_TTL_MS)
+  ]);
   return { code, email: identity.email };
 }
 
