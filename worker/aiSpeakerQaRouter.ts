@@ -206,20 +206,25 @@ async function insertReply(env:Env,comment:any,track:any,reply:string){
 async function charge(env:Env,u:any,q:any,commentId:string){
   if(!q.costUnits)return true;
   const b:any=await balance(env,u);if(!b?.userId||b.units<q.costUnits)return false;
-  const id='battery-'+crypto.randomUUID(),now=Date.now();
-  const uniqueKey='echostars:qa:'+commentId;
-  const tx=await env.STARRY_ID_DB.prepare("INSERT OR IGNORE INTO battery_transactions(id,userId,deltaUnits,balanceAfterUnits,type,sourceApp,sourceId,description,actorUserId,uniqueKey,createdAt,trackId) VALUES (?,? ,?,?,?,?,?,?,?,?,?,?)")
-    .bind(id,b.userId,-q.costUnits,b.units-q.costUnits,'ai_speaker_qa_cost','echostars',commentId,'召喚演講者回答問題',b.userId,uniqueKey,now,q.trackId||'').run();
+  // Conditional D1 insert guards double-spend across concurrent requests.
+  const tx=await env.STARRY_ID_DB.prepare("INSERT OR IGNORE INTO battery_transactions(id,userId,deltaUnits,balanceAfterUnits,type,sourceApp,sourceId,description,actorUserId,uniqueKey,createdAt,trackId) SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE (SELECT COALESCE(SUM(deltaUnits),0) FROM battery_transactions WHERE userId=?)>=?")
+    .bind('battery-'+crypto.randomUUID(),b.userId,-q.costUnits,b.units-q.costUnits,'ai_speaker_qa_cost','echostars',commentId,'召喚演講者回答問題',b.userId,'echostars:qa:'+commentId,Date.now(),q.trackId||'',b.userId,q.costUnits).run();
   return !!tx.meta?.changes;
+}
+async function refund(env:Env,u:any,q:any,commentId:string){
+  if(!q.costUnits||!u)return;
+  const b:any=await balance(env,u);if(!b?.userId)return;
+  await env.STARRY_ID_DB.prepare("INSERT OR IGNORE INTO battery_transactions(id,userId,deltaUnits,balanceAfterUnits,type,sourceApp,sourceId,description,actorUserId,uniqueKey,createdAt,trackId) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+    .bind('battery-'+crypto.randomUUID(),b.userId,q.costUnits,b.units+q.costUnits,'ai_speaker_qa_refund','echostars',commentId,'回答失敗退還電池',b.userId,'echostars:qa:refund:'+commentId,Date.now(),q.trackId||'').run();
 }
 export async function processQaAfterComment(req:Request,env:Env,ctx:any,comment:any,mode:string){
   if(!['current','all'].includes(mode)||!comment?.id)return;
   const work=(async()=>{
-    let q:any=null;
+    let q:any=null,charged=false,replyInserted=false,u:any=null;
     try{
       const cfg=await settings(env);
       if(!cfg.enabled)return;
-      const u=await actor(req,env);
+      u=await actor(req,env);
       // Assert the newly stored author matches the authenticated user.
       if(u?txt(comment.authorEmail).toLowerCase()!==txt(u.email).toLowerCase():!!txt(comment.authorEmail))return;
       if(comment.replyToId){
@@ -254,11 +259,14 @@ export async function processQaAfterComment(req:Request,env:Env,ctx:any,comment:
       const reply=aiText(raw).slice(0,1700);
       if(!reply){await fail(env,q,comment.id,'AI 未產生有效回答');return;}
       if(!await charge(env,u,q,comment.id)){await fail(env,q,comment.id,'電池不足，未扣款');return;}
+      charged=q.costUnits>0;
       await insertReply(env,comment,track,'📚 '+reply+'\n\n（依逐字稿生成，非講者本人即時回答）');
-      await env.DB.prepare("UPDATE qa_claims SET status='done',error=NULL WHERE commentId=?").bind(comment.id).run();
+      replyInserted=true;
+      await env.DB.prepare("UPDATE qa_claims SET status='done',error=NULL WHERE commentId=?").bind(comment.id).run().catch(()=>null);
     }catch(e){
       console.warn('AI speaker QA failed',e instanceof Error?e.message:'unknown');
-      if(q)await fail(env,q,comment.id,'服務暫時無法回答').catch(()=>null);
+      if(!replyInserted && charged)await refund(env,u,q,comment.id).catch(()=>null);
+      if(q && !replyInserted)await fail(env,q,comment.id,'服務暫時無法回答').catch(()=>null);
     }
   })();
   if(ctx?.waitUntil)ctx.waitUntil(work);else await work;
