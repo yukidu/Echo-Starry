@@ -22,7 +22,10 @@ const ECOSYSTEM_ORIGINS = new Set([
 const TICKET_APPS = {
   echostars: { origin: 'https://echo.starry.phd', label: '繁星回聲' },
   gostarry: { origin: 'https://go.starry.phd', label: '繁星任意門' },
-  downloadstarry: { origin: 'https://download.starry.phd', label: '繁星捕手' }
+  downloadstarry: { origin: 'https://download.starry.phd', label: '繁星捕手' },
+  boxstarry: { origin: 'https://eye.starry.phd', label: '繁星視界' },
+  'starry-sync': { origin: 'https://sync.starry.phd', label: '繁星共振' },
+  'starry-ai': { origin: 'https://ai.starry.phd', label: '繁星副官' }
 } as const;
 
 type TicketAppId = keyof typeof TICKET_APPS;
@@ -189,7 +192,7 @@ async function ensureTicketSchema(env: Env) {
 }
 
 function ticketAppId(pathname: string): TicketAppId | null {
-  const match = pathname.match(/^\/api\/apps\/(echostars|gostarry|downloadstarry)\/ticket$/);
+  const match = pathname.match(/^\/api\/apps\/(echostars|gostarry|downloadstarry|boxstarry|starry-sync|starry-ai)\/ticket$/);
   return match ? match[1] as TicketAppId : null;
 }
 
