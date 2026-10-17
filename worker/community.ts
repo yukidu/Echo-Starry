@@ -360,6 +360,23 @@ export async function communityApi(request: Request, env: Env, defaults: any[]):
     if (path === '/api/comments' || commentList) {
       const trackId = commentList ? decodeURIComponent(commentList[1]) : null;
       if (method === 'GET') {
+        // Notification inbox only needs a small, relevant slice of the community feed.
+        // Keep /api/comments unchanged for administration/statistics compatibility.
+        if (!trackId && url.searchParams.has('mention')) {
+          const name = String(url.searchParams.get('mention') || '').trim().slice(0, 80);
+          if (!name) return json([]);
+          const matches = await db.prepare(`
+            SELECT id,trackId,authorName,authorAvatar,authorBadge,authorEmail,
+                   content,timestamp,createdAt,replyToId,replyToAuthor,isAdmin,
+                   likes,'[]' AS likedBy
+              FROM comments
+             WHERE instr(lower(COALESCE(content,'')),lower(?)) > 0
+                OR instr(lower(COALESCE(content,'')),lower(?)) > 0
+                OR lower(trim(COALESCE(replyToAuthor,''))) = lower(?)
+             ORDER BY createdAt DESC LIMIT 120
+          `).bind(`@${name}`, `＠${name}`, name).all();
+          return json((matches.results || []).map(normalizeComment));
+        }
         const statement = trackId ? db.prepare('SELECT * FROM comments WHERE trackId = ? ORDER BY createdAt DESC').bind(trackId) : db.prepare('SELECT * FROM comments ORDER BY createdAt DESC');
         return json((await statement.all()).results.map(normalizeComment));
       }
