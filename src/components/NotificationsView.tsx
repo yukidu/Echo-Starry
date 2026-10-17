@@ -25,6 +25,7 @@ interface NotificationsViewProps {
   onApproveRank: (userId: string, rank?: AmwayRank) => Promise<void>;
   onViewMember?: (user: UserProfile) => void;
   comments?: Comment[];
+  onRequestMembers?: () => Promise<void>;
   tracks?: Track[];
   onSelectTrack?: (track: Track, commentId?: string) => void;
   onAddComment?: (trackId: string, content: string, replyToId?: string, replyToAuthor?: string) => Promise<void>;
@@ -52,7 +53,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   isAdmin,
   onApproveRank,
   onViewMember,
-  comments = [],
+  onRequestMembers,
   tracks = [],
   onSelectTrack,
   onAddComment
@@ -83,26 +84,54 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
       return [];
     }
   });
-  const [internalComments, setInternalComments] = useState<Comment[]>(comments);
+  const [internalComments, setInternalComments] = useState<Comment[]>([]);
+  const [mentionsLoading, setMentionsLoading] = useState(false);
+  const [memberLoading, setMemberLoading] = useState(false);
+  const [memberLoadError, setMemberLoadError] = useState(false);
+  const requestedMembersRef = useRef(false);
 
   React.useEffect(() => {
-    if (comments.length > 0) setInternalComments(comments);
-  }, [comments]);
+    if (activeTab === 'messages' || !onRequestMembers || requestedMembersRef.current) return;
+    requestedMembersRef.current = true;
+    setMemberLoading(true);
+    void onRequestMembers().catch(() => {
+      requestedMembersRef.current = false;
+      setMemberLoadError(true);
+    }).finally(() => setMemberLoading(false));
+  }, [activeTab]);
+
+  const retryMemberLoad = () => {
+    setMemberLoadError(false);
+    requestedMembersRef.current = false;
+    setMemberLoading(true);
+    requestedMembersRef.current = true;
+    void onRequestMembers?.().catch(() => {
+      requestedMembersRef.current = false;
+      setMemberLoadError(true);
+    }).finally(() => setMemberLoading(false));
+  };
 
   React.useEffect(() => {
     if (activeTab === 'pending' && !canSeePending) setActiveTab('messages');
   }, [activeTab, canSeePending]);
 
   React.useEffect(() => {
-    let cancelled = false;
-    void fetch('/api/comments')
-      .then(res => (res.ok ? res.json() : null))
+    const name = currentUser?.name?.trim();
+    if (!name) { setInternalComments([]); setMentionsLoading(false); return; }
+    const controller = new AbortController();
+    setMentionsLoading(true);
+    // The server filters and caps the result before sending it to mobile devices.
+    void fetch(`/api/comments?mention=${encodeURIComponent(name)}`, { signal: controller.signal })
+      .then(res => (res.ok ? res.json() : []))
       .then(data => {
-        if (!cancelled && Array.isArray(data)) setInternalComments(data);
+        if (!controller.signal.aborted) setInternalComments(Array.isArray(data) ? data : []);
       })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
+      .catch(() => {})
+      .finally(() => {
+        if (!controller.signal.aborted) setMentionsLoading(false);
+      });
+    return () => controller.abort();
+  }, [currentUser?.name]);
 
   const dismissMention = (commentId: string) => {
     if (typeof window !== 'undefined') {
@@ -120,7 +149,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   };
 
   const mentionNotifications = useMemo(() => {
-    const list = internalComments.length > 0 ? internalComments : comments;
+    const list = internalComments;
     const myName = currentUser?.name?.trim().toLowerCase();
     return list
       .filter(comment => {
@@ -160,7 +189,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
         return Number(b.createdAt || 0) - Number(a.createdAt || 0);
       })
       .slice(0, 100);
-  }, [internalComments, comments, currentUser, tracks, users, dismissedMentionIds]);
+  }, [internalComments, currentUser, tracks, users, dismissedMentionIds]);
 
   const pendingUsers = useMemo(
     () => users
@@ -250,7 +279,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
             </button>
             {canSeePending && (
               <button type="button" onClick={() => setActiveTab('pending')} className={tabClass('pending')}>
-                未審合
+                未審核
               </button>
             )}
             <button type="button" onClick={() => setActiveTab('new-members')} className={tabClass('new-members')}>
@@ -271,7 +300,9 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
       {activeTab === 'messages' && (
         <div className="space-y-2">
-          {mentionNotifications.length === 0 ? (
+          {mentionsLoading ? (
+            <div className="py-10 text-center text-xs text-slate-500">正在讀取我的訊息…</div>
+          ) : mentionNotifications.length === 0 ? (
             <div className="py-10 px-4 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 text-slate-400 text-xs">
               <MessageSquare className="w-8 h-8 mx-auto text-slate-300 mb-2" />
               <p className="font-bold text-slate-500 dark:text-slate-300">目前沒有新訊息</p>
@@ -415,10 +446,14 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
       {activeTab === 'pending' && canSeePending && (
         <div className="space-y-2">
-          {pendingUsers.length === 0 ? (
+          {memberLoading ? (
+            <div className="py-10 text-center text-xs text-slate-500">正在載入待審核會員…</div>
+          ) : memberLoadError ? (
+            <button type="button" onClick={retryMemberLoad} className="w-full py-8 text-center text-xs text-rose-500">載入失敗，點此重試</button>
+          ) : pendingUsers.length === 0 ? (
             <div className="py-10 px-4 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 text-slate-400 text-xs">
               <CheckCircle className="w-8 h-8 mx-auto text-emerald-400 mb-2" />
-              <p className="font-bold text-slate-500 dark:text-slate-300">目前沒有未審合會員</p>
+              <p className="font-bold text-slate-500 dark:text-slate-300">目前沒有未審核會員</p>
             </div>
           ) : pendingUsers.map(user => (
             <div key={user.id} className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-amber-200/80 dark:border-amber-900/70 shadow-2xs">
@@ -433,7 +468,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-extrabold text-sm text-slate-900 dark:text-slate-100">{user.name}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-bold">未審合</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-bold">未審核</span>
                   </div>
                   <div className="mt-1 text-xs text-slate-600 dark:text-slate-300 flex items-center gap-x-2 gap-y-1 flex-wrap">
                     <span>會場：{user.center || '未填'}</span>
@@ -495,7 +530,11 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
       {activeTab === 'new-members' && (
         <div className="space-y-2">
-          {newMembers.length === 0 ? (
+          {memberLoading ? (
+            <div className="py-10 text-center text-xs text-slate-500">正在載入新會員…</div>
+          ) : memberLoadError ? (
+            <button type="button" onClick={retryMemberLoad} className="w-full py-8 text-center text-xs text-rose-500">載入失敗，點此重試</button>
+          ) : newMembers.length === 0 ? (
             <div className="py-10 px-4 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 text-slate-400 text-xs">
               <Bell className="w-8 h-8 mx-auto text-slate-300 mb-2" />
               <p className="font-bold text-slate-500 dark:text-slate-300">目前沒有新會員資料</p>

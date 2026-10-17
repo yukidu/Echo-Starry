@@ -1111,7 +1111,6 @@ export default function App() {
   // Load large users/comments datasets only for screens that use them.
   useEffect(() => {
     const needsCommunityData =
-      currentTab === 'notifications' ||
       currentTab === 'stats' ||
       isAdminOpen ||
       isProfileOpen ||
@@ -1122,7 +1121,6 @@ export default function App() {
     if (!needsCommunityData) return;
     void fetchAllUsers();
     if (
-      currentTab === 'notifications' ||
       currentTab === 'stats' ||
       isProfileOpen ||
       Boolean(commentPreviewTrack)
@@ -2590,8 +2588,8 @@ export default function App() {
             isAdmin={isSuperAdmin}
             isAdministrator={isAdministrator}
             onApproveRank={handleApproveRank}
+            onRequestMembers={() => fetchAllUsers()}
             onViewMember={user => setPreviewMember(user)}
-            comments={allComments.length > 0 ? allComments : comments}
             tracks={tracks}
             onSelectTrack={openTrackDetail}
             onAddComment={(trackId, content, replyToId, replyToAuthor) =>

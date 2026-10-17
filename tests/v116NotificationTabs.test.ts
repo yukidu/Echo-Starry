@@ -7,7 +7,7 @@ const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 
 test('notification tabs match the personal-center underline navigation and sticker tab is removed', () => {
   assert.equal(notifications.includes('我的訊息'), true);
-  assert.equal(notifications.includes('未審合'), true);
+  assert.equal(notifications.includes('未審核'), true);
   assert.equal(notifications.includes('新會員'), true);
   assert.equal(notifications.includes('貼紙通知'), false);
   assert.equal(notifications.includes('/api/stickers/notifications'), false);
