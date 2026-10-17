@@ -9,7 +9,7 @@ const localServer = readFileSync(new URL('../server.ts', import.meta.url), 'utf8
 
 test('opening notifications never loads the unbounded comments/users datasets', () => {
   const effect = app.split('// Load large users/comments datasets only for screens that use them.')[1]
-    ?.split('// Filter & Search')[0] || '';
+    ?.split('  }, [currentTab, isAdminOpen, isProfileOpen, isStickersOpen, commentPreviewTrack, selectedDetailTrack]);')[0] || '';
   assert.ok(effect.includes('const needsCommunityData ='));
   assert.ok(!effect.includes("currentTab === 'notifications'"));
   assert.ok(app.includes('onRequestMembers={() => fetchAllUsers()}'));
