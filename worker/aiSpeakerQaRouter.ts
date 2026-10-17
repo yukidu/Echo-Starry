@@ -129,7 +129,16 @@ function canAccess(u:any,t:any){
   if(/鑽石|皇冠|大使/.test(have))return true;
   return order.indexOf(have)>=0&&order.indexOf(required)>=0&&order.indexOf(have)>=order.indexOf(required);
 }
+async function mayUseTranscript(env:Env,u:any,track:any){
+  if(!canAccess(u,track))return false;
+  const cost=Number(track.stickerUnlockCost||0);
+  if(cost<=0||isSuper(u))return true;
+  if(!u)return false;
+  const row=await env.DB.prepare('SELECT trackId FROM sticker_unlocks WHERE userId=? AND trackId=? LIMIT 1').bind(u.id,track.id).first().catch(()=>null);
+  return !!row;
+}
 async function reserve(env:Env,q:any,cfg:any,id:string,trackId:string,mode:string){
+  if(q.daily<1)return false;
   // Conditional increment is atomic in D1; never exceed user limit or global free budget.
   const db=env.DB;
   const global=await db.prepare("INSERT INTO qa_daily(identity,day,used) VALUES ('__global__',?,1) ON CONFLICT(identity,day) DO UPDATE SET used=used+1 WHERE used<? RETURNING used").bind(q.today,cfg.globalDaily).first();
@@ -164,6 +173,7 @@ async function excerpts(env:Env,track:any,u:any,mode:string,question:string){
   const terms=question.toLowerCase().split(/[\s，。、？！?!.]+/).filter(x=>x.length>=2).slice(0,8);
   const found:{score:number;part:string}[]=[];
   for(const row of rows.slice(0,70)){
+    if(!await mayUseTranscript(env,u,row))continue;
     const idx:any=await env.DB.prepare("SELECT r2Key FROM transcript_index WHERE trackId=? AND status='ready' LIMIT 1").bind(row.id).first();
     if(!idx?.r2Key)continue;
     const object=await env.R2_BUCKET?.get(idx.r2Key);
@@ -222,9 +232,15 @@ export async function processQaAfterComment(req:Request,env:Env,ctx:any,comment:
         }
         if(entry.replyToId||entry.authorBadge==='AI_SPEAKER')return;
         if(u?txt(entry.authorEmail).toLowerCase()!==txt(u.email).toLowerCase():txt(entry.deviceId)!==txt(comment.deviceId)||!!entry.authorEmail)return;
+        if(!u){
+          // A deviceId is public in legacy comment JSON and can be spoofed.
+          // Require the original root's server-side fingerprint too.
+          const rootClaim:any=await env.DB.prepare('SELECT identity FROM qa_claims WHERE commentId=? LIMIT 1').bind(entry.id).first();
+          if(!rootClaim||txt(rootClaim.identity)!==await identity(req,null))return;
+        }
       }
       const track:any=await env.DB.prepare('SELECT * FROM tracks WHERE id=? LIMIT 1').bind(comment.trackId).first();
-      if(!track||!canAccess(u,track)||!env.R2_BUCKET||!env.AI)return;
+      if(!track||!await mayUseTranscript(env,u,track)||!env.R2_BUCKET||!env.AI)return;
       q=await quota(req,env,u,cfg);
       if(q.reason)return;
       q.trackId=track.id;
@@ -257,7 +273,7 @@ export async function handleQaRequest(req:Request,env:Env):Promise<Response|null
       const q=await quota(req,env,u,cfg);
       const trackId=txt(url.searchParams.get('trackId'));
       const track:any=trackId?await env.DB.prepare('SELECT * FROM tracks WHERE id=?').bind(trackId).first():null;
-      if(trackId&&(!track||!canAccess(u,track)))q.reason='沒有此音檔的問答權限';
+      if(trackId&&(!track||!await mayUseTranscript(env,u,track)))q.reason='沒有此音檔的問答權限';
       return json({enabled:cfg.enabled&&!q.reason,reason:q.reason,tier:q.tier,label:q.label,daily:q.daily,free:q.free,freeLeft:q.freeLeft,left:q.left,cost:q.cost});
     }
     if(!admin)return json({error:'只有超級管理員可以管理逐字稿與問答設定'},403);
