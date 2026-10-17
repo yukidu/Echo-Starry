@@ -3,8 +3,9 @@ import appWorker from './starryMainBatteryGameRouter';
 import { handleStarryIdRandomMotto } from './starryIdRandomMottoRouter';
 import { handleStarryEcosystemAuthEntry } from './starryEcosystemAuthEntryRouter';
 
-// Workflow class 必須由正式 Worker 入口匯出；保留既有安全入口同時掛載逐字稿 Workflow。
-export { TranscriptWorkflow } from './transcriptWorkflowV281';
+// Workflow / Container named handlers 必須由正式安全入口匯出，不改既有網站路由。
+export { TranscriptWorkflow } from './transcriptWorkflowV282';
+export { AudioSegmenterContainer } from './audioSegmenterContainer';
 
 const ID_HOST = 'id.starry.phd';
 const LOGIN_PATH = '/starry-main-login';
