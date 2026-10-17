@@ -405,7 +405,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             const showBadge = isAiSpeaker || !!registeredAuthor;
             const userLiked = likeStats[c.id] !== undefined ? likeStats[c.id].hasLiked : (c.likedBy || []).some(k => myKeys.includes(k));
             const userLikesCount = likeStats[c.id] !== undefined ? likeStats[c.id].likes : (c.likes || 0);
-            const isAvatarUrl = displayAuthorAvatar && (displayAuthorAvatar.startsWith('http') || displayAuthorAvatar.startsWith('data:'));
+            const isAvatarUrl = displayAuthorAvatar && (displayAuthorAvatar.startsWith('http') || displayAuthorAvatar.startsWith('data:') || displayAuthorAvatar.startsWith('/'));
             const isClickable = !!registeredAuthor && !isAiSpeaker;
             const timestampLines = formatCommentTimestampDisplay(c);
             const displayContent = stripLegacyAutoReplyMention(c.content, c.replyToAuthor);
