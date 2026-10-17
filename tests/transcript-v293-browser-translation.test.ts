@@ -13,11 +13,12 @@ const entry = readFileSync('worker/starryMainInlineLoginRouter.ts', 'utf8');
 const wrangler = readFileSync('wrangler.toml', 'utf8');
 const workflow = readFileSync('worker/transcriptWorkflowV282.ts', 'utf8');
 const batteryUi = readFileSync('public/transcript-battery-settings-v301.js', 'utf8');
+const memberRouter = readFileSync('worker/transcriptMemberNotificationsRouter.ts', 'utf8');
 
-test('v301 loads one consolidated transcript client, stable UI layer and battery settings', () => {
+test('v302 loads one consolidated transcript client, stable UI layer and refreshed battery settings', () => {
   assert.doesNotThrow(() => new Function(ui));
   assert.doesNotThrow(() => new Function(batteryUi));
-  assert.match(html, /transcript-client-v290\.js\?v=293[\s\S]*transcript-ui-v297\.js\?v=301[\s\S]*transcript-battery-settings-v301\.js\?v=301/);
+  assert.match(html, /transcript-client-v290\.js\?v=293[\s\S]*transcript-ui-v297\.js\?v=301[\s\S]*transcript-battery-settings-v301\.js\?v=302/);
   assert.doesNotMatch(html, /transcript-ui-v293\.js\?v=296|transcript-ui-v292|transcript-presentation-v28[4589]|transcript-client\.js/);
 });
 
@@ -70,14 +71,25 @@ test('v301 has exactly one detail layout policy: transcript, player, keywords, a
   assert.doesNotMatch(ui, /function findRoundedBlockByText/);
 });
 
-test('v301 mounts transcript battery rules inside My Battery Book Other tab', () => {
+test('v302 mounts transcript battery rules inside My Battery Book Other tab with browser translation wording', () => {
   assert.match(batteryUi, /button\[role="tab"\]\[aria-selected="true"\]/);
   assert.match(batteryUi, /includes\('其他'\)/);
   assert.match(batteryUi, /form\.prepend\(section\)/);
   assert.match(batteryUi, /解鎖逐字稿的花費/);
   assert.match(batteryUi, /協助訂正錯字的獎勵/);
-  assert.match(batteryUi, /使用逐字稿翻譯功能的花費/);
+  assert.match(batteryUi, /使用逐字稿瀏覽器翻譯的花費/);
+  assert.match(batteryUi, /不是 Cloudflare AI 費用/);
   assert.match(batteryUi, /\/api\/v281\/transcript-settings/);
+});
+
+test('v302 Echo-host transcript settings use the already logged-in Echo super-admin session', () => {
+  assert.match(memberRouter, /async function echoTranscriptSettingsApi/);
+  assert.match(memberRouter, /const actor = await verifiedActor\(request, env\)/);
+  assert.match(memberRouter, /isEchoSuperAdmin\(actor\)/);
+  assert.match(memberRouter, /請先登入繁星回聲/);
+  assert.match(memberRouter, /url\.hostname\.toLowerCase\(\) !== 'id\.starry\.phd'/);
+  assert.match(memberRouter, /unlock_cost_units/);
+  assert.match(memberRouter, /correction_reward_units/);
 });
 
 test('audio management list exposes four transcript progress labels without opening edit mode', () => {
