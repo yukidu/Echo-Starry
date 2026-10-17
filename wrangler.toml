@@ -1,6 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/starryMainV293Router.ts" # v293: audited safe entry + sequential transcript scheduler
+main = "worker/starryMainInlineLoginRouter.ts"
 compatibility_date = "2026-10-16"
 compatibility_flags = ["nodejs_compat"]
 
