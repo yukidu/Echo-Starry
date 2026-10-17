@@ -7,7 +7,7 @@ const LANGUAGE_NAMES: Record<string,string> = {
   en: 'English',
   vi: 'Tiếng Việt',
   id: 'Bahasa Indonesia',
-  yue: '廣東話',
+  yue: '粵語',
   ja: '日本語',
   ko: '한국어',
   fr: 'Français',
@@ -82,23 +82,43 @@ async function translateBatchRobust(env: Env, source: string[], target: string):
   } catch (error) {
     if (source.length <= 1) throw error;
     const middle = Math.ceil(source.length / 2);
-    const left = await translateBatchRobust(env, source.slice(0, middle), target);
-    const right = await translateBatchRobust(env, source.slice(middle), target);
+    const [left, right] = await Promise.all([
+      translateBatchRobust(env, source.slice(0, middle), target),
+      translateBatchRobust(env, source.slice(middle), target)
+    ]);
     return [...left, ...right];
   }
 }
 
 async function translateSegments(env: Env, segments: Segment[], target: string) {
-  const translated: Segment[] = [];
   const batchSize = 12;
+  const batches: Array<{ index: number; items: Segment[] }> = [];
   for (let i = 0; i < segments.length; i += batchSize) {
-    const batch = segments.slice(i, i + batchSize);
-    const values = await translateBatchRobust(env, batch.map(item => text(item.text)), target);
-    batch.forEach((item, index) => translated.push({
-      id: text(item.id), start: Number(item.start || 0), end: Number(item.end || 0), text: values[index] || text(item.text)
-    }));
+    batches.push({ index: i, items: segments.slice(i, i + batchSize) });
   }
-  return translated;
+
+  const output = new Array<Segment>(segments.length);
+  let cursor = 0;
+  const worker = async () => {
+    while (true) {
+      const slot = cursor++;
+      if (slot >= batches.length) return;
+      const batch = batches[slot];
+      const values = await translateBatchRobust(env, batch.items.map(item => text(item.text)), target);
+      batch.items.forEach((item, offset) => {
+        output[batch.index + offset] = {
+          id: text(item.id),
+          start: Number(item.start || 0),
+          end: Number(item.end || 0),
+          text: values[offset] || text(item.text)
+        };
+      });
+    }
+  };
+
+  const concurrency = Math.min(3, Math.max(1, batches.length));
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+  return output.filter(Boolean);
 }
 
 export async function handleTranscriptTranslationV285(request: Request, env: Env, ctx: any, trackId: string, language: string) {
@@ -136,7 +156,7 @@ export async function handleTranscriptTranslationV285(request: Request, env: Env
 
   try {
     const translated = await translateSegments(env, sourceSegments, target);
-    const payload = { version:2, trackId, language, label:target, model:MODEL, sourceHash, createdAt:Date.now(), segments:translated };
+    const payload = { version:3, trackId, language, label:target, model:MODEL, sourceHash, createdAt:Date.now(), segments:translated };
     await (env as any).R2_BUCKET.put(key, JSON.stringify(payload), {
       httpMetadata:{ contentType:'application/json; charset=utf-8' },
       customMetadata:{ trackId, language, sourceHash, model:MODEL, format:'translation-json' }
