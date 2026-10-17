@@ -77,7 +77,7 @@ export function successPage(user: any, credential: string) {
     <h1 style="font-size:20px;margin:12px 0 8px">Google 登入完成</h1>
     <p id="login-progress" style="font-size:14px;line-height:1.7;color:#64748b;margin:0">正在同步繁星通行證…</p>
     <p id="login-error" role="alert" style="color:#b91c1c;font-size:14px;line-height:1.7;margin-top:12px"></p>
-    <a id="login-retry" href="https://id.starry.phd/auth/echostars?choose=1" style="display:none;margin-top:12px;color:#0f8b83;font-weight:bold">改用繁星通行證重新登入</a>
+    <a id="login-retry" href="https://id.starry.phd/" style="display:none;margin-top:12px;color:#0f8b83;font-weight:bold">前往繁星通行證登入，完成後返回繁星回聲</a>
   </main>
   <script>
     (async function () {
