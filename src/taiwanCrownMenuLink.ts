@@ -584,10 +584,29 @@ function createProfileMottoEditor(member: CrownMember) {
 }
 
 function syncProfileMottoFields() {
+  // Only the signed-in user's own ProfileModal may show their motto.
+  // Older code searched the entire document for "什麼原因留在安麗？",
+  // inadvertently adding the signed-in user's motto to OTHER members' cards.
+  const ownProfile = document.querySelector<HTMLElement>('.profile-page');
+  const hasNativeMotto = Boolean(ownProfile?.querySelector(
+    '[data-profile-motto-primary="1"], [data-profile-motto-readonly="1"]'
+  ));
+
+  // Clean up old injected content in other member views; never touch the
+  // member's genuine server-rendered motto or the native profile field.
+  document.querySelectorAll<HTMLElement>(
+    '[data-profile-motto-view], [data-profile-motto-edit]'
+  ).forEach(node => {
+    if (!ownProfile?.contains(node) || hasNativeMotto) node.remove();
+  });
+
+  // Current ProfileModal renders its own field, so do not inject a duplicate.
+  if (!ownProfile || hasNativeMotto) return;
   const member = readCurrentMember();
   if (!member) return;
 
-  const labels = Array.from(document.querySelectorAll<HTMLElement>('span, label')).filter(element =>
+  // Legacy compatibility is strictly limited to the signed-in user's page.
+  const labels = Array.from(ownProfile.querySelectorAll<HTMLElement>('span, label')).filter(element =>
     element.textContent?.trim() === '什麼原因留在安麗？'
   );
   for (const label of labels) {
