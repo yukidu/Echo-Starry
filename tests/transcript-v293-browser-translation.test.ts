@@ -12,14 +12,16 @@ const audioManagement = readFileSync('src/v161AudioManagementNavigation.tsx', 'u
 const entry = readFileSync('worker/starryMainInlineLoginRouter.ts', 'utf8');
 const wrangler = readFileSync('wrangler.toml', 'utf8');
 const workflow = readFileSync('worker/transcriptWorkflowV282.ts', 'utf8');
+const batteryUi = readFileSync('public/transcript-battery-settings-v301.js', 'utf8');
 
-test('v297 loads one consolidated transcript client and stable UI layer', () => {
+test('v301 loads one consolidated transcript client, stable UI layer and battery settings', () => {
   assert.doesNotThrow(() => new Function(ui));
-  assert.match(html, /transcript-client-v290\.js\?v=293[\s\S]*transcript-ui-v297\.js\?v=297/);
+  assert.doesNotThrow(() => new Function(batteryUi));
+  assert.match(html, /transcript-client-v290\.js\?v=293[\s\S]*transcript-ui-v297\.js\?v=301[\s\S]*transcript-battery-settings-v301\.js\?v=301/);
   assert.doesNotMatch(html, /transcript-ui-v293\.js\?v=296|transcript-ui-v292|transcript-presentation-v28[4589]|transcript-client\.js/);
 });
 
-test('v297 hides only selected sentence-ending punctuation while preserving question marks', () => {
+test('v301 hides only selected sentence-ending punctuation while preserving question marks', () => {
   assert.match(ui, /DISPLAY_END_PUNCTUATION = new Set\(\['、','，','！','。',',','!','\.'\]\)/);
   assert.match(ui, /function displaySubtitleText/);
   assert.match(ui, /DISPLAY_END_PUNCTUATION\.has\(last\) \? parts\.slice\(0, -1\)\.join\(''\) : raw/);
@@ -28,7 +30,7 @@ test('v297 hides only selected sentence-ending punctuation while preserving ques
   assert.match(ui, /guardSubtitleDisplay\(overlayLine\)/);
 });
 
-test('v297 enlarged transcript uses darker fixed two-line box and auto-shrinks to fit', () => {
+test('v301 enlarged transcript uses darker fixed two-line box and auto-shrinks to fit', () => {
   assert.match(ui, /background:rgba\(0,0,0,\.72\)!important/);
   assert.match(ui, /height:7\.15rem!important;min-height:7\.15rem!important;max-height:7\.15rem!important/);
   assert.match(ui, /function fitOverlayLine/);
@@ -36,7 +38,7 @@ test('v297 enlarged transcript uses darker fixed two-line box and auto-shrinks t
   assert.match(ui, /const maxPx = window\.innerWidth <= 420 \? 43 : 57/);
 });
 
-test('v297 prevents enlarged subtitle flicker by keeping one writer and fitting on text assignment', () => {
+test('v301 prevents enlarged subtitle flicker by keeping one writer and fitting on text assignment', () => {
   assert.match(ui, /let logicalValue = initialRaw/);
   assert.match(ui, /get\(\) \{ return logicalValue; \}/);
   assert.match(ui, /fitOverlayLine\(this, true\)/);
@@ -47,14 +49,35 @@ test('v297 prevents enlarged subtitle flicker by keeping one writer and fitting 
   assert.match(client, /state\.paintTimer=setInterval\(\(\)=>paint\(false\),160\)/);
 });
 
-test('v297 fixes transcript, player, and audio-info ordering without legacy keyword reordering', () => {
-  assert.match(ui, /function anchorTranscriptAbovePlayer/);
+test('v301 provides default-expanded transcript collapse control beside enlarge subtitle', () => {
+  assert.match(ui, /data-v301-collapse/);
+  assert.match(ui, /expanded \? '▲收起' : '▼展開'/);
+  assert.match(ui, /panel\.dataset\.v301Expanded = '1'/);
+  assert.match(ui, /expand\.insertAdjacentElement\('afterend', button\)/);
+  assert.match(ui, /setTranscriptExpanded/);
+  assert.match(ui, /\[data-v290-body\]/);
+});
+
+test('v301 has exactly one detail layout policy: transcript, player, keywords, audio info', () => {
+  assert.match(ui, /function stabilizeDetailLayout/);
   assert.match(ui, /timeline\.insertAdjacentElement\('beforebegin', panel\)/);
-  assert.match(ui, /function placeAudioInfoBelowPlayer/);
-  assert.match(ui, /timeline\.insertAdjacentElement\('afterend', info\)/);
-  assert.match(ui, /data-v297-audio-info-card/);
+  assert.match(ui, /timeline\.insertAdjacentElement\('afterend', keywordBlock\)/);
+  assert.match(ui, /const infoAnchor = keywordBlock \|\| timeline/);
+  assert.match(ui, /infoAnchor\.insertAdjacentElement\('afterend', info\)/);
+  assert.doesNotMatch(ui, /function anchorTranscriptAbovePlayer/);
+  assert.doesNotMatch(ui, /function placeAudioInfoBelowPlayer/);
   assert.doesNotMatch(ui, /function moveKeywordsAboveReferences/);
   assert.doesNotMatch(ui, /function findRoundedBlockByText/);
+});
+
+test('v301 mounts transcript battery rules inside My Battery Book Other tab', () => {
+  assert.match(batteryUi, /button\[role="tab"\]\[aria-selected="true"\]/);
+  assert.match(batteryUi, /includes\('其他'\)/);
+  assert.match(batteryUi, /form\.prepend\(section\)/);
+  assert.match(batteryUi, /解鎖逐字稿的花費/);
+  assert.match(batteryUi, /協助訂正錯字的獎勵/);
+  assert.match(batteryUi, /使用逐字稿翻譯功能的花費/);
+  assert.match(batteryUi, /\/api\/v281\/transcript-settings/);
 });
 
 test('audio management list exposes four transcript progress labels without opening edit mode', () => {
@@ -69,7 +92,7 @@ test('audio management list exposes four transcript progress labels without open
   assert.match(bulkScheduler, /items/);
 });
 
-test('v297 automatically uses the browser Translator API for the whole page when supported', () => {
+test('v301 automatically uses the browser Translator API for the whole page when supported', () => {
   assert.doesNotMatch(html, /translate="no"/);
   assert.doesNotMatch(html, /name="google"\s+content="notranslate"/);
   assert.match(ui, /globalThis\.Translator/);
@@ -81,7 +104,7 @@ test('v297 automatically uses the browser Translator API for the whole page when
   assert.match(ui, /瀏覽器整頁翻譯/);
 });
 
-test('v297 falls back to browser full-page translation UI when direct launch is unavailable', () => {
+test('v301 falls back to browser full-page translation UI when direct launch is unavailable', () => {
   assert.match(ui, /Safari 網址列的「頁面選單／aA」→「翻譯網站」/);
   assert.match(ui, /這台瀏覽器目前不允許網站直接按下內建翻譯/);
   assert.match(ui, /瀏覽器選單「翻譯」/);
@@ -103,7 +126,7 @@ test('paid foreign-language Cloudflare AI translation remains disabled', () => {
   assert.doesNotMatch(ui, /\/api\/v281\/transcripts\/.*translate/);
 });
 
-test('v297 keeps centered tools original translation icon and normal two-line auto fit', () => {
+test('v301 keeps centered tools original translation icon and normal two-line auto fit', () => {
   assert.match(ui, /\.v290-title\{display:none!important\}/);
   assert.match(ui, /\.v290-tools\{margin-left:0!important;width:100%!important;justify-content:center!important/);
   assert.match(ui, /class="v297-translate-icon"/);
