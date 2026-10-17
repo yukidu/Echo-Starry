@@ -22,7 +22,6 @@
       ]
     },
     "allowImportingTsExtensions": true,
-    "noImplicitAny": false,
     "noEmit": true
   }
 }
