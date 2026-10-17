@@ -566,11 +566,14 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
 
   if (path === '/api/google-sync' && method === 'POST') {
     const requestId = crypto.randomUUID();
+    let stage = 'credential';
     try {
       const input = await requestBody(request);
       const identity = await verifyGoogleCredential(env, text(input.credential));
+      stage = 'member';
       const synced = await syncVerifiedIdentity(env, identity, input.appId || 'starry-id');
       if (!synced.user) throw new Error('member_sync_failed');
+      stage = 'session';
       const session = await createSession(db, synced.user.id, synced.appId);
       return json(request, {
         success: true,
@@ -584,18 +587,25 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
       const conflict = ['identity_conflict', 'email_conflict'].includes(code);
       const restricted = ['account_inactive', 'app_membership_blocked', 'app_membership_required'].includes(code);
       const unsupported = code === 'unsupported_app';
-      console.warn('Starry ID login rejected', { requestId, code });
+      // A temporary database/network failure after credential verification
+      // must not be presented as an invalid Google account.
+      const temporary = !conflict && !restricted && !unsupported &&
+        (stage !== 'credential' || code === 'ERR_JWKS_TIMEOUT' || error instanceof TypeError);
+      const status = conflict ? 409 : unsupported || restricted ? 403 : temporary ? 503 : 401;
+      console.warn('Starry ID login rejected', { requestId, code, stage, status });
       return json(request, {
         requestId,
-        code: conflict ? 'IDENTITY_CONFLICT' : unsupported ? 'APP_NOT_ALLOWED' : restricted ? 'ACCOUNT_RESTRICTED' : 'LOGIN_REJECTED',
+        code: conflict ? 'IDENTITY_CONFLICT' : unsupported ? 'APP_NOT_ALLOWED' : restricted ? 'ACCOUNT_RESTRICTED' : temporary ? 'LOGIN_SERVICE_UNAVAILABLE' : 'LOGIN_REJECTED',
         error: conflict
           ? '會員身份資料發生衝突，請聯絡管理員。'
           : unsupported
             ? '此應用尚未登記使用 Starry ID。'
             : restricted
               ? '此會員目前無法使用這個服務。'
-              : 'Google 登入驗證失敗，請重新選擇 Google 帳號。'
-      }, conflict ? 409 : unsupported || restricted ? 403 : 401);
+              : temporary
+                ? '登入服務暫時忙碌，請稍後再試。'
+                : 'Google 登入驗證失敗，請重新選擇 Google 帳號。'
+      }, status);
     }
   }
 

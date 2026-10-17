@@ -1,4 +1,4 @@
-import './ecosystemSsoClient';
+import { setInteractiveGoogleLoginActive } from './ecosystemSsoClient';
 import { withGoogleLoginDeadline } from './googleLoginDeadline';
 let pending: Promise<any> | null = null;
 let revision = 0;
@@ -12,6 +12,7 @@ export function exchangeGoogleCredential(credential: string, fetcher: typeof fet
   if (pending) return pendingCredential === credential ? pending : Promise.reject(new Error('上一個帳號仍在登入，請稍後再試。'));
   pendingCredential = credential;
   revision += 1;
+  setInteractiveGoogleLoginActive(true);
   pending = withGoogleLoginDeadline(async signal => {
     const centralResult = await fetcher(STARRY_ID_SYNC_URL, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -33,6 +34,6 @@ export function exchangeGoogleCredential(credential: string, fetcher: typeof fet
       throw new Error(data?.error || '繁星回聲登入同步失敗，請稍後重試。');
     }
     return { ...data, starryUserId: String(centralData.user.id) };
-  }).finally(() => { pending = null; pendingCredential = ''; });
+  }).finally(() => { pending = null; pendingCredential = ''; setInteractiveGoogleLoginActive(false); });
   return pending;
 }

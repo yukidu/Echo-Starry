@@ -273,7 +273,8 @@ async function handleGoogleCredential(response: any) {
     const user = {
       ...data.user,
       _authToken: data.authToken,
-      _sessionExpiresAt: data.sessionExpiresAt
+      _sessionExpiresAt: data.sessionExpiresAt,
+      _starryUserId: String(data.starryUserId || '')
     };
     localStorage.setItem(USER_KEY, JSON.stringify(user));
     sessionStorage.setItem(SESSION_CHECK_KEY, String(Date.now()));
