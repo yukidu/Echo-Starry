@@ -1,21 +1,73 @@
 (() => {
-  if (window.__starryV303RuntimeFixes) return;
-  window.__starryV303RuntimeFixes = true;
+  if (window.__starryV304RuntimeFixes) return;
+  window.__starryV304RuntimeFixes = true;
 
   const PROXY_ROOT_ID = 'v303-transcript-time-proxy-root';
   const PROXY_FLAG = 'v303Proxy';
   let syncTimer = 0;
 
   const style = document.createElement('style');
-  style.id = 'starry-v303-runtime-fixes-style';
+  style.id = 'starry-v304-runtime-fixes-style';
   style.textContent = `
-    body .v161-track-editor-overlay{overflow:hidden!important;overscroll-behavior:contain!important}
-    body .v161-track-editor-overlay .upload-modal-overlay{position:absolute!important;inset:4.4rem 0 0 0!important;height:auto!important;max-height:none!important;overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior-y:contain!important;touch-action:pan-y!important}
-    body .v161-track-editor-overlay .upload-modal-overlay>div:first-child{min-height:100%!important;height:max-content!important;overflow:visible!important}
+    body .v161-track-editor-overlay{
+      position:fixed!important;
+      inset:0!important;
+      z-index:2147483000!important;
+      box-sizing:border-box!important;
+      padding-top:4.4rem!important;
+      overflow-y:auto!important;
+      overflow-x:hidden!important;
+      -webkit-overflow-scrolling:touch!important;
+      overscroll-behavior-y:contain!important;
+      touch-action:pan-y!important;
+    }
+    body .v161-track-editor-overlay>.upload-modal-overlay{
+      position:relative!important;
+      inset:auto!important;
+      top:auto!important;
+      right:auto!important;
+      bottom:auto!important;
+      left:auto!important;
+      width:100%!important;
+      height:auto!important;
+      min-height:calc(100dvh - 4.4rem)!important;
+      max-height:none!important;
+      overflow:visible!important;
+      overflow-x:visible!important;
+      overflow-y:visible!important;
+      overscroll-behavior:auto!important;
+      touch-action:auto!important;
+      display:block!important;
+    }
+    body .v161-track-editor-overlay>.upload-modal-overlay>div:first-child{
+      width:100%!important;
+      height:auto!important;
+      min-height:calc(100dvh - 4.4rem)!important;
+      max-height:none!important;
+      overflow:visible!important;
+    }
+    body .v161-track-editor-overlay #track-upload-form{
+      overflow:visible!important;
+      max-height:none!important;
+    }
     [data-v303-keyword-placeholder="1"]{display:none!important}
-    @media(max-width:767px){body .v161-track-editor-overlay .upload-modal-overlay{inset:4rem 0 0 0!important}}
+    @media(max-width:767px){
+      body .v161-track-editor-overlay{padding-top:4rem!important}
+      body .v161-track-editor-overlay>.upload-modal-overlay,
+      body .v161-track-editor-overlay>.upload-modal-overlay>div:first-child{min-height:calc(100dvh - 4rem)!important}
+    }
   `;
   document.head.appendChild(style);
+
+  function prepareEditorScroll() {
+    const editor = document.querySelector('.v161-track-editor-overlay');
+    if (!(editor instanceof HTMLElement)) return;
+    if (editor.dataset.v304ScrollReady === '1') return;
+    editor.dataset.v304ScrollReady = '1';
+    editor.scrollTop = 0;
+    const modal = editor.querySelector(':scope > .upload-modal-overlay');
+    if (modal instanceof HTMLElement) modal.scrollTop = 0;
+  }
 
   function realTimeline() {
     return [...document.querySelectorAll('#audio-timeline')]
@@ -155,6 +207,7 @@
   function scheduleSync() {
     clearTimeout(syncTimer);
     syncTimer = window.setTimeout(() => {
+      prepareEditorScroll();
       syncTranscriptTimeProxy();
       stabilizeKeywordBelowPhoto();
     }, 0);
