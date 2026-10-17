@@ -28,12 +28,12 @@ test('v294 hides only selected sentence-ending punctuation while preserving ques
   assert.match(ui, /guardSubtitleDisplay\(overlayLine\)/);
 });
 
-test('v294 enlarged transcript uses darker fixed two-line box and auto-shrinks to fit', () => {
-  assert.match(ui, /background:rgba\(0,0,0,\.48\)!important/);
-  assert.match(ui, /height:8\.8rem!important;min-height:8\.8rem!important;max-height:8\.8rem!important/);
+test('v296 enlarged transcript uses darker fixed two-line box and auto-shrinks to fit', () => {
+  assert.match(ui, /background:rgba\(0,0,0,\.72\)!important/);
+  assert.match(ui, /height:7\.15rem!important;min-height:7\.15rem!important;max-height:7\.15rem!important/);
   assert.match(ui, /function fitOverlayLine/);
   assert.match(ui, /line\.scrollHeight > availableHeight \+ 1 \|\| line\.scrollWidth > availableWidth \+ 1/);
-  assert.match(ui, /const maxPx = window\.innerWidth <= 420 \? 42 : 56/);
+  assert.match(ui, /const maxPx = window\.innerWidth <= 420 \? 43 : 57/);
 });
 
 test('v294 audio management list exposes four transcript progress labels without opening edit mode', () => {
@@ -48,20 +48,21 @@ test('v294 audio management list exposes four transcript progress labels without
   assert.match(bulkScheduler, /items/);
 });
 
-test('v295 automatically uses the browser Translator API for the whole page when supported', () => {
+test('v296 automatically uses the browser Translator API for the whole page when supported', () => {
   assert.doesNotMatch(html, /translate="no"/);
   assert.doesNotMatch(html, /name="google"\s+content="notranslate"/);
   assert.match(ui, /globalThis\.Translator/);
   assert.match(ui, /TranslatorApi\.availability/);
   assert.match(ui, /TranslatorApi\.create/);
-  assert.match(ui, /translator\.translate\(core\)/);
+  assert.match(ui, /translator\.translate\(raw\)/);
   assert.match(ui, /collectTextNodes\(document\.body\)/);
-  assert.match(ui, /watchDynamicPageTranslation/);
+  assert.match(ui, /watchDynamicTranslation/);
   assert.match(ui, /瀏覽器整頁翻譯/);
 });
 
-test('v295 falls back to the browser full-page translation UI when direct launch is unavailable', () => {
-  assert.match(ui, /Safari 不允許網站直接按下內建翻譯/);
+test('v296 falls back to browser full-page translation UI when direct launch is unavailable', () => {
+  assert.match(ui, /Safari 網址列的「頁面選單／aA」→「翻譯網站」/);
+  assert.match(ui, /這台瀏覽器目前不允許網站直接按下內建翻譯/);
   assert.match(ui, /瀏覽器選單「翻譯」/);
   assert.match(ui, /if \(!automatic\)/);
   assert.match(ui, /browserInstruction\(label\)/);
@@ -90,10 +91,10 @@ test('v295 permanently anchors transcript immediately above player without movin
   assert.doesNotMatch(ui, /root\.insertBefore\(keyword/);
 });
 
-test('v294 keeps centered tools original translation icon and normal two-line auto fit', () => {
+test('v296 keeps centered tools original translation icon and normal two-line auto fit', () => {
   assert.match(ui, /\.v290-title\{display:none!important\}/);
   assert.match(ui, /\.v290-tools\{margin-left:0!important;width:100%!important;justify-content:center!important/);
-  assert.match(ui, /class="v293-translate-icon"/);
+  assert.match(ui, /class="v296-translate-icon"/);
   assert.match(ui, /height:4\.65rem!important/);
   assert.match(ui, /function fitTranscriptLine/);
   assert.match(ui, /while \(size > minPx && line\.scrollHeight > availableHeight \+ 1\)/);
