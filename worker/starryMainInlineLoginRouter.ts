@@ -3,6 +3,9 @@ import appWorker from './starryMainBatteryGameRouter';
 import { handleStarryIdRandomMotto } from './starryIdRandomMottoRouter';
 import { handleStarryEcosystemAuthEntry } from './starryEcosystemAuthEntryRouter';
 
+// Workflow class 必須由正式 Worker 入口匯出；保留既有安全入口同時掛載逐字稿 Workflow。
+export { TranscriptWorkflow } from './transcriptWorkflowV281';
+
 const ID_HOST = 'id.starry.phd';
 const LOGIN_PATH = '/starry-main-login';
 const GOOGLE_SYNC_PATH = '/api/google-sync';
@@ -244,12 +247,30 @@ function loginPage(env: Env) {
   });
 }
 
+function isTranscriptV281Path(pathname: string) {
+  return pathname === '/api/v281/transcript-settings' ||
+    pathname === '/api/v281/transcript-corrections' ||
+    pathname === '/api/v281/transcript-user-notifications' ||
+    pathname === '/api/v281/transcript-user-notifications/read' ||
+    pathname === '/api/v281/transcripts/bulk-start' ||
+    pathname === '/api/v281/transcripts/bulk-status' ||
+    /^\/api\/v281\/transcript-corrections\/[^/]+\/(accept|revoke|supplement)$/.test(pathname) ||
+    /^\/api\/v281\/transcripts\/[^/]+$/.test(pathname) ||
+    /^\/api\/v281\/transcripts\/[^/]+\/unlock$/.test(pathname) ||
+    /^\/api\/v281\/transcripts\/[^/]+\/segments\/[^/]+$/.test(pathname);
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx?: any): Promise<Response> {
     const url = new URL(request.url);
 
     const ecosystemAuthResponse = handleStarryEcosystemAuthEntry(request, env);
     if (ecosystemAuthResponse) return ecosystemAuthResponse;
+
+    if (isTranscriptV281Path(url.pathname)) {
+      const transcript = await import('./transcriptV281Gateway');
+      return transcript.default.fetch(request, env as any, ctx as any);
+    }
 
     const randomMottoResponse = await handleStarryIdRandomMotto(request, env);
     if (randomMottoResponse) return randomMottoResponse;
@@ -271,6 +292,16 @@ export default {
     const fastHomeResponse = await serveFastHomeApi(request, env, ctx);
     if (fastHomeResponse) return fastHomeResponse;
 
+    if (url.hostname === ID_HOST && url.pathname === '/battery-ledger') {
+      const response = await appWorker.fetch(request, env, ctx);
+      const ledger = await import('./transcriptLedgerSettingsInjector');
+      return ledger.injectTranscriptLedgerSettings(response);
+    }
     return appWorker.fetch(request, env, ctx);
+  },
+  async scheduled(controller: any, env: Env, ctx: any) {
+    const transcript = await import('./transcriptRouter');
+    const handler = (transcript.default as any).scheduled;
+    if (typeof handler === 'function') return handler(controller, env as any, ctx);
   }
 };
