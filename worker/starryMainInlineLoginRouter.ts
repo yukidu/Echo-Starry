@@ -2,6 +2,7 @@ import type { Env } from './index';
 import appWorker from './starryMainBatteryGameRouter';
 import { handleStarryIdRandomMotto } from './starryIdRandomMottoRouter';
 import { handleStarryEcosystemAuthEntry } from './starryEcosystemAuthEntryRouter';
+import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
 
 // Workflow / Container named handlers 必須由正式安全入口匯出，不改既有網站路由。
 export { TranscriptWorkflow } from './transcriptWorkflowV282';
@@ -97,7 +98,6 @@ async function rebuildHomeApiCache(requestUrl: string, pathname: '/api/tracks' |
   if (!response.ok) return;
   await writeHomeApiCache(env, pathname, await response.text());
 }
-
 function cacheLiveHomeResponse(response: Response, pathname: '/api/tracks' | '/api/categories', env: Env, ctx?: any) {
   if (!env.KV || !response.ok) return;
   const clone = response.clone();
@@ -300,9 +300,7 @@ export default {
     }
     return appWorker.fetch(request, env, ctx);
   },
-  async scheduled(controller: any, env: Env, ctx: any) {
-    const transcript = await import('./transcriptRouter');
-    const handler = (transcript.default as any).scheduled;
-    if (typeof handler === 'function') return handler(controller, env as any, ctx);
+  async scheduled(_controller: any, env: Env, ctx: any) {
+    ctx.waitUntil(queueNextTranscriptV293(env as any));
   }
 };

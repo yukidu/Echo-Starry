@@ -1,6 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/starryMainInlineLoginRouter.ts" # v281: audited safe entry + audio segmenter + transcript workflow
+main = "worker/starryMainInlineLoginRouter.ts"
 compatibility_date = "2026-10-16"
 compatibility_flags = ["nodejs_compat"]
 
@@ -23,7 +23,7 @@ custom_domain = true
 pattern = "id.starry.phd"
 custom_domain = true
 
-# 保留原本 Cloudflare 建置流程；回歸測試由 GitHub Actions 額外把關。
+# 保留原本 Cloudflare 建置流程；回歸測試由 GitHub Actions額外把關。
 [build]
 command = "npm run build"
 
@@ -84,9 +84,9 @@ class_name = "AudioSegmenterContainer"
 type = "durable-object"
 storage = "sqlite"
 
-# 台灣時間每天 08:05 啟動，緊接 Workers AI 每日免費額度重置後處理。
+# 每 15 分鐘檢查一次，只允許一份逐字稿處理中；上一份完成才排下一份。
 [triggers]
-crons = ["5 0 * * *"]
+crons = ["*/15 * * * *"]
 
 [vars]
 ENVIRONMENT = "production"
