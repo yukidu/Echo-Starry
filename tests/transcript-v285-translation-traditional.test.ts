@@ -2,32 +2,34 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const presentation = readFileSync('public/transcript-presentation-v285.js','utf8');
+const presentation = readFileSync('public/transcript-presentation-v290.js','utf8');
 const workflow = readFileSync('worker/transcriptWorkflowV282.ts','utf8');
 const translation = readFileSync('worker/transcriptTranslationV285.ts','utf8');
 const gateway = readFileSync('worker/transcriptV281Gateway.ts','utf8');
 const ledger = readFileSync('worker/transcriptLedgerSettingsInjector.ts','utf8');
 const html = readFileSync('index.html','utf8');
 
-test('v285 presentation JavaScript is valid and loads after v284', () => {
+test('consolidated transcript presentation JavaScript is valid and loaded alone', () => {
   assert.doesNotThrow(() => new Function(presentation));
-  assert.match(html, /transcript-presentation-v284\.js\?v=284[\s\S]*transcript-presentation-v285\.js\?v=285/);
+  assert.match(html, /transcript-presentation-v290\.js\?v=290/);
+  assert.doesNotMatch(html, /transcript-presentation-v284\.js|transcript-presentation-v285\.js/);
 });
 
 test('enlarged transcript defaults above floating player and supports long press drag', () => {
   assert.match(presentation, /data-echostars-media-session/);
-  assert.match(presentation, /--v285-overlay-bottom/);
+  assert.match(presentation, /--v290-overlay-bottom/);
   assert.match(presentation, /420/);
   assert.match(presentation, /setPointerCapture/);
-  assert.match(presentation, /v285-manual-position/);
-  assert.match(presentation, /rgba\(0,0,0,\.36\)/);
+  assert.match(presentation, /v290-manual-position/);
+  assert.match(presentation, /rgba\(0,0,0,\.18\)/);
 });
 
-test('translation menu includes mandatory native-language labels', () => {
+test('translation menu includes mandatory native-language labels and English control', () => {
   for (const label of ['简体中文','English','Tiếng Việt','Bahasa Indonesia','廣東話','日本語','한국어','Français','हिन्दी']) {
     assert.match(presentation, new RegExp(label));
   }
-  assert.match(presentation, /翻譯 ▾/);
+  assert.match(presentation, /<span>Translate<\/span>/);
+  assert.match(presentation, /<b>文<\/b><i>A<\/i>/);
   assert.match(presentation, /\?translate=/);
 });
 
@@ -53,7 +55,7 @@ test('only Chinese transcript is normalized to Taiwan Traditional before R2 stor
   assert.match(workflow, /language: storedLanguage/);
 });
 
-test('super admin transcript battery settings are promoted near the top of ledger', () => {
+test('super admin transcript battery settings remain promoted near ledger top', () => {
   assert.match(ledger, /逐字稿功能解鎖所需電池/);
   assert.match(ledger, /訂正錯字電池獎勵/);
   assert.match(ledger, /\/api\/v281\/transcript-settings/);
