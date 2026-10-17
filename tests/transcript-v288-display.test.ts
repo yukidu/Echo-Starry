@@ -2,30 +2,32 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const script = readFileSync('public/transcript-presentation-v288.js', 'utf8');
+const script = readFileSync('public/transcript-presentation-v290.js', 'utf8');
 const html = readFileSync('index.html', 'utf8');
 
-test('v288 transcript presentation is valid and loaded after v285', () => {
+test('consolidated transcript presentation is valid and loaded alone', () => {
   assert.doesNotThrow(() => new Function(script));
-  assert.match(html, /transcript-presentation-v285\.js\?v=285[\s\S]*transcript-presentation-v288\.js\?v=288/);
+  assert.match(html, /transcript-presentation-v290\.js\?v=290/);
+  assert.doesNotMatch(html, /transcript-presentation-v288\.js\?v=288/);
 });
 
-test('v288 displays original transcript segments without a 15-character splitter', () => {
+test('transcript has no fixed 15-character splitter and uses punctuation sentences', () => {
   assert.doesNotMatch(script, /MAX_(?:LYRIC_)?CHARS/);
   assert.doesNotMatch(script, /每句約 15 字/);
-  assert.match(script, /state\.segments = data\.segments\.map/);
-  assert.match(script, /c\.textContent = text\(current\.text\)/);
+  assert.match(script, /new Set\(\['，','。','！',',','\.','!'\]\)/);
+  assert.match(script, /data-v290-current/);
 });
 
-test('v288 forces the whole player directly below the transcript and keywords after player', () => {
-  assert.match(script, /#v283-transcript-panel\{order:-1000!important\}/);
-  assert.match(script, /#audio-timeline\{order:-999!important\}/);
+test('whole player stays directly below transcript and keywords after player', () => {
+  assert.match(script, /panel\.style\.setProperty\('order','-1000'/);
+  assert.match(script, /context\.timeline\.style\.setProperty\('order','-999'/);
   assert.match(script, /網友關鍵字/);
   assert.match(script, /'-998'/);
 });
 
-test('v288 keeps full-segment correction and translated segments', () => {
+test('sentence correction and translated segments remain available', () => {
   assert.match(script, /\/segments\/.*segment\.id/);
-  assert.match(script, /expectedText:text\(segment\.text\)/);
+  assert.match(script, /expectedText:oldFull/);
   assert.match(script, /\?translate=/);
+  assert.match(script, /originalSegments/);
 });
