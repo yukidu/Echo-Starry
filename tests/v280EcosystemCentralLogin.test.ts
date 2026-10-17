@@ -7,7 +7,7 @@ const inlineEntry = readFileSync(new URL('../worker/starryMainInlineLoginRouter.
 const wrangler = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
 
 test('ecosystem apps have a real central Starry Pass login entry', () => {
-  assert.match(authEntry, /\/auth\//);
+  assert.match(authEntry, /authAlias/);
   assert.match(authEntry, /starry-ai/);
   assert.match(authEntry, /starry-sync/);
   assert.match(authEntry, /boxstarry/);
