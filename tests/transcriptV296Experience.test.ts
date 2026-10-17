@@ -9,7 +9,7 @@ test('v301 transcript UI keeps the requested visual and fixed layout rules', () 
   const index = read('index.html');
 
   assert.match(index, /transcript-ui-v297\.js\?v=301/);
-  assert.match(index, /transcript-battery-settings-v301\.js\?v=301/);
+  assert.match(index, /transcript-battery-settings-v301\.js\?v=302/);
   assert.match(ui, /放大字幕/);
   assert.match(ui, /\[data-v290-expand\][\s\S]*var\(--color-primary/);
   assert.match(ui, /background:rgba\(0,0,0,\.72\)/);
@@ -78,15 +78,27 @@ test('v300 backend uses semantic punctuation, Whisper VAD pauses, then a 12-char
   assert.match(gateway, /sentencePolicy/);
 });
 
-test('v301 battery settings are mounted directly inside the Other tab', () => {
+test('v302 battery settings are mounted inside Other tab with clear browser translation wording', () => {
   const battery = read('public/transcript-battery-settings-v301.js');
   assert.match(battery, /button\[role="tab"\]\[aria-selected="true"\]/);
   assert.match(battery, /includes\('其他'\)/);
   assert.match(battery, /解鎖逐字稿的花費/);
   assert.match(battery, /協助訂正錯字的獎勵/);
-  assert.match(battery, /使用逐字稿翻譯功能的花費/);
+  assert.match(battery, /使用逐字稿瀏覽器翻譯的花費/);
+  assert.match(battery, /不是 Cloudflare AI 費用/);
   assert.match(battery, /\/api\/v281\/transcript-settings/);
   assert.match(battery, /form\.prepend\(section\)/);
+});
+
+test('v302 accepts Echo super-admin session for transcript battery settings on echo host', () => {
+  const memberRouter = read('worker/transcriptMemberNotificationsRouter.ts');
+  assert.match(memberRouter, /function isEchoSuperAdmin/);
+  assert.match(memberRouter, /async function echoTranscriptSettingsApi/);
+  assert.match(memberRouter, /請先登入繁星回聲/);
+  assert.match(memberRouter, /url\.pathname === '\/api\/v281\/transcript-settings'/);
+  assert.match(memberRouter, /url\.hostname\.toLowerCase\(\) !== 'id\.starry\.phd'/);
+  assert.match(memberRouter, /unlock_cost_units/);
+  assert.match(memberRouter, /correction_reward_units/);
 });
 
 test('v296 battery ledger backend still exposes all three transcript game rules', () => {
