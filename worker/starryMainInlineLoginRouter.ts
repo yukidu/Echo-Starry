@@ -249,6 +249,8 @@ function loginPage(env: Env) {
 function isTranscriptV281Path(pathname: string) {
   return pathname === '/api/v281/transcript-settings' ||
     pathname === '/api/v281/transcript-corrections' ||
+    pathname === '/api/v281/transcript-user-notifications' ||
+    pathname === '/api/v281/transcript-user-notifications/read' ||
     /^\/api\/v281\/transcript-corrections\/[^/]+\/(accept|revoke|supplement)$/.test(pathname) ||
     /^\/api\/v281\/transcripts\/[^/]+$/.test(pathname) ||
     /^\/api\/v281\/transcripts\/[^/]+\/unlock$/.test(pathname) ||
@@ -260,7 +262,7 @@ export default {
     const url = new URL(request.url);
 
     if (isTranscriptV281Path(url.pathname)) {
-      const transcript = await import('./transcriptModerationRouter');
+      const transcript = await import('./transcriptMemberNotificationsRouter');
       return transcript.default.fetch(request, env as any, ctx as any);
     }
 
@@ -284,7 +286,12 @@ export default {
     const fastHomeResponse = await serveFastHomeApi(request, env, ctx);
     if (fastHomeResponse) return fastHomeResponse;
 
-    return appWorker.fetch(request, env, ctx);
+    const response = await appWorker.fetch(request, env, ctx);
+    if (url.hostname === ID_HOST && url.pathname === '/battery-ledger') {
+      const ledger = await import('./transcriptLedgerSettingsInjector');
+      return ledger.injectTranscriptLedgerSettings(response);
+    }
+    return response;
   },
   async scheduled(controller: any, env: Env, ctx: any) {
     const transcript = await import('./transcriptRouter');
