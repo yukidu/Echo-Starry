@@ -2,6 +2,9 @@ import type { Env } from './index';
 import appWorker from './starryMainBatteryGameRouter';
 import { handleStarryIdRandomMotto } from './starryIdRandomMottoRouter';
 
+// Workflow class 必須由正式 Worker 入口匯出；保留既有安全入口同時掛載逐字稿 Workflow。
+export { TranscriptWorkflow } from './transcriptRouter';
+
 const ID_HOST = 'id.starry.phd';
 const LOGIN_PATH = '/starry-main-login';
 const GOOGLE_SYNC_PATH = '/api/google-sync';
@@ -243,9 +246,23 @@ function loginPage(env: Env) {
   });
 }
 
+function isTranscriptV281Path(pathname: string) {
+  return pathname === '/api/v281/transcript-settings' ||
+    pathname === '/api/v281/transcript-corrections' ||
+    /^\/api\/v281\/transcript-corrections\/[^/]+\/(accept|revoke|supplement)$/.test(pathname) ||
+    /^\/api\/v281\/transcripts\/[^/]+$/.test(pathname) ||
+    /^\/api\/v281\/transcripts\/[^/]+\/unlock$/.test(pathname) ||
+    /^\/api\/v281\/transcripts\/[^/]+\/segments\/[^/]+$/.test(pathname);
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx?: any): Promise<Response> {
     const url = new URL(request.url);
+
+    if (isTranscriptV281Path(url.pathname)) {
+      const transcript = await import('./transcriptModerationRouter');
+      return transcript.default.fetch(request, env as any, ctx as any);
+    }
 
     const randomMottoResponse = await handleStarryIdRandomMotto(request, env);
     if (randomMottoResponse) return randomMottoResponse;
@@ -268,5 +285,10 @@ export default {
     if (fastHomeResponse) return fastHomeResponse;
 
     return appWorker.fetch(request, env, ctx);
+  },
+  async scheduled(controller: any, env: Env, ctx: any) {
+    const transcript = await import('./transcriptRouter');
+    const handler = (transcript.default as any).scheduled;
+    if (typeof handler === 'function') return handler(controller, env as any, ctx);
   }
 };
