@@ -31,19 +31,26 @@ test('translation menu includes mandatory native-language labels', () => {
   assert.match(presentation, /\?translate=/);
 });
 
-test('translations preserve auth via original transcript API and cache in R2', () => {
+test('translations preserve auth, cache in R2, and split long AI batches safely', () => {
   assert.match(translation, /transcriptMemberNotificationsRouter/);
   assert.match(translation, /sourceHash/);
   assert.match(translation, /\/translations\//);
   assert.match(translation, /@cf\/openai\/gpt-oss-20b/);
+  assert.match(translation, /max_tokens: 4096/);
+  assert.match(translation, /translateBatchRobust/);
+  assert.match(translation, /const batchSize = 12/);
   assert.match(gateway, /handleTranscriptTranslationV285/);
 });
 
-test('Chinese transcript is normalized to Taiwan Traditional before R2 storage', () => {
-  assert.match(workflow, /language: 'zh-Hant-TW'/);
-  assert.match(workflow, /traditionalizeSegments/);
+test('only Chinese transcript is normalized to Taiwan Traditional before R2 storage', () => {
+  assert.doesNotMatch(workflow, /language: 'zh',/);
+  assert.match(workflow, /likelyChineseTranscript/);
+  assert.match(workflow, /if \(isChinese\) await traditionalizeSegments/);
+  assert.match(workflow, /storedLanguage = isChinese \? 'zh-Hant-TW' : 'original'/);
   assert.match(workflow, /Never output Simplified Chinese/);
-  assert.match(workflow, /customMetadata: \{ trackId, model: MODEL, format: 'json', language: 'zh-Hant-TW' \}/);
+  assert.match(workflow, /max_tokens: 4096/);
+  assert.match(workflow, /traditionalizeBatchRobust/);
+  assert.match(workflow, /language: storedLanguage/);
 });
 
 test('super admin transcript battery settings are promoted near the top of ledger', () => {

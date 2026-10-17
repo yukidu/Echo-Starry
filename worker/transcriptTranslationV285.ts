@@ -7,7 +7,7 @@ const LANGUAGE_NAMES: Record<string,string> = {
   en: 'English',
   vi: 'Tiếng Việt',
   id: 'Bahasa Indonesia',
-  yue: '香港廣東話（繁體字、自然口語）',
+  yue: '廣東話',
   ja: '日本語',
   ko: '한국어',
   fr: 'Français',
@@ -69,17 +69,31 @@ async function translateBatch(env: Env, source: string[], target: string) {
     messages: [
       { role:'system', content: prompt },
       { role:'user', content: JSON.stringify(source) }
-    ]
+    ],
+    max_tokens: 4096,
+    temperature: 0.15
   });
   return parseStringArray(aiText(result), source.length);
 }
 
+async function translateBatchRobust(env: Env, source: string[], target: string): Promise<string[]> {
+  try {
+    return await translateBatch(env, source, target);
+  } catch (error) {
+    if (source.length <= 1) throw error;
+    const middle = Math.ceil(source.length / 2);
+    const left = await translateBatchRobust(env, source.slice(0, middle), target);
+    const right = await translateBatchRobust(env, source.slice(middle), target);
+    return [...left, ...right];
+  }
+}
+
 async function translateSegments(env: Env, segments: Segment[], target: string) {
   const translated: Segment[] = [];
-  const batchSize = 32;
+  const batchSize = 12;
   for (let i = 0; i < segments.length; i += batchSize) {
     const batch = segments.slice(i, i + batchSize);
-    const values = await translateBatch(env, batch.map(item => text(item.text)), target);
+    const values = await translateBatchRobust(env, batch.map(item => text(item.text)), target);
     batch.forEach((item, index) => translated.push({
       id: text(item.id), start: Number(item.start || 0), end: Number(item.end || 0), text: values[index] || text(item.text)
     }));
@@ -122,7 +136,7 @@ export async function handleTranscriptTranslationV285(request: Request, env: Env
 
   try {
     const translated = await translateSegments(env, sourceSegments, target);
-    const payload = { version:1, trackId, language, label:target, model:MODEL, sourceHash, createdAt:Date.now(), segments:translated };
+    const payload = { version:2, trackId, language, label:target, model:MODEL, sourceHash, createdAt:Date.now(), segments:translated };
     await (env as any).R2_BUCKET.put(key, JSON.stringify(payload), {
       httpMetadata:{ contentType:'application/json; charset=utf-8' },
       customMetadata:{ trackId, language, sourceHash, model:MODEL, format:'translation-json' }

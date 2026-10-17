@@ -120,6 +120,19 @@ function parseStringArray(raw: string, count: number) {
   return value.map(item => item.trim());
 }
 
+function likelyChineseTranscript(segments: Segment[]) {
+  const sample = segments.map(item => item.text).join('').slice(0, 24000);
+  if (!sample) return false;
+  const han = (sample.match(/\p{Script=Han}/gu) || []).length;
+  const kana = (sample.match(/[\p{Script=Hiragana}\p{Script=Katakana}]/gu) || []).length;
+  const hangul = (sample.match(/\p{Script=Hangul}/gu) || []).length;
+  const latin = (sample.match(/[A-Za-z]/g) || []).length;
+  const chineseMarkers = (sample.match(/[的了是在我你他們这這個个有和不就也都要會会說说為为跟讓让把嗎吗呢]/g) || []).length;
+  const scriptTotal = han + kana + hangul + latin;
+  if (han < 20 || kana > han * 0.12 || hangul > han * 0.08) return false;
+  return chineseMarkers >= 8 || (scriptTotal > 0 && han / scriptTotal >= 0.45);
+}
+
 async function traditionalizeBatch(env: Env, values: string[]) {
   if (!values.length) return [];
   const result: any = await env.AI.run(TRADITIONAL_MODEL, {
@@ -129,19 +142,33 @@ async function traditionalizeBatch(env: Env, values: string[]) {
         content: `Convert every JSON array item to Taiwan Traditional Chinese (繁體中文／台灣用字). Return ONLY one JSON array of exactly ${values.length} strings in the same order. Do not merge, split, number, explain, summarize or add notes. Preserve meaning, names, Amway terminology, ranks, punctuation and spoken style. Never output Simplified Chinese characters when a Traditional form exists.`
       },
       { role: 'user', content: JSON.stringify(values) }
-    ]
+    ],
+    max_tokens: 4096,
+    temperature: 0.1
   });
   return parseStringArray(aiText(result), values.length);
 }
 
+async function traditionalizeBatchRobust(env: Env, values: string[]): Promise<string[]> {
+  try {
+    return await traditionalizeBatch(env, values);
+  } catch (error) {
+    if (values.length <= 1) throw error;
+    const middle = Math.ceil(values.length / 2);
+    const left = await traditionalizeBatchRobust(env, values.slice(0, middle));
+    const right = await traditionalizeBatchRobust(env, values.slice(middle));
+    return [...left, ...right];
+  }
+}
+
 async function traditionalizeSegments(env: Env, step: WorkflowStep, segments: Segment[]) {
-  const batchSize = 32;
+  const batchSize = 12;
   for (let offset = 0; offset < segments.length; offset += batchSize) {
     const batch = segments.slice(offset, offset + batchSize);
     const normalized: string[] = await step.do(
       `traditionalize-${String(Math.floor(offset / batchSize) + 1).padStart(3, '0')}`,
       { retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' }, timeout: '10 minutes' },
-      async () => traditionalizeBatch(env, batch.map(item => item.text))
+      async () => traditionalizeBatchRobust(env, batch.map(item => item.text))
     );
     normalized.forEach((value, index) => { batch[index].text = value || batch[index].text; });
   }
@@ -237,10 +264,9 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
             return this.env.AI.run(MODEL, {
               audio,
               task: 'transcribe',
-              language: 'zh',
               vad_filter: true,
               condition_on_previous_text: true,
-              initial_prompt: `請輸出繁體中文（台灣用字）逐字稿，不使用簡體中文。講者：${text(info.track.speaker)}。獎銜：${text(info.track.speakerRank)}。常見詞：安麗、白金、鑽石、翡翠、皇冠。`
+              initial_prompt: `Transcribe exactly in the original spoken language; do not translate. 請依錄音原本語言逐字轉錄，不翻譯。Speaker/講者：${text(info.track.speaker)}。Rank/獎銜：${text(info.track.speakerRank)}。Common proper nouns/常見專有名詞：Amway/安麗、Platinum/白金、Diamond/鑽石、Emerald/翡翠、Crown/皇冠。`
             });
           }
         );
@@ -265,13 +291,15 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
         seg.end = Number(Math.min(duration, Math.max(seg.start + 0.2, seg.end)).toFixed(3));
       });
 
-      await traditionalizeSegments(this.env, step, segments);
+      const isChinese = likelyChineseTranscript(segments);
+      if (isChinese) await traditionalizeSegments(this.env, step, segments);
+      const storedLanguage = isChinese ? 'zh-Hant-TW' : 'original';
       const fullText = segments.map(seg => seg.text).join('\n');
       const file: TranscriptFile = {
-        version: 3,
+        version: 4,
         trackId,
         model: MODEL,
-        language: 'zh-Hant-TW',
+        language: storedLanguage,
         createdAt: Date.now(),
         durationSeconds: duration,
         text: fullText,
@@ -286,15 +314,15 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
         await Promise.all([
           this.env.R2_BUCKET.put(jsonKey, JSON.stringify(file), {
             httpMetadata: { contentType: 'application/json; charset=utf-8' },
-            customMetadata: { trackId, model: MODEL, format: 'json', language: 'zh-Hant-TW' }
+            customMetadata: { trackId, model: MODEL, format: 'json', language: storedLanguage }
           }),
           this.env.R2_BUCKET.put(txtKey, fullText, {
             httpMetadata: { contentType: 'text/plain; charset=utf-8' },
-            customMetadata: { trackId, model: MODEL, format: 'txt', language: 'zh-Hant-TW' }
+            customMetadata: { trackId, model: MODEL, format: 'txt', language: storedLanguage }
           }),
           this.env.R2_BUCKET.put(vttKey, toVtt(segments), {
             httpMetadata: { contentType: 'text/vtt; charset=utf-8' },
-            customMetadata: { trackId, model: MODEL, format: 'vtt', language: 'zh-Hant-TW' }
+            customMetadata: { trackId, model: MODEL, format: 'vtt', language: storedLanguage }
           })
         ]);
         await this.env.DB.prepare(`UPDATE transcript_index SET status='ready',r2Key=?,model=?,chunkCount=?,segmentCount=?,wordCount=?,durationSeconds=?,error=NULL,updatedAt=? WHERE trackId=?`)
@@ -302,7 +330,7 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
       });
 
       await cleanupAudio(this.env, trackId, info.ext);
-      return { trackId, chunks, segments: segments.length, language: 'zh-Hant-TW', jsonKey, txtKey, vttKey };
+      return { trackId, chunks, segments: segments.length, language: storedLanguage, jsonKey, txtKey, vttKey };
     } catch (error) {
       await cleanupAudio(this.env, trackId, info.ext);
       await this.env.DB.prepare("UPDATE transcript_index SET status='failed',error=?,updatedAt=? WHERE trackId=?")
