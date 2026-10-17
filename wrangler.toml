@@ -58,7 +58,7 @@ bucket_name = "echoes-audio-bucket"
 binding = "KV"
 id = "a2e345e244cb40b4a804be3f89584b90"
 
-# 4. Cloudflare Workers AI：逐字稿使用 Whisper Large v3 Turbo。
+# 4. Cloudflare Workers AI：只用於產生繁體中文逐字稿，不做外語翻譯。
 [ai]
 binding = "AI"
 
@@ -83,6 +83,10 @@ class_name = "AudioSegmenterContainer"
 [exports.AudioSegmenterContainer]
 type = "durable-object"
 storage = "sqlite"
+
+# 每 15 分鐘檢查一次；排程器本身保證同時間只處理一份逐字稿。
+[triggers]
+crons = ["*/15 * * * *"]
 
 [vars]
 ENVIRONMENT = "production"
