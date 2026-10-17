@@ -30,8 +30,45 @@ function integerOrNull(value: unknown) {
   return Number.isFinite(number) ? Math.trunc(number) : null;
 }
 
+function normalizeBirthday(value: unknown) {
+  const raw = text(value);
+  if (!raw) return '';
+  const match = raw.match(/^(\d{4})[-\/]?(\d{1,2})[-\/]?(\d{1,2})$/);
+  if (!match) return '';
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  if (probe.getUTCFullYear() !== year || probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day) return '';
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function birthdayDerived(birthday: string) {
+  if (!birthday) return null;
+  const [year, monthText, dayText] = birthday.split('-');
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const digits = `${year}${monthText}${dayText}`.split('').map(Number);
+  const talentNumber = digits.reduce((sum, value) => sum + value, 0);
+  let lifeNumber = talentNumber;
+  while (lifeNumber >= 10) lifeNumber = String(lifeNumber).split('').reduce((sum, value) => sum + Number(value), 0);
+  let zodiac = '雙魚座';
+  if ((month === 3 && day >= 21) || (month === 4 && day <= 19)) zodiac = '牡羊座';
+  else if ((month === 4 && day >= 20) || (month === 5 && day <= 20)) zodiac = '金牛座';
+  else if ((month === 5 && day >= 21) || (month === 6 && day <= 21)) zodiac = '雙子座';
+  else if ((month === 6 && day >= 22) || (month === 7 && day <= 22)) zodiac = '巨蟹座';
+  else if ((month === 7 && day >= 23) || (month === 8 && day <= 22)) zodiac = '獅子座';
+  else if ((month === 8 && day >= 23) || (month === 9 && day <= 22)) zodiac = '處女座';
+  else if ((month === 9 && day >= 23) || (month === 10 && day <= 23)) zodiac = '天秤座';
+  else if ((month === 10 && day >= 24) || (month === 11 && day <= 22)) zodiac = '天蠍座';
+  else if ((month === 11 && day >= 23) || (month === 12 && day <= 21)) zodiac = '射手座';
+  else if ((month === 12 && day >= 22) || (month === 1 && day <= 19)) zodiac = '摩羯座';
+  else if ((month === 1 && day >= 20) || (month === 2 && day <= 18)) zodiac = '水瓶座';
+  return { zodiac, talentNumber, lifeNumber };
+}
+
 function profileValue(source: any, field: typeof SHARED_PROFILE_FIELDS[number]) {
-  if (field === 'birthday') return text(source.birthday ?? source.birthDate);
+  if (field === 'birthday') return normalizeBirthday(source.birthday ?? source.birthDate);
   if (field === 'rankApproved') return source.rankApproved ? 1 : 0;
   if (field === 'talentNumber' || field === 'lifeNumber') return integerOrNull(source[field]);
   return text(source[field]);
@@ -64,9 +101,10 @@ function auditStatement(
 /**
  * EchoStars -> Starry ID compatibility synchronization.
  *
- * v305 source-of-truth rules:
+ * v306 source-of-truth rules:
  * - Starry ID central profiles are the ONLY authoritative personal-profile source.
  * - Legacy Echo profile fields may seed a profile ONLY when the central profile does not exist yet.
+ * - New legacy seeds normalize birthday and recompute zodiac / numerology before entering central storage.
  * - Once a central profile exists, Echo may update app_memberships / identity links only.
  * - A legacy rank-approval event may approve an already-pending CENTRAL rank, but the rank value
  *   always comes from the central pending profile; a stale Echo rank can never replace it.
@@ -100,11 +138,8 @@ export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string,
   const trustedIds = [...new Set([legacyId, identityId].filter(Boolean))];
   if (trustedIds.length > 1) throw new Error('Starry ID legacy link and Google identity disagree');
 
-  // Prefer a durable link / verified Google subject. Never merge by email alone.
   const centralId = trustedIds[0] || sourceId;
-  if (emailOwner && text(emailOwner.id) !== centralId) {
-    throw new Error('Starry ID email belongs to another user');
-  }
+  if (emailOwner && text(emailOwner.id) !== centralId) throw new Error('Starry ID email belongs to another user');
 
   const now = Date.now();
   const oldProfile: any = await central.prepare('SELECT * FROM profiles WHERE userId = ? LIMIT 1').bind(centralId).first();
@@ -146,9 +181,31 @@ export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string,
   }
 
   if (!oldProfile) {
-    // Migration/provisioning only: legacy values can seed a brand-new central profile.
     const profileValues: Record<string, unknown> = { userId: centralId };
     for (const field of SHARED_PROFILE_FIELDS) profileValues[field] = profileValue(source, field);
+
+    const birthday = text(profileValues.birthday);
+    const derived = birthdayDerived(birthday);
+    if (derived) {
+      profileValues.zodiac = derived.zodiac;
+      profileValues.talentNumber = derived.talentNumber;
+      profileValues.lifeNumber = derived.lifeNumber;
+    } else if (text(source.birthday ?? source.birthDate)) {
+      profileValues.birthday = '';
+      profileValues.zodiac = '';
+      profileValues.talentNumber = null;
+      profileValues.lifeNumber = null;
+    }
+
+    if (Number(profileValues.rankApproved || 0) === 1 && !text(profileValues.approvedRank)) {
+      const importedRank = text(profileValues.rank);
+      if (importedRank) profileValues.approvedRank = importedRank;
+      else profileValues.rankApproved = 0;
+    }
+    if (Number(profileValues.rankApproved || 0) === 1 && !text(profileValues.rankAuditStatus)) {
+      profileValues.rankAuditStatus = 'approved';
+    }
+
     profileValues.createdAt = now;
     profileValues.updatedAt = now;
     const profileColumns = ['userId', ...SHARED_PROFILE_FIELDS, 'createdAt', 'updatedAt'];
@@ -156,7 +213,6 @@ export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string,
       VALUES (${profileColumns.map(() => '?').join(',')})`)
       .bind(...profileColumns.map(column => profileValues[column])));
 
-    // Legacy relationship labels are import hints only. They never overwrite an existing central relationship.
     for (const [relationType, sourceField] of RELATIONSHIPS) {
       const label = text(source[sourceField]);
       if (!label) continue;
@@ -166,8 +222,6 @@ export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string,
         .bind(centralId, relationType, label, now));
     }
   } else {
-    // Rank approval compatibility bridge:
-    // legacy Echo can signal that an approval happened, but CENTRAL pending rank is the request being approved.
     const centralPending = text(oldProfile.rankAuditStatus) === 'pending' && !Number(oldProfile.rankApproved || 0);
     const legacyApproved = text(source.rankAuditStatus) === 'approved' && Boolean(source.rankApproved);
     const pendingRank = text(oldProfile.rank);
@@ -199,8 +253,6 @@ export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string,
 
   await central.batch(statements);
 
-  // Keep the legacy Echo row compatible only AFTER central writes succeed.
-  // When a central pending rank was approved, mirror that approved central rank back to Echo.
   if (oldProfile) {
     const centralPending = text(oldProfile.rankAuditStatus) === 'pending' && !Number(oldProfile.rankApproved || 0);
     const legacyApproved = text(source.rankAuditStatus) === 'approved' && Boolean(source.rankApproved);
@@ -227,7 +279,6 @@ export async function syncEchoMemberToStarryBestEffort(
   try {
     return await syncEchoMemberToStarry(env, userId, actorUserId);
   } catch (error) {
-    // No PII in logs. Central outages/conflicts must never break EchoStars app-specific actions.
     console.warn('Starry ID compatibility sync skipped', {
       reason,
       userId,
