@@ -42,10 +42,25 @@ jobs:
           set -euo pipefail
           export WRANGLER_OUTPUT_FILE="$RUNNER_TEMP/wrangler-output.jsonl"
           rm -f "$WRANGLER_OUTPUT_FILE"
+
+          set +e
           npx wrangler versions upload --message "GitHub ${GITHUB_SHA}"
+          WRANGLER_STATUS=$?
+          set -e
+
+          if [ ! -s "$WRANGLER_OUTPUT_FILE" ]; then
+            echo "Wrangler did not report a completed version upload."
+            exit "$WRANGLER_STATUS"
+          fi
+
           VERSION_ID="$(node -e 'const fs=require("fs"); const p=process.env.WRANGLER_OUTPUT_FILE; const xs=fs.readFileSync(p,"utf8").trim().split(/\n+/).map(x=>JSON.parse(x)); const hit=[...xs].reverse().find(x=>x.type==="version-upload"&&x.version_id); if(!hit) process.exit(2); process.stdout.write(hit.version_id)')"
           test -n "$VERSION_ID"
+          echo "Uploaded Worker version: $VERSION_ID"
           echo "version_id=$VERSION_ID" >> "$GITHUB_OUTPUT"
+
+          if [ "$WRANGLER_STATUS" -ne 0 ]; then
+            echo "Wrangler returned $WRANGLER_STATUS after Cloudflare accepted the version; continuing with the verified version ID."
+          fi
       - name: Promote version to Cloudflare Production
         shell: bash
         env:
