@@ -1,6 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "echostars"
-main = "worker/starryMainAudioSegmenterEntry.ts" # v281: 安全入口 + 完整音檔切片 Container + 逐字稿 Workflow
+main = "worker/starryMainInlineLoginRouter.ts" # v281: audited safe entry + audio segmenter + transcript workflow
 compatibility_date = "2026-10-16"
 compatibility_flags = ["nodejs_compat"]
 
