@@ -141,7 +141,7 @@ async function traditionalizeBatch(env: Env, values: string[]) {
     messages: [
       {
         role: 'system',
-        content: `Convert every JSON array item to Taiwan Traditional Chinese (繁體中文／台灣用字). Return ONLY one JSON array of exactly ${values.length} strings in the same order. Do not merge, split, number, explain, summarize or add notes. Preserve meaning, names, Amway terminology, ranks, punctuation and spoken style. Never output Simplified Chinese characters when a Traditional form exists.`
+        content: `Convert every JSON array item to Taiwan Traditional Chinese (繁體中文／台灣用字) and restore natural Taiwan Chinese punctuation from the spoken meaning and phrasing. Return ONLY one JSON array of exactly ${values.length} strings in the same order. Do not merge or split array items. Do not add, remove, paraphrase, summarize, translate or reorder spoken content. Keep names, Amway terminology, ranks and spoken style unchanged. Add punctuation only where the meaning clearly supports it; use question marks only for actual questions. Never output Simplified Chinese characters when a Traditional form exists.`
       },
       { role: 'user', content: JSON.stringify(values) }
     ],
@@ -312,7 +312,7 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
       const storedLanguage = isChinese ? 'zh-Hant-TW' : 'original';
       const fullText = segments.map(seg => seg.text).join('\n');
       const file: TranscriptFile = {
-        version: 4,
+        version: 5,
         trackId,
         model: MODEL,
         language: storedLanguage,
