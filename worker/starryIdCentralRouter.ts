@@ -23,6 +23,8 @@ const TOKEN_RE = /^[A-Za-z0-9_-]{30,}$/;
 const APP_ID_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const NOINDEX = 'noindex, nofollow, noarchive, nosnippet, noimageindex';
 const SESSION_COOKIE = 'starry_id_session';
+const IOS_HANDOFF_TTL_MS = 90 * 1000;
+const IOS_HANDOFF_ORIGIN = 'https://echo.starry.phd';
 const sessionSchemaReady = new WeakMap<object, Promise<void>>();
 
 const USER_EDITABLE_PROFILE_FIELDS = new Set([
@@ -352,6 +354,53 @@ async function createSession(db: any, userId: string, appId: string) {
   return { token, expiresAt };
 }
 
+
+// Google credentials are verified on the server, then exchanged for a short,
+// single-use handoff. Never print a Google ID token into the returned HTML.
+export async function issueEchoIosLoginHandoff(env: StarryEnv, credential: string) {
+  const db = env.STARRY_ID_DB;
+  if (!db) throw new Error('starry_id_unavailable');
+  const identity = await verifyGoogleCredential(env, credential);
+  const synced = await syncVerifiedIdentity(env, identity, 'echostars');
+  if (!synced.user?.id) throw new Error('member_sync_failed');
+  await db.prepare(`CREATE TABLE IF NOT EXISTS ios_login_handoffs (
+    codeHash TEXT PRIMARY KEY,
+    userId TEXT NOT NULL,
+    expiresAt INTEGER NOT NULL
+  )`).run();
+  const code = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+  const codeHash = await hashToken(code);
+  const now = Date.now();
+  await db.batch([
+    db.prepare('DELETE FROM ios_login_handoffs WHERE expiresAt<=?').bind(now),
+    db.prepare('INSERT INTO ios_login_handoffs (codeHash,userId,expiresAt) VALUES (?,?,?)')
+      .bind(codeHash, String(synced.user.id), now + IOS_HANDOFF_TTL_MS)
+  ]);
+  return { code, email: identity.email };
+}
+
+async function completeEchoIosLogin(request: Request, env: StarryEnv) {
+  if (request.headers.get('Origin') !== IOS_HANDOFF_ORIGIN) {
+    return json(request, { error: 'Origin not allowed' }, 403);
+  }
+  const db = env.STARRY_ID_DB;
+  if (!db) return json(request, { error: '登入服務暫時無法使用' }, 503);
+  const body: any = await requestBody(request);
+  const code = text(body?.ticket);
+  if (!TOKEN_RE.test(code)) return json(request, { error: '登入驗證碼無效' }, 401);
+  const codeHash = await hashToken(code);
+  // Atomic consumption prevents replay even with two simultaneous requests.
+  const record: any = await db.prepare(`DELETE FROM ios_login_handoffs
+    WHERE codeHash=? AND expiresAt>? RETURNING userId`)
+    .bind(codeHash, Date.now()).first();
+  if (!record?.userId) return json(request, { error: '登入驗證碼已使用或過期' }, 401);
+  const member = await readMember(db, String(record.userId));
+  if (!member || member.status !== 'active') return json(request, { error: '會員狀態不可用' }, 403);
+  const session = await createSession(db, String(member.id), 'echostars');
+  return json(request, { success: true, user: { id: member.id, email: member.primaryEmail } },
+    200, { 'Set-Cookie': sessionCookie(session.token, session.expiresAt) });
+}
+
 async function sessionUser(request: Request, env: StarryEnv) {
   const db = env.STARRY_ID_DB;
   const token = requestSessionToken(request);
@@ -561,6 +610,15 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
       return json(request, { ok: true, service: 'starry-id', members: Number(row?.count || 0) });
     } catch {
       return json(request, { ok: false, service: 'starry-id' }, 503);
+    }
+  }
+
+  if (path === '/api/mobile-login/complete' && method === 'POST') {
+    try {
+      return await completeEchoIosLogin(request, env);
+    } catch (error) {
+      console.warn('iOS handoff completion failed', { code: error instanceof Error ? error.message : 'unknown' });
+      return json(request, { error: '登入服務暫時忙碌，請重試。' }, 503);
     }
   }
 
