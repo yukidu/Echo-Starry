@@ -42,6 +42,8 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     .access-app-line{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;border:1px solid #2c3e59;background:#13253f;cursor:pointer}
     .access-app-line span{min-width:0;overflow-wrap:anywhere}
     .access-app-line small{display:block;color:#aebbd3;font-size:11px;margin-top:3px}
+    .access-load-error{margin:10px 0 14px;padding:12px;border:1px solid #9b5662;border-radius:12px;background:#2b1d33;color:#ffe1e5;line-height:1.6;overflow-wrap:anywhere}
+    .access-load-error .btn{margin-top:9px}
     .access-preview{border:1px solid #738bb4;background:#172844;border-radius:12px;padding:13px;margin:14px 0;line-height:1.6}
     .access-preview label{display:block;margin:12px 0 6px}
     .access-preview input{width:100%;padding:10px;border:1px solid #738bb4;border-radius:9px;background:#101a31;color:var(--text)}
@@ -88,6 +90,10 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
           <summary class="access-summary">🛡️ App 使用權限（點擊展開）</summary>
           <div class="access-content">
           <div class="access-help" id="appAccessScope">選取會員以管理權限</div>
+          <div id="appAccessError" class="access-load-error hidden" role="alert" aria-live="polite">
+            <div id="appAccessErrorText">讀取 App 清單失敗</div>
+            <button type="button" class="btn" id="appAccessRetryBtn">重新讀取 App 清單</button>
+          </div>
           <div class="access-help">Starry ID 中央登入不可關閉。未明確設定的 App 保留現有使用規則；未經測試的 App 不會在本階段強制封鎖。</div>
           <div id="appAccessSingle" class="hidden">
             <div class="access-help">直接選擇每個 App 的「允許」或「禁止」，修改前仍會先預覽確認。</div>
@@ -141,7 +147,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
   <script>
   (() => {
     const CLIENT_ID = ${safeClientId};
-    const state = { session:null, user:null, isSuperAdmin:false, targetUserId:null, adminOpen:false, members:[], visibility:null, selectedIds:new Set(), memberOffset:0, accessApps:[], accessUserIds:[], accessPreview:null };
+    const state = { session:null, user:null, isSuperAdmin:false, targetUserId:null, adminOpen:false, members:[], visibility:null, selectedIds:new Set(), memberOffset:0, accessApps:[], accessUserIds:[], accessPreview:null, accessLoadToken:0, accessLastRequest:null };
     const $ = (id) => document.getElementById(id);
     const editable = [
       ['name','姓名',false],['amwayId','會員編號 / Amway ID',false],['phone','電話',false],['residence','居住地',false],
@@ -154,7 +160,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     async function api(path, options={}){
       const response=await fetch(path,{credentials:'same-origin',...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});
       let data={}; try{data=await response.json();}catch{}
-      if(!response.ok) throw new Error(data.error||'操作失敗');
+      if(!response.ok){ const error=new Error(data.error||'操作失敗（HTTP '+response.status+'）');error.status=response.status;throw error; }
       return data;
     }
     function initials(user){ const name=(user?.name||user?.email||'S').trim(); return name.slice(0,1).toUpperCase(); }
@@ -330,23 +336,42 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
       if(!state.isSuperAdmin)return;
       const keys=[...new Set(ids)].filter(Boolean);
       if(!keys.length)return;
+      const requestToken=++state.accessLoadToken;
+      state.accessLastRequest={ids:keys,label,bulk};
       const panel=$('appAccessPanel');panel.classList.remove('hidden');
       $('appAccessSingle').classList.toggle('hidden',bulk);
       $('appAccessBulk').classList.toggle('hidden',!bulk);
       if(bulk)panel.open=true;
-      $('appAccessScope').textContent='正在讀取 '+label+' 的權限…';hideAccessPreview();
+      $('appAccessScope').textContent='正在讀取 '+label+' 的權限…';
+      $('appAccessError').classList.add('hidden');
+      $('appAccessSingleApps').replaceChildren();
+      $('appAccessApps').replaceChildren();
+      $('appAccessPreviewBtn').disabled=true;
+      hideAccessPreview();
       try{
         await ensureAccessCatalog();
-        state.accessUserIds=keys;
+        if(requestToken!==state.accessLoadToken)return;
+        if(!state.accessApps.length)throw new Error('尚未設定任何 App，請檢查 Starry ID 應用清單');
         let current=[];
         if(keys.length===1){
           const record=await api('/api/admin/app-access/member/'+encodeURIComponent(keys[0]));
+          if(requestToken!==state.accessLoadToken)return;
           current=record.apps||[];
         }
+        state.accessUserIds=keys;
         if(bulk)renderAppChoices([]);else renderSingleAppChoices(current);
+        $('appAccessPreviewBtn').disabled=false;
         $('appAccessScope').textContent=label+'｜共 '+keys.length+' 位會員';
         await loadAccessHistory();
-      }catch(e){$('appAccessScope').textContent='讀取失敗';toast(e.message||'無法讀取權限',true);}
+      }catch(error){
+        if(requestToken!==state.accessLoadToken)return;
+        const status=error?.status?'（HTTP '+error.status+'）':'';
+        const reason=error?.message||'目前無法連線，請稍後重試';
+        $('appAccessScope').textContent='App 權限清單未載入';
+        $('appAccessErrorText').textContent='讀取 App 清單失敗'+status+'：'+reason;
+        $('appAccessError').classList.remove('hidden');
+        toast('App 清單讀取失敗，請查看提示或重新讀取',true);
+      }
     }
     async function previewAccess(input){
       try{
@@ -384,6 +409,10 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         }
       }catch(e){box.textContent='無法讀取操作紀錄';}
     }
+    $('appAccessRetryBtn').addEventListener('click',()=>{
+      const last=state.accessLastRequest;
+      if(last)void showAppAccess(last.ids,last.label,last.bulk);
+    });
     $('appAccessPreviewBtn').addEventListener('click',()=>{
       const apps=[...document.querySelectorAll('.access-app-choice:checked')].map(el=>el.value);
       void previewAccess({userIds:state.accessUserIds,appIds:apps,mode:$('appAccessMode').value});
