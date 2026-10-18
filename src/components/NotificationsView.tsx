@@ -1,4 +1,5 @@
 import { effectiveMemberRank } from '../utils/ranks';
+import { buildMentionNotifications, getPendingNotificationUsers, getNewNotificationMembers, parseDismissedMentions } from '../utils/notificationsModel';
 import { ThemedSelect } from './ThemedSelect';
 import { SpeakerNameLink, openSpeakerProfile } from './SpeakerNameLink';
 import React, { useMemo, useRef, useState } from 'react';
@@ -33,13 +34,6 @@ interface NotificationsViewProps {
 }
 
 type NotificationTab = 'messages' | 'pending' | 'new-members';
-
-const dateValue = (value?: string | number | null) => {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  if (!value) return 0;
-  const parsed = Date.parse(String(value));
-  return Number.isFinite(parsed) ? parsed : 0;
-};
 
 const shortDate = (value?: string | number | null) => {
   if (!value) return '近期';
@@ -83,13 +77,15 @@ const NotificationsViewComponent: React.FC<NotificationsViewProps> = ({
     if (typeof window === 'undefined') return [];
     try {
       const stored = localStorage.getItem('sq_dismissed_mentions');
-      return stored ? JSON.parse(stored) : [];
+      return parseDismissedMentions(stored);
     } catch {
       return [];
     }
   });
   const [internalComments, setInternalComments] = useState<Comment[]>([]);
   const [mentionsLoading, setMentionsLoading] = useState(false);
+  const [mentionsLoadError, setMentionsLoadError] = useState(false);
+  const [mentionsRetry, setMentionsRetry] = useState(0);
   const [memberLoading, setMemberLoading] = useState(false);
   const [memberLoadError, setMemberLoadError] = useState(false);
   const requestedMembersRef = useRef(false);
@@ -121,96 +117,58 @@ const NotificationsViewComponent: React.FC<NotificationsViewProps> = ({
 
   React.useEffect(() => {
     const name = currentUser?.name?.trim();
-    if (!name) { setInternalComments([]); setMentionsLoading(false); return; }
+    if (!name) {
+      setInternalComments([]);
+      setMentionsLoadError(false);
+      setMentionsLoading(false);
+      return;
+    }
     const controller = new AbortController();
     setMentionsLoading(true);
-    // The server filters and caps the result before sending it to mobile devices.
+    setMentionsLoadError(false);
+    // Slow requests should not leave the page stuck at a spinner.
+    const timeout = window.setTimeout(() => controller.abort(), 12000);
     void fetch(`/api/comments?mention=${encodeURIComponent(name)}`, { signal: controller.signal })
-      .then(res => (res.ok ? res.json() : []))
+      .then(res => {
+        if (!res.ok) throw new Error('通知讀取失敗');
+        return res.json();
+      })
       .then(data => {
         if (!controller.signal.aborted) setInternalComments(Array.isArray(data) ? data : []);
       })
-      .catch(() => {})
+      .catch(() => {
+        if (controller.signal.aborted && !document.hidden) setMentionsLoadError(true);
+        else if (!controller.signal.aborted) setMentionsLoadError(true);
+      })
       .finally(() => {
-        if (!controller.signal.aborted) setMentionsLoading(false);
+        window.clearTimeout(timeout);
+        setMentionsLoading(false);
       });
-    return () => controller.abort();
-  }, [currentUser?.name]);
+    return () => { window.clearTimeout(timeout); controller.abort(); };
+  }, [currentUser?.name, mentionsRetry]);
 
   const dismissMention = (commentId: string) => {
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('sq_dismissed_mentions');
-        const list: string[] = stored ? JSON.parse(stored) : [];
-        if (!list.includes(commentId)) {
-          list.push(commentId);
-          localStorage.setItem('sq_dismissed_mentions', JSON.stringify(list));
-        }
-      } catch {}
-    }
-    setDismissedMentionIds(prev => (prev.includes(commentId) ? prev : [...prev, commentId]));
+    setDismissedMentionIds(prev => {
+      const next = prev.includes(commentId) ? prev : [...prev, commentId].slice(-5000);
+      try { localStorage.setItem('sq_dismissed_mentions', JSON.stringify(next)); } catch {}
+      return next;
+    });
     setInternalComments(prev => prev.filter(comment => comment.id !== commentId));
   };
 
-  const mentionNotifications = useMemo(() => {
-    const list = internalComments;
-    const myName = currentUser?.name?.trim().toLowerCase();
-    return list
-      .filter(comment => {
-        if (!comment.content || dismissedMentionIds.includes(comment.id)) return false;
-        const isSelf =
-          (comment.authorEmail && currentUser?.email && comment.authorEmail.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
-          (comment.authorName && currentUser?.name && comment.authorName.toLowerCase().trim() === currentUser.name.toLowerCase().trim());
-        if (isSelf) return false;
-        const lower = comment.content.toLowerCase();
-        const isDirectMention = myName
-          ? lower.includes(`@${myName}`) || lower.includes(`＠${myName}`) || comment.replyToAuthor?.toLowerCase().trim() === myName
-          : false;
-        return isDirectMention;
-      })
-      .map(comment => {
-        const track = tracks.find(trackItem => trackItem.id === comment.trackId);
-        const authorUser = users.find(user =>
-          (comment.authorEmail && user.email && user.email.toLowerCase().trim() === comment.authorEmail.toLowerCase().trim()) ||
-          (user.name && user.name === comment.authorName)
-        );
-        const lower = comment.content.toLowerCase();
-        const isDirectMention = myName
-          ? lower.includes(`@${myName}`) || lower.includes(`＠${myName}`) || comment.replyToAuthor?.toLowerCase().trim() === myName
-          : false;
-        return {
-          id: `mention-${comment.id}`,
-          comment,
-          track,
-          authorUser,
-          isDirectMention,
-          createdAt: comment.createdAt || 0,
-          timestamp: comment.timestamp || '近期'
-        };
-      })
-      .sort((a, b) => {
-        if (a.isDirectMention !== b.isDirectMention) return a.isDirectMention ? -1 : 1;
-        return Number(b.createdAt || 0) - Number(a.createdAt || 0);
-      })
-      .slice(0, 100);
-  }, [internalComments, currentUser, tracks, users, dismissedMentionIds]);
-
-  const pendingUsers = useMemo(
-    () => users
-      .filter(user => user.rankAuditStatus === 'pending' || user.rankApproved === false)
-      .sort((a, b) => dateValue(b.rankUpdatedAt || b.registerDate) - dateValue(a.rankUpdatedAt || a.registerDate)),
-    [users]
+  // Only the currently visible tab performs list processing.
+  // In particular, opening messages must not sort or render the entire member directory.
+  const mentionNotifications = useMemo(
+    () => activeTab === 'messages' ? buildMentionNotifications(internalComments, currentUser, tracks, users, dismissedMentionIds) : [],
+    [activeTab, internalComments, currentUser, tracks, users, dismissedMentionIds]
   );
-
+  const pendingUsers = useMemo(
+    () => activeTab === 'pending' && canSeePending ? getPendingNotificationUsers(users) : [],
+    [activeTab, canSeePending, users]
+  );
   const newMembers = useMemo(
-    () => users
-      .filter(user =>
-        user.email?.toLowerCase().trim() !== 'yukidu@gmail.com' &&
-        (user.rankAuditStatus === 'approved' || user.rankApproved === true)
-      )
-      .sort((a, b) => dateValue(b.registerDate || b.auditedAt) - dateValue(a.registerDate || a.auditedAt))
-      .slice(0, 50),
-    [users]
+    () => activeTab === 'new-members' ? getNewNotificationMembers(users) : [],
+    [activeTab, users]
   );
 
   const handleScrollTabs = (direction: 'left' | 'right') => {
@@ -306,6 +264,11 @@ const NotificationsViewComponent: React.FC<NotificationsViewProps> = ({
         <div className="space-y-2">
           {mentionsLoading ? (
             <div className="py-10 text-center text-xs text-slate-500">正在讀取我的訊息…</div>
+          ) : mentionsLoadError ? (
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 text-center space-y-2">
+              <p className="text-xs text-slate-600 dark:text-slate-300">通知暫時無法載入，其他功能仍可正常使用。</p>
+              <button type="button" className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-xs" onClick={() => setMentionsRetry(n => n + 1)}>重新讀取通知</button>
+            </div>
           ) : mentionNotifications.length === 0 ? (
             <div className="py-10 px-4 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 text-slate-400 text-xs">
               <MessageSquare className="w-8 h-8 mx-auto text-slate-300 mb-2" />
