@@ -49,6 +49,7 @@ interface CommentsSectionProps {
   onDeleteComment: (commentId: string) => Promise<void>;
   onEditComment: (commentId: string, newContent: string) => Promise<void>;
   onViewMember?: (user: UserProfile) => void;
+  onViewSpeaker?: (name:string) => void;
   allUsers?: UserProfile[];
   tracks?: Track[];
 }
@@ -67,7 +68,8 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   onDeleteComment,
   onEditComment,
   onViewMember,
-  allUsers = [],
+  onViewSpeaker,
+  allUsers = [], 
   tracks = []
 }) => {
   const [inputText, setInputText] = useState('');
@@ -151,7 +153,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
     if (heading.parentElement) observer?.observe(heading.parentElement);
     resize();
     return () => observer?.disconnect();
-  }, [speakerName,comments.length]);
+  }, [speakerName,comments.length,qaMode]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -377,8 +379,12 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
     <div className="w-full bg-white/70 dark:bg-slate-900/60 rounded-3xl p-4 sm:p-5 border border-rose-100/60 dark:border-slate-800 shadow-xs relative leading-snug">
       <div className="w-full min-w-0 mb-3">
         <h3 ref={headingRef} className="font-black text-slate-800 dark:text-slate-100 flex items-center gap-[0.18em] whitespace-nowrap overflow-hidden w-full max-w-full leading-tight" style={{fontSize:32}}>
-          <span className="shrink-0">召喚</span><AiBadge/>
-          <span className="rainbow-admin-text font-black shrink-0">{speakerName || '演講者'}</span><span className="shrink-0">問問題</span>
+          {qaMode === 'off' ? <>
+            <span className="shrink-0">分享學習心得獲得</span><span className="rainbow-admin-text font-black shrink-0">電池</span>
+          </> : <>
+            <span className="shrink-0">召喚</span><AiBadge/>
+            <span className="rainbow-admin-text font-black shrink-0">{speakerName || '演講者'}</span><span className="shrink-0">問問題</span>
+          </>} 
         </h3>
         <fieldset className="mt-2 flex flex-wrap items-center gap-3 text-xs sm:text-sm" aria-label="召喚範圍">
           {([['current','本場演講'],['all','所有演講'],['off','關閉']] as const).map(([value,label]) => (
@@ -468,7 +474,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             const userLiked = likeStats[c.id] !== undefined ? likeStats[c.id].hasLiked : (c.likedBy || []).some(k => myKeys.includes(k));
             const userLikesCount = likeStats[c.id] !== undefined ? likeStats[c.id].likes : (c.likes || 0);
             const isAvatarUrl = displayAuthorAvatar && (displayAuthorAvatar.startsWith('http') || displayAuthorAvatar.startsWith('data:') || displayAuthorAvatar.startsWith('/'));
-            const isClickable = !!registeredAuthor && !isAiSpeaker;
+            const isClickable = Boolean(registeredAuthor || (isAiSpeaker && onViewSpeaker));
             const timestampLines = formatCommentTimestampDisplay(c);
             const displayContent = stripLegacyAutoReplyMention(c.content, c.replyToAuthor);
 
@@ -476,9 +482,9 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
               <div id={`comment-${c.id}`} key={c.id} className={`${isReply ? 'pt-2' : 'pt-3 first:pt-0'}`}>
                 <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-start gap-x-2">
                   <div
-                    onClick={isClickable ? () => handleAuthorClick(c) : undefined}
+                    onClick={isClickable ? () => isAiSpeaker ? onViewSpeaker?.(displayAuthorName.split(/\s*[&＆]\s*/)[0]) : handleAuthorClick(c) : undefined}
                     className={`w-14 shrink-0 flex flex-col items-center gap-1 ${isClickable ? 'cursor-pointer hover:opacity-85 transition-opacity' : 'cursor-default pointer-events-none'}`}
-                    title={isClickable ? `點擊查看【${displayAuthorName}】會員個人檔案` : undefined}
+                    title={isClickable ? `點擊查看【${displayAuthorName}】個人資料頁` : undefined}
                   >
                     {isAvatarUrl ? <img src={displayAuthorAvatar} alt={displayAuthorName} className="w-14 h-14 rounded-full object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700" /> : <span className="w-14 h-14 rounded-full flex items-center justify-center text-3xl shrink-0">{displayAuthorAvatar || '👤'}</span>}
                     <span className="text-[8px] text-slate-400 dark:text-slate-500 font-mono leading-[1.05] text-center">{timestampLines.map((line, index) => <span key={`${c.id}-time-${index}`} className="block whitespace-nowrap">{line}</span>)}</span>
@@ -486,9 +492,9 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
 
                   <div className="min-w-0">
                     <div
-                      onClick={isClickable ? () => handleAuthorClick(c) : undefined}
+                      onClick={isClickable ? () => isAiSpeaker ? onViewSpeaker?.(displayAuthorName.split(/\s*[&＆]\s*/)[0]) : handleAuthorClick(c) : undefined}
                       className={`${isClickable ? 'cursor-pointer hover:opacity-85 transition-opacity' : 'cursor-default pointer-events-none'} min-w-0`}
-                      title={isClickable ? `點擊查看【${displayAuthorName}】會員個人檔案` : undefined}
+                      title={isClickable ? `點擊查看【${displayAuthorName}】個人資料頁` : undefined}
                     >
                       {isAiSpeaker ? <span className="inline-flex items-center gap-1 font-bold text-base leading-tight break-words"><AiBadge/><span className="rainbow-admin-text">{displayAuthorName}</span></span> : c.isAdmin || displayAuthorBadge === '貢獻者' ? <span className="rainbow-admin-text font-bold text-base leading-tight break-words">{displayAuthorName}</span> : isClickable ? <span className="font-bold text-slate-800 dark:text-slate-100 text-base underline decoration-dotted underline-offset-2 hover:text-rose-600 transition-colors leading-tight break-words">{displayAuthorName}</span> : <span className="font-bold text-slate-700 dark:text-slate-300 text-base select-none leading-tight break-words">{displayAuthorName}</span>}
                     </div>
