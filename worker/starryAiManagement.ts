@@ -7,13 +7,12 @@ type ControlEnv = { STARRY_ID_DB?: Db; DB?: Db; [key:string]:any };
 export const AI_TASK_CATALOG = Object.freeze([
   { id:'mirror.reading',app:'繁星心鏡',title:'AI 個人化解籤',description:'生命靈數、金句、個人資料交叉解籤',model:'Qwen 3.8 27B → GPT-OSS 120B → GLM 4.7 Flash',path:'繁星心鏡 → 主選單 → 超級管理員 → AI 設定',url:'https://mirror.starry.phd/admin',mode:'realtime' },
   { id:'echo.qa',app:'繁星回聲',title:'AI 演講者留言答覆',description:'以逐字稿為根據回覆會員提問',model:'Gemma 4 26B（後台可切換）',path:'繁星回聲 → 管理後台 → 逐字稿管理 → AI 問答設定',url:'https://echo.starry.phd/?starryAiTarget=qa',mode:'realtime' },
-  { id:'echo.translation',app:'繁星回聲',title:'逐字稿翻譯',description:'依會員要求翻譯已完成逐字稿',model:'GPT-OSS 20B',path:'繁星回聲 → 音檔 → 逐字稿 → 翻譯',url:'https://echo.starry.phd/',mode:'interactive' },
   { id:'echo.bio',app:'繁星回聲',title:'演講者 AI 簡介摘要',description:'綜合公開逐字稿產生演講者介紹',model:'GLM 4.7 Flash',path:'繁星回聲 → 管理後台 → 演講者管理',url:'https://echo.starry.phd/?starryAiTarget=speaker',mode:'background' },
   { id:'echo.transcribe',app:'繁星回聲',title:'錄音／影片轉逐字稿',description:'長音檔分段處理；已開始的工作不強制中斷',model:'Whisper Large V3 Turbo',path:'繁星回聲 → 管理後台 → 逐字稿',url:'https://echo.starry.phd/?starryAiTarget=transcript',mode:'background' },
-  { id:'echo.normalize',app:'繁星回聲',title:'逐字稿繁體中文整理',description:'依附轉錄流程執行，無法獨立早於原始逐字稿完成',model:'GPT-OSS 20B',path:'繁星回聲 → 管理後台 → 逐字稿',url:'https://echo.starry.phd/?starryAiTarget=transcript',mode:'dependent' }
+  { id:'echo.normalize',app:'繁星回聲',title:'逐字稿繁中校正（轉錄後自動）',description:'中文錄音轉寫完成後，自動轉台灣繁體並整理標點；不會翻成其他語言，也不能先於語音轉寫執行',model:'GPT-OSS 20B',path:'繁星回聲 → 管理後台 → 逐字稿',url:'https://echo.starry.phd/?starryAiTarget=transcript',mode:'dependent' }
 ] as const);
 export const DEFAULT_AI_ORDER: AiTaskOrder[] = AI_TASK_CATALOG.map((task, i) => ({
-  id:task.id,tier:(i<2?1:i<4?2:3) as AiTier,order:i
+  id:task.id,tier:(task.id==='mirror.reading'||task.id==='echo.qa'?1:task.id==='echo.bio'?2:3) as AiTier,order:i
 }));
 
 const configCache: { at:number; entries:AiTaskOrder[]; source:'saved'|'default'; updatedAt:number } =
@@ -130,7 +129,7 @@ export async function recentAiChanges(env:ControlEnv) {
   }catch{return [];}
 }
 export async function collectAiCatalog(env:ControlEnv) {
-  let items:any[]=AI_TASK_CATALOG.map(x=>({...x,source:'已登記',healthy:true}));
+  let items:any[]=AI_TASK_CATALOG.map(x=>({...x,recommendedTier:DEFAULT_AI_ORDER.find(order=>order.id===x.id)?.tier||3,source:'已登記',healthy:true}));
   // Read public metadata only; NEVER access another app's private member data.
   // Model changes in Mirror immediately surface without redeploying Starry ID.
   try {
