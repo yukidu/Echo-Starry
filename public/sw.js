@@ -1,4 +1,4 @@
-const CACHE_NAME = 'echostars-shell-v178';
+const CACHE_NAME = 'echostars-shell-v179';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-monochrome.svg', '/icon-192.png', '/icon-512.png'];
 const FORCE_STALE_CLIENT_REFRESH = true;
 
@@ -16,7 +16,7 @@ self.addEventListener('activate', event => {
     await Promise.all(oldShellKeys.map(key => caches.delete(key)));
     await self.clients.claim();
 
-    // v178: when a new shell replaces an older release, navigate existing tabs once.
+    // v179: refresh existing clients once so legacy admin UI gets the new optional settings field.
     // This prevents a successfully deployed Production build from looking stale merely
     // because an already-open tab is still executing the previous in-memory bundle.
     if (FORCE_STALE_CLIENT_REFRESH && upgradingExistingClient) {
