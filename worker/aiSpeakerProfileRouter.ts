@@ -20,9 +20,9 @@ export async function getSpeakerProfile(env:SpeakerEnv,name:string,create=true){
   return row;
 }
 export async function publicSpeakerSources(env:SpeakerEnv,name:string){
-  const rows=await env.DB.prepare("SELECT t.id,t.title,t.speaker,t.speakerRank,t.requiredRank,t.isPrivateVip,t.authorizedOnlyVisible,t.stickerUnlockCost,i.r2Key,i.updatedAt,p.status AS storyPilotStatus,p.revision AS storyPilotRevision FROM track_speakers ts JOIN tracks t ON t.id=ts.trackId JOIN transcript_index i ON i.trackId=t.id AND i.status='ready' AND i.r2Key IS NOT NULL LEFT JOIN ai_story_pilots p ON p.trackId=t.id WHERE ts.speakerName=? ORDER BY i.updatedAt DESC LIMIT 120").bind(name).all();
+  const rows=await env.DB.prepare("SELECT t.id,t.title,t.speaker,t.speakerRank,t.requiredRank,t.isPrivateVip,t.authorizedOnlyVisible,t.stickerUnlockCost,i.r2Key,i.updatedAt,p.status AS storyPilotStatus,p.revision AS storyPilotRevision,p.approvedAt AS storyPilotApprovedAt FROM track_speakers ts JOIN tracks t ON t.id=ts.trackId JOIN transcript_index i ON i.trackId=t.id AND i.status='ready' AND i.r2Key IS NOT NULL LEFT JOIN ai_story_pilots p ON p.trackId=t.id WHERE ts.speakerName=? ORDER BY i.updatedAt DESC LIMIT 120").bind(name).all();
   const sources=(rows.results||[]).filter(publiclyReadable);
-  const revision=sources.map((r:any)=>r.id+':'+r.updatedAt).sort().join('|');
+  const revision=sources.map((r:any)=>r.id+':'+r.updatedAt+(r.storyPilotStatus?':reviewed:'+r.storyPilotApprovedAt+':'+r.storyPilotRevision:'')).sort().join('|');
   return {sources,revision};
 }
 export async function speakerNeedsStoryReview(env:SpeakerEnv,name:string){
