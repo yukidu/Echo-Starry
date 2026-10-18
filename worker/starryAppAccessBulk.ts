@@ -43,7 +43,7 @@ export async function ensureBulkAccessSchema(db:any):Promise<void>{
       db.prepare('CREATE INDEX IF NOT EXISTS starry_app_access_bulk_jobs_actor ON starry_app_access_bulk_jobs(actorUserId,createdAt DESC)'),
       db.prepare('CREATE INDEX IF NOT EXISTS starry_app_access_bulk_items_pending ON starry_app_access_bulk_items(jobId,applied,reverted)')
     ]).then(()=>undefined).catch((error:any)=>{schemaReady.delete(db as object);throw error;});
-    schemaReady.set(db as object,ready);
+    schemaReady.set(db as object,ready as Promise<void>);
   }
   await ready;
 }
