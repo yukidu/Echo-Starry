@@ -3,6 +3,7 @@ import { Star, MessageSquare, Heart, Clock, Lock, MoreVertical, Share2, Bookmark
 import { Track } from '../types';
 import { AudioMemory } from '../utils/audio';
 import './AudioCard.css';
+import { SpeakerNameLink } from './SpeakerNameLink';
 
 const FAVORITES_KEY = 'echostars_favorite_track_ids_v1';
 
@@ -298,7 +299,7 @@ export const AudioCard: React.FC<AudioCardProps> = ({
             </h3>
 
             <p className="font-bold text-sm sm:text-base leading-tight text-slate-700 dark:text-slate-200 mt-1 truncate" title={speakerDisplay}>
-              {speakerDisplay}
+              <SpeakerNameLink name={track.speaker}/>{track.speakerRank||''}
             </p>
 
             {categories.length > 0 && (
