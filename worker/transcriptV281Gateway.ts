@@ -307,7 +307,7 @@ export default {
       const rows: any = await (env as any).DB.prepare('SELECT trackId,status FROM transcript_index').all();
       return json({ statuses: Object.fromEntries((rows.results || []).map((row: any) => [text(row.trackId), text(row.status)])) });
     }
-    const relisten = url.pathname.match(/^\\/api\\/v281\\/transcript-management\\/relisten\\/([^/]+)$/);
+    const relisten = url.pathname.match(/^\/api\/v281\/transcript-management\/relisten\/([^/]+)$/);
     if (relisten) {
       if (request.method.toUpperCase() !== 'POST') return json({ error: 'Method not allowed' }, 405);
       if (!await superAdmin(request, env)) return json({ error: '只有超級管理員可以重聽逐字稿' }, 403);
