@@ -1,4 +1,5 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { handleStarryAppAccessAdminRequest, readAppAccessDecision } from './starryAppAccess';
 import type { Env } from './index';
 import { calculateNumerology } from '../src/utils/numerology';
 import { ensureSpouseSchema } from './starryIdSpouseSchema';
@@ -12,6 +13,7 @@ type StarryEnv = Env & {
   STARRY_ID_ALLOWED_APPS?: string;
   STARRY_ID_SELF_ENROLL_APPS?: string;
   STARRY_ID_SUPER_ADMIN_EMAILS?: string;
+  STARRY_APP_ACCESS_REQUIRE_GRANT?: string;
 };
 
 const STAR_DOMAIN = 'id.starry.phd';
@@ -288,12 +290,17 @@ async function syncVerifiedIdentity(
   const userId = text(bySubject?.userId || byEmail?.id) || `u-${crypto.randomUUID()}`;
   const existing: any = await readMember(db, userId);
   if (existing?.status && existing.status !== 'active') throw new Error('account_inactive');
+  const explicitAppDecision = appId === 'starry-id' ? null : await readAppAccessDecision(db,userId,appId);
+  if (explicitAppDecision === 'deny') throw new Error('app_access_denied');
+  // Phased rollout: reject new central identities once every App integrates the central check.
+  if (appId !== 'starry-id' && !existing && explicitAppDecision !== 'allow' && env.STARRY_APP_ACCESS_REQUIRE_GRANT === 'true')
+    throw new Error('app_access_denied');
 
   const membership: any = await db.prepare(
     'SELECT status,role,isAdminUser FROM app_memberships WHERE userId=? AND appId=? LIMIT 1'
   ).bind(userId, appId).first();
   if (membership && membership.status !== 'active') throw new Error('app_membership_blocked');
-  if (!membership && !selfEnrollApp(env, appId)) throw new Error('app_membership_required');
+  if (!membership && !selfEnrollApp(env, appId) && explicitAppDecision !== 'allow') throw new Error('app_membership_required');
 
   const otherEmailOwner: any = await db.prepare(
     'SELECT id FROM users WHERE LOWER(TRIM(primaryEmail))=? AND id<>? LIMIT 1'
@@ -424,6 +431,7 @@ async function sessionUser(request: Request, env: StarryEnv) {
     'SELECT status,role,isAdminUser,isContributor,canUpload FROM app_memberships WHERE userId=? AND appId=? LIMIT 1'
   ).bind(session.userId, session.appId).first();
   if (!membership || membership.status !== 'active') return null;
+  if (session.appId !== 'starry-id' && await readAppAccessDecision(db,session.userId,session.appId) === 'deny') return null;
   const publicUser = publicMember(member);
   if (!publicUser) return null;
   const isSuperAdmin = configuredSuperAdmin(env, publicUser.email) || membership.role === 'super-admin';
@@ -606,6 +614,15 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
   if (!env.STARRY_ID_DB) return json(request, { error: 'Starry ID service unavailable' }, 503);
   const db = env.STARRY_ID_DB;
 
+  if (path.startsWith('/api/admin/app-access/')) {
+    const session = await sessionUser(request,env);
+    if (!session) return json(request,{error:'請先登入 Starry ID'},401);
+    // Access administration is deliberately stricter than ordinary profile editing.
+    if (session.appId !== 'starry-id' || !configuredSuperAdmin(env,session.member.email))
+      return json(request,{error:'只有 Starry ID 超級管理員可以設定 App 權限'},403);
+    return handleStarryAppAccessAdminRequest(request,env,session.member.id);
+  }
+
   if (path === '/api/ai-management') {
     const session=await sessionUser(request,env);
     if(!session)return json(request,{error:'請先登入 Starry ID'},401);
@@ -665,7 +682,7 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
     } catch (error) {
       const code = error instanceof Error ? error.message : 'login_failed';
       const conflict = ['identity_conflict', 'email_conflict'].includes(code);
-      const restricted = ['account_inactive', 'app_membership_blocked', 'app_membership_required'].includes(code);
+      const restricted = ['account_inactive', 'app_membership_blocked', 'app_membership_required', 'app_access_denied'].includes(code);
       const unsupported = code === 'unsupported_app';
       // A temporary database/network failure after credential verification
       // must not be presented as an invalid Google account.
@@ -681,7 +698,7 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
           : unsupported
             ? '此應用尚未登記使用 Starry ID。'
             : restricted
-              ? '此會員目前無法使用這個服務。'
+              ? (code === 'app_access_denied' ? '您沒有使用權限' : '此會員目前無法使用這個服務。')
               : temporary
                 ? '登入服務暫時忙碌，請稍後再試。'
                 : 'Google 登入驗證失敗，請重新選擇 Google 帳號。'
