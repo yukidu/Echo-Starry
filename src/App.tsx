@@ -2718,7 +2718,7 @@ export default function App() {
                   setIsBwExportOpen(true);
                 }}
                 onViewMember={user => setPreviewMember(user)}
-                onViewSpeaker={name=>{setSpeakerProfileName(name);window.scrollTo({top:0,behavior:'auto'});}}
+                onViewSpeaker={name=>setSpeakerProfileName(name)}
                 onUpdateTrack={handleUpdateTrack}
                 isVipUnlocked={isTrackVipUnlocked(activeTrack)}
                 onVipBlocked={(anchor) => showPermissionAlert('此錄音檔為【私密VIP】專屬內容，請向上傳者取得專屬授權連結後再播放。', anchor)}
@@ -3359,7 +3359,7 @@ export default function App() {
           </div>
           <div className="min-h-0 overflow-y-auto overscroll-contain">
             <Suspense fallback={<p role="status" className="p-8 text-center">正在載入演講者資訊…</p>}>
-              <SpeakerProfilePage name={speakerProfileName} onBack={()=>setSpeakerProfileName(null)} onOpenTrack={(id,commentId)=>{
+              <SpeakerProfilePage compact name={speakerProfileName} onBack={()=>setSpeakerProfileName(null)} onOpenTrack={(id,commentId)=>{
                 const target=tracks.find(t=>t.id===id);
                 setSpeakerProfileName(null);
                 if(target)openTrackDetail(target,commentId);
