@@ -3,6 +3,7 @@ import { WorkflowEntrypoint } from 'cloudflare:workers';
 import type { WorkflowEvent, WorkflowStep } from 'cloudflare:workers';
 import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
 import { markSpeakerBiosDirty } from './aiSpeakerProfileRouter';
+import { cleanTranscriptSegmentsOnce, loadCleanupSettings } from './transcriptCleanupService';
 
 const MODEL = '@cf/openai/whisper-large-v3-turbo';
 const TRADITIONAL_MODEL = '@cf/openai/gpt-oss-20b';
@@ -26,6 +27,8 @@ type TranscriptFile = {
   durationSeconds: number;
   text: string;
   segments: Segment[];
+  cleanupVersion?: number;
+  cleanedSegments?: {id:string;text:string}[];
 };
 
 function text(value: unknown) { return value == null ? '' : String(value).trim(); }
@@ -313,6 +316,18 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
       const isChinese = likelyChineseTranscript(segments);
       if (isChinese) await traditionalizeSegments(this.env, step, segments);
       const storedLanguage = isChinese ? 'zh-Hant-TW' : 'original';
+      // Preserve raw segments and timecodes; store separate C1 display text only.
+      // Snapshot one policy version for this entire recording, without reading D1 during playback.
+      const cleanupSnapshot = await step.do('c1-cleanup-settings-v1', async () => loadCleanupSettings(this.env.DB));
+      const cleanedSegments: {id:string;text:string}[] = [];
+      for (let offset=0;offset<segments.length;offset+=20) {
+        const part = await step.do(
+          'c1-cleanup-part-' + String(Math.floor(offset/20)+1).padStart(4,'0'),
+          { retries: { limit: 2, delay: '5 seconds', backoff: 'exponential' }, timeout: '10 minutes' },
+          async () => cleanTranscriptSegmentsOnce(this.env, segments.slice(offset,offset+20), cleanupSnapshot)
+        );
+        cleanedSegments.push(...part.cleanedSegments);
+      }
       const fullText = segments.map(seg => seg.text).join('\n');
       const file: TranscriptFile = {
         version: 5,
@@ -322,7 +337,9 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
         createdAt: Date.now(),
         durationSeconds: duration,
         text: fullText,
-        segments
+        segments,
+        cleanupVersion: cleanupSnapshot.version,
+        cleanedSegments
       };
       const base = folder(trackId);
       const jsonKey = `${base}/transcript.json`;
