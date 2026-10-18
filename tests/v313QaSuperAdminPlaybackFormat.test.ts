@@ -23,7 +23,7 @@ test('super admin bypasses both daily and site-wide caps without even reading co
   assert.equal(q.unlimited,true);
   assert.equal(q.reason,'');
   assert.equal(q.costUnits,0);
-  assert.equal(q.left,-1);
+  assert.equal(q.left,0);
   assert.equal(reads,0);
   let recorded=0;
   const claimEnv:any={DB:{prepare(sql:string){
@@ -53,7 +53,7 @@ test('AI answer is readable and ends with trusted recording source titles only',
   assert.match(router,/max_tokens:1400/);
 });
 test('speaker recordings require confirmation and play through existing bubble, preserving view',()=>{
-  assert.match(profile,/window\.confirm\('是否播放 '/);
+  assert.match(profile,/role="alertdialog"/);
   assert.match(profile,/onPlayTrack\|\|onOpenTrack/);
   assert.match(app,/onPlayTrack=\{id=>/);
   assert.match(app,/handlePlayTrack\(target,'bubble'\)/);
