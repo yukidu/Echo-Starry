@@ -1,4 +1,5 @@
 import { normalizeSpeakerName, splitSpeakerNames } from '../shared/speakers';
+import { resolveSpeakerBiographyStatus } from '../shared/speakerBiographyStatus';
 import { actor, isSuper, mayUseTranscript } from './aiSpeakerQaRouter';
 export type SpeakerEnv={DB:any;AI?:any;R2_BUCKET?:any;[key:string]:any};
 export const speakerText=(v:any)=>String(v??'').trim();
@@ -63,13 +64,18 @@ export async function handleSpeakerProfileRequest(req:Request,env:SpeakerEnv):Pr
       for(const item of q.results||[]){
         if(await mayUseTranscript(env,u,item))replies.push({answerId:item.answerId,questionId:item.questionId,trackId:item.trackId,title:item.title,rank:item.speakerRank,asker:item.asker,question:item.question,answer:item.answer,createdAt:item.createdAt});
       }
-      return result({speaker:{id:p.id,name:p.displayName,avatar:tracks.find(x=>x.speakerAvatar)?.speakerAvatar||'',biography:p.biography||'',bioStatus:p.bioStatus,bioUpdatedAt:p.bioUpdatedAt||0},tracks,hasMore:(data.results||[]).length===60,nextOffset:offset+60,replies,hasMoreReplies:(q.results||[]).length===40,nextReplyOffset:replyOffset+40});
+      return result({speaker:{id:p.id,name:p.displayName,avatar:tracks.find(x=>x.speakerAvatar)?.speakerAvatar||'',biography:speakerText(p.biography),bioStatus:resolveSpeakerBiographyStatus(p.bioStatus,!!speakerText(p.biography)),bioUpdatedAt:speakerText(p.biography)?p.bioUpdatedAt||0:0},tracks,hasMore:(data.results||[]).length===60,nextOffset:offset+60,replies,hasMoreReplies:(q.results||[]).length===40,nextReplyOffset:replyOffset+40});
     }
     if(!isSuper(u))return result({error:'只有超級管理員可以設定演講者摘要'},403);
     if(path==='/api/speaker-profiles/admin'&&method==='GET'){
       const names=await env.DB.prepare('SELECT speakerName AS name,COUNT(*) AS recordings FROM track_speakers GROUP BY speakerName ORDER BY speakerName LIMIT 500').all();
-      const profiles=await env.DB.prepare('SELECT id,displayName,bioStatus,bioUpdatedAt,error FROM ai_speaker_profiles ORDER BY displayName LIMIT 500').all();
-      return result({speakers:names.results||[],profiles:profiles.results||[],settings:await speakerSummaryOptions(env)});
+      const profiles=await env.DB.prepare("SELECT id,displayName,bioStatus,bioUpdatedAt,error, CASE WHEN length(trim(COALESCE(biography,'')))>0 THEN 1 ELSE 0 END AS hasBiography FROM ai_speaker_profiles ORDER BY displayName LIMIT 500").all();
+      const safeProfiles=(profiles.results||[]).map(({hasBiography,...profile}:any)=>({
+        ...profile,
+        bioStatus:resolveSpeakerBiographyStatus(profile.bioStatus,Boolean(hasBiography)),
+        bioUpdatedAt:hasBiography?profile.bioUpdatedAt:0
+      }));
+      return result({speakers:names.results||[],profiles:safeProfiles,settings:await speakerSummaryOptions(env)});
     }
     if(path==='/api/speaker-profiles/settings'&&method==='PUT'){
       const b:any=await req.json().catch(()=>null);
@@ -89,6 +95,11 @@ export async function handleSpeakerProfileRequest(req:Request,env:SpeakerEnv):Pr
       const exists=await env.DB.prepare('SELECT trackId FROM track_speakers WHERE speakerName=? LIMIT 1').bind(name).first();
       if(!exists)return result({error:'找不到演講者'},404);
       const p=await getSpeakerProfile(env,name,true);
+      const {sources}=await publicSpeakerSources(env,name);
+      if(!sources.length){
+        await env.DB.prepare("UPDATE ai_speaker_profiles SET biography='',bioStatus='waiting_sources',bioUpdatedAt=0,sourceRevision='',error=NULL,updatedAt=? WHERE id=?").bind(Date.now(),p.id).run();
+        return result({success:true,status:'waiting_sources',message:'目前沒有可使用的公開逐字稿，不會執行 AI 摘要'});
+      }
       await env.DB.prepare("UPDATE ai_speaker_profiles SET bioStatus='pending',sourceRevision='',error=NULL,updatedAt=? WHERE id=?").bind(Date.now(),p.id).run();
       return result({success:true,message:'已排入摘要更新，系統將依序處理'});
     }
