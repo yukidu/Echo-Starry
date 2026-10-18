@@ -148,47 +148,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           : 'permissions';
   const [activeTab, setActiveTab] = useState<AdminTab>(defaultAllowedTab);
 
-  // Per-track transcript state is fetched only while the administrator opens this tab.
-  const [transcriptStatuses, setTranscriptStatuses] = useState<Record<string, string>>({});
-  const [relisteningTrackId, setRelisteningTrackId] = useState<string | null>(null);
-  const [transcriptRelistenError, setTranscriptRelistenError] = useState('');
-  const loadTranscriptStatuses = async () => {
-    try {
-      const response = await fetch('/api/v281/transcript-management/status', { credentials: 'same-origin', cache: 'no-store' });
-      if (!response.ok) return;
-      const data = await response.json();
-      if (data?.statuses && typeof data.statuses === 'object') setTranscriptStatuses(data.statuses);
-    } catch { /* Status polling is best effort; cannot block other admin work. */ }
-  };
-
-  useEffect(() => {
-    if (!isOpen || activeTab !== 'tracks' || !isEffectiveAdmin) return;
-    void loadTranscriptStatuses();
-    const poll = window.setInterval(() => void loadTranscriptStatuses(), 30_000);
-    return () => window.clearInterval(poll);
-  }, [isOpen, activeTab, isEffectiveAdmin]);
-
-  const relistenTranscript = async (trackId: string) => {
-    if (relisteningTrackId || ['pending', 'queued', 'processing'].includes(transcriptStatuses[trackId])) return;
-    setRelisteningTrackId(trackId);
-    setTranscriptRelistenError('');
-    try {
-      const response = await fetch(`/api/v281/transcript-management/relisten/${encodeURIComponent(trackId)}`, {
-        method: 'POST',
-        credentials: 'same-origin'
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data?.error || '逐字稿重聽排程失敗');
-      setTranscriptStatuses(previous => ({ ...previous, [trackId]: 'pending' }));
-    } catch (error) {
-      setTranscriptRelistenError(error instanceof Error ? error.message : '逐字稿重聽失敗');
-      await loadTranscriptStatuses();
-    } finally {
-      setRelisteningTrackId(null);
-    }
-  };
-
-
   // Quick preview member modal state (Requirement 2)
   const [previewUser, setPreviewUser] = useState<UserProfile | null>(null);
 
@@ -1504,9 +1463,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
             </div>
           )}
 
-          {activeTab === 'tracks' && transcriptRelistenError && (
-            <p role="alert" className="text-xs font-bold text-rose-600 px-2">{transcriptRelistenError}</p>
-          )}
           {/* TAB 2: Tracks Management (Requirement 5: 貢獻者只能修改刪除自己上傳的錄音檔；管理員無限制) */}
           {activeTab === 'tracks' && isEffectiveAdmin && (
             <div className="space-y-2.5">
@@ -1515,14 +1471,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 .map(t => {
                   const badgeText = t.requiredRank === '無' ? '公開' : t.requiredRank;
                   const canManageThisTrack = isEffectiveAdmin || (isContributorOnly && t.uploaderEmail === currentUser?.email);
-                  const transcriptStatus = transcriptStatuses[t.id] || '';
-                  const transcriptBusy = ['pending','queued','processing'].includes(transcriptStatus) || relisteningTrackId === t.id;
-                  const transcriptStatusLabel: Record<string,string> = {
-                    pending: '排隊中逐字稿', queued: '排隊中逐字稿',
-                    processing: '正在撰寫逐字稿', ready: '已完成逐字稿',
-                    failed: '逐字稿異常'
-                  };
-
 
                   return (
                     <div
@@ -1557,21 +1505,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
                       {canManageThisTrack && (
                         <div className="flex items-center gap-1 shrink-0">
-                          <div className="flex flex-col items-center gap-0.5">
-                            <button
-                              type="button"
-                              onClick={() => void relistenTranscript(t.id)}
-                              disabled={transcriptBusy}
-                              title={transcriptBusy ? '這份逐字稿已在排隊或處理中' : '重新聆聽原始錄音並產生完整逐字稿'}
-                              className="px-2 py-1 rounded-lg border border-rose-300 text-rose-700 dark:text-rose-300 text-[11px] font-bold hover:bg-rose-50 dark:hover:bg-rose-950/50 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                            >
-                              {relisteningTrackId === t.id ? '正在排隊…' : transcriptBusy ? '正在重聽逐字稿' : '重聽逐字稿'}
-                            </button>
-                            <span className="text-[9px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                              {transcriptStatusLabel[transcriptStatus] || '尚未建立逐字稿'}
-                            </span>
-                          </div>
-
                           {/* Requirement 17: 修改按鈕正常開啟修改視窗 */}
                           <button
                             onClick={() => onEditTrack(t)}
