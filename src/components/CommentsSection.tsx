@@ -417,7 +417,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
           ))}
         </fieldset>
         {qaStatus?.reason && <div className="mt-1 text-xs text-amber-700 dark:text-amber-300" role="status">已自動關閉 <AiBadge/>：{qaStatus.reason}（一般心得留言仍可使用）</div>}
-        {qaStatus?.enabled && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{qaStatus.unlimited ? '超級管理員：網站內召喚不限次數、不扣電池' : <>今日免費剩餘 {qaStatus.freeLeft} 次／總共剩餘 {qaStatus.left} 次{qaStatus.freeLeft===0 ? ' · 每次 '+qaStatus.cost+' 顆電池':''}</>}</p>}
+        {qaStatus?.enabled && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{qaStatus.unlimited || qaStatus.freeLeft < 0 || qaStatus.left < 0 ? '超級管理員：網站內召喚不限次數、不扣電池' : <>今日免費剩餘 {Math.max(0,qaStatus.freeLeft)} 次／總共剩餘 {Math.max(0,qaStatus.left)} 次{qaStatus.freeLeft===0 ? ' · 每次 '+qaStatus.cost+' 顆電池':''}</>}</p>}
       </div>
 
       <form onSubmit={handleSubmit} className="mb-5 relative">
@@ -467,10 +467,14 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
       </form>
 
       {(isSubmitting && qaMode !== 'off' || pendingQa) && (
-        <div role="status" aria-live="polite" className="mb-3 flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 px-3 py-3 text-sm">
-          <AiBadge/>
-          <span className="rainbow-admin-text font-bold"><SpeakerNameLink name={speakerName}/></span>
-          <span>{pendingQa?.phase==='typing'?'正在輸入訊息中':'正在準備回答'}<span className="inline-block animate-pulse">…</span></span>
+        <div role="status" aria-live="polite" className="mb-3 min-w-0 max-w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 px-3 py-3 text-sm">
+          <div className="flex items-start gap-2 min-w-0">
+            <span className="shrink-0 mt-0.5"><AiBadge/></span>
+            <span className="rainbow-admin-text font-bold min-w-0 flex-1 break-words [overflow-wrap:anywhere]"><SpeakerNameLink name={speakerName}/></span>
+          </div>
+          <p className="mt-2 leading-normal text-slate-700 dark:text-slate-200 break-keep">
+            {pendingQa?.phase==='typing'?'正在輸入訊息中':'正在準備回答'}<span className="inline-block animate-pulse">…</span>
+          </p>
         </div>
       )}
       {qaNotice && !pendingQa && (
