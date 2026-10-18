@@ -34,6 +34,8 @@ interface CoverLibraryItem {
 
 interface UploadModalProps {
   isOpen: boolean;
+  /** The main upload/management workspace is an actual page, while editor dialogs stay overlays. */
+  presentation?: 'page' | 'overlay';
   onClose: () => void;
   onSuccess: (newTrack: Track) => void;
   currentUser: UserProfile | null;
@@ -78,6 +80,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  presentation = 'overlay',
   currentUser,
   isAdmin,
   trackToEdit,
@@ -803,7 +806,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   return (
-    <div className="upload-modal-overlay upload-page">
+    <div className={`upload-modal-overlay upload-page ${presentation === 'page' ? 'upload-standalone-page' : ''}`} data-upload-page-presentation={presentation}>
       <div className="w-full bg-white dark:bg-slate-900">
         {/* Header - Requirement 20: 統一底色與麥克風相同色 */}
         <div
