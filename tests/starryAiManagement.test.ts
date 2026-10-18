@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { AI_TASK_CATALOG, INACTIVE_AI_TASKS, DEFAULT_AI_ORDER, validateAiOrder, mergeAiOrder } from '../worker/starryAiManagement';
 import { renderStarryAiManagementPage } from '../worker/starryAiManagementPage';
 
