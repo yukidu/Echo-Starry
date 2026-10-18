@@ -152,7 +152,8 @@ export async function syncEchoMemberToStarry(env: StarrySyncEnv, userId: string,
       (userId,appId,status,role,isAdminUser,isContributor,canUpload,joinedAt,updatedAt)
       VALUES (?,'echostars',?,?,?,?,?,?,?)
       ON CONFLICT(userId,appId) DO UPDATE SET
-        status=excluded.status,role=excluded.role,isAdminUser=excluded.isAdminUser,
+        status=CASE WHEN app_memberships.status='active' THEN excluded.status ELSE app_memberships.status END,
+        role=excluded.role,isAdminUser=excluded.isAdminUser,
         isContributor=excluded.isContributor,canUpload=excluded.canUpload,updatedAt=excluded.updatedAt`)
       .bind(
         centralId,
