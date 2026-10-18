@@ -65,7 +65,8 @@ const BwExportModal = lazy(() => import('./components/BwExportModal').then(modul
 import { StatisticsView } from './components/StatisticsView';
 import { CommentPreviewModal } from './components/CommentPreviewModal';
 const MemberPreviewModal = lazy(() => import('./components/MemberPreviewModal').then(module => ({ default: module.MemberPreviewModal })));
-import { NotificationsView } from './components/NotificationsView';
+import { NotificationErrorBoundary } from './components/NotificationErrorBoundary';
+const NotificationsView = lazy(() => import('./components/NotificationsView').then(module => ({ default: module.NotificationsView })));
 import { TwinklingStars } from './components/TwinklingStars';
 import { TutorialSpotlight } from './components/TutorialSpotlight';
 const ChangelogModal = lazy(() => import('./components/ChangelogModal').then(module => ({ default: module.ChangelogModal })));
@@ -2667,7 +2668,9 @@ export default function App() {
             onViewMember={user => setPreviewMember(user)}
           />
         ) : currentTab === 'notifications' ? (
-          <NotificationsView
+          <NotificationErrorBoundary onReturnHome={handleReturnToHomePlaylist}>
+            <Suspense fallback={<div role="status" className="max-w-2xl mx-auto p-6 text-center text-sm text-slate-500">正在開啟通知…</div>}>
+              <NotificationsView
             users={allUsers}
             currentUser={currentUser}
             isAdmin={isSuperAdmin}
@@ -2680,7 +2683,9 @@ export default function App() {
             onAddComment={(trackId, content, replyToId, replyToAuthor) =>
               handleAddComment(content, replyToId, replyToAuthor, trackId)
             }
-          />
+              />
+            </Suspense>
+          </NotificationErrorBoundary>
         ) : (selectedDetailTrack || (currentTrack && playerMode === 'expanded')) ? (
           (() => {
             const activeTrack = selectedDetailTrack || currentTrack!;

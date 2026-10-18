@@ -206,7 +206,9 @@ export const Navbar: React.FC<NavbarProps> = ({
       if (onLogoClick) onLogoClick();
       else onSelectTab('home');
     } else {
-      if (currentTab !== 'home') onSelectTab('home');
+      // Switching to notifications must not mount the homepage first.
+      // A single transition also avoids duplicate player/notification work.
+      if (tab !== 'notifications' && currentTab !== 'home') onSelectTab('home');
       onSelectTab(tab);
     }
     setIsMobileMenuOpen(false);
