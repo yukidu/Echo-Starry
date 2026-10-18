@@ -36,10 +36,10 @@ test('answer model has room for reasoning and does not spend user batteries on f
   assert.match(qa,/if\(!await charge/);
   assert.match(qa,/if\(!replyInserted && charged\)await refund/);
 });
-test('reusable rainbow AI emblem includes uppercase letters and low-cost motion',()=>{
-  assert.match(badge,/>AI<\/span>/);
+test('reusable transparent Ai emblem has mixed-case letters and animated rainbow outline',()=>{
+  assert.match(badge,/>Ai<\/span>/);
   assert.match(badgeCss,/conic-gradient/);
-  assert.match(badgeCss,/transform: rotate/);
+  assert.match(badgeCss,/hue-rotate/);
   assert.match(badgeCss,/prefers-reduced-motion/);
   assert.match(comments,/AiBadge/);
 });
