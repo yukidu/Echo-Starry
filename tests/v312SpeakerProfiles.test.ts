@@ -51,11 +51,12 @@ test('speaker identity, restricted recordings and public summaries remain isolat
   assert.match(speaker,/查看原始留言對話/);
   assert.match(speaker,/speaker\.biography/);
 });
-test('transcript completion schedules a budgeted biography instead of running AI for every reader',()=>{
+test('transcript completion schedules a single background biography without daily caps',()=>{
   assert.match(transcript,/markSpeakerBiosDirty\(this\.env, trackId\)/);
   assert.match(worker,/generateNextSpeakerBiography\(env as any\)/);
-  assert.match(cron,/ai_speaker_generation_daily/);
-  assert.match(cron,/INSERT INTO ai_speaker_generation_daily/);
+  assert.doesNotMatch(cron,/ai_speaker_generation_daily|dailyLimit|const day=/);
+  assert.match(cron,/mayStartAiBackground/);
+  assert.match(cron,/UPDATE ai_speaker_profiles SET bioStatus='processing'/);
   assert.match(cron,/sources\.slice\(0,24\)/);
   assert.match(router,/path==='\/api\/speaker-profiles\/view'/);
   assert.match(router,/path==='\/api\/speaker-profiles\/settings'/);
