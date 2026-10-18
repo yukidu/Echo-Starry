@@ -140,7 +140,7 @@ export async function runNextStoryAttribution(env:Env){
         const result=await publishStory(env,{...verify,revision},draft);
         return {status:'approved',trackId:id,cursor:draft.cursor,total:draft.total,...result};
       }
-      await env.DB.prepare("UPDATE ai_story_pilots SET status='pending',cursor=?,r2Key=?,updatedAt=?,error=NULL WHERE trackId=? AND autoRun=1 AND status='processing' AND revision=?")
+      await env.DB.prepare("UPDATE ai_story_pilots SET status='pending',cursor=?,r2Key=?,updatedAt=?,error=NULL WHERE trackId=? AND status='processing' AND revision=?")
         .bind(draft.cursor,storyDraftKey(id),Date.now(),id,revision).run();
       return {status:'progress',trackId:id,cursor:draft.cursor,total:draft.total};
     }catch(e){
