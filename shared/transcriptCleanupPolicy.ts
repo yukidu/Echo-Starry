@@ -57,6 +57,8 @@ export function semanticCandidates(source: string, policy: CleanupPolicy): Clean
     let from = 0, i = 0;
     while ((i = text.indexOf(word, from)) !== -1) {
       const start = i, end = i + word.length;
+      // Only isolated candidates: expressions like 那個問題 / 就是這樣 retain meaning.
+      if (text[end] && !/[\s，。、：:；;！!？?.,]/u.test(text[end])) { from = end; continue; }
       // Context determines whether this is a filler or meaningful word.
       candidates.push({ id: String(start) + ':' + word, start, end, word });
       from = end;
@@ -87,7 +89,7 @@ export function cleanTranscriptText(source: string, policy: CleanupPolicy, seman
       const left = at ? next[at-1] : '';
       const right = next[at+word.length] || '';
       // Do not remove the first character of real words such as "厄運".
-      const conservative = hasBoundary(left) && (hasBoundary(right) || word.startsWith('呃'));
+      const conservative = hasBoundary(left) && (hasBoundary(right) || (word.startsWith('呃') && !(word==='呃' && right==='逆')));
       if (conservative) {
         next = next.slice(0,at) + next.slice(at+word.length);
         cursor = at;
