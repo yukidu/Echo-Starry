@@ -10,7 +10,7 @@ test('central AI catalogue registers only real cloud AI tasks across Echo and Mi
   assert.ok(AI_TASK_CATALOG.some(t=>t.id==='mirror.reading'));
   assert.ok(AI_TASK_CATALOG.some(t=>t.id==='echo.qa'));
   assert.ok(AI_TASK_CATALOG.some(t=>t.id==='echo.transcribe'));
-  assert.ok(!AI_TASK_CATALOG.some(t=>t.id==='echo.translation'));
+  assert.ok(!AI_TASK_CATALOG.some(t=>String(t.id)==='echo.translation'));
   assert.match(AI_TASK_CATALOG.find(t=>t.id==='echo.normalize')!.title,/轉錄後自動/);
   assert.equal(DEFAULT_AI_ORDER.find(t=>t.id==='echo.transcribe')?.tier,3);
   assert.equal(DEFAULT_AI_ORDER.find(t=>t.id==='echo.normalize')?.tier,3);
