@@ -5,8 +5,9 @@ import { readFileSync } from 'node:fs';
 const navbar = readFileSync(new URL('../src/components/Navbar.tsx', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../src/components/Navbar.css', import.meta.url), 'utf8');
 
-test('main-menu navigation clears the previous page before opening another page', () => {
-  assert.match(navbar, /if \(currentTab !== 'home'\) onSelectTab\('home'\);[\s\S]*onSelectTab\(tab\);/);
+test('main-menu notification navigation does not remount homepage unnecessarily', () => {
+  assert.match(navbar, /tab !== 'notifications' && currentTab !== 'home'/);
+  assert.match(navbar, /onSelectTab\(tab\);/);
   assert.match(navbar, /document\.body\.dataset\.mainTab = currentTab/);
 });
 
