@@ -3365,7 +3365,17 @@ export default function App() {
           </div>
           <div className="min-h-0 overflow-y-auto overscroll-contain">
             <Suspense fallback={<p role="status" className="p-8 text-center">正在載入演講者資訊…</p>}>
-              <SpeakerProfilePage compact name={speakerProfileName} onBack={()=>setSpeakerProfileName(null)} onOpenTrack={(id,commentId)=>{
+              <SpeakerProfilePage compact name={speakerProfileName} onBack={()=>setSpeakerProfileName(null)} onPlayTrack={id=>{
+                const target=tracks.find(t=>t.id===id);
+                if(!target)return;
+                // Keep the speaker popup and the current route intact.
+                setPlayerMode('bubble');
+                if(currentTrack?.id===target.id){
+                  if(!isPlaying)void handleTogglePlay();
+                } else {
+                  void handlePlayTrack(target,'bubble');
+                }
+              }} onOpenTrack={(id,commentId)=>{
                 const target=tracks.find(t=>t.id===id);
                 setSpeakerProfileName(null);
                 if(target)openTrackDetail(target,commentId);

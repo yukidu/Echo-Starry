@@ -77,7 +77,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [qaMode, setQaMode] = useState<'current' | 'all' | 'off'>('current');
-  const [qaStatus, setQaStatus] = useState<{enabled:boolean;reason:string;freeLeft:number;left:number;cost:number}|null>(null);
+  const [qaStatus, setQaStatus] = useState<{enabled:boolean;reason:string;freeLeft:number;left:number;cost:number;unlimited?:boolean}|null>(null);
   const [pendingQa,setPendingQa] = useState<{id:string;phase:'starting'|'typing'}|null>(null);
   const [qaNotice,setQaNotice] = useState('');
   // The stored original comment is the only reliable trigger for an AI answer.
@@ -130,6 +130,25 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
     timer=window.setTimeout(tick,1300);
     return ()=>{alive=false;if(timer!==undefined)window.clearTimeout(timer);};
   },[pendingQa?.id,trackId]);
+  // Refresh saved quotas after returning from the administrator settings page.
+  useEffect(()=>{
+    let alive=true;
+    const refresh=()=>{
+      if(document.visibilityState==='hidden')return;
+      void fetch('/api/qa/status?trackId='+encodeURIComponent(trackId),{credentials:'same-origin',cache:'no-store'})
+        .then(async r=>r.ok?r.json():null)
+        .then(d=>{
+          if(!alive||!d)return;
+          const previouslyDenied=!!qaStatus?.reason;
+          setQaStatus(d);
+          if(!d.enabled)setQaMode('off');
+          else if(previouslyDenied)setQaMode(mode=>mode==='off'?'current':mode);
+        }).catch(()=>{});
+    };
+    window.addEventListener('echostars:qa-settings-updated',refresh);
+    window.addEventListener('focus',refresh);
+    return ()=>{alive=false;window.removeEventListener('echostars:qa-settings-updated',refresh);window.removeEventListener('focus',refresh);};
+  },[trackId,qaStatus?.reason]);
   const headingRef = useRef<HTMLHeadingElement|null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -398,7 +417,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
           ))}
         </fieldset>
         {qaStatus?.reason && <div className="mt-1 text-xs text-amber-700 dark:text-amber-300" role="status">已自動關閉 <AiBadge/>：{qaStatus.reason}（一般心得留言仍可使用）</div>}
-        {qaStatus?.enabled && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">今日免費剩餘 {qaStatus.freeLeft} 次／總共剩餘 {qaStatus.left} 次{qaStatus.freeLeft===0 ? ' · 每次 '+qaStatus.cost+' 顆電池':''}</p>}
+        {qaStatus?.enabled && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{qaStatus.unlimited ? '超級管理員：網站內召喚不限次數、不扣電池' : <>今日免費剩餘 {qaStatus.freeLeft} 次／總共剩餘 {qaStatus.left} 次{qaStatus.freeLeft===0 ? ' · 每次 '+qaStatus.cost+' 顆電池':''}</>}</p>}
       </div>
 
       <form onSubmit={handleSubmit} className="mb-5 relative">

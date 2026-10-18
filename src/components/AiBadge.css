@@ -5,10 +5,10 @@
   vertical-align: middle;
   align-items: center;
   justify-content: center;
-  width: 1.45em;
-  height: 1.45em;
+  width: 1.05em;
+  height: 1.05em;
   flex: none;
-  border-radius: 0.35em;
+  border-radius: 0.18em;
   isolation: isolate;
   overflow: hidden;
   color: currentColor;
@@ -35,7 +35,7 @@
 }
 .starry-ai-badge-text {
   display: inline-block;
-  font-size: 0.66em;
+  font-size: 0.94em;
   font-weight: 900;
   letter-spacing: -0.04em;
   /* The Ai letters themselves have the same moving rainbow as the Newcomer badge. */
