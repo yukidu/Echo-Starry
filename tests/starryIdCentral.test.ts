@@ -34,7 +34,8 @@ test('Starry ID only accepts registered app ids for self enrollment', () => {
   assert.match(router, /STARRY_ID_ALLOWED_APPS/);
   assert.match(router, /STARRY_ID_SELF_ENROLL_APPS/);
   assert.match(router, /if \(!allowedApp\(env, appId\)\) throw new Error\('unsupported_app'\)/);
-  assert.match(router, /if \(!membership && !selfEnrollApp\(env, appId\)\) throw new Error\('app_membership_required'\)/);
+  assert.match(router, /if \(!membership && !selfEnrollApp\(env, appId\) && explicitAppDecision !== 'allow'\) throw new Error\('app_membership_required'\)/);
+  assert.match(router, /explicitAppDecision === 'deny'/);
   assert.match(wrangler, /STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry,[^"]*starry-mirror[^"]*"/);
   assert.match(wrangler, /STARRY_ID_SELF_ENROLL_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry,[^"]*starry-mirror[^"]*"/);
 });
