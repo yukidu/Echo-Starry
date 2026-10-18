@@ -342,13 +342,15 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
             throw new Error('中央會員選取資料不完整，請重新操作');
         }
         if(generation!==state.selectionGeneration)return; // Explicit clear/logout wins.
+        const beforeCount=selectedMemberCount();
         mergeMemberSelection(ids,shouldSelect);
+        const changed=Math.abs(selectedMemberCount()-beforeCount);
         if(currentMemberFilterKey()===key){
           state.currentFilterKey=key;
           state.currentFilterIds=ids;
         }
         refreshVisibleMemberChecks();
-        toast((shouldSelect?'已加入':'已取消目前篩選內的')+' '+ids.length+' 位會員，累積已選 '+selectedMemberCount()+' 位');
+        toast((shouldSelect?'本次新增':'本次取消')+' '+changed+' 位，累積已選 '+selectedMemberCount()+' 位');
       }catch(error){
         if(generation===state.selectionGeneration)
           toast(error.message||'無法讀取完整篩選名單，原本勾選已保留',true);
