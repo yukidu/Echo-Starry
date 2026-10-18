@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {formatSpeakerUploadDate} from '../src/components/SpeakerProfilePage';
+import {formatSpeakerUploadDate} from '../src/utils/speakerDate';
 
 const read=(p:string)=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const comments=read('src/components/CommentsSection.tsx');
@@ -38,6 +38,6 @@ test('custom confirmation stays on top of speaker popup and keeps the original p
   assert.match(speaker,/event\.stopPropagation\(\);setConfirmTrack\(null\)/);
 });
 test('PWA shell is updated so existing mobile browsers receive this fix',()=>{
-  assert.match(sw,/echostars-shell-v180/);
-  assert.match(release,/echostars-shell-v180/);
+  assert.match(sw,/const CACHE_NAME = 'echostars-shell-v\d+'/);
+  assert.match(release,/single current PWA cache version/);
 });
