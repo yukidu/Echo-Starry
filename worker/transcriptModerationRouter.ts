@@ -19,7 +19,7 @@ type Actor = {
 };
 
 type BaseSegment = { id: string; start: number; end: number; text: string };
-type TranscriptFile = { trackId: string; segments: BaseSegment[]; text?: string; durationSeconds?: number };
+type TranscriptFile = { trackId:string;segments:BaseSegment[];cleanedSegments?:{id:string;text:string}[];text?:string;durationSeconds?:number;createdAt?:number };
 
 const SESSION_COOKIE = 'echostars_session';
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{30,}$/;
@@ -202,6 +202,9 @@ async function baseTranscript(env: Env, trackId: string): Promise<TranscriptFile
 }
 
 function activeText(event: any) { return text(event?.adminText || event?.newText); }
+function cleanedBaseline(transcript:TranscriptFile, segmentId:string, original:string){
+  return transcript.cleanedSegments?.find(s=>s.id===segmentId)?.text || original;
+}
 
 async function currentSegmentState(env: Env, trackId: string, segmentId: string) {
   const transcript = await baseTranscript(env, trackId);
@@ -213,7 +216,7 @@ async function currentSegmentState(env: Env, trackId: string, segmentId: string)
   return {
     base,
     latest: latest || null,
-    text: latest ? activeText(latest) : text(base.text)
+    text: latest ? activeText(latest) : cleanedBaseline(transcript as TranscriptFile,segmentId,base.text)
   };
 }
 
@@ -225,7 +228,7 @@ async function resolvedSegments(env: Env, trackId: string) {
     .bind(trackId, Number((transcript as any)?.createdAt || 0)).all();
   const latest = new Map<string, string>();
   for (const row of rows.results || []) latest.set(text(row.segmentId), activeText(row));
-  return transcript.segments.map(segment => ({ ...segment, text: latest.get(segment.id) || text(segment.text) }));
+  return transcript.segments.map(segment => ({ ...segment, text: latest.get(segment.id) || cleanedBaseline(transcript,segment.id,segment.text) }));
 }
 
 async function correctedTranscriptResponse(request: Request, env: Env, ctx: ExecutionContext, trackId: string) {

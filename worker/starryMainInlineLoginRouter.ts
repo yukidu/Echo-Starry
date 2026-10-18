@@ -252,7 +252,8 @@ function loginPage(env: Env) {
 }
 
 function isTranscriptV281Path(pathname: string) {
-  return pathname === '/api/v281/transcript-settings' ||
+  return pathname === '/api/v281/transcript-cleanup' || pathname.startsWith('/api/v281/transcript-cleanup/') ||
+    pathname === '/api/v281/transcript-settings' ||
     pathname === '/api/v281/transcript-corrections' ||
     pathname === '/api/v281/transcript-user-notifications' ||
     pathname === '/api/v281/transcript-user-notifications/read' ||
