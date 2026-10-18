@@ -38,5 +38,6 @@ test('v299 automatic handoff and watchdog never retry failed recordings without 
 
 test('v299 keeps the 15-minute cron as recovery watchdog', () => {
   const wrangler = read('wrangler.toml');
-  assert.match(wrangler, /crons\s*=\s*\["\*\/15 \* \* \* \*"\]/);
+  assert.ok(wrangler.includes('"*/15 * * * *"'));
+  assert.ok(wrangler.includes('"*/5 * * * *"'));
 });
