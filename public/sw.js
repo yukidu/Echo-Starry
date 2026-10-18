@@ -1,4 +1,4 @@
-const CACHE_NAME = 'echostars-shell-v182';
+const CACHE_NAME = 'echostars-shell-v183';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-monochrome.svg', '/icon-192.png', '/icon-512.png'];
 const FORCE_STALE_CLIENT_REFRESH = true;
 
@@ -16,7 +16,7 @@ self.addEventListener('activate', event => {
     await Promise.all(oldShellKeys.map(key => caches.delete(key)));
     await self.clients.claim();
 
-    // v182: refresh existing clients after isolated notification page and recovery fixes.
+    // v183: refresh existing clients to stop the notifications observer feedback loop.
     // This prevents a successfully deployed Production build from looking stale merely
     // because an already-open tab is still executing the previous in-memory bundle.
     if (FORCE_STALE_CLIENT_REFRESH && upgradingExistingClient) {
