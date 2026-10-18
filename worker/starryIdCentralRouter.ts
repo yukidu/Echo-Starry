@@ -92,6 +92,31 @@ function configuredSuperAdmin(env: StarryEnv, email: unknown) {
   return configuredSuperAdminEmails(env).has(lower(email));
 }
 
+/**
+ * Central Starry ID membership (or its server-side administrator allowlist) is
+ * the only source of ecosystem administrator authority. An App-specific role,
+ * including a role called "super-admin", cannot grant central management.
+ *
+ * For Starry ID sessions reuse the already-verified membership row. A session
+ * issued through another App needs one central membership lookup, which stays
+ * live so revoked central roles lose access without waiting for cache expiry.
+ */
+export async function resolveCentralStarryAdmin(
+  db: any,
+  userId: string,
+  sessionAppId: string,
+  currentMembership: { role?: unknown; status?: unknown } | null,
+  centrallyConfiguredAdmin: boolean
+): Promise<boolean> {
+  if (!userId || !db || !currentMembership || currentMembership.status !== 'active') return false;
+  if (centrallyConfiguredAdmin) return true;
+  if (sessionAppId === 'starry-id') return currentMembership.role === 'super-admin';
+  const central: any = await db.prepare(
+    "SELECT status,role FROM app_memberships WHERE userId=? AND appId='starry-id' LIMIT 1"
+  ).bind(userId).first();
+  return central?.status === 'active' && central?.role === 'super-admin';
+}
+
 function bytesToBase64Url(bytes: Uint8Array) {
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -437,7 +462,9 @@ async function sessionUser(request: Request, env: StarryEnv) {
   if (session.appId !== 'starry-id' && !(await checkStarryAppAccess(db,session.userId,session.appId)).allowed) return null;
   const publicUser = publicMember(member);
   if (!publicUser) return null;
-  const isSuperAdmin = configuredSuperAdmin(env, publicUser.email) || membership.role === 'super-admin';
+  const isSuperAdmin = await resolveCentralStarryAdmin(
+    db, session.userId, session.appId, membership, configuredSuperAdmin(env, publicUser.email)
+  );
 
   return {
     member: publicUser,
@@ -610,8 +637,8 @@ function servicePage(env: StarryEnv) {
 }
 
 /** A verified central session must authorize every App-access admin request. */
-export function canManageStarryAppAccess(session: { appId: string; isSuperAdmin: boolean } | null): boolean {
-  return Boolean(session && session.appId === 'starry-id' && session.isSuperAdmin === true);
+export function canManageStarryAppAccess(session: { isSuperAdmin: boolean } | null): boolean {
+  return session?.isSuperAdmin === true;
 }
 
 async function handleApi(request: Request, env: StarryEnv, path: string) {
@@ -625,8 +652,9 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
   if (path.startsWith('/api/admin/app-access/')) {
     const session = await sessionUser(request,env);
     if (!session) return json(request,{error:'請先登入 Starry ID'},401);
-    // Reuse the same centrally verified super-admin decision as member management.
-    // A Starry ID super-admin membership is valid even without an email allowlist entry.
+    // Trust only centrally verified Starry ID administrator authority.
+    // The cookie may have been issued for another App, so do not require
+    // session.appId === 'starry-id' once sessionUser has authenticated it.
     if (!canManageStarryAppAccess(session))
       return json(request,{error:'只有 Starry ID 超級管理員可以設定 App 權限'},403);
     return handleStarryAppAccessAdminRequest(request,env,session.member.id);
