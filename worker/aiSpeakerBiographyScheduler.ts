@@ -19,10 +19,12 @@ export async function generateNextSpeakerBiography(env:SpeakerEnv){
   try{
     const {sources,revision}=await publicSpeakerSources(env,p.displayName);
     if(!sources.length){
-      await env.DB.prepare("UPDATE ai_speaker_profiles SET biography='',bioStatus='ready',sourceRevision=?,bioUpdatedAt=?,updatedAt=?,error=NULL WHERE id=?").bind(revision,Date.now(),Date.now(),p.id).run();
-      return {status:'ready',sources:0};
+      // Empty output is not a completed summary. Skip AI entirely until an
+      // eligible public transcript exists; later transcript updates requeue it.
+      await env.DB.prepare("UPDATE ai_speaker_profiles SET biography='',bioStatus='waiting_sources',sourceRevision=?,bioUpdatedAt=0,updatedAt=?,error=NULL WHERE id=?").bind(revision,Date.now(),p.id).run();
+      return {status:'waiting_sources',sources:0};
     }
-    if(p.sourceRevision===revision&&p.biography){
+    if(p.sourceRevision===revision&&speakerText(p.biography)){
       await env.DB.prepare("UPDATE ai_speaker_profiles SET bioStatus='ready',updatedAt=?,error=NULL WHERE id=?").bind(Date.now(),p.id).run();
       return {status:'ready',cached:true};
     }
