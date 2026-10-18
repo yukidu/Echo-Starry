@@ -47,7 +47,7 @@ test('Preview and a second confirmation are required to change member App permis
 });
 
 test('Bulk selection is limited, supports paging and displays revert history', () => {
-  assert.match(router, /LIMIT 100 OFFSET \?/);
+  assert.match(router, /LIMIT \? OFFSET \?/);
   assert.match(page, /access-member-row/);
   assert.match(page, /selectedIds:new Set\(\)/);
   assert.match(page, /state\.selectedIds\.size>=50/);
