@@ -31,7 +31,7 @@ test('typing uses real server state and only checks status for the requesting id
   assert.doesNotMatch(app,/for \(const wait of \[6500, 16000\]\)/);
 });
 test('answer model has room for reasoning and does not spend user batteries on failed reply',()=>{
-  assert.match(qa,/max_tokens:1400/);
+  assert.match(qa,/max_tokens:i===0\?1800:1200/);
   assert.match(qa,/if\(!reply\)\{await fail/);
   assert.match(qa,/if\(!await charge/);
   assert.match(qa,/if\(!replyInserted && charged\)await refund/);
