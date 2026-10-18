@@ -1,3 +1,4 @@
+import { mayStartAiBackground } from './starryAiManagement';
 import { aiText } from './aiSpeakerQaRouter';
 import {publicSpeakerSources,speakerSummaryOptions,speakerText,type SpeakerEnv} from './aiSpeakerProfileRouter';
 const day=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
@@ -7,6 +8,7 @@ const day=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
  */
 export async function generateNextSpeakerBiography(env:SpeakerEnv){
   if(!env.DB||!env.AI||!env.R2_BUCKET)return {status:'unavailable'};
+  if(!await mayStartAiBackground(env as any,'echo.bio'))return {status:'priority_deferred'};
   const cfg=await speakerSummaryOptions(env);
   const p:any=await env.DB.prepare("SELECT * FROM ai_speaker_profiles WHERE bioStatus='pending' AND updatedAt<? ORDER BY updatedAt DESC LIMIT 1").bind(Date.now()-30000).first();
   if(!p)return {status:'empty'};
