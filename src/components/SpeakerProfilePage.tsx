@@ -69,7 +69,7 @@ export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrac
       <div className="mt-4 space-y-2">
         <h2 className="flex items-center gap-2 font-bold"><BookOpenText size={18}/>綜合人物摘要</h2>
         {data.speaker.biography.trim()?<p className="whitespace-pre-wrap text-sm leading-7">{data.speaker.biography}</p>:<p className="text-sm text-slate-500">{
-          data.speaker.bioStatus==='review_required'?'多人演講故事歸屬仍待管理員核對，暫不顯示可能混淆的人物摘要':
+          data.speaker.bioStatus==='review_required'?'多人演講正在自動分析故事，尚未完成歸屬，暫不顯示可能混淆的人物摘要':
           data.speaker.bioStatus==='waiting_sources'?'目前沒有可用的公開逐字稿，尚無法產生摘要':
           data.speaker.bioStatus==='missing_summary'?'摘要內容缺失，請管理員檢查來源與處理狀態':
           data.speaker.bioStatus==='failed'?'摘要暫時無法生成，管理員可重新排隊':
