@@ -11,7 +11,7 @@
   border-radius: 0.35em;
   isolation: isolate;
   overflow: hidden;
-  color: #fff;
+  color: currentColor;
   font-family: system-ui, -apple-system, sans-serif;
   font-size: 1em;
   line-height: 1;
@@ -30,7 +30,7 @@
   z-index: -1;
   inset: 2px;
   border-radius: 0.25em;
-  background: #101827;
+  background: var(--starry-ai-icon-background, transparent);
 }
 .starry-ai-badge-text { font-size: 0.59em; font-weight: 900; letter-spacing: -0.04em; }
 @keyframes starry-ai-border-spin { to { transform: rotate(360deg); } }
