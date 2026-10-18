@@ -118,6 +118,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const [selectedCategories, setSelectedCategories] = useState<CategoryType[]>(['事業']);
   const [series, setSeries] = useState('');
   const [speechDate, setSpeechDate] = useState(new Date().toISOString().split('T')[0].replace(/-/g, '/'));
+  const [transcriptLanguageHint, setTranscriptLanguageHint] = useState('auto');
   const [seriesOrder, setSeriesOrder] = useState('第 1 集');
   const [guestVisible, setGuestVisible] = useState(false);
   const [authorizedOnlyVisible, setAuthorizedOnlyVisible] = useState(false);
@@ -449,6 +450,19 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setAudioDurationSeconds(null);
     }
   }, [trackToEdit, isOpen]);
+
+  // The language is only a recognition hint; the AI always preserves real mixed-language speech.
+  React.useEffect(() => {
+    let cancelled = false;
+    setTranscriptLanguageHint('auto');
+    if (isOpen && trackToEdit?.id) {
+      void fetch(`/api/v281/transcript-language-hints/${encodeURIComponent(trackToEdit.id)}`, { credentials: 'same-origin' })
+        .then(response => response.ok ? response.json() : null)
+        .then(data => { if (!cancelled && data?.languageHint) setTranscriptLanguageHint(data.languageHint); })
+        .catch(() => {});
+    }
+    return () => { cancelled = true; };
+  }, [trackToEdit?.id, isOpen]);
 
   if (!isOpen) return null;
 
@@ -795,6 +809,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       if (!trackObj?.id || (trackToEdit && trackObj.id !== trackToEdit.id)) {
         throw new Error('伺服器未回傳已儲存的音檔，請重試。');
       }
+      // Store the optional hint separately, without rewriting other track/profile fields.
+      if (transcriptLanguageHint !== 'auto' || trackToEdit) {
+        try {
+          const hintResponse = await fetch(`/api/v281/transcript-language-hints/${encodeURIComponent(trackObj.id)}`, {
+            method: 'PUT',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ languageHint: transcriptLanguageHint })
+          });
+          if (!hintResponse.ok) console.warn('逐字稿語言提示未儲存，將使用自動辨識');
+        } catch { console.warn('逐字稿語言提示未儲存，將使用自動辨識'); }
+      }
       onSuccess(normalizedTrack);
       window.dispatchEvent(new CustomEvent('echostars:sticker-changed'));
       onClose();
@@ -912,6 +938,25 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               </p>
             )}
           </div>
+
+          <label className="block font-bold text-slate-700 dark:text-slate-300">
+            逐字稿原音語言
+            <ThemedSelect value={transcriptLanguageHint} onChange={event => setTranscriptLanguageHint(event.target.value)}
+              className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+              <option value="auto">自動辨識／混合語言（預設）</option>
+              <option value="zh">國語</option>
+              <option value="nan">台語</option>
+              <option value="en">英語</option>
+              <option value="vi">越南語</option>
+              <option value="yue">粵語</option>
+              <option value="ja">日語</option>
+              <option value="ko">韓語</option>
+              <option value="other">其他語言</option>
+            </ThemedSelect>
+            <span className="block mt-1 text-[11px] font-normal text-slate-500">
+              僅協助 AI 辨識，不會強制翻譯。錄音中混合其他語言時一律保留原音。
+            </span>
+          </label>
 
           {/* 2. Cover Photo Area */}
           <div className="space-y-2">

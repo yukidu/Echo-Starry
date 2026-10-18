@@ -149,6 +149,9 @@ function installStyles() {
     .v161-actions { display:flex; gap:.28rem; align-items:center; }
     .v161-action { display:inline-flex; align-items:center; justify-content:center; gap:.2rem; min-height:1.9rem; padding:.3rem .48rem; border-radius:.6rem; font-size:.7rem; font-weight:850; white-space:nowrap; }
     .v161-edit { background:color-mix(in srgb,var(--color-primary,#c06c84) 12%,white); color:var(--color-primary,#c06c84); }
+    .v161-relisten { background:rgb(219 234 254); color:rgb(29 78 216); }
+    .v161-relisten:disabled { opacity:.5; cursor:not-allowed; }
+    .dark .v161-relisten { background:rgb(30 58 138 / .5); color:rgb(191 219 254); }
     .v161-delete { background:rgb(254 226 226); color:rgb(190 24 93); }
     .dark .v161-edit { background:rgb(51 65 85); }
     .dark .v161-delete { background:rgb(76 29 49); color:rgb(253 164 175); }
@@ -179,6 +182,7 @@ function TrackManagement() {
   const [error, setError] = useState('');
   const [editingTrack, setEditingTrack] = useState<Track | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [relisteningId, setRelisteningId] = useState<string | null>(null);
   const [transcriptStatuses, setTranscriptStatuses] = useState<Record<string, TranscriptProgressItem>>({});
   const [transcriptStatusesReady, setTranscriptStatusesReady] = useState(false);
   const returnScrollRef = useRef(0);
@@ -305,6 +309,29 @@ function TrackManagement() {
     }
   };
 
+  const relistenTrack = async (track: Track) => {
+    if (!superAdmin || relisteningId || ['pending','queued','processing'].includes(transcriptStatuses[track.id]?.status)) return;
+    setError('');
+    setRelisteningId(track.id);
+    try {
+      const response = await fetch(`/api/v281/transcript-management/relisten/${encodeURIComponent(track.id)}`, {
+        method: 'POST',
+        credentials: 'same-origin'
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || '重聽逐字稿失敗');
+      setTranscriptStatuses(previous => ({
+        ...previous,
+        [track.id]: { trackId: track.id, status: 'pending', error: null, updatedAt: Date.now() }
+      }));
+      setTranscriptStatusesReady(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '無法啟動逐字稿重聽');
+    } finally {
+      setRelisteningId(null);
+    }
+  };
+
   if (!user) return null;
 
   return (
@@ -349,6 +376,7 @@ function TrackManagement() {
             const permission = !track.requiredRank || track.requiredRank === '無' ? '公開' : track.requiredRank;
             const speakerRank = normalize(track.speakerRank) && track.speakerRank !== '無' ? ` ${track.speakerRank}` : '';
             const transcriptItem = transcriptStatuses[track.id];
+            const relistenBusy = relisteningId === track.id || ['pending','queued','processing'].includes(transcriptItem?.status || '');
             const transcriptBadge = superAdmin && transcriptStatusesReady && normalize(track.audioUrl)
               ? transcriptProgressPresentation(transcriptItem)
               : null;
@@ -369,6 +397,13 @@ function TrackManagement() {
                 </div>
                 <div className="v161-actions">
                   <button type="button" className="v161-action v161-edit" onClick={() => openEditor(track)}><Edit2 className="h-3.5 w-3.5" />編輯</button>
+                  {superAdmin && normalize(track.audioUrl) && (
+                    <button type="button" className="v161-action v161-relisten"
+                      onClick={() => void relistenTrack(track)} disabled={relistenBusy}
+                      title={relistenBusy ? '此音檔已在排隊或正在重聽' : 'AI 重新聆聽原始音檔，產生完整原音逐字稿'}>
+                      {relistenBusy ? '正在重聽逐字稿' : '重聽逐字稿'}
+                    </button>
+                  )}
                   <button type="button" className="v161-action v161-delete" onClick={() => void deleteTrack(track)}><Trash2 className="h-3.5 w-3.5" />{deletingId === track.id ? '再按一次確認' : '刪除'}</button>
                 </div>
               </div>

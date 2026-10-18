@@ -256,6 +256,9 @@ function isTranscriptV281Path(pathname: string) {
     pathname === '/api/v281/transcript-corrections' ||
     pathname === '/api/v281/transcript-user-notifications' ||
     pathname === '/api/v281/transcript-user-notifications/read' ||
+    /^\/api\/v281\/transcript-language-hints\/[^/]+$/.test(pathname) ||
+    pathname === '/api/v281/transcript-management/status' ||
+    /^\/api\/v281\/transcript-management\/relisten\/[^/]+$/.test(pathname) ||
     pathname === '/api/v281/transcripts/bulk-start' ||
     pathname === '/api/v281/transcripts/bulk-status' ||
     /^\/api\/v281\/transcript-corrections\/[^/]+\/(accept|revoke|supplement)$/.test(pathname) ||

@@ -222,8 +222,10 @@ async function loadTranscript(env: TranscriptEnv, trackId: string): Promise<Tran
 
 async function applyCorrections(env: TranscriptEnv, transcript: TranscriptFile) {
   const rows = await env.DB.prepare(`SELECT c.segmentId,c.newText FROM transcript_corrections c
-    JOIN (SELECT segmentId,MAX(createdAt) AS newest FROM transcript_corrections WHERE trackId=? GROUP BY segmentId) latest
-    ON latest.segmentId=c.segmentId AND latest.newest=c.createdAt WHERE c.trackId=?`).bind(transcript.trackId, transcript.trackId).all();
+    JOIN (SELECT segmentId,MAX(createdAt) AS newest FROM transcript_corrections
+      WHERE trackId=? AND createdAt>=? GROUP BY segmentId) latest
+    ON latest.segmentId=c.segmentId AND latest.newest=c.createdAt WHERE c.trackId=? AND c.createdAt>=?`)
+    .bind(transcript.trackId, Number(transcript.createdAt || 0), transcript.trackId, Number(transcript.createdAt || 0)).all();
   const map = new Map<string, string>();
   for (const row of rows.results || []) map.set(text(row.segmentId), text(row.newText));
   return transcript.segments.map(seg => ({ ...seg, text: map.get(seg.id) || seg.text }));

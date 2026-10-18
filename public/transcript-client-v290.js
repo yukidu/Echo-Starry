@@ -3,7 +3,7 @@
   window.__starryTranscriptV290 = true;
 
   const LANGUAGES = [
-    ['zh-Hant','繁體中文'],['zh-Hans','简体中文'],['en','English'],['vi','Tiếng Việt'],
+    ['zh-Hant','原音字幕'],['zh-Hans','简体中文'],['en','English'],['vi','Tiếng Việt'],
     ['id','Bahasa Indonesia'],['yue','粵語'],['ja','日本語'],['ko','한국어'],['fr','Français'],
     ['hi','हिन्दी'],['es','Español'],['th','ไทย'],['ms','Bahasa Melayu'],['de','Deutsch'],
     ['pt','Português'],['ar','العربية']

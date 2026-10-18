@@ -1,6 +1,7 @@
 import type { Env } from './index';
 import transcriptWorker from './transcriptMemberNotificationsRouter';
 import { queueAllPendingTranscripts, transcriptBulkStatus } from './transcriptBulkScheduler';
+import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
 import { batteriesToUnits, unitsToBatteries } from '../shared/battery';
 
 const SESSION_COOKIE = 'echostars_session';
@@ -200,8 +201,8 @@ async function remapDerivedCorrection(request: Request, env: Env, ctx: any, trac
   const transcript: any = JSON.parse(await object.text());
   const base = Array.isArray(transcript?.segments) ? transcript.segments.find((item: any) => text(item?.id) === derived.sourceId) : null;
   if (!base) return json({ error: '找不到原始逐字稿句子' }, 404);
-  const latest: any = await db.prepare('SELECT newText FROM transcript_corrections WHERE trackId=? AND segmentId=? ORDER BY createdAt DESC LIMIT 1')
-    .bind(trackId, derived.sourceId).first().catch(() => null);
+  const latest: any = await db.prepare('SELECT newText FROM transcript_corrections WHERE trackId=? AND segmentId=? AND createdAt>=? ORDER BY createdAt DESC LIMIT 1')
+    .bind(trackId, derived.sourceId, Number(transcript?.createdAt || 0)).first().catch(() => null);
   const currentFull = String(latest?.newText ?? base.text ?? '');
   const currentChars = Array.from(currentFull);
   if (derived.from < 0 || derived.to > currentChars.length || derived.from >= derived.to) {
@@ -299,6 +300,71 @@ async function extendSettings(request: Request, env: Env, ctx: any) {
 export default {
   async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
     const url = new URL(request.url);
+    const languageHintRoute = url.pathname.match(/^\/api\/v281\/transcript-language-hints\/([^/]+)$/);
+    if (languageHintRoute) {
+      const trackId = decodeURIComponent(languageHintRoute[1]);
+      const actor = await sessionActor(request, env);
+      if (!actor) return json({ error: '請先登入會員' }, 401);
+      const db = (env as any).DB;
+      const track: any = await db.prepare('SELECT id,uploaderId,uploaderEmail FROM tracks WHERE id=? LIMIT 1').bind(trackId).first();
+      if (!track) return json({ error: '找不到音檔' }, 404);
+      const isOwner = (text(track.uploaderId) && text(track.uploaderId) === text(actor.id)) ||
+        (text(track.uploaderEmail) && text(track.uploaderEmail).toLowerCase() === text(actor.email).toLowerCase());
+      if (!isSuperAdmin(actor) && !isOwner) return json({ error: '沒有權限修改音檔語言' }, 403);
+      if (request.method.toUpperCase() === 'GET') {
+        const row: any = await db.prepare('SELECT languageHint FROM transcript_language_hints WHERE trackId=? LIMIT 1')
+          .bind(trackId).first().catch(() => null);
+        return json({ languageHint: text(row?.languageHint) || 'auto' });
+      }
+      if (request.method.toUpperCase() !== 'PUT') return json({ error: 'Method not allowed' }, 405);
+      const body: any = await request.json().catch(() => ({}));
+      const hint = text(body.languageHint);
+      if (!['auto','zh','nan','en','vi','yue','ja','ko','other'].includes(hint))
+        return json({ error: '不支援的語言提示' }, 400);
+      await db.prepare(`CREATE TABLE IF NOT EXISTS transcript_language_hints (
+        trackId TEXT PRIMARY KEY,languageHint TEXT NOT NULL,updatedAt INTEGER NOT NULL)`).run();
+      if (hint === 'auto') {
+        await db.prepare('DELETE FROM transcript_language_hints WHERE trackId=?').bind(trackId).run();
+      } else {
+        await db.prepare(`INSERT INTO transcript_language_hints(trackId,languageHint,updatedAt)
+          VALUES (?,?,?) ON CONFLICT(trackId) DO UPDATE SET languageHint=excluded.languageHint,updatedAt=excluded.updatedAt`)
+          .bind(trackId, hint, Date.now()).run();
+      }
+      return json({ success: true, languageHint: hint });
+    }
+    // Admin-only per-track relistening. Old completed transcripts are never bulk rewritten.
+    if (url.pathname === '/api/v281/transcript-management/status') {
+      if (request.method.toUpperCase() !== 'GET') return json({ error: 'Method not allowed' }, 405);
+      if (!await superAdmin(request, env)) return json({ error: '只有超級管理員可以查看逐字稿狀態' }, 403);
+      const rows: any = await (env as any).DB.prepare('SELECT trackId,status FROM transcript_index').all();
+      return json({ statuses: Object.fromEntries((rows.results || []).map((row: any) => [text(row.trackId), text(row.status)])) });
+    }
+    const relisten = url.pathname.match(/^\/api\/v281\/transcript-management\/relisten\/([^/]+)$/);
+    if (relisten) {
+      if (request.method.toUpperCase() !== 'POST') return json({ error: 'Method not allowed' }, 405);
+      if (!await superAdmin(request, env)) return json({ error: '只有超級管理員可以重聽逐字稿' }, 403);
+      const trackId = decodeURIComponent(relisten[1]);
+      const db = (env as any).DB;
+      const track: any = await db.prepare('SELECT id,audioUrl,durationSeconds FROM tracks WHERE id=? LIMIT 1').bind(trackId).first();
+      if (!track || !text(track.audioUrl)) return json({ error: '找不到可重聽的原始音檔' }, 404);
+      const now = Date.now();
+      // Single atomic D1 statement: pending/queued/processing cannot be queued twice.
+      // Preserve the old R2 key, corrections and reward history until the replacement finishes.
+      const claimed: any = await db.prepare(`INSERT INTO transcript_index
+        (trackId,status,r2Key,model,chunkCount,segmentCount,wordCount,durationSeconds,error,createdAt,updatedAt)
+        VALUES (?,'pending',NULL,'@cf/openai/whisper-large-v3-turbo',0,0,0,?,NULL,?,?)
+        ON CONFLICT(trackId) DO UPDATE SET
+          status='pending',error=NULL,updatedAt=excluded.updatedAt
+        WHERE transcript_index.status IN ('ready','failed')
+        RETURNING trackId`)
+        .bind(trackId, Math.max(0, Number(track.durationSeconds || 0)), now, now).all();
+      if (!claimed?.results?.length) return json({ error: '這份逐字稿已在排隊或處理中，不能重複啟動' }, 409);
+      // Queue promptly but preserve the existing central concurrency policy.
+      ctx.waitUntil(queueNextTranscriptV293(env as any, { includeFailed: false }).catch((error: unknown) => {
+        console.error('Transcript relisten scheduling failed', error);
+      }));
+      return json({ success: true, trackId, status: 'pending', message: '已排入重聽逐字稿隊列' }, 202);
+    }
     if (url.pathname === '/api/v281/transcripts/bulk-start') {
       if (request.method.toUpperCase() !== 'POST') return json({ error: 'Method not allowed' }, 405);
       const actor = await superAdmin(request, env);
