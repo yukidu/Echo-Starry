@@ -47,6 +47,7 @@ test('notification navigation is no longer trapped by global synchronous mutatio
  assert.match(home,/requestAnimationFrame\(\(\) => \{/);
  assert.doesNotMatch(home,/queueMicrotask\(\(\) => \{/);
  assert.match(home,/dataset\.mainTab === 'notifications'/);
+ assert.match(app,/document\.body\.dataset\.mainTab = currentTab/);
  assert.match(home,/if\(relevant\)queueSync\(\)/);
  assert.match(notifications,/const \[visibleRows,setVisibleRows\] = useState\(25\)/);
  assert.match(notifications,/mentionNotifications\.slice\(0,visibleRows\)/);
