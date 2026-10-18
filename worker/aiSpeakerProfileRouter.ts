@@ -37,8 +37,7 @@ export async function speakerSummaryOptions(env:SpeakerEnv){
   return {
     keywords:map.get('keywords')||'',
     direction:map.get('direction')||'只根據演講逐字稿整理客觀人物摘要',
-    maxChars:Math.max(50,Math.min(3000,Number(map.get('maxChars')||500))),
-    dailyLimit:Math.max(1,Math.min(10,Number(map.get('dailyLimit')||3)))
+    maxChars:Math.max(50,Math.min(3000,Number(map.get('maxChars')||500)))
   };
 }
 export async function handleSpeakerProfileRequest(req:Request,env:SpeakerEnv):Promise<Response|null>{
@@ -74,13 +73,13 @@ export async function handleSpeakerProfileRequest(req:Request,env:SpeakerEnv):Pr
     }
     if(path==='/api/speaker-profiles/settings'&&method==='PUT'){
       const b:any=await req.json().catch(()=>null);
-      const maxChars=Number(b?.maxChars),dailyLimit=Number(b?.dailyLimit);
-      if(!b||!Number.isInteger(maxChars)||maxChars<50||maxChars>3000||!Number.isInteger(dailyLimit)||dailyLimit<1||dailyLimit>10||speakerText(b.keywords).length>800||speakerText(b.direction).length>1200)return result({error:'摘要字數限50～3000字，每日生成限1～10篇'},400);
+      const maxChars=Number(b?.maxChars);
+      // Ignore dailyLimit from an older cached client; the daily cap has been retired.
+      if(!b||!Number.isInteger(maxChars)||maxChars<50||maxChars>3000||speakerText(b.keywords).length>800||speakerText(b.direction).length>1200)return result({error:'摘要字數限50～3000字'},400);
       await env.DB.batch([
         env.DB.prepare("INSERT INTO ai_speaker_summary_settings(key,value) VALUES ('keywords',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(speakerText(b.keywords)),
         env.DB.prepare("INSERT INTO ai_speaker_summary_settings(key,value) VALUES ('direction',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(speakerText(b.direction)),
-        env.DB.prepare("INSERT INTO ai_speaker_summary_settings(key,value) VALUES ('maxChars',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(String(maxChars)),
-        env.DB.prepare("INSERT INTO ai_speaker_summary_settings(key,value) VALUES ('dailyLimit',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(String(dailyLimit))
+        env.DB.prepare("INSERT INTO ai_speaker_summary_settings(key,value) VALUES ('maxChars',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(String(maxChars))
       ]);
       return result({success:true});
     }
@@ -91,7 +90,7 @@ export async function handleSpeakerProfileRequest(req:Request,env:SpeakerEnv):Pr
       if(!exists)return result({error:'找不到演講者'},404);
       const p=await getSpeakerProfile(env,name,true);
       await env.DB.prepare("UPDATE ai_speaker_profiles SET bioStatus='pending',sourceRevision='',error=NULL,updatedAt=? WHERE id=?").bind(Date.now(),p.id).run();
-      return result({success:true,message:'已排入摘要更新，系統將依每日免費額度處理'});
+      return result({success:true,message:'已排入摘要更新，系統將依序處理'});
     }
     return result({error:'找不到功能'},404);
   }catch(e){

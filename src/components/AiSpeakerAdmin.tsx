@@ -4,7 +4,7 @@ import {Search,RefreshCcw,Save} from 'lucide-react';
 import {AiBadge} from './AiBadge';
 type Entry={name:string;recordings:number};
 type Snapshot={id:string;displayName:string;bioStatus:string;bioUpdatedAt:number;error?:string};
-type Setting={keywords:string;direction:string;maxChars:number;dailyLimit:number};
+type Setting={keywords:string;direction:string;maxChars:number};
 const call=async(path:string,init?:RequestInit)=>{
   const res=await fetch(path,{cache:'no-store',credentials:'same-origin',...init});
   const data=await res.json().catch(()=>({}));
@@ -14,7 +14,7 @@ const call=async(path:string,init?:RequestInit)=>{
 export const AiSpeakerAdmin:React.FC=()=>{
   const [list,setList]=useState<Entry[]>([]);
   const [profiles,setProfiles]=useState<Snapshot[]>([]);
-  const [cfg,setCfg]=useState<Setting>({keywords:'',direction:'',maxChars:500,dailyLimit:3});
+  const [cfg,setCfg]=useState<Setting>({keywords:'',direction:'',maxChars:500});
   const [query,setQuery]=useState('');
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
@@ -51,14 +51,9 @@ export const AiSpeakerAdmin:React.FC=()=>{
       <label className="block text-sm font-bold">彙整方向與寫作要求
         <textarea rows={3} value={cfg.direction} maxLength={1200} onChange={e=>setCfg(x=>({...x,direction:e.target.value}))} className="block w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent p-3 mt-1 text-sm" placeholder="例如：客觀第三人稱、依時間整理不同獎銜時期的發展"/>
       </label>
-      <div className="grid grid-cols-2 gap-3">
-        <label className="text-sm font-bold">摘要文字上限
-          <input type="number" min={50} max={3000} value={cfg.maxChars} onChange={e=>setCfg(x=>({...x,maxChars:Number(e.target.value)}))} className="mt-1 block w-full rounded-xl border bg-transparent p-3"/>
-        </label>
-        <label className="text-sm font-bold">每日最多生成篇數
-          <input type="number" min={1} max={10} value={cfg.dailyLimit} onChange={e=>setCfg(x=>({...x,dailyLimit:Number(e.target.value)}))} className="mt-1 block w-full rounded-xl border bg-transparent p-3"/>
-        </label>
-      </div>
+      <label className="block text-sm font-bold">摘要文字上限
+        <input type="number" min={50} max={3000} value={cfg.maxChars} onChange={e=>setCfg(x=>({...x,maxChars:Number(e.target.value)}))} className="mt-1 block w-full rounded-xl border bg-transparent p-3"/>
+      </label>
       <button type="button" disabled={busy} onClick={()=>void save()} className="inline-flex justify-center items-center gap-2 bg-rose-600 text-white rounded-xl p-3 font-black disabled:opacity-40"><Save size={18}/>儲存摘要設定</button>
     </div>
     <div className="flex gap-2 items-center"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} className="min-w-0 flex-1 border rounded-xl bg-transparent p-2" placeholder="搜尋演講者名字"/><button type="button" onClick={()=>void load()} disabled={busy} className="border rounded-lg px-2 py-2"><RefreshCcw size={17}/></button></div>
