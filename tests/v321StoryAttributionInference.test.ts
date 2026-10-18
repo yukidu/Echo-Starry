@@ -86,7 +86,7 @@ test('workflow advances cursor only after the draft has been saved, not after fa
 test('live GLM JSON response shape is supported, including Cloudflare chat.completion wrappers',async()=>{
   const ai={run:async(_model:string,args:any)=>{
     assert.equal(args.chat_template_kwargs.enable_thinking,false);
-    return {id:'chatcmpl-example',object:'chat.completion',choices:[{message:{role:'assistant',content:'```json\\n[]\\n```',reasoning:null}}]};
+    return {id:'chatcmpl-example',object:'chat.completion',choices:[{message:{role:'assistant',content:'```json\n[]\n```',reasoning:null}}]};
   }};
   const out=await inferStoryBatch(ai,segments.slice(0,5),'張先生&王女士','[s-0] 無確定證據');
   assert.deepEqual(out,[]);
