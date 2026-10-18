@@ -637,7 +637,7 @@ function servicePage(env: StarryEnv) {
 }
 
 /** A verified central session must authorize every App-access admin request. */
-export function canManageStarryAppAccess(session: { isSuperAdmin: boolean } | null): boolean {
+export function canManageStarryAppAccess(session: { isSuperAdmin: boolean; appId?: string } | null): boolean {
   return session?.isSuperAdmin === true;
 }
 
