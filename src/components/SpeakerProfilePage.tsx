@@ -3,12 +3,13 @@ import {ChevronLeft, Headphones, BookOpenText, MessageCircle, RefreshCw} from 'l
 import {AiBadge} from './AiBadge';
 type TrackSummary={id:string;title:string;speakerRank?:string;speakerAvatar?:string;uploadDate?:string;durationSeconds?:number;requiredRank?:string};
 type QaPair={answerId:string;questionId:string;trackId:string;title:string;rank?:string;asker:string;question:string;answer:string;createdAt:number};
-type ProfileData={speaker:{id:string;name:string;avatar:string;biography:string;bioStatus:string;bioUpdatedAt:number};tracks:TrackSummary[];replies:QaPair[];hasMore:boolean;nextOffset:number};
+type ProfileData={speaker:{id:string;name:string;avatar:string;biography:string;bioStatus:string;bioUpdatedAt:number};tracks:TrackSummary[];replies:QaPair[];hasMore:boolean;nextOffset:number;hasMoreReplies:boolean;nextReplyOffset:number};
 export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrack:(trackId:string,commentId?:string)=>void}>=({name,onBack,onOpenTrack})=>{
   const [data,setData]=useState<ProfileData|null>(null);
   const [error,setError]=useState('');
   const [loading,setLoading]=useState(true);
   const [more,setMore]=useState(false);
+  const [moreReplies,setMoreReplies]=useState(false);
   const [section,setSection]=useState<'audio'|'qa'>('audio');
   useEffect(()=>{
     let live=true;setLoading(true);setError('');setData(null);
@@ -19,6 +20,15 @@ export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrac
       .finally(()=>{if(live)setLoading(false);});
     return()=>{live=false;};
   },[name]);
+  const loadMoreReplies=async()=>{
+    if(!data?.hasMoreReplies||moreReplies)return;setMoreReplies(true);
+    try{
+      const r=await fetch('/api/speaker-profiles/view?name='+encodeURIComponent(name)+'&replyOffset='+data.nextReplyOffset,{credentials:'same-origin'});
+      const next:ProfileData=await r.json();if(!r.ok)throw Error('無法取得更多問答');
+      setData(x=>x?{...x,replies:[...x.replies,...next.replies],hasMoreReplies:next.hasMoreReplies,nextReplyOffset:next.nextReplyOffset}:x);
+    }catch(e){setError(e instanceof Error?e.message:'載入失敗');}
+    finally{setMoreReplies(false);}
+  };
   const loadMore=async()=>{
     if(!data?.hasMore||more)return;setMore(true);
     try{
@@ -68,6 +78,7 @@ export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrac
         <button type="button" className="text-sm underline text-rose-600" onClick={()=>onOpenTrack(q.trackId,q.questionId)}>查看原始留言對話</button>
       </div>)}
       {!data.replies.length&&<p className="text-sm text-center text-slate-500 p-5">目前沒有可公開查閱的問答紀錄</p>}
+      {data.hasMoreReplies&&<button type="button" disabled={moreReplies} onClick={()=>void loadMoreReplies()} className="w-full p-3 rounded-xl border text-sm">{moreReplies?'載入中…':'載入更多歷史問答'}</button>}
     </section>}
     </>}
   </main>;
