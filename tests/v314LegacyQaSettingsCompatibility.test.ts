@@ -27,7 +27,7 @@ test('new client can save, clear, and safely validate response instructions',()=
   assert.match(admin,/replyDirections:data\.replyDirections\|\|''/);
 });
 test('new service worker shell updates existing mobile tabs once after release',()=>{
-  assert.match(serviceWorker,/const CACHE_NAME = 'echostars-shell-v\\d+'/);
+  assert.match(serviceWorker,/const CACHE_NAME = 'echostars-shell-v\d+'/);
   assert.match(serviceWorker,/upgradingExistingClient/);
   assert.match(serviceWorker,/await client\.navigate\(client\.url\)/);
 });
