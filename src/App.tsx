@@ -732,6 +732,27 @@ export default function App() {
   const visitorShareTrackId = useRef<string | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  // Deep links from Starry ID AI catalogue open the appropriate management
+  // workspace. Never auto-open admin tools for ordinary members.
+  useEffect(() => {
+    if (!isAdmin || typeof window === 'undefined') return;
+    const destination=new URLSearchParams(window.location.search).get('starryAiTarget');
+    if (!['qa','speaker','transcript'].includes(destination||'')) return;
+    setCurrentTab('admin');
+    setIsAdminOpen(true);
+    let attempts=0;
+    const timer=window.setInterval(()=>{
+      attempts++;
+      const buttons=Array.from(document.querySelectorAll<HTMLButtonElement>('button'));
+      const terms=destination==='speaker'?['演講者管理','演講者']:
+        destination==='qa'?['AI 問答','逐字稿管理','逐字稿']:['逐字稿'];
+      const btn=buttons.find(b=>terms.some(t=>(b.textContent||'').trim()===t));
+      if(btn){btn.click();window.clearInterval(timer)}
+      if(attempts>=10)window.clearInterval(timer);
+    },300);
+    return ()=>window.clearInterval(timer);
+  }, [isAdmin]);
+
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileEditRequested,setProfileEditRequested] = useState(false);
   const uplineInviteHandledRef = useRef('');

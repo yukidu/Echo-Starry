@@ -1,5 +1,6 @@
 import type { Env } from './index';
 import { sessionContext } from './starryIdProfileDirectoryRouter';
+import { recordAiActivity } from './starryAiManagement';
 
 const PUBLIC_HOST = 'id.starry.phd';
 const INTERNAL_HOST = 'starry-id.internal';
@@ -303,6 +304,12 @@ export async function handleStarryMirrorBridge(request: Request, env: Env): Prom
     return identity ? json({ authenticated: true, identity }) : json({ authenticated: false }, 401);
   }
   if (url.pathname === '/internal/starry-mirror/context') return aiContext(request, env);
+  if (url.pathname === '/internal/starry-mirror/ai-activity') {
+    const identity=await verifyToken(request,env);
+    if(!identity)return json({error:'invalid_app_session'},401);
+    await recordAiActivity(env as any,'mirror.reading');
+    return json({ok:true});
+  }
   if (url.pathname === '/internal/starry-mirror/battery') return adjustBattery(request, env);
   return json({ error: 'not_found' }, 404);
 }

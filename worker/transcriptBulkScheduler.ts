@@ -1,3 +1,4 @@
+import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
 const TRANSCRIPT_MODEL = '@cf/openai/whisper-large-v3-turbo';
 const BATCH_LIMIT = 100;
 
@@ -56,43 +57,19 @@ export async function transcriptBulkStatus(env: SchedulerEnv) {
 
 export async function queueAllPendingTranscripts(env: SchedulerEnv) {
   await ensureIndex(env);
-  const rows: any = await env.DB.prepare(`SELECT t.id,t.durationSeconds FROM tracks t
-    LEFT JOIN transcript_index i ON i.trackId=t.id
-    WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>''
-      AND (i.trackId IS NULL OR i.status IN ('pending','failed'))
-    ORDER BY COALESCE(t.uploadDate,'') DESC,t.id`).all();
-  const candidates = rows?.results || [];
-  if (!candidates.length) return { queued: 0, errors: [], status: await transcriptBulkStatus(env) };
-
-  const now = Date.now();
-  const runKey = new Date(now).toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
-  const allErrors: any[] = [];
-  let queued = 0;
-
-  for (let start = 0; start < candidates.length; start += BATCH_LIMIT) {
-    const batch = candidates.slice(start, start + BATCH_LIMIT);
-    for (const row of batch) {
-      await env.DB.prepare(`INSERT INTO transcript_index(trackId,status,r2Key,model,chunkCount,segmentCount,wordCount,durationSeconds,error,createdAt,updatedAt)
-        VALUES (?,'queued',NULL,?,0,0,0,?,NULL,?,?)
-        ON CONFLICT(trackId) DO UPDATE SET status='queued',error=NULL,updatedAt=excluded.updatedAt`)
-        .bind(row.id, TRANSCRIPT_MODEL, Number(row.durationSeconds || 0), now, now).run();
-    }
-
-    const instances = batch.map((row: any, index: number) => ({
-      id: `echo-transcript-bulk-${runKey}-${String(start + index).padStart(3, '0')}-${text(row.id).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 36)}`,
-      params: { trackId: row.id }
-    }));
-    const result: any = await env.TRANSCRIPT_WORKFLOW.createBatch({ instances });
-    queued += Array.isArray(result?.created) ? result.created.length : 0;
-    for (const error of result?.errors || []) {
-      const row = batch[Number(error.index)];
-      if (row) {
-        await env.DB.prepare("UPDATE transcript_index SET status='pending',error=?,updatedAt=? WHERE trackId=?")
-          .bind(text(error.message || error.code || 'Workflow queue error'), Date.now(), row.id).run();
-      }
-      allErrors.push({ index: start + Number(error.index || 0), id: text(error.id), code: text(error.code), message: text(error.message) });
-    }
-  }
-
-  return { queued, errors: allErrors, status: await transcriptBulkStatus(env) };
+  // The old bulk action bypassed the concurrency gate by starting 100
+  // workflows directly. It now only enqueues pending work in D1.
+  const now=Date.now();
+  await env.DB.prepare(`INSERT OR IGNORE INTO transcript_index
+      (trackId,status,r2Key,model,chunkCount,segmentCount,wordCount,durationSeconds,error,createdAt,updatedAt)
+      SELECT t.id,'pending',NULL,?,0,0,0,COALESCE(t.durationSeconds,0),NULL,?,?
+      FROM tracks t WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>''`).bind(TRANSCRIPT_MODEL,now,now).run();
+  await env.DB.prepare("UPDATE transcript_index SET status='pending',error=NULL,updatedAt=? WHERE status='failed'")
+    .bind(now).run();
+  const scheduled=await queueNextTranscriptV293(env,{includeFailed:false});
+  return {
+    queued:scheduled.queued,errors:scheduled.failures,
+    status:await transcriptBulkStatus(env),
+    note:'剩餘逐字稿保持排隊，由中央 AI 優先權自動安排啟動'
+  };
 }

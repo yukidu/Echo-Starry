@@ -4,11 +4,12 @@ import { readFileSync } from 'node:fs';
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('v299 scheduler is capped at five concurrent transcript workflows', () => {
+test('v299 scheduler is capped at five and respects dynamic lower background limits', () => {
   const scheduler = read('worker/transcriptSequentialSchedulerV293.ts');
   assert.match(scheduler, /MAX_CONCURRENT_TRANSCRIPTS\s*=\s*5/);
   assert.match(scheduler, /status IN \('queued','processing'\)/);
-  assert.match(scheduler, /targetConcurrency:\s*MAX_CONCURRENT_TRANSCRIPTS/);
+  assert.match(scheduler, /targetConcurrency:\s*maxConcurrent/);
+  assert.match(scheduler, /transcriptTargetConcurrency\(env\)/);
 });
 
 test('v299 atomically reserves only the remaining concurrency slots', () => {

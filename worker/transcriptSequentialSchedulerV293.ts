@@ -1,3 +1,4 @@
+import { transcriptTargetConcurrency } from './starryAiManagement';
 const TRANSCRIPT_MODEL = '@cf/openai/whisper-large-v3-turbo';
 const STALE_ACTIVE_MS = 3 * 60 * 60 * 1000;
 const MAX_CONCURRENT_TRANSCRIPTS = 5;
@@ -42,9 +43,10 @@ export async function queueNextTranscriptV293(env: SchedulerEnv, options: QueueN
     WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>''`)
     .bind(TRANSCRIPT_MODEL, now, now).run();
 
-  // v299：永遠補滿到最多 5 份同時處理。
+  // 依中央 AI 優先權控制新工作啟動；已開始的 Workflow 不強制中止。
   // 用「單一 UPDATE + 子查詢」同時算剩餘名額與搶位；D1 會序列化寫入，
   // 所以多個 Workflow 幾乎同時完成並接棒時，後一個寫入會看到前一個已搶到的 queued 名額，避免超過 5。
+  const maxConcurrent=await transcriptTargetConcurrency(env);
   const eligible = includeFailed
     ? `i.status IN ('pending','failed')`
     : `i.status='pending'`;
@@ -60,7 +62,7 @@ export async function queueNextTranscriptV293(env: SchedulerEnv, options: QueueN
       LIMIT (SELECT MAX(0, ? - COUNT(*)) FROM transcript_index WHERE status IN ('queued','processing'))
     )
     RETURNING trackId,durationSeconds`)
-    .bind(TRANSCRIPT_MODEL, now, MAX_CONCURRENT_TRANSCRIPTS).all();
+    .bind(TRANSCRIPT_MODEL, now, maxConcurrent).all();
 
   const claimed: any[] = Array.isArray(claimedResult?.results) ? claimedResult.results : [];
   const started: Array<{ trackId: string; instanceId: string }> = [];
@@ -100,7 +102,7 @@ export async function queueNextTranscriptV293(env: SchedulerEnv, options: QueueN
   return {
     queued: started.length,
     active: activeCount,
-    targetConcurrency: MAX_CONCURRENT_TRANSCRIPTS,
+    targetConcurrency: maxConcurrent,
     remaining: remainingCount,
     failures,
     started,
