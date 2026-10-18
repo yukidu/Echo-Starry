@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { createRoot, Root } from 'react-dom/client';
 import { Edit2, Search, Trash2, X, Users, UserRound, Bot } from 'lucide-react';
 import { TranscriptQaAdmin } from './components/TranscriptQaAdmin';
+import { AiSpeakerAdmin } from './components/AiSpeakerAdmin';
+import { AiBadge } from './components/AiBadge';
 import { UploadModal } from './components/UploadModal';
 import type { Track, UserProfile } from './types';
 
@@ -13,7 +15,7 @@ const roots = new Map<HTMLElement, Root>();
 const originalInputClick = HTMLInputElement.prototype.click;
 const originalScrollIntoView = Element.prototype.scrollIntoView;
 
-type ManageMode = 'mine' | 'community' | 'qa';
+type ManageMode = 'mine' | 'community' | 'qa' | 'speaker';
 type TranscriptProgressItem = {
   trackId: string;
   status: string;
