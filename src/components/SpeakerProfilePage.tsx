@@ -14,6 +14,19 @@ export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrac
   const [section,setSection]=useState<'audio'|'qa'>('audio');
   const [confirmTrack,setConfirmTrack]=useState<TrackSummary|null>(null);
   useEffect(()=>{
+    if(!confirmTrack)return;
+    // Capture Escape before the outer speaker modal's document listener.
+    const dismiss=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        setConfirmTrack(null);
+      }
+    };
+    document.addEventListener('keydown',dismiss,true);
+    return ()=>document.removeEventListener('keydown',dismiss,true);
+  },[confirmTrack]);
+  useEffect(()=>{
     let live=true;setLoading(true);setError('');setData(null);setConfirmTrack(null);
     void fetch('/api/speaker-profiles/view?name='+encodeURIComponent(name),{credentials:'same-origin',cache:'no-store'})
       .then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error||'資料讀取失敗');return d;})
