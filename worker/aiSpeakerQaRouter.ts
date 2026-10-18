@@ -117,7 +117,7 @@ async function balance(env:Env,user:any){
 }
 export async function quota(req:Request,env:Env,u:any,cfg:any){
   const t=tier(u),policy=cfg.policies[t],key=await identity(req,u),today=day();
-  if(isSuper(u))return {unlimited:true,tier:5,label:'超級管理員',key,today,total:0,freeLeft:-1,left:-1,daily:-1,free:-1,cost:0,costUnits:0,reason:'',enabled:true};
+  if(isSuper(u))return {unlimited:true,tier:5,label:'超級管理員',key,today,total:0,freeLeft:0,left:0,daily:0,free:0,cost:0,costUnits:0,reason:'',enabled:true};
   const row:any=await env.DB.prepare('SELECT used FROM qa_daily WHERE identity=? AND day=?').bind(key,today).first();
   const total=Number(row?.used||0),freeLeft=Math.max(0,policy.free-total),left=Math.max(0,policy.daily-total);
   const global:any=cfg.enabled?await env.DB.prepare("SELECT used FROM qa_daily WHERE identity='__global__' AND day=?").bind(today).first():null;
