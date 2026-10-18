@@ -2,6 +2,7 @@ import { SpeakerNameLink } from './SpeakerNameLink';
 import React, { useEffect, useMemo, useState } from 'react';
 import { RefreshCw, Download, Save, Search } from 'lucide-react';
 import { AiBadge } from './AiBadge';
+import { TranscriptCleanupAdmin } from './TranscriptCleanupAdmin';
 
 type Item = { id:string;title:string;speaker:string;speakerRank:string;status:string;error?:string;wordCount?:number;segmentCount?:number;durationSeconds?:number };
 type Model = {id:string;label:string;strength:string};
@@ -75,6 +76,7 @@ export const TranscriptQaAdmin:React.FC=()=>{
   return <section className="space-y-4 border border-slate-200 dark:border-slate-700 rounded-2xl p-3 sm:p-5" aria-label="逐字稿管理">
     <div className="flex justify-between items-center gap-2"><h2 className="flex items-center gap-1 text-xl font-black"><AiBadge/> 逐字稿管理</h2><button type="button" onClick={()=>void load()} disabled={busy} className="flex items-center gap-1 border rounded-lg p-2"><RefreshCw size={16}/>重新整理</button></div>
     {message&&<p role="status" className="text-rose-600 font-bold text-xs">{message}</p>}
+    <TranscriptCleanupAdmin />
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{([['總數',counts.total],['已完成',counts.ready],['排隊／處理中',counts.working],['異常',counts.failed]] as const).map(([k,v])=><div key={k} className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800"><small>{k}</small><strong className="block text-2xl">{v}</strong></div>)}</div>
     <div className="grid sm:grid-cols-3 gap-2"><label className="flex items-center gap-1"><Search size={18}/><input style={field} value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜尋演講者、音檔名稱"/></label><select style={field} value={speaker} onChange={e=>setSpeaker(e.target.value)} aria-label="講者篩選"><option value="">全部演講者</option>{speakers.map(s=><option key={s} value={s}>{s}</option>)}</select><select style={field} value={status} onChange={e=>setStatus(e.target.value)} aria-label="逐字稿狀態"><option value="">全部狀態</option><option value="ready">已完成</option><option value="processing">正在撰寫</option><option value="queued">排隊中</option><option value="failed">異常</option></select></div>
 
