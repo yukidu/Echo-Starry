@@ -4,6 +4,7 @@ import type { Env } from './index';
 import { calculateNumerology } from '../src/utils/numerology';
 import { ensureSpouseSchema } from './starryIdSpouseSchema';
 import { renderStarryIdMemberCenterPage } from './starryIdMemberCenterPage';
+import { memberDirectoryFilter } from './starryMemberDirectoryFilter';
 import { renderStarryAiManagementPage } from './starryAiManagementPage';
 import { loadAiPriorities, saveAiPriorities, collectAiCatalog, recentAiChanges, DEFAULT_AI_ORDER } from './starryAiManagement';
 
@@ -602,25 +603,12 @@ async function updateProfile(
   return publicMember(await readMember(db, userId));
 }
 
-const APPROVED_RANK_SQL = "CASE WHEN p.rankApproved=1 THEN TRIM(COALESCE(p.approvedRank,'')) ELSE '' END";
 const MEMBER_BATCH_SIZE = 80;
+const MEMBER_SELECTION_LIMIT = 5000;
 
-/** Progressive scrolling, exact approved-rank filtering and a stable cursor order. */
+/** Progressive scrolling, matching the same filter used for select-all and bulk jobs. */
 async function listMembers(db: any, search: string, offset = 0, rank = '') {
-  const q = text(search).slice(0, 80);
-  const targetRank = text(rank).slice(0, 100);
-  const clauses: string[] = [];
-  const params: any[] = [];
-  if (q) {
-    const like = `%${q}%`;
-    clauses.push(`(LOWER(COALESCE(p.name,'')) LIKE LOWER(?) OR LOWER(u.primaryEmail) LIKE LOWER(?) OR LOWER(COALESCE(p.amwayId,'')) LIKE LOWER(?))`);
-    params.push(like, like, like);
-  }
-  if (targetRank) {
-    clauses.push(`${APPROVED_RANK_SQL}=?`);
-    params.push(targetRank === '__unapproved__' ? '' : targetRank);
-  }
-  const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
+  const {where, params} = memberDirectoryFilter(search, rank);
   const rows: any = await db.prepare(`SELECT
       u.id,u.primaryEmail,u.status,p.name,p.rank,p.approvedRank,p.rankApproved,p.amwayId,p.center
     FROM users u LEFT JOIN profiles p ON p.userId=u.id
@@ -641,6 +629,19 @@ async function listMembers(db: any, search: string, offset = 0, rank = '') {
     center: row.center || ''
   }));
   return { total, members, nextOffset: offset + members.length, hasMore: offset + members.length < total };
+}
+
+/** Only centrally verified super-admins may resolve an exact selection snapshot. */
+export async function listFilteredMemberIds(db: any, search: string, rank: string) {
+  const {where, params} = memberDirectoryFilter(search,rank);
+  const found: any = await db.prepare(`SELECT u.id
+    FROM users u LEFT JOIN profiles p ON p.userId=u.id
+    ${where}
+    ORDER BY u.id LIMIT ?`).bind(...params,MEMBER_SELECTION_LIMIT+1).all();
+  const rows: any[] = found?.results || [];
+  if(rows.length>MEMBER_SELECTION_LIMIT)
+    return { error:'符合條件的會員超過 5,000 位，請先縮小篩選條件', status:413, ids:[] };
+  return { ids: rows.map(row => String(row.id)), count: rows.length };
 }
 
 async function listMemberApprovedRanks(db:any) {
@@ -813,6 +814,22 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
     if (!session) return json(request, { error: '請先登入 Starry ID' }, 401);
     if (!session.isSuperAdmin) return json(request, { error: '只有超級管理員可以管理全部會員。' }, 403);
     return json(request, await listMemberApprovedRanks(db));
+  }
+
+  if (path === '/api/admin/member-selection' && method === 'GET') {
+    // Sensitive member-ID snapshots are readable only from the ID console.
+    if (origin && origin !== 'https://id.starry.phd')
+      return json(request,{error:'請從 Starry ID 官網選取會員'},403);
+    // Identical central-super-admin gate to the normal member directory.
+    const session = await sessionUser(request, env);
+    if (!session) return json(request, { error: '請先登入 Starry ID' }, 401);
+    if (!session.isSuperAdmin) return json(request, { error: '只有超級管理員可以管理全部會員。' }, 403);
+    const url = new URL(request.url);
+    const selection = await listFilteredMemberIds(
+      db,url.searchParams.get('search')||'',url.searchParams.get('rank')||''
+    );
+    if ('error' in selection) return json(request,{error:selection.error},selection.status);
+    return json(request,selection,200,{'Cache-Control':'no-store'});
   }
 
   if (path === '/api/admin/members' && method === 'GET') {

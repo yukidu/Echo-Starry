@@ -180,7 +180,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
   <script>
   (() => {
     const CLIENT_ID = ${safeClientId};
-    const state = { session:null, user:null, isSuperAdmin:false, targetUserId:null, adminOpen:false, members:[], visibility:null, selectedIds:new Set(), excludedIds:new Set(), selectionMode:'manual', memberOffset:0, memberTotal:0, memberHasMore:false, memberLoading:false, memberLoadToken:0, memberRanksLoaded:false, activeSearch:'', activeRank:'', memberFilterPending:false, accessApps:[], accessUserIds:[], accessBulkSelection:null, accessPreview:null, accessLoadToken:0, accessLastRequest:null, bulkRunning:false };
+    const state = { session:null, user:null, isSuperAdmin:false, targetUserId:null, adminOpen:false, members:[], visibility:null, selectedIds:new Set(), currentFilterIds:null, currentFilterKey:'', selectionBusy:false, selectionGeneration:0, memberOffset:0, memberTotal:0, memberHasMore:false, memberLoading:false, memberLoadToken:0, memberRanksLoaded:false, activeSearch:'', activeRank:'', memberFilterPending:false, accessApps:[], accessUserIds:[], accessBulkSelection:null, accessPreview:null, accessLoadToken:0, accessLastRequest:null, bulkRunning:false };
     const $ = (id) => document.getElementById(id);
     const editable = [
       ['name','姓名',false],['amwayId','會員編號 / Amway ID',false],['phone','電話',false],['residence','居住地',false],
@@ -270,41 +270,105 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     function beginEdit(card,field,label,wide){ if(card.querySelector('.field-editor')) return; const value=state.user[field]===null||state.user[field]===undefined?'':String(state.user[field]); const display=card.querySelector('.field-value'); const edit=card.querySelector('.edit'); if(edit) edit.classList.add('hidden'); const input=wide?document.createElement('textarea'):document.createElement('input'); input.className='field-editor'; if(wide) input.rows=3; if(isNumeric(field)) input.inputMode='numeric'; input.value=value; display.replaceWith(input); let done=false; const cancel=()=>{ if(done)return; done=true; renderFields(state.user); }; const commit=()=>{ if(done)return; done=true; const next=input.value.trim(); if(next===value){renderFields(state.user);return;} saveField(field,next,card); }; input.addEventListener('keydown',(event)=>{ if(event.key==='Escape'){event.preventDefault();cancel();return;} if(event.key==='Enter' && (!wide || event.ctrlKey || event.metaKey)){event.preventDefault();commit();} }); input.addEventListener('blur',()=>{ if(!done) commit(); }); input.focus(); input.select(); }
     function renderMemberActive(){ document.querySelectorAll('.member-item').forEach(el=>el.classList.toggle('active',el.dataset.id===state.targetUserId)); }
     function showLoggedIn(){ $('loginView').classList.add('hidden'); $('memberView').classList.remove('hidden'); $('topActions').hidden=false; $('adminBtn').classList.toggle('hidden',!state.isSuperAdmin); }
-    function showLoggedOut(){ state.session=null; state.user=null; state.targetUserId=null; state.visibility=null; $('topActions').hidden=true; $('memberView').classList.add('hidden'); $('loginView').classList.remove('hidden'); initGoogle(); }
+    function showLoggedOut(){ resetMemberSelection(); state.session=null; state.user=null; state.targetUserId=null; state.visibility=null; $('topActions').hidden=true; $('memberView').classList.add('hidden'); $('loginView').classList.remove('hidden'); initGoogle(); }
     async function loadSession(){ try{ const data=await api('/api/session'); state.session=data; state.isSuperAdmin=Boolean(data.isSuperAdmin); state.targetUserId=data.user.id; await loadOwnVisibility(); showLoggedIn(); renderProfile(data.user); }catch{ showLoggedOut(); } }
     async function handleCredential(response){ $('loginStatus').textContent='正在登入…'; try{ await api('/api/google-sync',{method:'POST',body:JSON.stringify({credential:response.credential,appId:'starry-id'})}); $('loginStatus').textContent='登入成功'; await loadSession(); }catch(e){ $('loginStatus').textContent=e.message||'登入失敗'; toast(e.message||'登入失敗',true); } }
     function initGoogle(){ const start=Date.now(); const tick=()=>{ if(window.google?.accounts?.id){ try{ google.accounts.id.initialize({client_id:CLIENT_ID,callback:handleCredential,auto_select:false,cancel_on_tap_outside:true}); $('googleButton').replaceChildren(); google.accounts.id.renderButton($('googleButton'),{theme:'outline',size:'large',shape:'pill',text:'signin_with',locale:'zh_TW',width:280}); $('loginStatus').textContent=''; }catch(e){ $('loginStatus').textContent='Google 登入載入失敗，請重新整理。'; } return; } if(Date.now()-start<8000) setTimeout(tick,120); else $('loginStatus').textContent='Google 登入載入較慢，請重新整理再試。'; }; tick(); }
 
-    function selectedMemberCount(){
-      return state.selectionMode==='filtered' ? Math.max(0,state.memberTotal-state.excludedIds.size) : state.selectedIds.size;
+    const MAX_SELECTED_MEMBERS=5000;
+    function selectedMemberCount(){return state.selectedIds.size;}
+    function currentMemberFilterKey(){return JSON.stringify([state.activeSearch,state.activeRank]);}
+    function visibleFilterIds(){
+      if(state.currentFilterIds && state.currentFilterKey===currentMemberFilterKey())
+        return state.currentFilterIds;
+      // Once every matching row is loaded, the browser has an exact snapshot.
+      if(!state.memberHasMore && state.members.length===state.memberTotal)
+        return state.members.map(member=>member.id);
+      return null;
     }
     function showSelectedCount(){
       const selected=selectedMemberCount();
-      $('accessSelectedCount').textContent='已選 '+selected+'／符合 '+state.memberTotal+' 人';
-      $('memberSelectAll').checked=state.selectionMode==='filtered'&&state.excludedIds.size===0&&state.memberTotal>0;
-      $('memberSelectAll').indeterminate=state.selectionMode==='filtered'&&state.excludedIds.size>0;
-      $('memberSelectAll').disabled=state.memberFilterPending||(state.memberLoading&&!state.members.length);
-      $('bulkAccessButton').disabled=state.memberFilterPending||selected===0||(state.memberLoading&&!state.members.length);
+      const selectedInView=state.members.some(member=>state.selectedIds.has(member.id));
+      const exactIds=visibleFilterIds();
+      const isAllSelected=Boolean(exactIds && exactIds.length && exactIds.length===state.memberTotal
+        && exactIds.every(id=>state.selectedIds.has(id)));
+      const check=$('memberSelectAll');
+      $('accessSelectedCount').textContent='累積已選 '+selected+' 位｜目前符合 '+state.memberTotal+' 位';
+      check.checked=isAllSelected;
+      check.indeterminate=!isAllSelected && (exactIds
+        ? exactIds.some(id=>state.selectedIds.has(id)) : selectedInView);
+      check.disabled=state.memberFilterPending||state.selectionBusy||state.memberTotal===0;
+      $('bulkAccessButton').disabled=state.memberFilterPending||state.selectionBusy||selected===0;
     }
-    function selectedMember(memberId){
-      return state.selectionMode==='filtered' ? !state.excludedIds.has(memberId) : state.selectedIds.has(memberId);
-    }
-    function resetMemberSelection(){
-      state.selectionMode='manual';state.selectedIds.clear();state.excludedIds.clear();
-      document.querySelectorAll('.access-member-row input[type="checkbox"]').forEach(check=>{check.checked=false;});
+    function selectedMember(memberId){return state.selectedIds.has(memberId);}
+    function refreshVisibleMemberChecks(){
+      document.querySelectorAll('.access-member-row input[type="checkbox"]').forEach(check=>{
+        const id=check.parentNode.querySelector('.member-item')?.dataset.id;
+        check.checked=Boolean(id&&state.selectedIds.has(id));
+      });
       showSelectedCount();
+    }
+    /** Applied only after an explicit "清除勾選" or a full logout. */
+    function resetMemberSelection(){
+      ++state.selectionGeneration; // Discard a late response from an older select-all.
+      state.selectedIds.clear();
+      refreshVisibleMemberChecks();
+    }
+    function mergeMemberSelection(ids,shouldSelect){
+      const next=new Set(state.selectedIds);
+      for(const id of ids){
+        if(shouldSelect)next.add(id);
+        else next.delete(id);
+      }
+      if(next.size>MAX_SELECTED_MEMBERS)
+        throw new Error('最多可累積選取 5,000 位會員，請先縮小選取範圍');
+      state.selectedIds=next;
+    }
+    async function toggleCurrentFilterSelection(shouldSelect){
+      if(state.selectionBusy||state.memberFilterPending)return;
+      state.selectionBusy=true;
+      const generation=state.selectionGeneration;
+      const key=currentMemberFilterKey(),search=state.activeSearch,rank=state.activeRank;
+      showSelectedCount();
+      try{
+        let ids=state.currentFilterKey===key?state.currentFilterIds:null;
+        if(!ids){
+          const query='/api/admin/member-selection?search='+encodeURIComponent(search)+'&rank='+encodeURIComponent(rank);
+          const response=await api(query);
+          ids=response.ids;
+          if(!Array.isArray(ids)||ids.length!==response.count||
+             ids.length>MAX_SELECTED_MEMBERS||new Set(ids).size!==ids.length||
+             !ids.every(id=>typeof id==='string'&&id.length>0))
+            throw new Error('中央會員選取資料不完整，請重新操作');
+        }
+        if(generation!==state.selectionGeneration)return; // Explicit clear/logout wins.
+        const beforeCount=selectedMemberCount();
+        mergeMemberSelection(ids,shouldSelect);
+        const changed=Math.abs(selectedMemberCount()-beforeCount);
+        if(currentMemberFilterKey()===key){
+          state.currentFilterKey=key;
+          state.currentFilterIds=ids;
+        }
+        refreshVisibleMemberChecks();
+        toast((shouldSelect?'本次新增':'本次取消')+' '+changed+' 位，累積已選 '+selectedMemberCount()+' 位');
+      }catch(error){
+        if(generation===state.selectionGeneration)
+          toast(error.message||'無法讀取完整篩選名單，原本勾選已保留',true);
+      }finally{
+        state.selectionBusy=false;
+        refreshVisibleMemberChecks();
+      }
     }
     function memberCard(member){
       const line=document.createElement('div');line.className='access-member-row';
       const check=document.createElement('input');check.type='checkbox';check.checked=selectedMember(member.id);
       check.setAttribute('aria-label','選取 '+(member.name||member.email));
       check.addEventListener('change',()=>{
-        if(state.selectionMode==='filtered'){
-          if(check.checked)state.excludedIds.delete(member.id);else state.excludedIds.add(member.id);
-        }else{
-          if(check.checked)state.selectedIds.add(member.id);else state.selectedIds.delete(member.id);
-        }
-        showSelectedCount();
+        if(state.selectionBusy){check.checked=selectedMember(member.id);return;}
+        try{
+          mergeMemberSelection([member.id],check.checked);
+          showSelectedCount();
+        }catch(error){check.checked=selectedMember(member.id);toast(error.message,true);}
       });
       const b=document.createElement('button');b.className='member-item';b.type='button';b.dataset.id=member.id;
       const title=document.createElement('strong');title.textContent=member.name||'(未填姓名)';
@@ -362,8 +426,9 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
       state.activeSearch=$('memberSearch').value.trim();state.activeRank=$('memberRankFilter').value;
       state.memberFilterPending=false;
       state.memberOffset=0;state.memberTotal=0;state.memberHasMore=true;state.memberLoading=false;state.members=[];
+      state.currentFilterIds=null;state.currentFilterKey='';
       $('members').replaceChildren();$('memberCount').textContent='載入中…';
-      resetMemberSelection();
+      showSelectedCount(); // Keep previous selections across every filter change.
       await loadNextMembers();
     }
     $('memberLoadMore').addEventListener('click',()=>void loadNextMembers());
@@ -389,29 +454,29 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     $('logoutBtn').addEventListener('click',async()=>{ try{await api('/api/logout',{method:'POST',body:'{}'});}catch{} showLoggedOut(); });
     let searchTimer;
     $('memberSearch').addEventListener('input',()=>{
-      state.memberFilterPending=true;resetMemberSelection();
+      state.memberFilterPending=true;showSelectedCount();
       clearTimeout(searchTimer);searchTimer=setTimeout(()=>void resetMemberList(),220);
     });
     $('memberRankFilter').addEventListener('change',()=>void resetMemberList());
     $('memberClearSelection').addEventListener('click',resetMemberSelection);
-    $('memberSelectAll').addEventListener('change',checked=>{
-      if($('memberSelectAll').checked){
-        state.selectionMode='filtered';state.selectedIds.clear();state.excludedIds.clear();
-      }else{
-        state.selectionMode='manual';state.selectedIds.clear();state.excludedIds.clear();
-      }
-      document.querySelectorAll('.access-member-row input[type="checkbox"]').forEach(c=>{c.checked=selectedMember(c.parentNode.querySelector('.member-item').dataset.id);});
-      showSelectedCount();
+    $('memberSelectAll').addEventListener('change',()=>{
+      // Header selection adds/removes only the CURRENT filter. Prior selections
+      // from other filters remain untouched.
+      void toggleCurrentFilterSelection($('memberSelectAll').checked);
     });
     $('bulkAccessButton').addEventListener('click',()=>{
+      if(state.memberFilterPending||state.selectionBusy){
+        toast('請等候目前的搜尋或全選完成',true);return;
+      }
       if(!selectedMemberCount()){toast('請先選取會員',true);return;}
-      state.accessBulkSelection=state.selectionMode==='filtered'
-        ? {scope:'filtered',search:state.activeSearch,rank:state.activeRank,excludedIds:[...state.excludedIds]}
-        : {scope:'manual',userIds:[...state.selectedIds]};
+      // A deduplicated manual snapshot represents the UNION of every filter.
+      // The bulk server revalidates the IDs and materializes auditable D1 items
+      // before asking for the separate final confirmation.
+      state.accessBulkSelection={scope:'manual',userIds:[...state.selectedIds]};
       const selected=selectedMemberCount();
-      const first=state.members.find(m=>selectedMember(m.id))?.id||[...state.selectedIds][0];
-      if(!first){toast('請等待會員名單載入完成',true);return;}
-      void showAppAccess([first],'已選取 '+selected+' 位會員',true);
+      const first=state.members.find(m=>selectedMember(m.id))?.id||state.selectedIds.values().next().value;
+      if(!first){toast('沒有選取會員',true);return;}
+      void showAppAccess([first],'跨篩選累積已選 '+selected+' 位會員',true);
     });
     function hideAccessPreview(){state.accessPreview=null;$('appAccessReview').classList.add('hidden');$('appAccessConfirmText').value='';$('appAccessCommitBtn').disabled=true;}
     async function ensureAccessCatalog(){
