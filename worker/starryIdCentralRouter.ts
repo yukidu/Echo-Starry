@@ -1,5 +1,5 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
-import { handleStarryAppAccessAdminRequest, readAppAccessDecision } from './starryAppAccess';
+import { handleStarryAppAccessAdminRequest, checkStarryAppAccess, readAppAccessDecision } from './starryAppAccess';
 import type { Env } from './index';
 import { calculateNumerology } from '../src/utils/numerology';
 import { ensureSpouseSchema } from './starryIdSpouseSchema';
@@ -290,11 +290,14 @@ async function syncVerifiedIdentity(
   const userId = text(bySubject?.userId || byEmail?.id) || `u-${crypto.randomUUID()}`;
   const existing: any = await readMember(db, userId);
   if (existing?.status && existing.status !== 'active') throw new Error('account_inactive');
+  // Registration at id.starry.phd is always available. New identities must first
+  // register there, then obtain explicit grants before using other Apps.
+  if (appId !== 'starry-id') {
+    if (!existing) throw new Error('app_access_denied');
+    const access = await checkStarryAppAccess(db,userId,appId);
+    if (!access.allowed) throw new Error('app_access_denied');
+  }
   const explicitAppDecision = appId === 'starry-id' ? null : await readAppAccessDecision(db,userId,appId);
-  if (explicitAppDecision === 'deny') throw new Error('app_access_denied');
-  // Phased rollout: reject new central identities once every App integrates the central check.
-  if (appId !== 'starry-id' && !existing && explicitAppDecision !== 'allow' && env.STARRY_APP_ACCESS_REQUIRE_GRANT === 'true')
-    throw new Error('app_access_denied');
 
   const membership: any = await db.prepare(
     'SELECT status,role,isAdminUser FROM app_memberships WHERE userId=? AND appId=? LIMIT 1'
@@ -431,7 +434,7 @@ async function sessionUser(request: Request, env: StarryEnv) {
     'SELECT status,role,isAdminUser,isContributor,canUpload FROM app_memberships WHERE userId=? AND appId=? LIMIT 1'
   ).bind(session.userId, session.appId).first();
   if (!membership || membership.status !== 'active') return null;
-  if (session.appId !== 'starry-id' && await readAppAccessDecision(db,session.userId,session.appId) === 'deny') return null;
+  if (session.appId !== 'starry-id' && !(await checkStarryAppAccess(db,session.userId,session.appId)).allowed) return null;
   const publicUser = publicMember(member);
   if (!publicUser) return null;
   const isSuperAdmin = configuredSuperAdmin(env, publicUser.email) || membership.role === 'super-admin';
