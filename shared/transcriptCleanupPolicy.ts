@@ -96,7 +96,7 @@ export function cleanTranscriptText(source: string, policy: CleanupPolicy, seman
   }
   if (policy.removeStutters) {
     // Only three+ repeated Han characters at clause starts; deliberate doubled emphasis stays.
-    next = next.replace(/(^|[\s，。、！？!?；;])([\p{Script=Han}])\2{2,}(?=[\p{Script=Han}])/gu,'$1$2');
+    next = next.replace(/(^|[\s，。、！？!?；;])([\p{Script=Han}])\2{2,}(?=[\p{Script=Han}])/gu, (full,prefix,character) => policy.keepWords.includes(character) ? full : prefix + character);
   }
   next = next.replace(/[ \t]{2,}/g,' ').replace(/^[，,、 \t]+/u,'').replace(/\s+([，。、！？!?；;])/gu,'$1').trim();
   // Never invent or erase the entire meaning-bearing segment.
