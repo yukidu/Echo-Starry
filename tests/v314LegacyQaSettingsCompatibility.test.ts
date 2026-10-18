@@ -19,7 +19,7 @@ test('older mobile/PWA version may save five tier settings without replyDirectio
 test('new client can save, clear, and safely validate response instructions',()=>{
   assert.equal(parseReplyDirectionsUpdate({replyDirections:'溫暖精簡地回答'}),'溫暖精簡地回答');
   assert.equal(parseReplyDirectionsUpdate({replyDirections:''}),'');
-  assert.equal(parseReplyDirectionsUpdate({replyDirections:'答'.repeat(2000)}).length,2000);
+  assert.equal(parseReplyDirectionsUpdate({replyDirections:'答'.repeat(2000)})?.length,2000);
   assert.throws(()=>parseReplyDirectionsUpdate({replyDirections:'答'.repeat(2001)}),/不得超過2000字/);
   assert.throws(()=>parseReplyDirectionsUpdate({replyDirections:null}),/不得超過2000字/);
   assert.match(admin,/value=\{data\?\.replyDirections\|\|''\}/);
