@@ -2,7 +2,7 @@ const V139_STYLE_ID = 'echostars-v139-home-upload-polish';
 let selectedCategoryLabel = '全部';
 let syncQueued = false;
 
-type UploadWorkspaceTab = 'upload' | 'manage' | 'community';
+type UploadWorkspaceTab = 'upload' | 'manage' | 'community' | 'qa';
 
 function isGuestMode() {
   try { return !localStorage.getItem('sq_current_user_v1'); }
@@ -117,11 +117,14 @@ function installV139Styles() {
     }
     .upload-page[data-v139-upload-tab="upload"] .v138-track-management { display: none !important; }
     .upload-page[data-v139-upload-tab="manage"] #track-upload-form,
-    .upload-page[data-v139-upload-tab="community"] #track-upload-form { display: none !important; }
+    .upload-page[data-v139-upload-tab="community"] #track-upload-form,
+    .upload-page[data-v139-upload-tab="qa"] #track-upload-form { display: none !important; }
     .upload-page[data-v139-upload-tab="manage"] [data-v139-upload-actions="1"],
-    .upload-page[data-v139-upload-tab="community"] [data-v139-upload-actions="1"] { display: none !important; }
+    .upload-page[data-v139-upload-tab="community"] [data-v139-upload-actions="1"],
+    .upload-page[data-v139-upload-tab="qa"] [data-v139-upload-actions="1"] { display: none !important; }
     .upload-page[data-v139-upload-tab="manage"] .v161-manage-tabs,
-    .upload-page[data-v139-upload-tab="community"] .v161-manage-tabs { display: none !important; }
+    .upload-page[data-v139-upload-tab="community"] .v161-manage-tabs,
+    .upload-page[data-v139-upload-tab="qa"] .v161-manage-tabs { display: none !important; }
 
     @media (max-width: 639px) {
       .v139-upload-tabs { padding-inline: .45rem; gap: .18rem; }
@@ -191,7 +194,9 @@ function cleanOptionLabel(value: string) {
 
 function syncManagementMode(page: HTMLElement, tab: UploadWorkspaceTab) {
   if (tab === 'upload') return;
-  const desired = tab === 'community' ? '網友音檔' : '我的音檔';
+  // The v161 inner tabs are intentionally hidden by the outer v139 carousel.
+  // Forward the visible top-level "逐字稿" choice to the real v161 QA page.
+  const desired = tab === 'qa' ? '逐字稿' : tab === 'community' ? '網友音檔' : '我的音檔';
   const button = Array.from(page.querySelectorAll<HTMLButtonElement>('.v161-manage-tab'))
     .find(item => cleanOptionLabel(item.textContent || '') === desired);
   if (button && button.getAttribute('aria-selected') !== 'true') button.click();
@@ -206,7 +211,7 @@ function centerSelectedUploadTab(page: HTMLElement, tab: UploadWorkspaceTab) {
 }
 
 function setUploadTab(page: HTMLElement, tab: UploadWorkspaceTab) {
-  const allowedTab: UploadWorkspaceTab = tab === 'community' && !isSuperAdminMode() ? 'manage' : tab;
+  const allowedTab: UploadWorkspaceTab = (tab === 'community' || tab === 'qa') && !isSuperAdminMode() ? 'manage' : tab;
   const changed = page.dataset.v139UploadTab !== allowedTab;
   if (changed) page.dataset.v139UploadTab = allowedTab;
   page.querySelectorAll<HTMLButtonElement>('.v139-upload-tab').forEach(button => {
@@ -216,7 +221,7 @@ function setUploadTab(page: HTMLElement, tab: UploadWorkspaceTab) {
 
   const header = page.querySelector<HTMLElement>(':scope > div > div:not(.v139-upload-tabs)');
   const heading = header?.querySelector<HTMLElement>('h2');
-  const desiredHeading = allowedTab === 'community' ? '網友音檔' : allowedTab === 'manage' ? '管理音檔' : '上傳音檔';
+  const desiredHeading = allowedTab === 'qa' ? '逐字稿管理' : allowedTab === 'community' ? '網友音檔' : allowedTab === 'manage' ? '管理音檔' : '上傳音檔';
   if (heading && heading.textContent !== desiredHeading) heading.textContent = desiredHeading;
   const actionGroup = header?.querySelector<HTMLElement>('div.flex.items-center.gap-2');
   if (actionGroup && actionGroup.dataset.v139UploadActions !== '1') actionGroup.dataset.v139UploadActions = '1';
@@ -265,7 +270,10 @@ function syncUploadTabs() {
 
       addTab('upload', '上傳音檔');
       addTab('manage', '管理音檔');
-      if (isSuperAdminMode()) addTab('community', '網友音檔');
+      if (isSuperAdminMode()) {
+        addTab('community', '網友音檔');
+        addTab('qa', '🤖 逐字稿');
+      }
 
       tabs.append(makeScrollButton('left', scroller), scroller, makeScrollButton('right', scroller));
 
@@ -275,7 +283,7 @@ function syncUploadTabs() {
     }
 
     const requested = page.dataset.v139UploadTab as UploadWorkspaceTab | undefined;
-    const fallback: UploadWorkspaceTab = requested === 'manage' || requested === 'community' ? requested : 'upload';
+    const fallback: UploadWorkspaceTab = requested === 'manage' || requested === 'community' || requested === 'qa' ? requested : 'upload';
     setUploadTab(page, fallback);
   });
 }

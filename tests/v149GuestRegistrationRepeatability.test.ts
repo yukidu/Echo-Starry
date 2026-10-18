@@ -14,6 +14,6 @@ test('v149 guest CTA routes every click straight to the profile login view', () 
 
 test('v149 relies on the existing App popstate profile navigation contract', () => {
   assert.match(app, /setIsProfileOpen\(state\?\.tab === 'profile'\)/);
-  assert.match(app, /state\.view === 'tab'[\s\S]*\['stats','notifications','profile','stickers','install'\]\.includes/);
+  assert.match(app, /state\.view === 'tab'[\s\S]*\['stats','notifications','profile','stickers','install','upload'\]\.includes/);
   assert.match(app, /setCurrentTab\(state\.tab!\)/);
 });
