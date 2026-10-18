@@ -78,13 +78,18 @@
   }
 
   function scan() {
+    // React explicitly announces when the notifications page is mounted.
+    // Never observe the whole document: render() changes innerHTML, which used
+    // to retrigger MutationObserver -> scan -> render without end on populated inboxes.
+    if (document.body.dataset.mainTab !== 'notifications') return;
     const root = findRoot();
     if (!root) return;
+    // The same instance must not start another request or redraw on unrelated UI changes.
+    if (state.root === root && root.isConnected) return;
     state.root = root;
     void refresh(root);
   }
 
-  const observer = new MutationObserver(() => scan());
-  observer.observe(document.documentElement, { childList:true, subtree:true });
+  window.addEventListener('echostars:notifications-mounted', scan);
   scan();
 })();
