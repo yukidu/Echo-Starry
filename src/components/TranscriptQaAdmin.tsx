@@ -7,7 +7,7 @@ import { TranscriptCleanupAdmin } from './TranscriptCleanupAdmin';
 type Item = { id:string;title:string;speaker:string;speakerRank:string;status:string;error?:string;wordCount?:number;segmentCount?:number;durationSeconds?:number };
 type Model = {id:string;label:string;strength:string};
 type Tier = {tier:number;label:string;daily:number;free:number;cost:number};
-type Data = {items:Item[];models:Model[];policies:Tier[];model:string;enabled:boolean;globalDaily:number;globalUsed:number;replyDirections:string;history?:{commentId:string;createdAt:number;mode:string;status:string;error?:string;title?:string;authorName?:string}[]};
+type Data = {items:Item[];models:Model[];policies:Tier[];model:string;openAiConfigured:boolean;enabled:boolean;globalDaily:number;globalUsed:number;replyDirections:string;history?:{commentId:string;createdAt:number;mode:string;status:string;error?:string;title?:string;authorName?:string}[]};
 type Transcript = {text:string;originalText?:string;segments:{start:number;end:number;text:string}[];originalSegments?:{start:number;end:number;text:string}[];chineseCount:number;totalChars:number};
 const statuses:Record<string,string>={pending:'排隊中逐字稿',queued:'排隊中逐字稿',processing:'正在撰寫逐字稿',ready:'已完成逐字稿',failed:'逐字稿異常'};
 const field:React.CSSProperties={border:'1px solid #94a3b8',borderRadius:10,padding:'7px',background:'transparent',color:'inherit',width:'100%'};
@@ -103,12 +103,12 @@ export const TranscriptQaAdmin:React.FC=()=>{
     <div className="overflow-x-auto"><table className="w-full min-w-[440px] text-xs"><thead><tr><th className="text-left p-2">會員等級</th><th>每天上限</th><th>免費次數</th><th>每次電池</th></tr></thead><tbody>{data?.policies.map((p,i)=><tr key={p.tier} className="border-t dark:border-slate-700"><td className="font-bold p-2">{p.tier}. {p.label}</td>{(['daily','free','cost'] as const).map(k=><td key={k} className="p-1"><input type="number" style={{...field,width:'78px'}} min="0" step={k==='cost'?'0.1':'1'} aria-label={p.label+k} value={p[k]} onChange={e=>update(i,k,Number(e.target.value))}/></td>)}</tr>)}</tbody></table></div>
     <div className="space-y-2">
       <h4 className="font-bold">演講者回答文字格式</h4>
-      <p className="text-xs text-slate-500">系統固定：不顯示時間軸、秒數或逐句來源，只在最後列出參考的音檔名稱。以下可自訂其他語氣、長度與回答方式。</p>
+      <p className="text-xs text-slate-500">系統固定：不顯示來源、參考資料或音檔引用清單，留言最後自動附上「<本留言由ai回覆，僅供參考，非本人回覆！>」。以下可自訂其他語氣、長度與回答方式。</p>
       <textarea aria-label="AI 回答格式自訂指令" rows={5} maxLength={2000} value={data?.replyDirections||''} onChange={e=>setData(d=>d?{...d,replyDirections:e.target.value}:d)}
         placeholder="例如：以親切、生活化的繁體中文回答；先給出簡短結論，再分享兩點啟發。不必列舉逐字稿片段。"
         className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-transparent p-3 text-sm"/>
       <p className="text-xs text-slate-500">這個設定會套用到之後的新回答，不會改寫舊留言。</p>
     </div>
-    <h4 className="font-bold flex items-center gap-1"><AiBadge/> 回答模型（僅後台顯示）</h4><table className="w-full text-xs"><thead><tr><th className="text-left p-2">模型</th><th className="text-left">優點</th><th>選擇</th></tr></thead><tbody>{data?.models.map(m=><tr key={m.id} className="border-t dark:border-slate-700"><td className="p-2 font-bold">{m.label}</td><td>{m.strength}</td><td className="text-center"><input type="radio" name="qa-model" checked={data.model===m.id} onChange={()=>setData(d=>d?{...d,model:m.id}:d)}/></td></tr>)}</tbody></table><button type="button" disabled={busy||!data} onClick={()=>void save()} className="w-full rounded-xl p-3 flex items-center gap-2 justify-center bg-rose-600 text-white font-bold disabled:opacity-50"><Save size={18}/>儲存設定</button></div>
+    <h4 className="font-bold flex items-center gap-1"><AiBadge/> 回答模型（僅後台顯示）</h4><p className="text-xs text-slate-500">依照下方順序顯示模型。切換後需按「儲存設定」，原先的選擇不會自行改變。ChatGPT API 按使用量由 OpenAI 收費。</p>{data&&!data.openAiConfigured&&<p role="status" className="text-xs text-amber-700">目前未設定 OpenAI API 金鑰，請先完成 Cloudflare 安全金鑰設定。</p>}<table className="w-full text-xs"><thead><tr><th className="text-left p-2">模型</th><th className="text-left">優點</th><th>選擇</th></tr></thead><tbody>{data?.models.map(m=><tr key={m.id} className="border-t dark:border-slate-700"><td className="p-2 font-bold">{m.label}</td><td>{m.strength}</td><td className="text-center"><input type="radio" name="qa-model" checked={data.model===m.id} onChange={()=>setData(d=>d?{...d,model:m.id}:d)}/></td></tr>)}</tbody></table><button type="button" disabled={busy||!data} onClick={()=>void save()} className="w-full rounded-xl p-3 flex items-center gap-2 justify-center bg-rose-600 text-white font-bold disabled:opacity-50"><Save size={18}/>儲存設定</button></div>
   </section>;
 };
