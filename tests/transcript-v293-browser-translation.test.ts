@@ -156,7 +156,8 @@ test('v299 production transcript scheduler keeps five-way concurrency with a 15-
   assert.match(entry, /ctx\.waitUntil\(queueNextTranscriptV293\(env as any\)\)/);
   assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
   assert.match(wrangler, /\[triggers\]/);
-  assert.match(wrangler, /crons\s*=\s*\["\*\/15 \* \* \* \*"\]/);
+  assert.ok(wrangler.includes('"*/15 * * * *"'));
+  assert.ok(wrangler.includes('"*/5 * * * *"'));
   assert.match(wrangler, /只用於產生繁體中文逐字稿，不做外語翻譯/);
 });
 
