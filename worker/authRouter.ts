@@ -177,6 +177,8 @@ async function handleGoogleLogin(request: Request, env: Env) {
     const data = await syncVerifiedMember(env.DB, identity);
     stage = 'central-profile';
     let canonicalUser = data.user;
+    // Echo member privileges never fall back to a local-only decision.
+    if (!(env as any).STARRY_ID_DB) throw new Error('central_id_unavailable');
     if ((env as any).STARRY_ID_DB) {
       const centralId = await ensureCentralEchoMember(env, { ...data.user, googleSubject: identity.subject });
       const access = await checkStarryAppAccess((env as any).STARRY_ID_DB,centralId,'echostars');
