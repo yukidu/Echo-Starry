@@ -147,7 +147,7 @@ async function confirm(db:any,actor:string,input:any){
 async function report(db:any,actor:string,id:string){return describe(await loadJob(db,id,actor));}
 async function undoPreview(db:any,actor:string,id:string){
   const job=await loadJob(db,id,actor);
-  if(!['running','completed','conflict','undo_conflict'].includes(job.status)||Number(job.doneChanges)<=Number(job.revertedChanges)throw Error('這項作業目前沒有可以還原的修改');
+  if(!['running','completed','conflict','undo_conflict'].includes(job.status)||Number(job.doneChanges)<=Number(job.revertedChanges))throw Error('這項作業目前沒有可以還原的修改');
   if(Number(job.lockUntil||0)>Date.now())throw Error('作業進行中，請稍後再試');
   const mismatches:any=await db.prepare(`SELECT COUNT(*) AS count FROM starry_app_access_bulk_items b
     LEFT JOIN starry_app_access_decisions d ON d.userId=b.userId AND d.appId=b.appId
