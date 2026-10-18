@@ -20,8 +20,8 @@ export const DEFAULT_CLEANUP_POLICY: CleanupPolicy = {
   semanticJudgment: true
 };
 
-const punctuation = /[\\s，。、：:；;！!？?.,]/u;
-const wordRx = /^[\\p{Script=Han}\\p{Script=Latin}\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Hangul} -]{1,12}$/u;
+const punctuation = /[\s，。、：:；;！!？?.,]/u;
+const wordRx = /^[\p{Script=Han}\p{Script=Latin}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul} -]{1,12}$/u;
 const unique = (items: unknown, label: string): string[] => {
   if (!Array.isArray(items) || items.length > 40) throw new Error(label + '最多 40 個');
   const next: string[] = [];
@@ -96,9 +96,9 @@ export function cleanTranscriptText(source: string, policy: CleanupPolicy, seman
   }
   if (policy.removeStutters) {
     // Only three+ repeated Han characters at clause starts; deliberate doubled emphasis stays.
-    next = next.replace(/(^|[\\s，。、！？!?；;])([\\p{Script=Han}])\\2{2,}(?=[\\p{Script=Han}])/gu,'$1$2');
+    next = next.replace(/(^|[\s，。、！？!?；;])([\p{Script=Han}])\2{2,}(?=[\p{Script=Han}])/gu,'$1$2');
   }
-  next = next.replace(/[ \\t]{2,}/g,' ').replace(/^[，,、 \\t]+/u,'').replace(/\\s+([，。、！？!?；;])/gu,'$1').trim();
+  next = next.replace(/[ \t]{2,}/g,' ').replace(/^[，,、 \t]+/u,'').replace(/\s+([，。、！？!?；;])/gu,'$1').trim();
   // Never invent or erase the entire meaning-bearing segment.
   return next || raw;
 }
