@@ -46,7 +46,7 @@ test('speaker identity, restricted recordings and public summaries remain isolat
   assert.equal(publiclyReadable({requiredRank:'無',stickerUnlockCost:5}),false);
   assert.match(router,/await mayUseTranscript\(env,u,track\)/);
   assert.match(router,/await mayUseTranscript\(env,u,item\)/);
-  assert.match(router,/JOIN track_speakers/);
+  assert.match(router,/FROM track_speakers/);
   assert.match(router,/speakerRank/);
   assert.match(speaker,/查看原始留言對話/);
   assert.match(speaker,/speaker\.biography/);
