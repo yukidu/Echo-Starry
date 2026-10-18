@@ -311,7 +311,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         const lines=['操作：'+(labels[result.kind]||result.kind),'影響會員：'+result.memberCount+' 位','實際變更：'+result.changeCount+' 項',
           '會員：'+(result.members||[]).map(x=>x.name+' ('+x.id+')').join('、')+(result.memberCount>15?'…':''),
           '部分變更：'+(result.changes||[]).map(x=>x.appId+': '+(x.before||'原有規則')+' → '+(x.after||'原有規則')).join('；')+(result.truncated?'…':'')];
-        $('appAccessReviewText').textContent=lines.join('\n');
+        $('appAccessReviewText').textContent=lines.join('\\n');
         $('appAccessReviewText').style.whiteSpace='pre-wrap';
         $('appAccessReview').classList.remove('hidden');
         $('appAccessConfirmText').value='';$('appAccessCommitBtn').disabled=true;
