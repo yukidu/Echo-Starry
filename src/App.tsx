@@ -740,24 +740,27 @@ export default function App() {
     const protectBack = shouldProtectBrowserBack();
     const homeState: AppHistoryState = { echostars: true, view: 'home' };
     const existing = window.history.state as AppHistoryState | null;
+    // Direct-linked speaker pages need a true home URL below them in history.
+    const initialHistoryUrl = window.location.hash.startsWith('#/speaker/')
+      ? window.location.pathname + window.location.search : window.location.href;
 
     if (protectBack) {
       if (!existing?.echostars) {
         window.history.replaceState(
           { echostars: true, view: 'guard' } satisfies AppHistoryState,
           '',
-          window.location.href
+          initialHistoryUrl
         );
-        window.history.pushState(homeState, '', window.location.href);
+        window.history.pushState(homeState, '', initialHistoryUrl);
       } else if (existing.view === 'guard') {
-        window.history.pushState(homeState, '', window.location.href);
+        window.history.pushState(homeState, '', initialHistoryUrl);
       } else if (existing.view !== 'home') {
         // A reload should start from a predictable root state. Direct share URLs
         // can still reopen their track through the existing bootstrap logic.
-        window.history.replaceState(homeState, '', window.location.href);
+        window.history.replaceState(homeState, '', initialHistoryUrl);
       }
     } else {
-      window.history.replaceState(homeState, '', window.location.href);
+      window.history.replaceState(homeState, '', initialHistoryUrl);
     }
 
     historyReadyRef.current = true;
@@ -960,6 +963,7 @@ export default function App() {
 
   // 任何情況下，只要按主選單的logo或網站名稱，就會返回到首頁播放清單的「全部分類」，清空搜尋條件
   const handleReturnToHomePlaylist = useCallback(() => {
+    setSpeakerProfileName(null);
     resetLuckyDrawState();
     setUseDefaultHomeOrder(true);
     setSortField('權限');
@@ -2433,6 +2437,7 @@ export default function App() {
       <Navbar
         currentTab={currentTab}
         onSelectTab={tab => {
+          setSpeakerProfileName(null);
           setIsProfileOpen(false);
     setIsStickersOpen(false);
           setSelectedDetailTrack(null);
