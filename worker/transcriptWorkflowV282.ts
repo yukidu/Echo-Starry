@@ -142,7 +142,7 @@ async function traditionalizeBatch(env: Env, values: string[]) {
     messages: [
       {
         role: 'system',
-        content: `Convert every JSON array item to Taiwan Traditional Chinese (繁體中文／台灣用字) and restore natural Taiwan Chinese punctuation from the spoken meaning and phrasing. Return ONLY one JSON array of exactly ${values.length} strings in the same order. Do not merge or split array items. Do not add, remove, paraphrase, summarize, translate or reorder spoken content. Keep names, Amway terminology, ranks and spoken style unchanged. Add punctuation only where the meaning clearly supports it; use question marks only for actual questions. Never output Simplified Chinese characters when a Traditional form exists.`
+        content: `Convert only Chinese-language text within the JSON array items to Taiwan Traditional Chinese (繁體中文／台灣用字) and restore natural punctuation without changing other languages. Preserve English, Japanese, Korean, Vietnamese, Cantonese and all other non-Chinese spoken phrases verbatim and in their original order, even when mixed within the same segment. Return ONLY one JSON array of exactly ${values.length} strings in the same order. Do not merge or split array items. Do not add, remove, paraphrase, summarize, translate or reorder spoken content. Keep names, Amway terminology, ranks and spoken style unchanged. Add punctuation only where the meaning clearly supports it; use question marks only for actual questions. Never output Simplified Chinese characters when a Traditional form exists.`
       },
       { role: 'user', content: JSON.stringify(values) }
     ],
@@ -257,7 +257,9 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
           VALUES (?,'processing',NULL,?,0,0,0,?,NULL,?,?)
           ON CONFLICT(trackId) DO UPDATE SET status='processing',error=NULL,updatedAt=excluded.updatedAt`)
           .bind(trackId, MODEL, Number(track.durationSeconds || 0), now, now).run();
-        return { track, key, size: Number(object.size || 0), ext: audioExtension(key) };
+        const hintRow: any = await this.env.DB.prepare('SELECT languageHint FROM transcript_language_hints WHERE trackId=? LIMIT 1')
+          .bind(trackId).first().catch(() => null);
+        return { track, key, size: Number(object.size || 0), ext: audioExtension(key), languageHint: text(hintRow?.languageHint) || 'auto' };
       });
 
       const duration = Math.max(1, Number(info.track.durationSeconds || 1));
@@ -283,7 +285,7 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
               task: 'transcribe',
               vad_filter: true,
               condition_on_previous_text: true,
-              initial_prompt: `Transcribe exactly in the original spoken language; do not translate. 請依錄音原本語言逐字轉錄，不翻譯。Speaker/講者：${text(info.track.speaker)}。Rank/獎銜：${text(info.track.speakerRank)}。Common proper nouns/常見專有名詞：Amway/安麗、Platinum/白金、Diamond/鑽石、Emerald/翡翠、Crown/皇冠。`
+              initial_prompt: `Transcribe exactly in ALL originally spoken languages, preserving arbitrary mixed-language code switching; do not translate or unify languages. Language identification hint (never a forced output language): ${text(info.languageHint || 'auto')}. 所有原音語言均須照實保留，遇到國語、台語、英語、日語、越南語、粵語等任意混合時，依發話順序逐字轉錄，不翻譯、不統一成單一語言。Speaker/講者：${text(info.track.speaker)}。Rank/獎銜：${text(info.track.speakerRank)}。Common proper nouns/常見專有名詞：Amway/安麗、Platinum/白金、Diamond/鑽石、Emerald/翡翠、Crown/皇冠。`
             });
           }
         );
