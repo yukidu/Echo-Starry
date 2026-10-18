@@ -3,6 +3,8 @@ import type { Env } from './index';
 import { calculateNumerology } from '../src/utils/numerology';
 import { ensureSpouseSchema } from './starryIdSpouseSchema';
 import { renderStarryIdMemberCenterPage } from './starryIdMemberCenterPage';
+import { renderStarryAiManagementPage } from './starryAiManagementPage';
+import { loadAiPriorities, saveAiPriorities, collectAiCatalog, recentAiChanges, DEFAULT_AI_ORDER } from './starryAiManagement';
 
 type StarryEnv = Env & {
   STARRY_ID_DB?: any;
@@ -604,6 +606,26 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
   if (!env.STARRY_ID_DB) return json(request, { error: 'Starry ID service unavailable' }, 503);
   const db = env.STARRY_ID_DB;
 
+  if (path === '/api/ai-management') {
+    const session=await sessionUser(request,env);
+    if(!session)return json(request,{error:'請先登入 Starry ID'},401);
+    if(!session.isSuperAdmin)return json(request,{error:'只有超級管理員可以管理 AI'},403);
+    if(method==='GET'){
+      const [priorities,tasks,audit]=await Promise.all([loadAiPriorities(env),collectAiCatalog(env),recentAiChanges(env)]);
+      return json(request,{...priorities,tasks,audit,defaults:DEFAULT_AI_ORDER});
+    }
+    if(method==='PUT'){
+      try{
+        const input=await requestBody(request);
+        return json(request,{success:true,...await saveAiPriorities(env,session.member.id,input.entries)});
+      }catch(error){
+        const message=error instanceof Error?error.message:'invalid_ai_task_order';
+        return json(request,{error:/^invalid_ai_/.test(message)?'AI 排序內容不正確，請重新整理': '設定暫時無法儲存'},/^invalid_ai_/.test(message)?400:503);
+      }
+    }
+    return json(request,{error:'Method not allowed'},405);
+  }
+
   if (path === '/api/health' && method === 'GET') {
     try {
       const row: any = await db.prepare('SELECT COUNT(*) AS count FROM users').first();
@@ -757,6 +779,7 @@ export async function handleStarryIdCentral(request: Request, env: StarryEnv): P
   if (url.hostname !== STAR_DOMAIN) return null;
 
   if (url.pathname === '/' && request.method.toUpperCase() === 'GET') return servicePage(env);
+  if (url.pathname === '/ai-management' && request.method.toUpperCase() === 'GET') return renderStarryAiManagementPage();
   if (url.pathname === '/robots.txt' && request.method.toUpperCase() === 'GET') {
     return new Response('User-agent: *\nDisallow: /\n', {
       headers: { 'Content-Type': 'text/plain; charset=utf-8', 'X-Robots-Tag': NOINDEX }
