@@ -224,11 +224,13 @@ export async function handleStarryAppAccessAdminRequest(request:Request, env:Acc
   if(request.method!=='GET' && request.headers.get('Origin')!=='https://id.starry.phd')
     return fail('管理操作只能從 Starry ID 官方網站進行',403);
   try {
-    await ensureAccessSchema(db);
     const apps=appList(env);
     const path=url.pathname;
+    // The catalog is configured centrally and requires no D1 schema writes.
+    // Keep the picker available even if an unrelated audit/history table fails.
     if(path==='/api/admin/app-access/catalog'&&request.method==='GET')
       return api({apps:apps.map(id=>({id,label:APP_LABELS[id]||id})),protectedApp:PROTECTED_APP,maxMembers:MEMBER_LIMIT});
+    await ensureAccessSchema(db);
     const memberPath=path.match(/^\/api\/admin\/app-access\/member\/([A-Za-z0-9._:-]+)$/);
     if(memberPath && request.method==='GET'){
       const userId=memberPath[1];
