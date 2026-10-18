@@ -1,0 +1,37 @@
+/* One lightweight, reusable AI mark. The animation uses only transform. */
+.starry-ai-badge {
+  display: inline-flex;
+  position: relative;
+  vertical-align: middle;
+  align-items: center;
+  justify-content: center;
+  width: 1.45em;
+  height: 1.45em;
+  flex: none;
+  border-radius: 0.35em;
+  isolation: isolate;
+  overflow: hidden;
+  color: #fff;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 1em;
+  line-height: 1;
+}
+.starry-ai-badge::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  inset: -65%;
+  background: conic-gradient(#ff415b,#ffe24a,#42df83,#3fcffa,#7277fd,#ef66f5,#ff415b);
+  animation: starry-ai-border-spin 4s linear infinite;
+}
+.starry-ai-badge::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 2px;
+  border-radius: 0.25em;
+  background: #101827;
+}
+.starry-ai-badge-text { font-size: 0.59em; font-weight: 900; letter-spacing: -0.04em; }
+@keyframes starry-ai-border-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .starry-ai-badge::before { animation: none; } }
