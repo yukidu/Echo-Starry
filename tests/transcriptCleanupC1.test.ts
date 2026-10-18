@@ -7,12 +7,13 @@ const read=(path:string)=>readFileSync(new URL('../'+path,import.meta.url),'utf8
 test('C1 removes only unambiguous fillers and threefold stutters',()=>{
   assert.equal(cleanTranscriptText('呃，我我我覺得，那個問題非常非常重要',DEFAULT_CLEANUP_POLICY),'我覺得，那個問題非常非常重要');
   assert.equal(cleanTranscriptText('厄運不是運氣，嗯，對。',DEFAULT_CLEANUP_POLICY),'厄運不是運氣，嗯，對。');
+  assert.equal(cleanTranscriptText('呃逆需要診治',DEFAULT_CLEANUP_POLICY),'呃逆需要診治');
   assert.equal(cleanTranscriptText('好好好我們一起去',DEFAULT_CLEANUP_POLICY),'好好好我們一起去');
 });
 test('ambiguous words are left untouched unless AI selects specific bounded ids',()=>{
   const line='那個，然後我們開始';
   assert.equal(cleanTranscriptText(line,DEFAULT_CLEANUP_POLICY),line);
-  assert.deepEqual(semanticCandidates(line,DEFAULT_CLEANUP_POLICY).map(x=>x.id),['0:那個','3:然後']);
+  assert.deepEqual(semanticCandidates(line,DEFAULT_CLEANUP_POLICY).map(x=>x.id),['0:那個']);
   assert.equal(cleanTranscriptText(line,DEFAULT_CLEANUP_POLICY,['0:那個']),'然後我們開始');
   assert.equal(cleanTranscriptText('就是這樣',DEFAULT_CLEANUP_POLICY),'就是這樣');
 });
