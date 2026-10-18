@@ -2,22 +2,10 @@ import React, {useEffect,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ChevronLeft, Headphones, BookOpenText, MessageCircle, RefreshCw} from 'lucide-react';
 import {AiBadge} from './AiBadge';
+import {formatSpeakerUploadDate} from '../utils/speakerDate';
 type TrackSummary={id:string;title:string;speakerRank?:string;speakerAvatar?:string;uploadDate?:string;durationSeconds?:number;requiredRank?:string};
 type QaPair={answerId:string;questionId:string;trackId:string;title:string;rank?:string;asker:string;question:string;answer:string;createdAt:number};
 type ProfileData={speaker:{id:string;name:string;avatar:string;biography:string;bioStatus:string;bioUpdatedAt:number};tracks:TrackSummary[];replies:QaPair[];hasMore:boolean;nextOffset:number;hasMoreReplies:boolean;nextReplyOffset:number};
-/** Taiwan-localized date for ISO upload timestamps, with a clean date-only fallback. */
-export function formatSpeakerUploadDate(value?:string){
-  if(!value)return '日期未設定';
-  if(/^\d{4}-\d{2}-\d{2}$/.test(value))return value.replace(/-/g,'/');
-  const date=new Date(value);
-  if(!Number.isFinite(date.getTime()))return '日期未設定';
-  const parts=new Intl.DateTimeFormat('en-GB',{
-    timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',
-    hour:'2-digit',minute:'2-digit',hour12:false
-  }).formatToParts(date);
-  const get=(key:string)=>parts.find(x=>x.type===key)?.value||'';
-  return get('year')+'/'+get('month')+'/'+get('day')+' '+get('hour')+':'+get('minute');
-}
 export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrack:(trackId:string,commentId?:string)=>void;onPlayTrack?:(trackId:string)=>void;compact?:boolean}>=({name,onBack,onOpenTrack,onPlayTrack,compact=false})=>{
   const [data,setData]=useState<ProfileData|null>(null);
   const [error,setError]=useState('');
