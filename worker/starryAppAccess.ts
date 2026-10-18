@@ -153,8 +153,6 @@ async function commitPreview(db: any, actorUserId: string, input: any) {
     .bind(previewId,actorUserId).first();
   if (!preview || preview.consumedAt || Number(preview.expiresAt)<=Date.now()) throw new Error('預覽已過期或已執行');
   const changes=parseChanges(preview.changesJson);
-  const allowedApps = appList({STARRY_ID_ALLOWED_APPS:input.allowedAppList}); // unused; actual app list is validated at preview time
-  void allowedApps;
   const ids=[...new Set(changes.map(c=>c.userId))];
   const current=await getDecisions(db,ids);
   for(const c of changes) if(currentDecision(current,c.userId,c.appId)!==c.before) throw new Error('權限已變更，請重新預覽');
