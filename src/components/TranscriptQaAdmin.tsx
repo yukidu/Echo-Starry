@@ -92,7 +92,7 @@ export const TranscriptQaAdmin:React.FC=()=>{
       <p>全站今日已使用 {data?.globalUsed??0}／{data?.globalDaily??12} 次。只修改下方的五級會員額度，無法提高全站上限。</p>
       <p>超級管理員不受網站設定的每日次數、全站上限及電池限制；Cloudflare 供應商免費額度仍可能用完。</p>
       <label className="block font-bold mt-2">全站一般會員每日回答上限（保護免費額度）
-        <input type="number" style={field} min="1" max="100" value={data?.globalDaily??12} onChange={e=>setData(d=>d?{...d,globalDaily:Number(e.target.value)}))}/>
+        <input type="number" style={field} min="1" max="100" value={data?.globalDaily??12} onChange={e=>setData(d=>d?{...d,globalDaily:Number(e.target.value)}:d)}/>
       </label>
     </div>
     <div className="overflow-x-auto"><table className="w-full min-w-[440px] text-xs"><thead><tr><th className="text-left p-2">會員等級</th><th>每天上限</th><th>免費次數</th><th>每次電池</th></tr></thead><tbody>{data?.policies.map((p,i)=><tr key={p.tier} className="border-t dark:border-slate-700"><td className="font-bold p-2">{p.tier}. {p.label}</td>{(['daily','free','cost'] as const).map(k=><td key={k} className="p-1"><input type="number" style={{...field,width:'78px'}} min="0" step={k==='cost'?'0.1':'1'} aria-label={p.label+k} value={p[k]} onChange={e=>update(i,k,Number(e.target.value))}/></td>)}</tr>)}</tbody></table></div>
