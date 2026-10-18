@@ -61,7 +61,11 @@ export async function inferStoryBatch(ai:any,part:Segment[],speakerField:string,
     const result=await ai.run(STORY_AI_MODEL,{messages:[
       {role:'system',content:SYSTEM_RULES+(attempt?' 再次提醒：上一份 JSON 不合法。請務必輸出完整有效的 JSON 陣列，最多3項，或 []；每個括號與引號都必須閉合。':'')},
       {role:'user',content:user}
-    ],max_tokens:2200,temperature:0.1});
+    ],max_tokens:2200,temperature:0.1,
+      // GLM-4.7-Flash can spend its entire output budget on reasoning and
+      // return message.content=null; direct, concise JSON is required here.
+      chat_template_kwargs:{enable_thinking:false}
+    });
     try{
       const text=storyAiResponseText(result);
       if(!text)throw Error('AI 未回傳可用的故事分析文字');
