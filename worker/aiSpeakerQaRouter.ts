@@ -416,8 +416,14 @@ export async function handleQaRequest(req:Request,env:Env):Promise<Response|null
       if(!obj)return json({error:'逐字稿檔案不存在'},404);
       const data=JSON.parse(await obj.text());
       const segments=Array.isArray(data?.segments)?data.segments:[];
-      const text=segments.map((s:any)=>txt(s.text)).join('\n')||txt(data?.text);
-      return json({trackId:id,text,segments,chineseCount:(text.match(/\p{Script=Han}/gu)||[]).length,totalChars:[...text].filter(x=>!/\s/.test(x)).length});
+      const baseline = new Map<string,string>((Array.isArray(data?.cleanedSegments)?data.cleanedSegments:[])
+        .map((x:any)=>[String(x.id),String(x.text)]));
+      const displaySegments=segments.map((seg:any)=>({...seg,text:baseline.get(String(seg.id))||seg.text}));
+      const originalText=segments.map((seg:any)=>txt(seg.text)).join('\n')||txt(data?.text);
+      const text=displaySegments.map((seg:any)=>txt(seg.text)).join('\n')||originalText;
+      return json({trackId:id,text,originalText,segments:displaySegments,originalSegments:segments,
+        cleanupVersion:data?.cleanupVersion||null,chineseCount:(text.match(/\p{Script=Han}/gu)||[]).length,
+        totalChars:[...text].filter(x=>!/\s/.test(x)).length});
     }
     return json({error:'找不到管理功能'},404);
   }catch(e){console.error('QA request failed',e);return json({error:'服務暫時無法使用'},503);}
