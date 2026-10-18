@@ -14,12 +14,12 @@ import {
   Reply,
   AtSign,
   Radio,
-  Mic,
-  Bot
+  Mic
 } from 'lucide-react';
 import { Comment, UserProfile, Track } from '../types';
 import { VisitorIdentity } from '../utils/visitor';
 import { CollapsibleCommentText } from './CollapsibleCommentText';
+import { AiBadge } from './AiBadge';
 import { formatCommentTimestampDisplay } from '../../shared/commentTime';
 
 const stripLegacyAutoReplyMention = (content: string, replyToAuthor?: string) => {
@@ -75,6 +75,58 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [qaMode, setQaMode] = useState<'current' | 'all' | 'off'>('current');
   const [qaStatus, setQaStatus] = useState<{enabled:boolean;reason:string;freeLeft:number;left:number;cost:number}|null>(null);
+  const [pendingQa,setPendingQa] = useState<{id:string;phase:'starting'|'typing'}|null>(null);
+  const [qaNotice,setQaNotice] = useState('');
+  // The stored original comment is the only reliable trigger for an AI answer.
+  useEffect(()=>{
+    const onSent=(event:Event)=>{
+      const d=(event as CustomEvent<{trackId?:string;commentId?:string}>).detail;
+      if(d?.trackId!==trackId || !d.commentId)return;
+      setQaNotice('');
+      setPendingQa({id:d.commentId,phase:'starting'});
+    };
+    window.addEventListener('echostars:qa-comment-sent',onSent);
+    return ()=>window.removeEventListener('echostars:qa-comment-sent',onSent);
+  },[trackId]);
+  useEffect(()=>{
+    if(!pendingQa?.id)return;
+    let alive=true, timer:number|undefined,tries=0;
+    const started=Date.now(),id=pendingQa.id;
+    const tick=async()=>{
+      if(!alive)return;
+      try{
+        const r=await fetch('/api/qa/progress?commentId='+encodeURIComponent(id),{credentials:'same-origin',cache:'no-store'});
+        const data=r.ok?await r.json():null;
+        if(!alive)return;
+        if(data?.status==='done'){
+          setPendingQa(null);
+          setQaNotice('已完成回覆');
+          window.dispatchEvent(new CustomEvent('echostars:qa-refresh',{detail:{trackId}}));
+          return;
+        }
+        if(data?.status==='failed'){
+          setPendingQa(null);
+          setQaNotice('本次回答未成功：'+String(data.reason||'服務暫時無法回覆')+'。沒有扣除電池，可重新發起新留言。');
+          return;
+        }
+        if(data?.status==='pending')setPendingQa(old=>old?.id===id?{...old,phase:'typing'}:old);
+        if(data?.status==='starting'&&Date.now()-started>12000){
+          setPendingQa(null);
+          setQaNotice('此留言尚未啟動演講者回答，請確認今日額度及是否有開啟召喚。');
+          return;
+        }
+      }catch{/* Poor connections should not make an unverified failure claim. */}
+      if(Date.now()-started>90000){
+        setPendingQa(null);
+        setQaNotice('回答時間較久，請稍後返回這篇留言查看。');
+        return;
+      }
+      tries++;
+      timer=window.setTimeout(tick,tries<10?2600:5100);
+    };
+    timer=window.setTimeout(tick,1300);
+    return ()=>{alive=false;if(timer!==undefined)window.clearTimeout(timer);};
+  },[pendingQa?.id,trackId]);
   const headingRef = useRef<HTMLHeadingElement|null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -325,7 +377,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
     <div className="w-full bg-white/70 dark:bg-slate-900/60 rounded-3xl p-4 sm:p-5 border border-rose-100/60 dark:border-slate-800 shadow-xs relative leading-snug">
       <div className="w-full min-w-0 mb-3">
         <h3 ref={headingRef} className="font-black text-slate-800 dark:text-slate-100 flex items-center gap-[0.18em] whitespace-nowrap overflow-hidden w-full max-w-full leading-tight" style={{fontSize:32}}>
-          <span className="shrink-0">召喚</span><Bot className="shrink-0" style={{height:'1em',width:'1em'}} aria-label="人工智慧"/>
+          <span className="shrink-0">召喚</span><AiBadge/>
           <span className="rainbow-admin-text font-black shrink-0">{speakerName || '演講者'}</span><span className="shrink-0">問問題</span>
         </h3>
         <fieldset className="mt-2 flex flex-wrap items-center gap-3 text-xs sm:text-sm" aria-label="召喚範圍">
@@ -334,11 +386,11 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
               <input type="radio" name={'speaker-qa-'+trackId} checked={qaMode===value}
                 disabled={value!=='off' && !qaStatus?.enabled}
                 onChange={() => setQaMode(value)} />
-              <span className="font-bold">{label}{value==='off' && <Bot className="inline w-4 h-4 ml-1" aria-label="人工智慧"/>}</span>
+              <span className="font-bold">{label}{value==='off' && <AiBadge className="ml-1"/>}</span>
             </label>
           ))}
         </fieldset>
-        {qaStatus?.reason && <div className="mt-1 text-xs text-amber-700 dark:text-amber-300" role="status">已自動關閉 <Bot className="inline w-3 h-3" aria-label="人工智慧"/>：{qaStatus.reason}（一般心得留言仍可使用）</div>}
+        {qaStatus?.reason && <div className="mt-1 text-xs text-amber-700 dark:text-amber-300" role="status">已自動關閉 <AiBadge/>：{qaStatus.reason}（一般心得留言仍可使用）</div>}
         {qaStatus?.enabled && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">今日免費剩餘 {qaStatus.freeLeft} 次／總共剩餘 {qaStatus.left} 次{qaStatus.freeLeft===0 ? ' · 每次 '+qaStatus.cost+' 顆電池':''}</p>}
       </div>
 
@@ -388,6 +440,16 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
         )}
       </form>
 
+      {(isSubmitting && qaMode !== 'off' || pendingQa) && (
+        <div role="status" aria-live="polite" className="mb-3 flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 px-3 py-3 text-sm">
+          <AiBadge/>
+          <span className="rainbow-admin-text font-bold">{speakerName}</span>
+          <span>{pendingQa?.phase==='typing'?'正在輸入訊息中':'正在準備回答'}<span className="inline-block animate-pulse">…</span></span>
+        </div>
+      )}
+      {qaNotice && !pendingQa && (
+        <p className="mb-3 text-sm text-amber-700 dark:text-amber-300" role="status" aria-live="polite">{qaNotice}</p>
+      )}
       <div className="space-y-2.5 divide-y divide-slate-100 dark:divide-slate-800/70">
         {comments.length === 0 ? (
           <div className="text-center py-6 text-slate-400 dark:text-slate-500 text-xs">目前還沒有心得，快來當第一個分享心得的人吧！</div>
@@ -428,7 +490,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                       className={`${isClickable ? 'cursor-pointer hover:opacity-85 transition-opacity' : 'cursor-default pointer-events-none'} min-w-0`}
                       title={isClickable ? `點擊查看【${displayAuthorName}】會員個人檔案` : undefined}
                     >
-                      {isAiSpeaker ? <span className="inline-flex items-center gap-1 font-bold text-base leading-tight break-words"><Bot className="w-5 h-5 shrink-0" aria-label="人工智慧"/><span className="rainbow-admin-text">{displayAuthorName}</span></span> : c.isAdmin || displayAuthorBadge === '貢獻者' ? <span className="rainbow-admin-text font-bold text-base leading-tight break-words">{displayAuthorName}</span> : isClickable ? <span className="font-bold text-slate-800 dark:text-slate-100 text-base underline decoration-dotted underline-offset-2 hover:text-rose-600 transition-colors leading-tight break-words">{displayAuthorName}</span> : <span className="font-bold text-slate-700 dark:text-slate-300 text-base select-none leading-tight break-words">{displayAuthorName}</span>}
+                      {isAiSpeaker ? <span className="inline-flex items-center gap-1 font-bold text-base leading-tight break-words"><AiBadge/><span className="rainbow-admin-text">{displayAuthorName}</span></span> : c.isAdmin || displayAuthorBadge === '貢獻者' ? <span className="rainbow-admin-text font-bold text-base leading-tight break-words">{displayAuthorName}</span> : isClickable ? <span className="font-bold text-slate-800 dark:text-slate-100 text-base underline decoration-dotted underline-offset-2 hover:text-rose-600 transition-colors leading-tight break-words">{displayAuthorName}</span> : <span className="font-bold text-slate-700 dark:text-slate-300 text-base select-none leading-tight break-words">{displayAuthorName}</span>}
                     </div>
 
                     <div className="mt-1 flex items-center gap-1 min-w-0 flex-nowrap">
@@ -450,7 +512,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                     {editingId === c.id ? (
                       <div className="mt-1.5 space-y-1.5">
                         <textarea maxLength={2000} value={editContent} onChange={e => setEditContent(e.target.value)} className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/60 text-sm text-slate-800 dark:text-slate-100 outline-hidden" rows={2} />
-                        <p className="text-xs leading-snug text-amber-700 dark:text-amber-300"><Bot className="inline w-4 h-4" aria-label="人工智慧"/> <span className="rainbow-admin-text font-bold">{speakerName}</span>並無法知道你曾編輯此留言，如果要重新發問，請重新發起一篇新留言</p>
+                        <p className="text-xs leading-snug text-amber-700 dark:text-amber-300"><AiBadge/> <span className="rainbow-admin-text font-bold">{speakerName}</span>並無法知道你曾編輯此留言，如果要重新發問，請重新發起一篇新留言</p>
                         <div className="flex justify-end gap-1.5">
                           <button onClick={() => setEditingId(null)} className="px-2 py-1 rounded-lg text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-1 cursor-pointer"><X className="w-3 h-3" /> 取消</button>
                           <button onClick={() => handleSaveEdit(c.id)} className="px-2.5 py-1 rounded-lg text-xs bg-rose-600 text-white flex items-center gap-1 shadow-2xs font-bold cursor-pointer"><Check className="w-3 h-3" /> 儲存修改</button>

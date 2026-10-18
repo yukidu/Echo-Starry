@@ -1657,16 +1657,12 @@ export default function App() {
     window.dispatchEvent(new CustomEvent('echostars:sticker-changed'));
     if (activeCommentsTrackIdRef.current === targetTrackId) setComments(prev => [newComment, ...prev]);
     setAllComments(prev => [newComment, ...prev]);
-    // Background reply may finish after the original comment POST.
-    // Refresh only this active discussion twice, not the whole comment database.
-    if (qaMode && qaMode !== 'off') {
-      for (const wait of [6500, 16000]) {
-        window.setTimeout(() => {
-          if (activeCommentsTrackIdRef.current !== targetTrackId) return;
-          void apiJson('/api/tracks/' + encodeURIComponent(targetTrackId) + '/comments')
-            .then(list => { if (Array.isArray(list)) setComments(list); }).catch(() => {});
-        }, wait);
-      }
+    // Tell the current comment view which saved question has a pending answer.
+    // A single lightweight status check then refreshes only when it completes.
+    if (qaMode && qaMode !== 'off' && newComment?.id) {
+      window.dispatchEvent(new CustomEvent('echostars:qa-comment-sent', {
+        detail: { trackId: targetTrackId, commentId: newComment.id }
+      }));
     }
 
     setTracks(prev =>
@@ -1678,6 +1674,22 @@ export default function App() {
       setSelectedDetailTrack(prev => prev ? { ...prev, commentsCount: (prev.commentsCount || 0) + 1 } : null);
     }
   };
+
+  // Fetch comments once after a real AI completion, not on blind 6.5s/16s timers.
+  useEffect(() => {
+    const onReady = (event: Event) => {
+      const trackId = (event as CustomEvent<{trackId?:string}>).detail?.trackId;
+      if (!trackId || activeCommentsTrackIdRef.current !== trackId) return;
+      void apiJson('/api/tracks/' + encodeURIComponent(trackId) + '/comments')
+        .then((list: unknown) => {
+          if (Array.isArray(list) && activeCommentsTrackIdRef.current === trackId) {
+            setComments(list);
+          }
+        }).catch(() => {});
+    };
+    window.addEventListener('echostars:qa-refresh', onReady);
+    return () => window.removeEventListener('echostars:qa-refresh', onReady);
+  }, []);
 
   // Delete Comment
   const handleDeleteComment = async (commentId: string, explicitTrackId?: string) => {
