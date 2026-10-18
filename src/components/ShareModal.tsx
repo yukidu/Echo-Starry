@@ -1,3 +1,4 @@
+import { SpeakerNameLink } from './SpeakerNameLink';
 import React, { useEffect, useState } from 'react';
 import { Share2, Copy, Check, X, Smartphone, RefreshCw } from 'lucide-react';
 import { Track, UserProfile } from '../types';
@@ -162,7 +163,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 推薦分類: {categoryName}
               </span>
               <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate mt-0.5">
-                {track.speaker}《{track.title}》
+                <SpeakerNameLink name={track.speaker}/>《{track.title}》
               </p>
               <p className="text-[10px] text-slate-400 font-mono truncate">
                 {shareUrl || (isPreparingShare ? '正在建立分享連結…' : '分享連結尚未建立')}
