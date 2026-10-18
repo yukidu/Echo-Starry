@@ -22,7 +22,7 @@ test('transparent mixed-case Ai emblem is a reusable accessibility-aware compone
   assert.match(badgeStyle,/mask-composite: exclude/);
   assert.match(badgeStyle,/prefers-reduced-motion/);
   assert.doesNotMatch(badgeStyle,/background: #101827/);
-  assert.match(badgeStyle,/hue-rotate/);
+  assert.match(badgeStyle,/starry-ai-border-flow/);
 });
 test('closed AI uses gradient battery reward heading with original controls intact',()=>{
   assert.match(comments,/qaMode === 'off'/);
@@ -62,7 +62,7 @@ test('transcript completion schedules a budgeted biography instead of running AI
   assert.match(router,/if\(!isSuper\(u\)\)return result/);
 });
 test('speaker page is browser navigable and has a separate super-admin audio tab',()=>{
-  assert.match(app,/view:'speaker'/);
+  assert.match(app,/aria-modal="true" aria-label=\{speakerProfileName/);
   assert.match(app,/#\/speaker\//);
   assert.match(app,/<SpeakerProfilePage/);
   assert.match(tabs,/addTab\('speaker', 'Ai 演講者'\)/);
