@@ -58,12 +58,13 @@ export async function handleSpeakerProfileRequest(req:Request,env:SpeakerEnv):Pr
       for(const track of data.results||[]){
         if(await mayUseTranscript(env,u,track))tracks.push({id:track.id,title:track.title,speakerRank:track.speakerRank,speakerAvatar:track.speakerAvatar,uploadDate:track.uploadDate,requiredRank:track.requiredRank,durationSeconds:track.durationSeconds});
       }
-      const q=offset===0?await env.DB.prepare("SELECT a.id AS answerId,a.content AS answer,a.trackId,a.createdAt,q.id AS questionId,q.content AS question,q.authorName AS asker,t.title,t.speakerRank,t.requiredRank,t.isPrivateVip,t.authorizedOnlyVisible,t.stickerUnlockCost FROM track_speakers ts JOIN tracks t ON t.id=ts.trackId JOIN comments a ON a.trackId=t.id AND a.authorBadge='AI_SPEAKER' AND a.id LIKE 'qa-%' JOIN comments q ON q.id=a.replyToId WHERE ts.speakerName=? ORDER BY a.createdAt DESC LIMIT 90").bind(name).all():{results:[]};
+      const replyOffset=Math.min(5000,Math.max(0,Number(url.searchParams.get('replyOffset')||0)||0));
+      const q=offset===0?await env.DB.prepare("SELECT a.id AS answerId,a.content AS answer,a.trackId,a.createdAt,q.id AS questionId,q.content AS question,q.authorName AS asker,t.title,t.speakerRank,t.requiredRank,t.isPrivateVip,t.authorizedOnlyVisible,t.stickerUnlockCost FROM track_speakers ts JOIN tracks t ON t.id=ts.trackId JOIN comments a ON a.trackId=t.id AND a.authorBadge='AI_SPEAKER' AND a.id LIKE 'qa-%' JOIN comments q ON q.id=a.replyToId WHERE ts.speakerName=? ORDER BY a.createdAt DESC LIMIT 40 OFFSET ?").bind(name,replyOffset).all():{results:[]};
       const replies=[];
       for(const item of q.results||[]){
         if(await mayUseTranscript(env,u,item))replies.push({answerId:item.answerId,questionId:item.questionId,trackId:item.trackId,title:item.title,rank:item.speakerRank,asker:item.asker,question:item.question,answer:item.answer,createdAt:item.createdAt});
       }
-      return result({speaker:{id:p.id,name:p.displayName,avatar:tracks.find(x=>x.speakerAvatar)?.speakerAvatar||'',biography:p.biography||'',bioStatus:p.bioStatus,bioUpdatedAt:p.bioUpdatedAt||0},tracks:tracks.slice(0,30),hasMore:(data.results||[]).length===60,nextOffset:offset+60,replies:replies.slice(0,30)});
+      return result({speaker:{id:p.id,name:p.displayName,avatar:tracks.find(x=>x.speakerAvatar)?.speakerAvatar||'',biography:p.biography||'',bioStatus:p.bioStatus,bioUpdatedAt:p.bioUpdatedAt||0},tracks,hasMore:(data.results||[]).length===60,nextOffset:offset+60,replies,hasMoreReplies:(q.results||[]).length===40,nextReplyOffset:replyOffset+40});
     }
     if(!isSuper(u))return result({error:'只有超級管理員可以設定演講者摘要'},403);
     if(path==='/api/speaker-profiles/admin'&&method==='GET'){
