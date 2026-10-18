@@ -50,7 +50,7 @@ test('AI answer is readable and ends with trusted recording source titles only',
   assert.doesNotMatch(out,/第4段/);
   assert.match(router,/replyDirections/);
   assert.match(admin,/AI 回答格式自訂指令/);
-  assert.match(router,/max_tokens:1400/);
+  assert.match(router,/max_tokens:i===0\?1800:1200/);
 });
 test('speaker recordings require confirmation and play through existing bubble, preserving view',()=>{
   assert.match(profile,/role="alertdialog"/);
