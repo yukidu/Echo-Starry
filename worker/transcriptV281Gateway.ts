@@ -300,6 +300,38 @@ async function extendSettings(request: Request, env: Env, ctx: any) {
 export default {
   async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
     const url = new URL(request.url);
+    const languageHintRoute = url.pathname.match(/^\/api\/v281\/transcript-language-hints\/([^/]+)$/);
+    if (languageHintRoute) {
+      const trackId = decodeURIComponent(languageHintRoute[1]);
+      const actor = await sessionActor(request, env);
+      if (!actor) return json({ error: '請先登入會員' }, 401);
+      const db = (env as any).DB;
+      const track: any = await db.prepare('SELECT id,uploaderId,uploaderEmail FROM tracks WHERE id=? LIMIT 1').bind(trackId).first();
+      if (!track) return json({ error: '找不到音檔' }, 404);
+      const isOwner = (text(track.uploaderId) && text(track.uploaderId) === text(actor.id)) ||
+        (text(track.uploaderEmail) && text(track.uploaderEmail).toLowerCase() === text(actor.email).toLowerCase());
+      if (!isSuperAdmin(actor) && !isOwner) return json({ error: '沒有權限修改音檔語言' }, 403);
+      if (request.method.toUpperCase() === 'GET') {
+        const row: any = await db.prepare('SELECT languageHint FROM transcript_language_hints WHERE trackId=? LIMIT 1')
+          .bind(trackId).first().catch(() => null);
+        return json({ languageHint: text(row?.languageHint) || 'auto' });
+      }
+      if (request.method.toUpperCase() !== 'PUT') return json({ error: 'Method not allowed' }, 405);
+      const body: any = await request.json().catch(() => ({}));
+      const hint = text(body.languageHint);
+      if (!['auto','zh','nan','en','vi','yue','ja','ko','other'].includes(hint))
+        return json({ error: '不支援的語言提示' }, 400);
+      await db.prepare(`CREATE TABLE IF NOT EXISTS transcript_language_hints (
+        trackId TEXT PRIMARY KEY,languageHint TEXT NOT NULL,updatedAt INTEGER NOT NULL)`).run();
+      if (hint === 'auto') {
+        await db.prepare('DELETE FROM transcript_language_hints WHERE trackId=?').bind(trackId).run();
+      } else {
+        await db.prepare(`INSERT INTO transcript_language_hints(trackId,languageHint,updatedAt)
+          VALUES (?,?,?) ON CONFLICT(trackId) DO UPDATE SET languageHint=excluded.languageHint,updatedAt=excluded.updatedAt`)
+          .bind(trackId, hint, Date.now()).run();
+      }
+      return json({ success: true, languageHint: hint });
+    }
     // Admin-only per-track relistening. Old completed transcripts are never bulk rewritten.
     if (url.pathname === '/api/v281/transcript-management/status') {
       if (request.method.toUpperCase() !== 'GET') return json({ error: 'Method not allowed' }, 405);
