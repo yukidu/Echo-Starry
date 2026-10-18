@@ -19,6 +19,15 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     .card{border:1px solid var(--line);background:linear-gradient(160deg,rgba(20,34,59,.97),rgba(10,18,34,.97));border-radius:28px;padding:24px;box-shadow:var(--shadow)}.identity{display:flex;gap:17px;align-items:center;padding-bottom:21px;border-bottom:1px solid var(--line)}.avatar-shell{position:relative;flex:0 0 auto}.avatar{width:86px;height:86px;border-radius:24px;object-fit:cover;background:#223250;border:1px solid #425578}.avatar-fallback{width:86px;height:86px;border-radius:24px;display:grid;place-items:center;background:linear-gradient(145deg,#435f91,#6e62a9);font-size:30px;font-weight:700}.avatar-tools{position:absolute;right:-9px;bottom:-9px;display:flex;gap:5px}.avatar-tool,.edit,.field-eye{width:31px;height:31px;border-radius:10px;border:1px solid #314869;background:#172742;color:#d9e5ff;cursor:pointer;display:grid;place-items:center;padding:0}.avatar-tool:hover,.edit:hover,.field-eye:hover{background:#223657}.avatar-tool.visibility-off,.field-eye.visibility-off{color:#8594af;background:#111d31}.identity-main{min-width:0;flex:1}.identity-main h2{font-size:27px;margin:0 0 5px;overflow-wrap:anywhere}.email{color:var(--muted);overflow-wrap:anywhere}.badges{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.badge{padding:5px 9px;border-radius:999px;background:#1d3151;color:#cbd9f5;font-size:12px;border:1px solid #35517b}.badge.admin{background:#3a294f;border-color:#73569c;color:#efdfff}.section-title{font-size:14px;color:#c5d1e7;letter-spacing:.08em;margin:22px 0 8px;text-transform:uppercase}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.field{min-height:72px;border:1px solid #263a5a;border-radius:16px;background:#0e1a2e;padding:11px 12px;position:relative}.field.wide{grid-column:1/-1}.field-label{font-size:12px;color:#91a2c0;margin-bottom:7px}.field-value{font-size:16px;line-height:1.45;padding-right:72px;white-space:pre-wrap;overflow-wrap:anywhere}.field-value.empty{color:#71819e}.edit{position:absolute;right:8px;top:8px}.field-eye{position:absolute;right:46px;top:8px}.field.readonly .edit{display:none}.field-editor{width:100%;border:1px solid #5f7cac;background:#0a1426;color:#fff;border-radius:10px;padding:8px 9px;outline:none;resize:vertical}.field-hint{font-size:11px;color:#7789a8;margin-top:5px}.spouse-link{font-size:12px;color:var(--accent);margin-top:7px;padding-right:72px}.saving{opacity:.62;pointer-events:none}.footer-note{margin-top:18px;color:#8292ad;font-size:12px;line-height:1.6}.toast{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom));transform:translateX(-50%);background:#15233c;border:1px solid #415679;color:white;border-radius:13px;padding:10px 14px;box-shadow:var(--shadow);z-index:20;max-width:min(480px,calc(100% - 28px));text-align:center}.toast.error{border-color:#8c4751;color:#ffd8dc}
     @media(max-width:760px){.shell{padding:16px 12px 52px}.topbar{align-items:flex-start}.brand small{display:none}.layout.admin-open{grid-template-columns:1fr}.admin-panel{position:static;max-height:45vh}.card{padding:18px;border-radius:22px}.fields{grid-template-columns:1fr}.identity{align-items:flex-start}.avatar,.avatar-fallback{width:72px;height:72px;border-radius:20px}.identity-main h2{font-size:23px}.top-actions .btn{padding:8px 10px}}
 
+    .identity.access-mode{flex-direction:column;align-items:stretch}
+    .identity.access-mode #avatarWrap{align-self:center}
+    .access-section{width:100%;margin:0}
+    .access-summary{font-weight:700;cursor:pointer;list-style-position:inside;padding:3px 0;min-height:40px}
+    .access-content{padding-top:8px}
+    .access-toggle{border-radius:10px;padding:8px 13px;cursor:pointer;border:1px solid #425c82;background:#192b47;color:#fff}
+    .access-toggle.allow{border-color:#408e78;color:#97efce}
+    .access-toggle.deny{border-color:#9b5662;color:#ffc4c9}
+    .access-single-actions{display:flex;gap:7px;flex-wrap:wrap;margin-left:auto}
     .access-toolbar{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-top:10px}
     .access-toolbar span,.access-help{font-size:12px;color:var(--muted)}
     .access-member-row{display:flex;gap:8px;align-items:center}
@@ -73,31 +82,30 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         <div class="access-pager"><button type="button" class="btn" id="memberPrev">上一頁</button><span id="memberPage" class="access-help">第 1 頁</span><button type="button" class="btn" id="memberNext">下一頁</button></div>
       </aside>
       <section class="card" id="profileCard">
-        <div class="identity">
+        <div class="identity" id="memberIdentity">
           <div id="avatarWrap"></div>
-          <div class="identity-main">
-            <h2 id="displayName">會員</h2>
-            <div class="email" id="displayEmail"></div>
-            <div class="badges" id="badges"></div>
-          </div>
-        </div>
-        <div class="section-title">電子名片資料</div>
-        <div class="fields" id="fields"></div>
-        <div class="footer-note">鉛筆可修改資料，眼睛可控制該欄位是否顯示在公開名片；照片也可直接更換並控制公開／隱藏。Enter 儲存、Esc 取消；座右銘可用 Ctrl / ⌘ + Enter 儲存。</div>
-        <section class="access-section hidden" id="appAccessPanel" aria-label="App 使用權限管理">
-          <h3>App 使用權限</h3>
+        <details class="access-section hidden" id="appAccessPanel" aria-label="App 使用權限管理">
+          <summary class="access-summary">🛡️ App 使用權限（點擊展開）</summary>
+          <div class="access-content">
           <div class="access-help" id="appAccessScope">選取會員以管理權限</div>
           <div class="access-help">Starry ID 中央登入不可關閉。未明確設定的 App 保留現有使用規則；未經測試的 App 不會在本階段強制封鎖。</div>
+          <div id="appAccessSingle" class="hidden">
+            <div class="access-help">直接選擇每個 App 的「允許」或「禁止」，修改前仍會先預覽確認。</div>
+            <div class="access-apps" id="appAccessSingleApps"></div>
+          </div>
+          <div id="appAccessBulk" class="hidden">
           <div class="access-fields">
-            <label for="appAccessMode">設定方式</label>
+            <label for="appAccessMode">批次設定方式</label>
             <select id="appAccessMode">
-              <option value="grant">開放勾選的 App</option>
-              <option value="revoke">禁止勾選的 App</option>
-              <option value="replace">以勾選結果取代全部 App 權限</option>
+              <option value="grant">只開放勾選的 App（其他不變）</option>
+              <option value="revoke">只禁止勾選的 App（其他不變）</option>
+              <option value="replace">只允許勾選的 App（未勾選全部禁止）</option>
             </select>
             <button class="btn primary" type="button" id="appAccessPreviewBtn">預覽變更</button>
           </div>
+          <div id="appAccessBulkHelp" class="access-help">「只允許勾選的 App」會禁止所有未勾選的 App。請確認沒有漏選。</div>
           <div class="access-apps" id="appAccessApps"></div>
+          </div>
           <section class="access-preview hidden" id="appAccessReview">
             <strong>請再次確認</strong>
             <div id="appAccessReviewText"></div>
@@ -113,7 +121,18 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
             <div class="access-help">還原前也會再次顯示預覽。只有權限未被其他操作覆蓋時才可還原。</div>
             <div id="appAccessHistory"></div>
           </section>
-        </section>
+          </div>
+        </details>
+          <div class="identity-main">
+            <h2 id="displayName">會員</h2>
+            <div class="email" id="displayEmail"></div>
+            <div class="badges" id="badges"></div>
+          </div>
+        </div>
+        <div class="section-title">電子名片資料</div>
+        <div class="fields" id="fields"></div>
+        <div class="footer-note">鉛筆可修改資料，眼睛可控制該欄位是否顯示在公開名片；照片也可直接更換並控制公開／隱藏。Enter 儲存、Esc 取消；座右銘可用 Ctrl / ⌘ + Enter 儲存。</div>
+
       </section>
     </main>
   </div>
@@ -207,7 +226,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         root.appendChild(card);
       }
     }
-    function renderProfile(user){ state.user=user; state.targetUserId=user.id; renderAvatar(user); $('displayName').textContent=user.name||'尚未填寫姓名'; $('displayEmail').textContent=user.email||''; renderBadges(user); renderFields(user); renderMemberActive(); if(state.isSuperAdmin)void showAppAccess([user.id],user.name||user.email||'會員'); }
+    function renderProfile(user){ state.user=user; state.targetUserId=user.id; renderAvatar(user); $('displayName').textContent=user.name||'尚未填寫姓名'; $('displayEmail').textContent=user.email||''; renderBadges(user); renderFields(user); renderMemberActive(); $('memberIdentity').classList.toggle('access-mode',state.isSuperAdmin); if(state.isSuperAdmin)void showAppAccess([user.id],user.name||user.email||'會員',false); }
     async function saveField(field,value,card){ card.classList.add('saving'); try{ const path=state.isSuperAdmin && state.targetUserId!==state.session.user.id ? '/api/admin/members/'+encodeURIComponent(state.targetUserId) : '/api/profile'; const data=await api(path,{method:'PUT',body:JSON.stringify({[field]:value})}); renderProfile(data.user); toast('已儲存 '+editable.find(x=>x[0]===field)?.[1]); }catch(e){ card.classList.remove('saving'); renderFields(state.user); toast(e.message||'儲存失敗',true); } }
     function beginEdit(card,field,label,wide){ if(card.querySelector('.field-editor')) return; const value=state.user[field]===null||state.user[field]===undefined?'':String(state.user[field]); const display=card.querySelector('.field-value'); const edit=card.querySelector('.edit'); if(edit) edit.classList.add('hidden'); const input=wide?document.createElement('textarea'):document.createElement('input'); input.className='field-editor'; if(wide) input.rows=3; if(isNumeric(field)) input.inputMode='numeric'; input.value=value; display.replaceWith(input); let done=false; const cancel=()=>{ if(done)return; done=true; renderFields(state.user); }; const commit=()=>{ if(done)return; done=true; const next=input.value.trim(); if(next===value){renderFields(state.user);return;} saveField(field,next,card); }; input.addEventListener('keydown',(event)=>{ if(event.key==='Escape'){event.preventDefault();cancel();return;} if(event.key==='Enter' && (!wide || event.ctrlKey || event.metaKey)){event.preventDefault();commit();} }); input.addEventListener('blur',()=>{ if(!done) commit(); }); input.focus(); input.select(); }
     function renderMemberActive(){ document.querySelectorAll('.member-item').forEach(el=>el.classList.toggle('active',el.dataset.id===state.targetUserId)); }
@@ -257,7 +276,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     $('memberNext').addEventListener('click',()=>loadMembers($('memberSearch').value.trim(),state.memberOffset+100));
     $('bulkAccessButton').addEventListener('click',()=>{
       if(!state.selectedIds.size){toast('請先勾選會員',true);return;}
-      void showAppAccess([...state.selectedIds], '已選取 '+state.selectedIds.size+' 位會員');
+      void showAppAccess([...state.selectedIds], '已選取 '+state.selectedIds.size+' 位會員', true);
     });
     document.addEventListener('click',(event)=>{const target=event.target;if(target?.id==='v211Close'||target?.classList?.contains('v211-settings'))setTimeout(async()=>{if(isOwnProfile()){await loadOwnVisibility();renderProfile(state.user);}},120);});
 
@@ -284,11 +303,37 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         check.addEventListener('change',hideAccessPreview);
       }
     }
-    async function showAppAccess(ids,label){
+    function renderSingleAppChoices(memberApps){
+      const target=$('appAccessSingleApps');target.replaceChildren();
+      for(const app of memberApps){
+        const line=document.createElement('div');line.className='access-app-line';
+        const title=document.createElement('span');
+        const strong=document.createElement('strong');strong.textContent=app.label;
+        const hint=document.createElement('small');
+        hint.textContent=app.decision==='allow'?'目前：允許':app.decision==='deny'?'目前：禁止':
+          app.legacyMembership==='active'?'目前：依原有會員權限（已開放）':'目前：依原有 App 規則';
+        title.append(strong,hint);
+        const buttons=document.createElement('div');buttons.className='access-single-actions';
+        for(const mode of ['grant','revoke']){
+          const choice=document.createElement('button');choice.type='button';choice.className='access-toggle '+(mode==='grant'?'allow':'deny');
+          const desired=mode==='grant'?'allow':'deny';
+          choice.textContent=mode==='grant'?'允許':'禁止';
+          choice.setAttribute('aria-label',app.label+(mode==='grant'?'允許使用':'禁止使用'));
+          choice.disabled=app.decision===desired;
+          choice.addEventListener('click',()=>void previewAccess({mode,userIds:[state.accessUserIds[0]],appIds:[app.id]}));
+          buttons.appendChild(choice);
+        }
+        line.append(title,buttons);target.appendChild(line);
+      }
+    }
+    async function showAppAccess(ids,label,bulk=false){
       if(!state.isSuperAdmin)return;
       const keys=[...new Set(ids)].filter(Boolean);
       if(!keys.length)return;
       const panel=$('appAccessPanel');panel.classList.remove('hidden');
+      $('appAccessSingle').classList.toggle('hidden',bulk);
+      $('appAccessBulk').classList.toggle('hidden',!bulk);
+      if(bulk)panel.open=true;
       $('appAccessScope').textContent='正在讀取 '+label+' 的權限…';hideAccessPreview();
       try{
         await ensureAccessCatalog();
@@ -298,7 +343,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
           const record=await api('/api/admin/app-access/member/'+encodeURIComponent(keys[0]));
           current=record.apps||[];
         }
-        renderAppChoices(current);
+        if(bulk)renderAppChoices([]);else renderSingleAppChoices(current);
         $('appAccessScope').textContent=label+'｜共 '+keys.length+' 位會員';
         await loadAccessHistory();
       }catch(e){$('appAccessScope').textContent='讀取失敗';toast(e.message||'無法讀取權限',true);}
@@ -307,7 +352,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
       try{
         const result=await api('/api/admin/app-access/preview',{method:'POST',body:JSON.stringify(input)});
         state.accessPreview=result;
-        const labels={grant:'開放',revoke:'禁止',replace:'完全取代',undo:'還原'};
+        const labels={grant:'開放勾選的 App（其他不變）',revoke:'禁止勾選的 App（其他不變）',replace:'只開放勾選的 App，未勾選全部禁止',undo:'還原'};
         const lines=['操作：'+(labels[result.kind]||result.kind),'影響會員：'+result.memberCount+' 位','實際變更：'+result.changeCount+' 項',
           '會員：'+(result.members||[]).map(x=>x.name+' ('+x.id+')').join('、')+(result.memberCount>15?'…':''),
           '部分變更：'+(result.changes||[]).map(x=>x.appId+': '+(x.before||'原有規則')+' → '+(x.after||'原有規則')).join('；')+(result.truncated?'…':'')];
@@ -343,7 +388,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
       const apps=[...document.querySelectorAll('.access-app-choice:checked')].map(el=>el.value);
       void previewAccess({userIds:state.accessUserIds,appIds:apps,mode:$('appAccessMode').value});
     });
-    $('appAccessMode').addEventListener('change',hideAccessPreview);
+    $('appAccessMode').addEventListener('change',()=>{hideAccessPreview();$('appAccessBulkHelp').textContent=$('appAccessMode').value==='replace'?'注意：未勾選的 App 全部禁止，請仔細確認勾選清單。':'只有勾選的 App 會變更，其他 App 不會受到影響。';});
     $('appAccessConfirmText').addEventListener('input',()=>{
       $('appAccessCommitBtn').disabled= $('appAccessConfirmText').value!=='確認變更'||!state.accessPreview;
     });
@@ -357,7 +402,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         })});
         hideAccessPreview();
         toast('已變更 '+applied.changed+' 項權限。還原碼：'+applied.operationId);
-        if(state.accessUserIds.length===1)await showAppAccess(state.accessUserIds,state.user?.name||'會員');
+        if(state.accessUserIds.length===1)await showAppAccess(state.accessUserIds,state.user?.name||'會員',!$('appAccessBulk').classList.contains('hidden'));
         else await loadAccessHistory();
       }catch(e){toast(e.message||'設定失敗',true);$('appAccessCommitBtn').disabled=false;}
     });

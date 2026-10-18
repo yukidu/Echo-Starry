@@ -19,14 +19,16 @@ test('Central ID stays accessible and cannot be part of permission replacement',
   assert.match(access, /v !== PROTECTED_APP/);
   assert.match(access, /item\.appId === PROTECTED_APP/);
   assert.match(router, /appId === 'starry-id' \? null : await readAppAccessDecision/);
+  assert.match(access, /if \(appId===PROTECTED_APP\) return \{allowed:true/);
 });
 
 test('Existing members retain prior app membership until the coordinated rollout', () => {
-  assert.match(router, /explicitAppDecision === 'deny'/);
-  assert.match(router, /env\.STARRY_APP_ACCESS_REQUIRE_GRANT === 'true'/);
-  assert.match(router, /explicitAppDecision !== 'allow'/);
-  assert.match(router, /session\.appId !== 'starry-id' && await readAppAccessDecision/);
-  assert.doesNotMatch(read('wrangler.toml'), /STARRY_APP_ACCESS_REQUIRE_GRANT\s*=\s*'true'/);
+  assert.match(access, /NEW_MEMBER_GRANT_CUTOFF_MS/);
+  assert.match(access, /row\.explicitDecision==='deny'/);
+  assert.match(access, /row\.explicitDecision==='allow'/);
+  assert.match(access, /new_member_requires_grant/);
+  assert.match(router, /const access = await checkStarryAppAccess\(db,userId,appId\)/);
+  assert.match(router, /session\.appId !== 'starry-id' && !\(await checkStarryAppAccess/);
 });
 
 test('Preview and a second confirmation are required to change member App permissions', () => {
@@ -65,4 +67,22 @@ test('Embedded member-center JavaScript remains valid after adding bulk interfac
   const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
   assert.ok(script);
   assert.doesNotThrow(()=>new Function(script));
+});
+
+test('Single-member switch appears collapsed below avatar before name', () => {
+  const avatar=page.indexOf('<div id="avatarWrap"></div>');
+  const access=page.indexOf('<details class="access-section hidden"');
+  const name=page.indexOf('<div class="identity-main">');
+  assert.ok(avatar>=0 && access>avatar && name>access);
+  assert.match(page,/id="appAccessSingleApps"/);
+  assert.match(page,/choice\.textContent=mode==='grant'\?'允許':'禁止'/);
+  assert.match(page,/if\(bulk\)panel\.open=true/);
+  assert.match(page,/只允許勾選的 App（未勾選全部禁止）/);
+});
+
+test('Mirror checks central member policy when granting and validating app tokens', () => {
+  const mirror=read('worker/starryMirrorBridgeRouter.ts');
+  assert.match(mirror,/checkStarryAppAccess\(\(env as any\)\.STARRY_ID_DB,session\.userId,APP_ID\)/);
+  assert.match(mirror,/checkStarryAppAccess\(db,text\(row\.userId\),APP_ID\)/);
+  assert.match(mirror,/您沒有使用權限/);
 });
