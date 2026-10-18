@@ -194,7 +194,7 @@ async function excerpts(env:Env,track:any,u:any,mode:string,question:string){
     const people=new Set(splitSpeakerNames(track.speaker).map(s=>s.toLowerCase()));
     rows=(data.results||[]).filter((r:any)=>splitSpeakerNames(r.speaker).some(s=>people.has(s.toLowerCase()))&&canAccess(u,r));
   }
-  const terms=question.toLowerCase().split(/[\\s，。、？！?!.]+/).filter(x=>x.length>=2).slice(0,8);
+  const terms=question.toLowerCase().split(/[\s，。、？！?!.]+/).filter(x=>x.length>=2).slice(0,8);
   // One D1 lookup for all candidate recordings: no per-segment status requests.
   const candidates=rows.slice(0,70);
   const placeholders=candidates.map(()=>'?').join(',');
