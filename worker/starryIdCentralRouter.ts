@@ -650,6 +650,11 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
   const db = env.STARRY_ID_DB;
 
   if (path.startsWith('/api/admin/app-access/')) {
+    // Keep the manager-only API on the ID website even though authentication
+    // may originate from an App-issued cookie. Sibling Apps cannot use CORS to
+    // read member access decisions or submit administrative mutations.
+    if (origin && origin !== 'https://id.starry.phd')
+      return json(request,{error:'請從 Starry ID 官網操作 App 權限'},403);
     const session = await sessionUser(request,env);
     if (!session) return json(request,{error:'請先登入 Starry ID'},401);
     // Trust only centrally verified Starry ID administrator authority.
