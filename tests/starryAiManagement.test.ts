@@ -6,7 +6,7 @@ import { renderStarryAiManagementPage } from '../worker/starryAiManagementPage';
 
 test('central AI catalogue registers only real cloud AI tasks across Echo and Mirror',()=>{
   assert.equal(AI_TASK_CATALOG.length,5);
-  assert.equal(new Set(AI_TASK_CATALOG.map(t=>t.id)).size,6);
+  assert.equal(new Set(AI_TASK_CATALOG.map(t=>t.id)).size,AI_TASK_CATALOG.length);
   assert.ok(AI_TASK_CATALOG.some(t=>t.id==='mirror.reading'));
   assert.ok(AI_TASK_CATALOG.some(t=>t.id==='echo.qa'));
   assert.ok(AI_TASK_CATALOG.some(t=>t.id==='echo.transcribe'));
