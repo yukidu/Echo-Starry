@@ -476,7 +476,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         if(requestToken!==state.accessLoadToken)return;
         if(!state.accessApps.length)throw new Error('尚未設定任何 App，請檢查 Starry ID 應用清單');
         let current=[];
-        if(keys.length===1){
+        if(keys.length===1&&!bulk){
           const record=await api('/api/admin/app-access/member/'+encodeURIComponent(keys[0]));
           if(requestToken!==state.accessLoadToken)return;
           current=record.apps||[];
@@ -484,7 +484,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         state.accessUserIds=keys;
         if(bulk)renderAppChoices([]);else renderSingleAppChoices(current);
         $('appAccessPreviewBtn').disabled=false;
-        $('appAccessScope').textContent=label+'｜共 '+keys.length+' 位會員';
+        $('appAccessScope').textContent=label+(bulk?'｜批次管理':'｜單一會員');
         await loadAccessHistory();
       }catch(error){
         if(requestToken!==state.accessLoadToken)return;
@@ -500,6 +500,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
       try{
         const result=await api('/api/admin/app-access/preview',{method:'POST',body:JSON.stringify(input)});
         state.accessPreview=result;
+        $('appAccessDownloadPreviewBtn').classList.add('hidden');
         const labels={grant:'開放勾選的 App（其他不變）',revoke:'禁止勾選的 App（其他不變）',replace:'只開放勾選的 App，未勾選全部禁止',undo:'還原'};
         const lines=['操作：'+(labels[result.kind]||result.kind),'影響會員：'+result.memberCount+' 位','實際變更：'+result.changeCount+' 項',
           '會員：'+(result.members||[]).map(x=>x.name+' ('+x.id+')').join('、')+(result.memberCount>15?'…':''),
@@ -511,6 +512,98 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         $('appAccessReview').scrollIntoView({behavior:'smooth',block:'nearest'});
       }catch(e){hideAccessPreview();toast(e.message||'預覽失敗',true);}
     }
+    function displayBulkProgress(progress){
+      const node=$('appAccessBulkProgress');node.classList.remove('hidden');
+      const action=progress.status==='reverting'?'正在還原':'正在設定';
+      const done=progress.status==='reverting'?progress.reverted:progress.done;
+      const total=progress.status==='reverting'?progress.done:progress.changeCount;
+      const doneStatus={completed:'全部完成',reverted:'全部還原',conflict:'已暫停，請檢查權限'};
+      node.textContent=(doneStatus[progress.status]||action)+'：'+done+'／'+total+' 項權限｜作業還原碼：'+progress.jobId+
+        (progress.lastError?'｜'+progress.lastError:'');
+    }
+    async function continueBulkJob(jobId){
+      if(state.bulkRunning){toast('已有一項批次作業正在執行',true);return;}
+      state.bulkRunning=true;
+      try{
+        let progress=await api('/api/admin/app-access/bulk/status?jobId='+encodeURIComponent(jobId));
+        displayBulkProgress(progress);
+        while(progress.status==='running'||progress.status==='reverting'){
+          progress=await api('/api/admin/app-access/bulk/step',{method:'POST',body:JSON.stringify({jobId})});
+          displayBulkProgress(progress);
+        }
+        if(progress.status==='completed')toast('批次設定全部完成。還原碼：'+jobId);
+        if(progress.status==='reverted')toast('已還原完成：'+jobId);
+        if(progress.status==='conflict')toast('作業已暫停，請查看操作紀錄',true);
+      }catch(e){
+        $('appAccessBulkProgress').classList.remove('hidden');
+        $('appAccessBulkProgress').textContent='執行中斷：'+(e.message||'連線不穩')+'。已完成的部分都有紀錄，可按「繼續執行」或「預覽還原」。';
+        toast('可從操作紀錄恢復作業，不會重複套用已完成項目',true);
+      }finally{
+        state.bulkRunning=false;
+        await loadAccessHistory();
+      }
+    }
+    async function previewBulkAccess(input){
+      try{
+        const result=await api('/api/admin/app-access/bulk/preview',{method:'POST',body:JSON.stringify(input)});
+        if(!result.changeCount){toast('所選會員的權限已符合設定，沒有需要修改的項目');return;}
+        state.accessPreview={...result,kind:'bulk'};
+        const labels={grant:'只開放勾選的 App（其他不變）',revoke:'只禁止勾選的 App（其他不變）',replace:'只開放勾選的 App（未勾選全部禁止）'};
+        const examples=(result.examples||[]).map(x=>(x.name||x.userId)+' · '+x.appId+'：'+(x.beforeDecision||'原有規則')+' → '+x.afterDecision);
+        $('appAccessReviewText').textContent=[
+          '操作：'+labels[result.mode],
+          '符合條件：'+result.memberCount+' 位會員',
+          '實際權限變更：'+result.changeCount+' 項',
+          '變更範例：'+examples.join('；'),
+          '完整明細可先下載 CSV 檢查，確認後才會開始分批套用。中途離開可從操作紀錄恢復。'
+        ].join(String.fromCharCode(10));
+        $('appAccessReviewText').style.whiteSpace='pre-wrap';
+        $('appAccessDownloadPreviewBtn').classList.remove('hidden');
+        $('appAccessReview').classList.remove('hidden');
+        $('appAccessConfirmText').value='';$('appAccessCommitBtn').disabled=true;
+        $('appAccessReview').scrollIntoView({behavior:'smooth',block:'nearest'});
+      }catch(e){hideAccessPreview();toast(e.message||'批次預覽失敗',true);}
+    }
+    async function previewBulkUndo(jobId){
+      try{
+        const data=await api('/api/admin/app-access/bulk/undo-preview',{method:'POST',body:JSON.stringify({jobId})});
+        state.accessPreview={...data,kind:'bulk_undo'};
+        $('appAccessReviewText').textContent='還原作業：'+jobId+String.fromCharCode(10)+
+          '本次僅還原該批次已完成的 '+data.done+' 項修改，未執行的權限不變。'+String.fromCharCode(10)+
+          '還原前請確認沒有其他管理員更新相同的權限。輸入「確認變更」後開始分批還原。';
+        $('appAccessReviewText').style.whiteSpace='pre-wrap';
+        $('appAccessDownloadPreviewBtn').classList.add('hidden');
+        $('appAccessReview').classList.remove('hidden');
+        $('appAccessConfirmText').value='';$('appAccessCommitBtn').disabled=true;
+        $('appAccessReview').scrollIntoView({behavior:'smooth',block:'nearest'});
+      }catch(e){toast(e.message||'無法預覽還原',true);}
+    }
+    async function downloadBulkPreview(){
+      const preview=state.accessPreview;
+      if(!preview||preview.kind!=='bulk')return;
+      const button=$('appAccessDownloadPreviewBtn');button.disabled=true;
+      const esc=value=>{
+        const t=String(value===null||value===undefined?'':value);
+        const safe=/^[=+@-]/.test(t)?"'"+t:t;
+        return '"'+safe.replace(/"/g,'""')+'"';
+      };
+      try{
+        let offset=0,more=true;
+        const lines=[['會員ID','姓名','App','原權限','新權限'].map(esc).join(',')];
+        while(more){
+          const data=await api('/api/admin/app-access/bulk/details?jobId='+encodeURIComponent(preview.jobId)+'&offset='+offset);
+          for(const item of data.items||[])lines.push([item.userId,item.name,item.appId,item.beforeDecision||'原有規則',item.afterDecision].map(esc).join(','));
+          offset=data.nextOffset;more=data.hasMore;
+        }
+        const blob=new Blob([String.fromCharCode(65279)+lines.join(String.fromCharCode(13,10))],{type:'text/csv;charset=utf-8'});
+        const url=URL.createObjectURL(blob);
+        const link=document.createElement('a');link.href=url;link.download='Starry-ID-權限預覽-'+preview.jobId+'.csv';
+        document.body.appendChild(link);link.click();link.remove();
+        URL.revokeObjectURL(url);
+      }catch(e){toast('完整清單下載失敗：'+(e.message||'請重試'),true);}
+      finally{button.disabled=false;}
+    }
+    $('appAccessDownloadPreviewBtn').addEventListener('click',()=>void downloadBulkPreview());
     async function loadAccessHistory(){
       const box=$('appAccessHistory');box.replaceChildren();
       try{
@@ -530,7 +623,26 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
           }
           box.appendChild(line);
         }
-      }catch(e){box.textContent='無法讀取操作紀錄';}
+      }catch(e){box.textContent='無法讀取單人操作紀錄';}
+      try{
+        const data=await api('/api/admin/app-access/bulk/history');
+        for(const item of data.jobs||[]){
+          const line=document.createElement('div');line.className='access-history-row';
+          const label=document.createElement('span');
+          const status={running:'執行中／可續跑',reverting:'還原中／可續跑',completed:'已完成',reverted:'已還原',conflict:'已暫停'}[item.status]||item.status;
+          label.textContent='批次 '+new Date(item.createdAt).toLocaleString('zh-TW')+'｜'+status+'｜'+item.done+'/'+item.changeCount+'｜還原碼：'+item.jobId;
+          line.appendChild(label);
+          if(item.status==='running'||item.status==='reverting'){
+            const resume=document.createElement('button');resume.type='button';resume.className='btn';
+            resume.textContent='繼續執行';resume.addEventListener('click',()=>void continueBulkJob(item.jobId));line.appendChild(resume);
+          }
+          if(['completed','running','conflict'].includes(item.status)&&item.done>0){
+            const undo=document.createElement('button');undo.type='button';undo.className='btn';
+            undo.textContent='預覽還原';undo.addEventListener('click',()=>void previewBulkUndo(item.jobId));line.appendChild(undo);
+          }
+          box.appendChild(line);
+        }
+      }catch(e){toast('批次操作紀錄讀取失敗：'+(e.message||'請重試'),true);}
     }
     $('appAccessRetryBtn').addEventListener('click',()=>{
       const last=state.accessLastRequest;
@@ -538,7 +650,8 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     });
     $('appAccessPreviewBtn').addEventListener('click',()=>{
       const apps=[...document.querySelectorAll('.access-app-choice:checked')].map(el=>el.value);
-      void previewAccess({userIds:state.accessUserIds,appIds:apps,mode:$('appAccessMode').value});
+      if(!state.accessBulkSelection){toast('請先在左側勾選會員',true);return;}
+      void previewBulkAccess({selection:state.accessBulkSelection,appIds:apps,mode:$('appAccessMode').value});
     });
     $('appAccessMode').addEventListener('change',()=>{hideAccessPreview();$('appAccessBulkHelp').textContent=$('appAccessMode').value==='replace'?'注意：未勾選的 App 全部禁止，請仔細確認勾選清單。':'只有勾選的 App 會變更，其他 App 不會受到影響。';});
     $('appAccessConfirmText').addEventListener('input',()=>{
@@ -549,12 +662,21 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
       const preview=state.accessPreview;if(!preview)return;
       $('appAccessCommitBtn').disabled=true;
       try{
+        if(preview.kind==='bulk'||preview.kind==='bulk_undo'){
+          const endpoint=preview.kind==='bulk'?'confirm':'undo-confirm';
+          const done=await api('/api/admin/app-access/bulk/'+endpoint,{
+            method:'POST',body:JSON.stringify({jobId:preview.jobId,confirm:true,confirmationText:$('appAccessConfirmText').value})
+          });
+          hideAccessPreview();
+          void continueBulkJob(done.jobId);
+          return;
+        }
         const applied=await api('/api/admin/app-access/commit',{method:'POST',body:JSON.stringify({
           previewId:preview.previewId,confirm:true,confirmationText:$('appAccessConfirmText').value
         })});
         hideAccessPreview();
         toast('已變更 '+applied.changed+' 項權限。還原碼：'+applied.operationId);
-        if(state.accessUserIds.length===1)await showAppAccess(state.accessUserIds,state.user?.name||'會員',!$('appAccessBulk').classList.contains('hidden'));
+        if(state.accessUserIds.length===1)await showAppAccess(state.accessUserIds,state.user?.name||'會員',false);
         else await loadAccessHistory();
       }catch(e){toast(e.message||'設定失敗',true);$('appAccessCommitBtn').disabled=false;}
     });
