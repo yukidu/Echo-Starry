@@ -45,7 +45,8 @@ test('regular members still keep their per-tier and site-wide limits',()=>{
 test('AI answer is readable and ends with trusted recording source titles only',()=>{
   const out=formatQaAnswer('演講最重要的是互相扶持。\n參考資料：12:35 第4段\n（12:35）',['堅持的力量','人生的轉折']);
   assert.match(out,/演講最重要的是互相扶持/);
-  assert.match(out,/參考資料：《堅持的力量》、《人生的轉折》/);
+  assert.doesNotMatch(out,/參考資料|人生的轉折|堅持的力量/);
+  assert.ok(out.endsWith('<本留言由ai回覆，僅供參考，非本人回覆！>'));
   assert.doesNotMatch(out,/12:35/);
   assert.doesNotMatch(out,/第4段/);
   assert.match(router,/replyDirections/);
