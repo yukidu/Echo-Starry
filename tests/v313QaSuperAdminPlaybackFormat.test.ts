@@ -60,9 +60,9 @@ test('speaker recordings require confirmation and play through existing bubble, 
   assert.match(app,/if\(!isPlaying\)void handleTogglePlay\(\)/);
 });
 test('reusable rainbow Ai icon aligns with normal line height without shrinking its lettering',()=>{
-  assert.match(badge,/width: 1\.05em/);
-  assert.match(badge,/height: 1\.05em/);
-  assert.match(badge,/font-size: 0\.94em/);
+  assert.match(badge,/width: 0\.9em/);
+  assert.match(badge,/height: 0\.9em/);
+  assert.match(badge,/font-size: 1em/);
   assert.match(badge,/padding: 1px/);
   assert.match(badge,/mask-composite: exclude/);
 });
