@@ -30,7 +30,8 @@ export function parseStoryClaims(raw:string,segments:any[],speakerField:string):
   let items:any[];
   try{
     const parsed=JSON.parse(value);
-    items=Array.isArray(parsed)?parsed:Array.isArray(parsed?.claims)?parsed.claims:[];
+    if(!Array.isArray(parsed)&&!Array.isArray(parsed?.claims))throw Error('missing claims');
+    items=Array.isArray(parsed)?parsed:parsed.claims;
   }catch{throw Error('AI 故事分析格式不完整，未儲存本次內容');}
   if(items.length>30)throw Error('AI 回傳過多項目，請縮小單次分析範圍');
   const seen=new Set<string>(),out:StoryClaim[]=[];
