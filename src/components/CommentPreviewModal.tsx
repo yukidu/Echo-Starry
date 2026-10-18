@@ -2,6 +2,7 @@ import { effectiveMemberRank } from '../utils/ranks';
 import { commentThreads } from '../utils/comments';
 import { apiJson, identityKeys } from '../utils/api';
 import { SpeakerNameLink } from './SpeakerNameLink';
+import { AiBadge } from './AiBadge';
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   MessageSquare,
@@ -317,8 +318,9 @@ export const CommentPreviewModal: React.FC<CommentPreviewModalProps> = ({
             const threads = commentThreads(comments);
             const rootComments = threads.roots;
             const renderSingleComment = (c: Comment, isReply = false) => {
-              const registeredAuthor = getRegisteredAuthor(c);
-              const isVisitor = !registeredAuthor;
+              const isAiSpeaker = c.id.startsWith('qa-') && c.authorBadge === 'AI_SPEAKER';
+              const registeredAuthor = isAiSpeaker ? null : getRegisteredAuthor(c);
+              const isVisitor = !registeredAuthor && !isAiSpeaker;
               const isAuthor = Boolean(c.authorEmail ? currentUser?.email && c.authorEmail.toLowerCase().trim() === currentUser.email.toLowerCase().trim() : c.deviceId && visitor?.deviceId && c.deviceId === visitor.deviceId);
               const isClickable = Boolean(registeredAuthor);
               const displayAuthorName = registeredAuthor?.name || c.authorName;
@@ -334,7 +336,7 @@ export const CommentPreviewModal: React.FC<CommentPreviewModalProps> = ({
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                     <div onClick={isClickable ? () => handleAuthorClick(c) : undefined} className={`flex items-center gap-1.5 flex-wrap ${isClickable ? 'cursor-pointer hover:opacity-85 transition-opacity' : 'cursor-default pointer-events-none select-none'}`} title={isClickable ? `點擊查看【${displayAuthorName}】會員檔案` : undefined}>
                       {isAvatarUrl ? <img src={displayAuthorAvatar} alt={displayAuthorName} className="w-5 h-5 rounded-full object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700" /> : <span className="text-sm shrink-0">{displayAuthorAvatar || '👤'}</span>}
-                      <span className={`font-bold ${isRainbow ? 'rainbow-admin-text' : isClickable ? 'text-slate-800 dark:text-slate-200 underline decoration-dotted underline-offset-2 hover:text-rose-600 transition-colors' : 'text-slate-700 dark:text-slate-300'}`}>{displayAuthorName}</span>
+                      <span className={`font-bold ${isRainbow || isAiSpeaker ? 'rainbow-admin-text' : isClickable ? 'text-slate-800 dark:text-slate-200 underline decoration-dotted underline-offset-2 hover:text-rose-600 transition-colors' : 'text-slate-700 dark:text-slate-300'}`}>{isAiSpeaker ? <><AiBadge/> <SpeakerNameLink name={displayAuthorName}/></> : displayAuthorName}</span>
                       {isVisitor && <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] font-medium border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 select-none">訪客</span>}
                       {showBadge && <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] font-medium border border-[var(--theme-border-subtle,#f1e7ea)] dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">{displayAuthorBadge}</span>}
                     </div>
