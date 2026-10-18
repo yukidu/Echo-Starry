@@ -34,7 +34,7 @@ async function ensure(db:Db) {
 }
 export function validateAiOrder(input:unknown):AiTaskOrder[] {
   if (!Array.isArray(input)||input.length!==AI_TASK_CATALOG.length) throw Error('invalid_ai_task_count');
-  const keys=new Set(AI_TASK_CATALOG.map(x=>x.id));
+  const keys=new Set<string>(AI_TASK_CATALOG.map(x=>x.id));
   const ids=new Set<string>();
   const output:AiTaskOrder[]=[];
   for(let i=0;i<input.length;i++){
