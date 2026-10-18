@@ -78,6 +78,28 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [qaMode, setQaMode] = useState<'current' | 'all' | 'off'>('current');
+  const searchModel = new URLSearchParams(window.location.search).get('qa-test');
+  const qaTestModel = searchModel === 'gpt' || searchModel === 'glm' ? searchModel : null;
+  type PrivateEntry = { id:string; question:string; answer:string; model:string; mode:string; elapsedMs:number; createdAt:number };
+  const [qaTestAccess,setQaTestAccess] = useState(false);
+  const [qaTestError,setQaTestError] = useState('');
+  const [qaTestEntries,setQaTestEntries] = useState<PrivateEntry[]>([]);
+  useEffect(()=>{
+    if(!qaTestModel)return;
+    let active=true;
+    setQaTestAccess(false);setQaTestEntries([]);setQaTestError('');
+    void fetch('/api/qa/test/status',{credentials:'same-origin',cache:'no-store'})
+      .then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error||'登入權限不足');return d;})
+      .then(async d=>{
+        if(!active||!d.authorized)return;
+        setQaTestAccess(true);
+        const r=await fetch('/api/qa/test?model='+qaTestModel+'&trackId='+encodeURIComponent(trackId),{credentials:'same-origin',cache:'no-store'});
+        const history=await r.json();
+        if(!r.ok)throw Error(history.error||'無法讀取測試問答');
+        if(active)setQaTestEntries(history.items||[]);
+      }).catch(e=>{if(active)setQaTestError(e instanceof Error?e.message:'無法驗證測試權限');});
+    return ()=>{active=false;};
+  },[qaTestModel,trackId,currentUser?.id]);
   const speakerOptions=useMemo(()=>splitSpeakerNames(speakerName),[speakerName]);
   const [qaTargetSpeaker,setQaTargetSpeaker]=useState('');
   useEffect(()=>{setQaTargetSpeaker('');},[trackId,speakerName]);
@@ -136,6 +158,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   },[pendingQa?.id,trackId]);
   // Refresh saved quotas after returning from the administrator settings page.
   useEffect(()=>{
+    if(qaTestModel)return;
     let alive=true;
     const refresh=()=>{
       if(document.visibilityState==='hidden')return;
@@ -155,6 +178,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   },[trackId,qaStatus?.reason]);
   const headingRef = useRef<HTMLHeadingElement|null>(null);
   useEffect(() => {
+    if(qaTestModel)return;
     let cancelled = false;
     setQaMode('current');
     void fetch('/api/qa/status?trackId=' + encodeURIComponent(trackId), { credentials:'same-origin',cache:'no-store' })
@@ -327,6 +351,16 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
     setErrorMessage(null);
     try {
       const question=qaMode!=='off'&&speakerOptions.length>1?'@'+qaTargetSpeaker+' '+inputText.trim():inputText.trim();
+      if (qaTestModel) {
+        if(!qaTestAccess)throw Error(qaTestError||'請先以指定管理員身分登入，測試不會公開發布');
+        if(qaMode==='off')throw Error('請選擇測試演講範圍');
+        const r=await fetch('/api/qa/test',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({trackId,model:qaTestModel,mode:qaMode,question})});
+        const data=await r.json();
+        if(!r.ok)throw Error(data.error||'模型回答失敗');
+        setQaTestEntries(prev=>[data.entry,...prev].slice(0,30));
+        setInputText('');setReplyingTo(null);setIsMentionOpen(false);
+        return;
+      }
       await onAddComment(question, replyingTo?.id, replyingTo?.authorName, qaMode);
       if (qaMode !== 'off') {
         window.setTimeout(() => {
@@ -415,11 +449,12 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             <span className="rainbow-admin-text font-black shrink-0"><SpeakerNameLink name={qaTargetSpeaker || speakerName || '演講者'}/></span><span className="shrink-0">問問題</span>
           </>} 
         </h3>
+        {qaTestModel && <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm" role="status"><strong>私人 AI 測試：{qaTestModel==='gpt'?'GPT-6 Luna':'GLM-4.7-Flash'}</strong><p>只有指定管理員可使用；問答獨立保存、不公開留言、不扣電池。每款每日最多 30 題。{qaTestError && <span className="text-rose-600">{qaTestError}</span>}</p></div>}
         <fieldset className="mt-2 flex flex-wrap items-center gap-3 text-xs sm:text-sm" aria-label="召喚範圍">
-          {([['current','本場演講'],['all','所有演講'],['off','關閉']] as const).map(([value,label]) => (
+          {([['current','本場演講'],['all','所有演講'],...(qaTestModel?[]:[['off','關閉']])] as Array<['current'|'all'|'off',string]>).map(([value,label]) => (
             <label key={value} className="inline-flex items-center gap-1.5 cursor-pointer">
               <input type="radio" name={'speaker-qa-'+trackId} checked={qaMode===value}
-                disabled={value!=='off' && !qaStatus?.enabled}
+                disabled={qaTestModel ? !qaTestAccess : value!=='off' && !qaStatus?.enabled}
                 onChange={() => setQaMode(value)} />
               <span className="font-bold">{label}{value==='off' && <AiBadge className="ml-1"/>}</span>
             </label>
@@ -431,8 +466,8 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             {speakerOptions.map(person=><option key={person} value={person}>{person}</option>)}
           </select>
         </label>}
-        {qaStatus?.reason && <div className="mt-1 text-xs text-amber-700 dark:text-amber-300" role="status">已自動關閉 <AiBadge/>：{qaStatus.reason}（一般心得留言仍可使用）</div>}
-        {qaStatus?.enabled && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{qaStatus.unlimited ? '超級管理員：網站內召喚不限次數、不扣電池' : <>今日免費剩餘 {qaStatus.freeLeft} 次／總共剩餘 {qaStatus.left} 次{qaStatus.freeLeft===0 ? ' · 每次 '+qaStatus.cost+' 顆電池':''}</>}</p>}
+        {!qaTestModel && qaStatus?.reason && <div className="mt-1 text-xs text-amber-700 dark:text-amber-300" role="status">已自動關閉 <AiBadge/>：{qaStatus.reason}（一般心得留言仍可使用）</div>}
+        {!qaTestModel && qaStatus?.enabled && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{qaStatus.unlimited ? '超級管理員：網站內召喚不限次數、不扣電池' : <>今日免費剩餘 {qaStatus.freeLeft} 次／總共剩餘 {qaStatus.left} 次{qaStatus.freeLeft===0 ? ' · 每次 '+qaStatus.cost+' 顆電池':''}</>}</p>}
       </div>
 
       <form onSubmit={handleSubmit} className="mb-5 relative">
@@ -444,7 +479,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             </div>
           )}
 
-          <textarea ref={textareaRef} value={inputText} onChange={handleTextareaChange} maxLength={2000} rows={3} placeholder={replyingTo ? '寫下回覆內容...' : currentUser ? `按這裡寫下您的心得收穫，可獲得+${commentStickerReward}張貼紙（必須100%聽完錄音）` : '按這裡寫下您的心得收穫...'} className="w-full bg-transparent resize-none outline-hidden text-sm sm:text-base text-slate-800 dark:text-slate-100 placeholder:text-slate-400" />
+          <textarea ref={textareaRef} value={inputText} onChange={handleTextareaChange} maxLength={2000} rows={3} placeholder={qaTestModel ? '請輸入你的 AI 演講者測試問題（不會發布正式留言）' : replyingTo ? '寫下回覆內容...' : currentUser ? `按這裡寫下您的心得收穫，可獲得+${commentStickerReward}張貼紙（必須100%聽完錄音）` : '按這裡寫下您的心得收穫...'} className="w-full bg-transparent resize-none outline-hidden text-sm sm:text-base text-slate-800 dark:text-slate-100 placeholder:text-slate-400" />
 
           {isMentionOpen && (
             <div className="absolute left-2 top-full mt-1 z-40 w-64 max-w-[calc(100vw-32px)] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95">
@@ -468,7 +503,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
 
           <div className="flex items-center justify-end gap-3 pt-2.5 border-t border-slate-200/50 dark:border-slate-700/50 mt-1.5">
   <span className="text-xs text-slate-400 font-mono">{inputText.length}/2000</span>
-  <button type="submit" disabled={isSubmitting || !inputText.trim()} className="px-5 py-2 rounded-xl text-white font-medium text-sm transition-all shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer" style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}>
+  <button type="submit" disabled={isSubmitting || !inputText.trim() || Boolean(qaTestModel && !qaTestAccess)} className="px-5 py-2 rounded-xl text-white font-medium text-sm transition-all shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer" style={{ backgroundColor: 'var(--color-primary, #c06c84)' }}>
     {isSubmitting ? '送出中...' : '送出'}
   </button>
 </div>
@@ -494,7 +529,13 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
         <p className="mb-3 text-sm text-amber-700 dark:text-amber-300" role="status" aria-live="polite">{qaNotice}</p>
       )}
       <div className="space-y-2.5 divide-y divide-slate-100 dark:divide-slate-800/70">
-        {comments.length === 0 ? (
+        {qaTestModel ? (
+          qaTestEntries.length===0 ? <p className="text-center py-6 text-slate-400 text-sm">尚無私人測試紀錄。請選擇演講範圍，親自輸入問題。</p> :
+          qaTestEntries.map(item=><div key={item.id} className="py-3 space-y-2 text-sm">
+            <div className="rounded-xl bg-rose-50 dark:bg-slate-800 p-3"><strong>我的測試提問</strong><p className="whitespace-pre-wrap break-words mt-1">{item.question}</p></div>
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3"><strong>{item.model==='gpt'?'GPT-6 Luna':'GLM-4.7-Flash'} · 回答耗時 {(item.elapsedMs/1000).toFixed(1)} 秒</strong><p className="whitespace-pre-wrap break-words mt-1">{item.answer}</p></div>
+          </div>)
+        ) : comments.length === 0 ? (
           <div className="text-center py-6 text-slate-400 dark:text-slate-500 text-xs">目前還沒有心得，快來當第一個分享心得的人吧！</div>
         ) : (() => {
           const threads = commentThreads(comments);
