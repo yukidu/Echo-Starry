@@ -1,9 +1,10 @@
 import { SpeakerNameLink } from './SpeakerNameLink';
+import { speakerBiographyStatusLabel, type SpeakerBiographyStatus } from '../../shared/speakerBiographyStatus';
 import React,{useEffect,useMemo,useState} from 'react';
 import {Search,RefreshCcw,Save} from 'lucide-react';
 import {AiBadge} from './AiBadge';
 type Entry={name:string;recordings:number};
-type Snapshot={id:string;displayName:string;bioStatus:string;bioUpdatedAt:number;error?:string};
+type Snapshot={id:string;displayName:string;bioStatus:SpeakerBiographyStatus;bioUpdatedAt:number;error?:string};
 type Setting={keywords:string;direction:string;maxChars:number};
 const call=async(path:string,init?:RequestInit)=>{
   const res=await fetch(path,{cache:'no-store',credentials:'same-origin',...init});
@@ -61,7 +62,7 @@ export const AiSpeakerAdmin:React.FC=()=>{
       {visible.map(v=>{
         const p=profiles.find(x=>x.displayName===v.name);
         return <div key={v.name} className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 flex gap-3 items-center justify-between">
-          <div className="min-w-0"><strong className="block break-words"><SpeakerNameLink name={v.name}/></strong><span className="text-xs text-slate-500">{v.recordings} 場錄音 · {p?.bioStatus==='ready'?'摘要已完成':p?.bioStatus==='processing'?'正在產生摘要':p?.bioStatus==='failed'?'摘要異常':'等待產生摘要'}</span></div>
+          <div className="min-w-0"><strong className="block break-words"><SpeakerNameLink name={v.name}/></strong><span className="text-xs text-slate-500">{v.recordings} 場錄音 · {speakerBiographyStatusLabel(p?.bioStatus||'pending')}</span></div>
           <button disabled={busy} onClick={()=>void refresh(v.name)} type="button" className="shrink-0 text-xs font-bold px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-xl disabled:opacity-40">重新摘要</button>
         </div>;
       })}
