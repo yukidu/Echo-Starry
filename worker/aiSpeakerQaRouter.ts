@@ -105,7 +105,7 @@ async function balance(env:Env,user:any){
   const row:any=await env.STARRY_ID_DB.prepare('SELECT COALESCE(SUM(deltaUnits),0) n FROM battery_transactions WHERE userId=?').bind(central).first();
   return {userId:central,units:Number(row?.n||0)};
 }
-async function quota(req:Request,env:Env,u:any,cfg:any){
+export async function quota(req:Request,env:Env,u:any,cfg:any){
   const t=tier(u),policy=cfg.policies[t],key=await identity(req,u),today=day();
   if(isSuper(u))return {unlimited:true,tier:5,label:'超級管理員',key,today,total:0,freeLeft:-1,left:-1,daily:-1,free:-1,cost:0,costUnits:0,reason:'',enabled:true};
   const row:any=await env.DB.prepare('SELECT used FROM qa_daily WHERE identity=? AND day=?').bind(key,today).first();
@@ -143,7 +143,7 @@ export async function mayUseTranscript(env:Env,u:any,track:any){
   const row=await env.DB.prepare('SELECT trackId FROM sticker_unlocks WHERE userId=? AND trackId=? LIMIT 1').bind(u.id,track.id).first().catch(()=>null);
   return !!row;
 }
-async function reserve(env:Env,q:any,cfg:any,id:string,trackId:string,mode:string){
+export async function reserve(env:Env,q:any,cfg:any,id:string,trackId:string,mode:string){
   // Super-admin has no application quota, counter increments or battery fees.
   // Cloudflare provider limits still apply externally.
   if(q.unlimited){
