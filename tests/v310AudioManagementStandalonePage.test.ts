@@ -10,9 +10,9 @@ const upload=read('src/components/UploadModal.tsx');
 const css=read('src/index.css');
 
 test('mobile audio workspace exposes QA as a top-level super-admin tab',()=>{
-  assert.match(v139,/type UploadWorkspaceTab = 'upload' \| 'manage' \| 'community' \| 'qa'/);
-  assert.match(v139,/addTab\('qa', '🤖 逐字稿'\)/);
-  assert.match(v139,/tab === 'qa' \? '逐字稿'/);
+  assert.match(v139,/type UploadWorkspaceTab = 'upload' \| 'manage' \| 'community' \| 'qa' \| 'speaker'/);
+  assert.match(v139,/addTab\('qa', 'Ai 逐字稿'\)/);
+  assert.match(v139,/tab === 'speaker' \? '演講者' : tab === 'qa' \? '逐字稿'/);
   assert.match(v139,/allowedTab === 'qa' \? '逐字稿管理'/);
   assert.match(v139,/requested === 'qa'/);
   assert.match(v139,/data-v139-upload-tab="qa"\] #track-upload-form/);

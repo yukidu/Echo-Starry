@@ -70,7 +70,7 @@ function cookieToken(req:Request){
   const t=item?.split('=').slice(1).join('=')||'';
   return TOKEN_RE.test(t)?t:'';
 }
-async function actor(req:Request,env:Env){
+export async function actor(req:Request,env:Env){
   const token=cookieToken(req);
   if(!token)return null;
   const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token));
@@ -78,7 +78,7 @@ async function actor(req:Request,env:Env){
   const row:any=await env.DB.prepare("SELECT u.id,u.email,u.role,u.rank,u.approvedRank,u.rankApproved,u.isAdminUser,u.isBlocked,s.expiresAt FROM auth_sessions s JOIN users u ON u.id=s.userId WHERE s.tokenHash=? LIMIT 1").bind(hash).first();
   return row&&!row.isBlocked&&Number(row.expiresAt)>Date.now()?row:null;
 }
-const isSuper=(u:any)=>Boolean(u&&(txt(u.email).toLowerCase()==='yukidu@gmail.com'||u.role==='超級管理員'));
+export const isSuper=(u:any)=>Boolean(u&&(txt(u.email).toLowerCase()==='yukidu@gmail.com'||u.role==='超級管理員'));
 export function tier(u:any){
   if(!u)return 0;
   if(!u.rankApproved)return 1;
@@ -134,7 +134,7 @@ function canAccess(u:any,t:any){
   if(/鑽石|皇冠|大使/.test(have))return true;
   return order.indexOf(have)>=0&&order.indexOf(required)>=0&&order.indexOf(have)>=order.indexOf(required);
 }
-async function mayUseTranscript(env:Env,u:any,track:any){
+export async function mayUseTranscript(env:Env,u:any,track:any){
   if(!canAccess(u,track))return false;
   const cost=Number(track.stickerUnlockCost||0);
   if(cost<=0||isSuper(u))return true;

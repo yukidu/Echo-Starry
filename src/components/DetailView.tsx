@@ -65,6 +65,7 @@ interface DetailViewProps {
   onEditComment: (commentId: string, newContent: string) => Promise<void>;
   onOpenBwExport: (mode: 'comments' | 'rated') => void;
   onViewMember?: (user: UserProfile) => void;
+  onViewSpeaker?: (name:string) => void;
   onUpdateTrack?: (trackId: string, updates: Partial<Track>, options?: { persist?: boolean }) => Promise<void>;
   onSelectKeyword?: (keyword: string) => void;
   onSelectSpeakerRank?: (rank: string) => void;
@@ -106,6 +107,7 @@ export const DetailView: React.FC<DetailViewProps> = ({
   onEditComment,
   onOpenBwExport,
   onViewMember,
+  onViewSpeaker,
   onUpdateTrack,
   onSelectKeyword,
   onSelectSpeakerRank,
@@ -1081,6 +1083,7 @@ export const DetailView: React.FC<DetailViewProps> = ({
           onDeleteComment={onDeleteComment}
           onEditComment={onEditComment}
           onViewMember={onViewMember}
+          onViewSpeaker={onViewSpeaker}
           allUsers={allUsers}
           tracks={tracks}
         />

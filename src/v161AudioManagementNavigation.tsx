@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot, Root } from 'react-dom/client';
-import { Edit2, Search, Trash2, X, Users, UserRound, Bot } from 'lucide-react';
+import { Edit2, Search, Trash2, X, Users, UserRound } from 'lucide-react';
 import { TranscriptQaAdmin } from './components/TranscriptQaAdmin';
+import { AiSpeakerAdmin } from './components/AiSpeakerAdmin';
+import { AiBadge } from './components/AiBadge';
 import { UploadModal } from './components/UploadModal';
 import type { Track, UserProfile } from './types';
 
@@ -13,7 +15,7 @@ const roots = new Map<HTMLElement, Root>();
 const originalInputClick = HTMLInputElement.prototype.click;
 const originalScrollIntoView = Element.prototype.scrollIntoView;
 
-type ManageMode = 'mine' | 'community' | 'qa';
+type ManageMode = 'mine' | 'community' | 'qa' | 'speaker';
 type TranscriptProgressItem = {
   trackId: string;
   status: string;
@@ -311,10 +313,11 @@ function TrackManagement() {
           <div className="v161-manage-tabs" role="tablist" aria-label="管理音檔來源">
             <button type="button" className="v161-manage-tab" aria-selected={mode === 'mine'} onClick={() => { setMode('mine'); setMemberQuery(''); }}>我的音檔</button>
             <button type="button" className="v161-manage-tab" aria-selected={mode === 'community'} onClick={() => setMode('community')}>網友音檔</button>
-            <button type="button" className="v161-manage-tab" aria-selected={mode === 'qa'} onClick={() => setMode('qa')}><Bot className="inline h-4 w-4"/> 逐字稿</button>
+            <button type="button" className="v161-manage-tab" aria-selected={mode === 'qa'} onClick={() => setMode('qa')}><AiBadge/> 逐字稿</button>
+            <button type="button" className="v161-manage-tab" aria-selected={mode === 'speaker'} onClick={() => setMode('speaker')}><AiBadge/> 演講者</button>
           </div>
         )}
-        {mode !== 'qa' && <div className={`v161-search-row ${superAdmin && mode === 'community' ? 'has-member-search' : ''}`}>
+        {mode !== 'qa' && mode !== 'speaker' && <div className={`v161-search-row ${superAdmin && mode === 'community' ? 'has-member-search' : ''}`}>
           <label className="v161-search">
             <Search className="h-4 w-4 shrink-0 text-slate-400" />
             <input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋音檔、講者、獎銜或日期" />
@@ -332,7 +335,8 @@ function TrackManagement() {
       </div>
 
       {superAdmin && mode === 'qa' && <TranscriptQaAdmin />}
-      {mode !== 'qa' && <>
+      {superAdmin && mode === 'speaker' && <AiSpeakerAdmin />}
+      {mode !== 'qa' && mode !== 'speaker' && <>
       {error && <div className="mb-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">{error}</div>}
       {loading ? (
         <div className="py-4 text-center text-xs text-slate-400">讀取音檔清單中…</div>

@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer';
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 import type { WorkflowEvent, WorkflowStep } from 'cloudflare:workers';
 import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
+import { markSpeakerBiosDirty } from './aiSpeakerProfileRouter';
 
 const MODEL = '@cf/openai/whisper-large-v3-turbo';
 const TRADITIONAL_MODEL = '@cf/openai/gpt-oss-20b';
@@ -345,6 +346,8 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
           .bind(jsonKey, MODEL, chunks, segments.length, fullText.length, duration, Date.now(), trackId).run();
       });
 
+      // Successful new transcripts queue a speaker biography refresh without making the recording fail on bio errors.
+      await markSpeakerBiosDirty(this.env, trackId).catch(() => null);
       await cleanupAudio(this.env, trackId, info.ext);
       const next = await queueFollowingTranscript(this.env, step, 'queue-next-transcript');
       return { trackId, chunks, segments: segments.length, language: storedLanguage, jsonKey, txtKey, vttKey, next };

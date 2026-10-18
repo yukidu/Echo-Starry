@@ -57,6 +57,7 @@ import { AudioCard } from './components/AudioCard';
 import { MiniPlayer } from './components/MiniPlayer';
 import { DetailView } from './components/DetailView';
 const UploadModal = lazy(() => import('./components/UploadModal').then(module => ({ default: module.UploadModal })));
+const SpeakerProfilePage = lazy(() => import('./components/SpeakerProfilePage').then(m => ({default:m.SpeakerProfilePage})));
 const AdminModal = lazy(() => import('./components/AdminModal').then(module => ({ default: module.AdminModal })));
 const ProfileModal = lazy(() => import('./components/ProfileModal').then(module => ({ default: module.ProfileModal })));
 import { ShareModal } from './components/ShareModal';
@@ -94,7 +95,8 @@ type HomeCache = {
 
 type AppHistoryState = {
   echostars?: true;
-  view?: 'guard' | 'home' | 'detail' | 'tab';
+  view?: 'guard' | 'home' | 'detail' | 'tab' | 'speaker';
+  speakerName?: string;
   trackId?: string;
   tab?: 'stats' | 'notifications' | 'profile' | 'stickers' | 'install' | 'upload';
 };
@@ -202,6 +204,10 @@ function trackMatchesHomeBaseFilters(
 export default function App() {
   // Navigation & View States
   const [currentTab, setCurrentTab] = useState<NavTab>('home');
+  const [speakerProfileName,setSpeakerProfileName] = useState<string|null>(()=>{
+    if(typeof window==='undefined'||!window.location.hash.startsWith('#/speaker/'))return null;
+    try{return decodeURIComponent(window.location.hash.slice('#/speaker/'.length)).slice(0,100);}catch{return null;}
+  });
 
   // Dynamic Categories (Requirement 5: 後台修改或刪除分類標籤後，首頁下拉選單同步更新)
   const [categoryOptions, setCategoryOptions] = useState<string[]>(() => {
@@ -734,24 +740,27 @@ export default function App() {
     const protectBack = shouldProtectBrowserBack();
     const homeState: AppHistoryState = { echostars: true, view: 'home' };
     const existing = window.history.state as AppHistoryState | null;
+    // Direct-linked speaker pages need a true home URL below them in history.
+    const initialHistoryUrl = window.location.hash.startsWith('#/speaker/')
+      ? window.location.pathname + window.location.search : window.location.href;
 
     if (protectBack) {
       if (!existing?.echostars) {
         window.history.replaceState(
           { echostars: true, view: 'guard' } satisfies AppHistoryState,
           '',
-          window.location.href
+          initialHistoryUrl
         );
-        window.history.pushState(homeState, '', window.location.href);
+        window.history.pushState(homeState, '', initialHistoryUrl);
       } else if (existing.view === 'guard') {
-        window.history.pushState(homeState, '', window.location.href);
+        window.history.pushState(homeState, '', initialHistoryUrl);
       } else if (existing.view !== 'home') {
         // A reload should start from a predictable root state. Direct share URLs
         // can still reopen their track through the existing bootstrap logic.
-        window.history.replaceState(homeState, '', window.location.href);
+        window.history.replaceState(homeState, '', initialHistoryUrl);
       }
     } else {
-      window.history.replaceState(homeState, '', window.location.href);
+      window.history.replaceState(homeState, '', initialHistoryUrl);
     }
 
     historyReadyRef.current = true;
@@ -789,6 +798,7 @@ export default function App() {
       closeTransientUi();
 
       const state = event.state as AppHistoryState | null;
+      setSpeakerProfileName(state?.view==='speaker' ? state.speakerName||null : null);
       setIsProfileOpen(state?.tab === 'profile');
       setIsStickersOpen(state?.tab === 'stickers');
 
@@ -851,7 +861,9 @@ export default function App() {
       (currentTrack && playerMode === 'expanded' ? currentTrack : null);
 
     let nextState: AppHistoryState;
-    if (isUploadOpen) {
+    if (speakerProfileName) {
+      nextState={echostars:true,view:'speaker',speakerName:speakerProfileName};
+    } else if (isUploadOpen) {
       nextState={echostars:true,view:'tab',tab:'upload'};
     } else if (isProfileOpen || isStickersOpen) {
       nextState={echostars:true,view:'tab',tab:isProfileOpen?'profile':'stickers'};
@@ -868,13 +880,17 @@ export default function App() {
       currentState?.echostars === true &&
       currentState.view === nextState.view &&
       currentState.trackId === nextState.trackId &&
-      currentState.tab === nextState.tab;
+      currentState.tab === nextState.tab &&
+      currentState.speakerName === nextState.speakerName;
 
     if (!isSame) {
-      window.history.pushState(nextState, '', window.location.href);
+      window.history.pushState(nextState, '', nextState.view==='speaker'
+        ? window.location.pathname+window.location.search+'#/speaker/'+encodeURIComponent(nextState.speakerName||'')
+        : window.location.pathname+window.location.search);
     }
   }, [
     currentTab,
+    speakerProfileName,
     isUploadOpen,
     isProfileOpen,
     isStickersOpen,
@@ -947,6 +963,7 @@ export default function App() {
 
   // 任何情況下，只要按主選單的logo或網站名稱，就會返回到首頁播放清單的「全部分類」，清空搜尋條件
   const handleReturnToHomePlaylist = useCallback(() => {
+    setSpeakerProfileName(null);
     resetLuckyDrawState();
     setUseDefaultHomeOrder(true);
     setSortField('權限');
@@ -2420,6 +2437,7 @@ export default function App() {
       <Navbar
         currentTab={currentTab}
         onSelectTab={tab => {
+          setSpeakerProfileName(null);
           setIsProfileOpen(false);
     setIsStickersOpen(false);
           setSelectedDetailTrack(null);
@@ -2601,7 +2619,14 @@ export default function App() {
           setSelectedDetailTrack(prev => prev ? byId.get(prev.id) || prev : prev);
         }}
       />
-      </Suspense>) : currentTab === 'install' ? (<IOSInstallPage onBack={handleReturnToHomePlaylist}/>) : currentTab === 'stats' ? (
+      </Suspense>) : speakerProfileName ? (<Suspense fallback={<p role="status" className="p-8 text-center">正在載入講者資料…</p>}><SpeakerProfilePage name={speakerProfileName} onBack={()=>{
+          if(window.history.state?.view==='speaker')window.history.back();
+          else setSpeakerProfileName(null);
+        }} onOpenTrack={(id,commentId)=>{
+          const t=tracks.find(v=>v.id===id);
+          setSpeakerProfileName(null);
+          if(t)openTrackDetail(t,commentId);
+        }}/></Suspense>) : currentTab === 'install' ? (<IOSInstallPage onBack={handleReturnToHomePlaylist}/>) : currentTab === 'stats' ? (
           <StatisticsView
             tracks={tracks}
             users={allUsers}
@@ -2688,6 +2713,7 @@ export default function App() {
                   setIsBwExportOpen(true);
                 }}
                 onViewMember={user => setPreviewMember(user)}
+                onViewSpeaker={name=>{setSpeakerProfileName(name);window.scrollTo({top:0,behavior:'auto'});}}
                 onUpdateTrack={handleUpdateTrack}
                 isVipUnlocked={isTrackVipUnlocked(activeTrack)}
                 onVipBlocked={(anchor) => showPermissionAlert('此錄音檔為【私密VIP】專屬內容，請向上傳者取得專屬授權連結後再播放。', anchor)}

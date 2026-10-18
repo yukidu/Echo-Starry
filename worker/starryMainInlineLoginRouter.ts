@@ -4,6 +4,8 @@ import { handleStarryIdRandomMotto } from './starryIdRandomMottoRouter';
 import { handleStarryEcosystemAuthEntry } from './starryEcosystemAuthEntryRouter';
 import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
 import { handleQaRequest, processQaAfterComment } from './aiSpeakerQaRouter';
+import { handleSpeakerProfileRequest } from './aiSpeakerProfileRouter';
+import { generateNextSpeakerBiography } from './aiSpeakerBiographyScheduler';
 
 // Workflow / Container named handlers 必須由正式安全入口匯出，不改既有網站路由。
 export { TranscriptWorkflow } from './transcriptWorkflowV282';
@@ -274,6 +276,11 @@ export default {
       return transcript.default.fetch(request, env as any, ctx as any);
     }
 
+    if (url.pathname.startsWith('/api/speaker-profiles/')) {
+      const speakerProfile = await handleSpeakerProfileRequest(request, env as any);
+      if (speakerProfile) return speakerProfile;
+    }
+
     // First-party transcript QA management and public quota status.
     if (url.pathname.startsWith('/api/qa/')) {
       const qa = await handleQaRequest(request, env as any);
@@ -323,5 +330,7 @@ export default {
   },
   async scheduled(_controller: any, env: Env, ctx: any) {
     ctx.waitUntil(queueNextTranscriptV293(env as any));
+    // Budgeted and scheduled; biography AI never blocks the playback site.
+    ctx.waitUntil(generateNextSpeakerBiography(env as any));
   }
 };

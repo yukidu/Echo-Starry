@@ -95,7 +95,8 @@ async function main() {
           '<div class="v161-manage-tabs">' +
             '<button type="button" class="v161-manage-tab" aria-selected="true">我的音檔</button>' +
             '<button type="button" class="v161-manage-tab" aria-selected="false">網友音檔</button>' +
-            '<button type="button" class="v161-manage-tab" aria-selected="false">逐字稿</button>' +
+            '<button type="button" class="v161-manage-tab" aria-selected="false">Ai 逐字稿</button>' +
+            '<button type="button" class="v161-manage-tab" aria-selected="false">Ai 演講者</button>' +
           '</div>' +
         '</section>' +
       '</div>';
@@ -151,6 +152,15 @@ async function main() {
         innerTabsDisplay: getComputedStyle(page.querySelector('.v161-manage-tabs')).display
       };
 
+      page.querySelector('.v139-upload-tab[data-tab="speaker"]')?.click();
+      await new Promise(resolve => setTimeout(resolve, 80));
+      const speaker = {
+        pageTab: page.dataset.v139UploadTab || '',
+        selected: page.querySelector('.v139-upload-tab[aria-selected="true"]')?.textContent?.trim() || '',
+        innerSelected: Array.from(page.querySelectorAll('.v161-manage-tab')).find(button => button.getAttribute('aria-selected') === 'true')?.textContent?.trim() || '',
+        formDisplay: getComputedStyle(page.querySelector('#track-upload-form')).display
+      };
+
       page.querySelector('.v139-upload-tab[data-tab="upload"]')?.click();
       await new Promise(resolve => setTimeout(resolve, 80));
       const upload = {
@@ -161,10 +171,10 @@ async function main() {
 
       page.remove();
       localStorage.removeItem('sq_current_user_v1');
-      return { initial, community, manage, qa, upload };
+      return { initial, community, manage, qa, speaker, upload };
     })()`);
 
-    const expectedLabels = JSON.stringify(['上傳音檔','管理音檔','網友音檔','🤖 逐字稿']);
+    const expectedLabels = JSON.stringify(['上傳音檔','管理音檔','網友音檔','Ai 逐字稿','Ai 演講者']);
     if (JSON.stringify(state.initial.labels) !== expectedLabels || !state.initial.headerBeforeTabs || !state.initial.saveInHeader || state.initial.overflowX !== 'auto' || !state.initial.leftNav || !state.initial.rightNav || state.initial.selected !== '上傳音檔') {
       throw new Error(`Upload tab shell mismatch: ${JSON.stringify(state.initial)}`);
     }
@@ -174,8 +184,11 @@ async function main() {
     if (state.manage.pageTab !== 'manage' || state.manage.selected !== '管理音檔' || state.manage.innerSelected !== '我的音檔') {
       throw new Error(`Manage tab mismatch: ${JSON.stringify(state.manage)}`);
     }
-    if (state.qa.pageTab !== 'qa' || state.qa.selected !== '🤖 逐字稿' || state.qa.innerSelected !== '逐字稿' || state.qa.formDisplay !== 'none' || state.qa.innerTabsDisplay !== 'none') {
+    if (state.qa.pageTab !== 'qa' || state.qa.selected !== 'Ai 逐字稿' || state.qa.innerSelected !== 'Ai 逐字稿' || state.qa.formDisplay !== 'none' || state.qa.innerTabsDisplay !== 'none') {
       throw new Error(`Transcript QA tab mismatch: ${JSON.stringify(state.qa)}`);
+    }
+    if (state.speaker.pageTab !== 'speaker' || state.speaker.selected !== 'Ai 演講者' || state.speaker.innerSelected !== 'Ai 演講者' || state.speaker.formDisplay !== 'none') {
+      throw new Error(`Speaker tab mismatch: ${JSON.stringify(state.speaker)}`);
     }
     if (state.upload.pageTab !== 'upload' || state.upload.selected !== '上傳音檔' || state.upload.formDisplay === 'none') {
       throw new Error(`Upload tab mismatch: ${JSON.stringify(state.upload)}`);
