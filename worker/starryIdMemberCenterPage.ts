@@ -180,7 +180,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
   <script>
   (() => {
     const CLIENT_ID = ${safeClientId};
-    const state = { session:null, user:null, isSuperAdmin:false, targetUserId:null, adminOpen:false, members:[], visibility:null, selectedIds:new Set(), excludedIds:new Set(), selectionMode:'manual', memberOffset:0, memberTotal:0, memberHasMore:false, memberLoading:false, memberLoadToken:0, memberRanksLoaded:false, accessApps:[], accessUserIds:[], accessBulkSelection:null, accessPreview:null, accessLoadToken:0, accessLastRequest:null, bulkRunning:false };
+    const state = { session:null, user:null, isSuperAdmin:false, targetUserId:null, adminOpen:false, members:[], visibility:null, selectedIds:new Set(), excludedIds:new Set(), selectionMode:'manual', memberOffset:0, memberTotal:0, memberHasMore:false, memberLoading:false, memberLoadToken:0, memberRanksLoaded:false, activeSearch:'', activeRank:'', memberFilterPending:false, accessApps:[], accessUserIds:[], accessBulkSelection:null, accessPreview:null, accessLoadToken:0, accessLastRequest:null, bulkRunning:false };
     const $ = (id) => document.getElementById(id);
     const editable = [
       ['name','姓名',false],['amwayId','會員編號 / Amway ID',false],['phone','電話',false],['residence','居住地',false],
@@ -283,7 +283,8 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
       $('accessSelectedCount').textContent='已選 '+selected+'／符合 '+state.memberTotal+' 人';
       $('memberSelectAll').checked=state.selectionMode==='filtered'&&state.excludedIds.size===0&&state.memberTotal>0;
       $('memberSelectAll').indeterminate=state.selectionMode==='filtered'&&state.excludedIds.size>0;
-      $('bulkAccessButton').disabled=selected===0||state.memberLoading&&!state.members.length;
+      $('memberSelectAll').disabled=state.memberFilterPending||(state.memberLoading&&!state.members.length);
+      $('bulkAccessButton').disabled=state.memberFilterPending||selected===0||(state.memberLoading&&!state.members.length);
     }
     function selectedMember(memberId){
       return state.selectionMode==='filtered' ? !state.excludedIds.has(memberId) : state.selectedIds.has(memberId);
@@ -331,7 +332,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
       state.memberLoading=true;const token=state.memberLoadToken;
       $('memberLoadMore').textContent='正在載入會員…';showSelectedCount();
       try{
-        const search=$('memberSearch').value.trim(),rank=$('memberRankFilter').value;
+        const search=state.activeSearch,rank=state.activeRank;
         const url='/api/admin/members?search='+encodeURIComponent(search)+'&rank='+encodeURIComponent(rank)+'&offset='+state.memberOffset;
         const data=await api(url);
         if(token!==state.memberLoadToken)return;
@@ -358,6 +359,8 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     }
     async function resetMemberList(){
       ++state.memberLoadToken;
+      state.activeSearch=$('memberSearch').value.trim();state.activeRank=$('memberRankFilter').value;
+      state.memberFilterPending=false;
       state.memberOffset=0;state.memberTotal=0;state.memberHasMore=true;state.memberLoading=false;state.members=[];
       $('members').replaceChildren();$('memberCount').textContent='載入中…';
       resetMemberSelection();
@@ -386,6 +389,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     $('logoutBtn').addEventListener('click',async()=>{ try{await api('/api/logout',{method:'POST',body:'{}'});}catch{} showLoggedOut(); });
     let searchTimer;
     $('memberSearch').addEventListener('input',()=>{
+      state.memberFilterPending=true;resetMemberSelection();
       clearTimeout(searchTimer);searchTimer=setTimeout(()=>void resetMemberList(),220);
     });
     $('memberRankFilter').addEventListener('change',()=>void resetMemberList());
@@ -402,7 +406,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     $('bulkAccessButton').addEventListener('click',()=>{
       if(!selectedMemberCount()){toast('請先選取會員',true);return;}
       state.accessBulkSelection=state.selectionMode==='filtered'
-        ? {scope:'filtered',search:$('memberSearch').value.trim(),rank:$('memberRankFilter').value,excludedIds:[...state.excludedIds]}
+        ? {scope:'filtered',search:state.activeSearch,rank:state.activeRank,excludedIds:[...state.excludedIds]}
         : {scope:'manual',userIds:[...state.selectedIds]};
       const selected=selectedMemberCount();
       const first=state.members.find(m=>selectedMember(m.id))?.id||[...state.selectedIds][0];
@@ -517,7 +521,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
       const action=progress.status==='reverting'?'正在還原':'正在設定';
       const done=progress.status==='reverting'?progress.reverted:progress.done;
       const total=progress.status==='reverting'?progress.done:progress.changeCount;
-      const doneStatus={completed:'全部完成',reverted:'全部還原',conflict:'已暫停，請檢查權限'};
+      const doneStatus={completed:'全部完成',reverted:'全部還原',conflict:'已暫停，請檢查權限',undo_conflict:'還原已暫停，請檢查權限'};
       node.textContent=(doneStatus[progress.status]||action)+'：'+done+'／'+total+' 項權限｜作業還原碼：'+progress.jobId+
         (progress.lastError?'｜'+progress.lastError:'');
     }
@@ -533,7 +537,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         }
         if(progress.status==='completed')toast('批次設定全部完成。還原碼：'+jobId);
         if(progress.status==='reverted')toast('已還原完成：'+jobId);
-        if(progress.status==='conflict')toast('作業已暫停，請查看操作紀錄',true);
+        if(progress.status==='conflict'||progress.status==='undo_conflict')toast('作業已暫停，請查看操作紀錄',true);
       }catch(e){
         $('appAccessBulkProgress').classList.remove('hidden');
         $('appAccessBulkProgress').textContent='執行中斷：'+(e.message||'連線不穩')+'。已完成的部分都有紀錄，可按「繼續執行」或「預覽還原」。';
@@ -629,14 +633,14 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         for(const item of data.jobs||[]){
           const line=document.createElement('div');line.className='access-history-row';
           const label=document.createElement('span');
-          const status={running:'執行中／可續跑',reverting:'還原中／可續跑',completed:'已完成',reverted:'已還原',conflict:'已暫停'}[item.status]||item.status;
+          const status={running:'執行中／可續跑',reverting:'還原中／可續跑',completed:'已完成',reverted:'已還原',conflict:'已暫停',undo_conflict:'還原衝突'}[item.status]||item.status;
           label.textContent='批次 '+new Date(item.createdAt).toLocaleString('zh-TW')+'｜'+status+'｜'+item.done+'/'+item.changeCount+'｜還原碼：'+item.jobId;
           line.appendChild(label);
           if(item.status==='running'||item.status==='reverting'){
             const resume=document.createElement('button');resume.type='button';resume.className='btn';
             resume.textContent='繼續執行';resume.addEventListener('click',()=>void continueBulkJob(item.jobId));line.appendChild(resume);
           }
-          if(['completed','running','conflict'].includes(item.status)&&item.done>0){
+          if(['completed','running','conflict','undo_conflict'].includes(item.status)&&item.done>item.reverted){
             const undo=document.createElement('button');undo.type='button';undo.className='btn';
             undo.textContent='預覽還原';undo.addEventListener('click',()=>void previewBulkUndo(item.jobId));line.appendChild(undo);
           }
