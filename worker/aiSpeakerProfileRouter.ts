@@ -1,11 +1,12 @@
 import { normalizeSpeakerName, splitSpeakerNames } from '../shared/speakers';
 import { resolveSpeakerBiographyStatus } from '../shared/speakerBiographyStatus';
 import { actor, isSuper, mayUseTranscript } from './aiSpeakerQaRouter';
+import { pilotReady } from '../shared/storyAttribution';
 export type SpeakerEnv={DB:any;AI?:any;R2_BUCKET?:any;[key:string]:any};
 export const speakerText=(v:any)=>String(v??'').trim();
 export const speakerKey=(name:string)=>normalizeSpeakerName(name).replace(/\s+/g,'').toLocaleLowerCase('zh-Hant');
 const result=(v:any,status=200)=>new Response(JSON.stringify(v),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'private, no-store'}});
-export const publiclyReadable=(r:any)=>!Number(r.isPrivateVip)&&!Number(r.authorizedOnlyVisible)&&!Number(r.stickerUnlockCost)&&(!speakerText(r.requiredRank)||['無','公開'].includes(speakerText(r.requiredRank)));
+export const publiclyReadable=(r:any)=>!Number(r.isPrivateVip)&&!Number(r.authorizedOnlyVisible)&&!Number(r.stickerUnlockCost)&&(!speakerText(r.requiredRank)||['無','公開'].includes(speakerText(r.requiredRank)))&&(!r.storyPilotStatus||pilotReady({status:r.storyPilotStatus,revision:r.storyPilotRevision},r.updatedAt,r.r2Key,r.speaker));
 export async function getSpeakerProfile(env:SpeakerEnv,name:string,create=true){
   name=normalizeSpeakerName(name);
   if(!name||name.length>100)return null;
@@ -19,10 +20,14 @@ export async function getSpeakerProfile(env:SpeakerEnv,name:string,create=true){
   return row;
 }
 export async function publicSpeakerSources(env:SpeakerEnv,name:string){
-  const rows=await env.DB.prepare("SELECT t.id,t.title,t.speakerRank,t.requiredRank,t.isPrivateVip,t.authorizedOnlyVisible,t.stickerUnlockCost,i.r2Key,i.updatedAt FROM track_speakers ts JOIN tracks t ON t.id=ts.trackId JOIN transcript_index i ON i.trackId=t.id AND i.status='ready' AND i.r2Key IS NOT NULL WHERE ts.speakerName=? ORDER BY i.updatedAt DESC LIMIT 120").bind(name).all();
+  const rows=await env.DB.prepare("SELECT t.id,t.title,t.speaker,t.speakerRank,t.requiredRank,t.isPrivateVip,t.authorizedOnlyVisible,t.stickerUnlockCost,i.r2Key,i.updatedAt,p.status AS storyPilotStatus,p.revision AS storyPilotRevision,p.approvedAt AS storyPilotApprovedAt FROM track_speakers ts JOIN tracks t ON t.id=ts.trackId JOIN transcript_index i ON i.trackId=t.id AND i.status='ready' AND i.r2Key IS NOT NULL LEFT JOIN ai_story_pilots p ON p.trackId=t.id WHERE ts.speakerName=? ORDER BY i.updatedAt DESC LIMIT 120").bind(name).all();
   const sources=(rows.results||[]).filter(publiclyReadable);
-  const revision=sources.map((r:any)=>r.id+':'+r.updatedAt).sort().join('|');
+  const revision=sources.map((r:any)=>r.id+':'+r.updatedAt+(r.storyPilotStatus?':reviewed:'+r.storyPilotApprovedAt+':'+r.storyPilotRevision:'')).sort().join('|');
   return {sources,revision};
+}
+export async function speakerNeedsStoryReview(env:SpeakerEnv,name:string){
+  const rows=await env.DB.prepare("SELECT p.status,p.revision,t.speaker,i.updatedAt,i.r2Key FROM ai_story_pilots p JOIN tracks t ON t.id=p.trackId JOIN track_speakers ts ON ts.trackId=t.id LEFT JOIN transcript_index i ON i.trackId=t.id WHERE ts.speakerName=? LIMIT 10").bind(name).all();
+  return (rows.results||[]).some((r:any)=>!pilotReady(r,r.updatedAt,r.r2Key,r.speaker));
 }
 export async function markSpeakerBiosDirty(env:SpeakerEnv,trackId:string){
   const row:any=await env.DB.prepare('SELECT speaker FROM tracks WHERE id=? LIMIT 1').bind(trackId).first();
@@ -59,20 +64,26 @@ export async function handleSpeakerProfileRequest(req:Request,env:SpeakerEnv):Pr
         if(await mayUseTranscript(env,u,track))tracks.push({id:track.id,title:track.title,speakerRank:track.speakerRank,speakerAvatar:track.speakerAvatar,uploadDate:track.uploadDate,requiredRank:track.requiredRank,durationSeconds:track.durationSeconds});
       }
       const replyOffset=Math.min(5000,Math.max(0,Number(url.searchParams.get('replyOffset')||0)||0));
-      const q=offset===0?await env.DB.prepare("SELECT a.id AS answerId,a.content AS answer,a.trackId,a.createdAt,q.id AS questionId,q.content AS question,q.authorName AS asker,t.title,t.speakerRank,t.requiredRank,t.isPrivateVip,t.authorizedOnlyVisible,t.stickerUnlockCost FROM track_speakers ts JOIN tracks t ON t.id=ts.trackId JOIN comments a ON a.trackId=t.id AND a.authorBadge='AI_SPEAKER' AND a.id LIKE 'qa-%' JOIN comments q ON q.id=a.replyToId WHERE ts.speakerName=? ORDER BY a.createdAt DESC LIMIT 40 OFFSET ?").bind(name,replyOffset).all():{results:[]};
+      const q=offset===0?await env.DB.prepare("SELECT a.id AS answerId,a.content AS answer,a.trackId,a.createdAt,q.id AS questionId,q.content AS question,q.authorName AS asker,t.title,t.speakerRank,t.requiredRank,t.isPrivateVip,t.authorizedOnlyVisible,t.stickerUnlockCost FROM track_speakers ts JOIN tracks t ON t.id=ts.trackId JOIN comments a ON a.trackId=t.id AND a.authorBadge='AI_SPEAKER' AND a.id LIKE 'qa-%' JOIN comments q ON q.id=a.replyToId LEFT JOIN ai_story_pilots sp ON sp.trackId=t.id WHERE ts.speakerName=? AND (sp.trackId IS NULL OR (sp.status='approved' AND a.createdAt>sp.approvedAt)) ORDER BY a.createdAt DESC LIMIT 40 OFFSET ?").bind(name,replyOffset).all():{results:[]};
       const replies=[];
       for(const item of q.results||[]){
         if(await mayUseTranscript(env,u,item))replies.push({answerId:item.answerId,questionId:item.questionId,trackId:item.trackId,title:item.title,rank:item.speakerRank,asker:item.asker,question:item.question,answer:item.answer,createdAt:item.createdAt});
       }
-      return result({speaker:{id:p.id,name:p.displayName,avatar:tracks.find(x=>x.speakerAvatar)?.speakerAvatar||'',biography:speakerText(p.biography),bioStatus:resolveSpeakerBiographyStatus(p.bioStatus,!!speakerText(p.biography)),bioUpdatedAt:speakerText(p.biography)?p.bioUpdatedAt||0:0},tracks,hasMore:(data.results||[]).length===60,nextOffset:offset+60,replies,hasMoreReplies:(q.results||[]).length===40,nextReplyOffset:replyOffset+40});
+      const needsReview=await speakerNeedsStoryReview(env,name);
+      const safeBio=needsReview?'':speakerText(p.biography);
+      const safeStatus=needsReview?'review_required':resolveSpeakerBiographyStatus(p.bioStatus,!!safeBio);
+      return result({speaker:{id:p.id,name:p.displayName,avatar:tracks.find(x=>x.speakerAvatar)?.speakerAvatar||'',biography:safeBio,bioStatus:safeStatus,bioUpdatedAt:safeBio?p.bioUpdatedAt||0:0},tracks,hasMore:(data.results||[]).length===60,nextOffset:offset+60,replies,hasMoreReplies:(q.results||[]).length===40,nextReplyOffset:replyOffset+40});
     }
     if(!isSuper(u))return result({error:'只有超級管理員可以設定演講者摘要'},403);
     if(path==='/api/speaker-profiles/admin'&&method==='GET'){
       const names=await env.DB.prepare('SELECT speakerName AS name,COUNT(*) AS recordings FROM track_speakers GROUP BY speakerName ORDER BY speakerName LIMIT 500').all();
       const profiles=await env.DB.prepare("SELECT id,displayName,bioStatus,bioUpdatedAt,error, CASE WHEN length(trim(COALESCE(biography,'')))>0 THEN 1 ELSE 0 END AS hasBiography FROM ai_speaker_profiles ORDER BY displayName LIMIT 500").all();
+      const underReview=await env.DB.prepare('SELECT DISTINCT ts.speakerName FROM ai_story_pilots p JOIN tracks t ON t.id=p.trackId JOIN track_speakers ts ON ts.trackId=t.id LEFT JOIN transcript_index i ON i.trackId=t.id').all();
+      const namesWithReview=new Set<string>();
+      for(const x of underReview.results||[]){if(await speakerNeedsStoryReview(env,x.speakerName))namesWithReview.add(x.speakerName);}
       const safeProfiles=(profiles.results||[]).map(({hasBiography,...profile}:any)=>({
         ...profile,
-        bioStatus:resolveSpeakerBiographyStatus(profile.bioStatus,Boolean(hasBiography)),
+        bioStatus:namesWithReview.has(profile.displayName)?'review_required':resolveSpeakerBiographyStatus(profile.bioStatus,Boolean(hasBiography)),
         bioUpdatedAt:hasBiography?profile.bioUpdatedAt:0
       }));
       return result({speakers:names.results||[],profiles:safeProfiles,settings:await speakerSummaryOptions(env)});
@@ -96,6 +107,7 @@ export async function handleSpeakerProfileRequest(req:Request,env:SpeakerEnv):Pr
       if(!exists)return result({error:'找不到演講者'},404);
       const p=await getSpeakerProfile(env,name,true);
       const {sources}=await publicSpeakerSources(env,name);
+      if(await speakerNeedsStoryReview(env,name))return result({success:false,error:'相關多人演講仍需管理員確認故事歸屬'},409);
       if(!sources.length){
         await env.DB.prepare("UPDATE ai_speaker_profiles SET biography='',bioStatus='waiting_sources',bioUpdatedAt=0,sourceRevision='',error=NULL,updatedAt=? WHERE id=?").bind(Date.now(),p.id).run();
         return result({success:true,status:'waiting_sources',message:'目前沒有可使用的公開逐字稿，不會執行 AI 摘要'});

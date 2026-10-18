@@ -5,6 +5,7 @@ import { recordAiActivity } from './starryAiManagement';
  * Disabled by default until super-admin enables it after production verification.
  */
 import { splitSpeakerNames } from '../shared/speakers';
+import { pilotReady,selectQaSpeaker } from '../shared/storyAttribution';
 import { formatCommentTimestamp } from '../shared/commentTime';
 
 type Env = { DB:any; STARRY_ID_DB?:any; R2_BUCKET?:any; AI?:any; [key:string]:any };
@@ -194,9 +195,30 @@ async function excerpts(env:Env,track:any,u:any,mode:string,question:string){
     rows=(data.results||[]).filter((r:any)=>splitSpeakerNames(r.speaker).some(s=>people.has(s.toLowerCase()))&&canAccess(u,r));
   }
   const terms=question.toLowerCase().split(/[\s，。、？！?!.]+/).filter(x=>x.length>=2).slice(0,8);
+  // One D1 lookup for all candidate recordings: no per-segment status requests.
+  const candidates=rows.slice(0,70);
+  const placeholders=candidates.map(()=>'?').join(',');
+  const approvals=placeholders?await env.DB.prepare("SELECT p.trackId,p.status,p.revision,t.speaker,i.updatedAt,i.r2Key FROM ai_story_pilots p JOIN tracks t ON t.id=p.trackId LEFT JOIN transcript_index i ON i.trackId=p.trackId WHERE p.trackId IN ("+placeholders+")")
+    .bind(...candidates.map((x:any)=>x.id)).all():{results:[]};
+  const pilotMap=new Map((approvals.results||[]).map((x:any)=>[x.trackId,x]));
+  const selectedSpeaker=selectQaSpeaker(question,track.speaker);
   const found:{score:number;part:string;title:string}[]=[];
-  for(const row of rows.slice(0,70)){
+  for(const row of candidates){
     if(!await mayUseTranscript(env,u,row))continue;
+    const pilot:any=pilotMap.get(row.id);
+    if(pilot){
+      if(!pilotReady(pilot,pilot.updatedAt,pilot.r2Key,pilot.speaker)||!selectedSpeaker)continue;
+      if(!splitSpeakerNames(pilot.speaker).includes(selectedSpeaker))continue;
+      const facts=await env.DB.prepare('SELECT text,kind FROM ai_story_facts WHERE trackId=? AND owner=? AND sourceRevision=? ORDER BY start LIMIT 60').bind(row.id,selectedSpeaker,pilot.revision).all();
+      for(const fact of facts.results||[]){
+        const text=txt(fact.text)+(fact.kind==='shared'?'（夫妻共同經歷）':fact.kind==='retold'?'（由另一位講者轉述）':'');
+        const score=terms.reduce((sum,x)=>sum+(text.toLowerCase().includes(x)?1:0),0);
+        found.push({score,part:'【'+txt(row.title)+'｜已核對人物：'+selectedSpeaker+'】'+text,title:txt(row.title)});
+      }
+      continue;
+    }
+    // All-talk search must not reintroduce unreviewed multi-speaker recordings.
+    if(mode==='all'&&splitSpeakerNames(row.speaker).length>1)continue;
     const idx:any=await env.DB.prepare("SELECT r2Key FROM transcript_index WHERE trackId=? AND status='ready' LIMIT 1").bind(row.id).first();
     if(!idx?.r2Key)continue;
     const object=await env.R2_BUCKET?.get(idx.r2Key);
@@ -275,8 +297,8 @@ export async function generateQaAnswer(env:Env,model:string,messages:any[]){
   return {reply:'',model:'',attempts:candidates.length,reasons:failures};
 }
 
-async function insertReply(env:Env,comment:any,track:any,reply:string){
-  const createdAt=Date.now(),id='qa-'+crypto.randomUUID(),name=txt(track.speaker)||'演講者';
+async function insertReply(env:Env,comment:any,track:any,reply:string,selectedSpeaker=''){
+  const createdAt=Date.now(),id='qa-'+crypto.randomUUID(),name=selectedSpeaker||txt(track.speaker)||'演講者';
   await env.DB.batch([
     env.DB.prepare("INSERT INTO comments(id,trackId,authorName,authorAvatar,authorBadge,authorEmail,deviceId,content,timestamp,createdAt,replyToId,replyToAuthor,isAdmin,likes,likedBy) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,0,'[]')")
       .bind(id,track.id,name,txt(track.speakerAvatar),'AI_SPEAKER','','',reply,formatCommentTimestamp({createdAt}),createdAt,comment.id,txt(comment.authorName)),
@@ -326,6 +348,10 @@ export async function processQaAfterComment(req:Request,env:Env,ctx:any,comment:
       }
       const track:any=await env.DB.prepare('SELECT * FROM tracks WHERE id=? LIMIT 1').bind(comment.trackId).first();
       if(!track||!await mayUseTranscript(env,u,track)||!env.R2_BUCKET||!env.AI)return;
+      const pilot:any=await env.DB.prepare("SELECT p.status,p.revision,t.speaker,i.updatedAt,i.r2Key FROM ai_story_pilots p JOIN tracks t ON t.id=p.trackId LEFT JOIN transcript_index i ON i.trackId=p.trackId WHERE p.trackId=? LIMIT 1").bind(track.id).first();
+      if(pilot&&!pilotReady(pilot,pilot.updatedAt,pilot.r2Key,pilot.speaker))return;
+      const selectedSpeaker=pilot?selectQaSpeaker(comment.content,track.speaker):'';
+      if(pilot&&!selectedSpeaker)return;
       q=await quota(req,env,u,cfg);
       if(q.reason)return;
       q.trackId=track.id;
@@ -341,7 +367,7 @@ export async function processQaAfterComment(req:Request,env:Env,ctx:any,comment:
       if(!reply){await fail(env,q,comment.id,'AI 無法產生回答（備援模型也沒有成功），本次不扣電池');return;}
       if(!await charge(env,u,q,comment.id)){await fail(env,q,comment.id,'電池不足，未扣款');return;}
       charged=q.costUnits>0;
-      await insertReply(env,comment,track,formatQaAnswer(reply,source.sources));
+      await insertReply(env,comment,track,formatQaAnswer(reply,source.sources),selectedSpeaker);
       replyInserted=true;
       await env.DB.prepare("UPDATE qa_claims SET status='done',error=NULL WHERE commentId=?").bind(comment.id).run().catch(()=>null);
     }catch(e){
@@ -379,6 +405,10 @@ export async function handleQaRequest(req:Request,env:Env):Promise<Response|null
       const trackId=txt(url.searchParams.get('trackId'));
       const track:any=trackId?await env.DB.prepare('SELECT * FROM tracks WHERE id=?').bind(trackId).first():null;
       if(trackId&&(!track||!await mayUseTranscript(env,u,track)))q.reason='沒有此音檔的問答權限';
+      else if(trackId&&!q.reason){
+        const pilot:any=await env.DB.prepare("SELECT p.status,p.revision,t.speaker,i.updatedAt,i.r2Key FROM ai_story_pilots p JOIN tracks t ON t.id=p.trackId LEFT JOIN transcript_index i ON i.trackId=p.trackId WHERE p.trackId=? LIMIT 1").bind(trackId).first();
+        if(pilot&&!pilotReady(pilot,pilot.updatedAt,pilot.r2Key,pilot.speaker))q.reason='多人故事尚待管理員核對，暫停此場 AI 問答';
+      }
       else if(trackId&&!q.reason){
         const index:any=await env.DB.prepare("SELECT status FROM transcript_index WHERE trackId=? LIMIT 1").bind(trackId).first().catch(()=>null);
         if(index?.status!=='ready')q.reason='本場演講逐字稿尚未完成';

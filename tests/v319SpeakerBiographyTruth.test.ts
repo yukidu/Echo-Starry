@@ -27,9 +27,10 @@ test('speaker summary source restrictions remain strict and do not require AI to
   const admin=read('src/components/AiSpeakerAdmin.tsx');
   assert.match(scheduler,/if\(!sources\.length\)\{[\s\S]*?bioStatus='waiting_sources'/);
   assert.doesNotMatch(scheduler,/biography='',bioStatus='ready'/);
-  assert.match(router,/bioStatus:resolveSpeakerBiographyStatus\(p\.bioStatus,!!speakerText\(p\.biography\)\)/);
+  assert.match(router,/bioStatus:safeStatus/);
+  assert.match(router,/resolveSpeakerBiographyStatus\(p\.bioStatus,!!safeBio\)/);
   assert.match(router,/AS hasBiography/);
-  assert.match(router,/bioStatus:resolveSpeakerBiographyStatus\(profile\.bioStatus,Boolean\(hasBiography\)\)/);
+  assert.match(router,/namesWithReview\.has\(profile\.displayName\)\?'review_required':resolveSpeakerBiographyStatus\(profile\.bioStatus,Boolean\(hasBiography\)\)/);
   assert.match(router,/if\(!sources\.length\)\{/);
   assert.match(view,/目前沒有可用的公開逐字稿/);
   assert.match(admin,/speakerBiographyStatusLabel\(p\?\.bioStatus\|\|'pending'\)/);

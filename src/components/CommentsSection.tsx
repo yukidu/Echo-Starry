@@ -21,6 +21,7 @@ import { VisitorIdentity } from '../utils/visitor';
 import { CollapsibleCommentText } from './CollapsibleCommentText';
 import { AiBadge } from './AiBadge';
 import { SpeakerNameLink } from './SpeakerNameLink';
+import { splitSpeakerNames } from '../../shared/speakers';
 import { formatCommentTimestampDisplay } from '../../shared/commentTime';
 
 const stripLegacyAutoReplyMention = (content: string, replyToAuthor?: string) => {
@@ -77,6 +78,9 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [qaMode, setQaMode] = useState<'current' | 'all' | 'off'>('current');
+  const speakerOptions=useMemo(()=>splitSpeakerNames(speakerName),[speakerName]);
+  const [qaTargetSpeaker,setQaTargetSpeaker]=useState('');
+  useEffect(()=>{setQaTargetSpeaker('');},[trackId,speakerName]);
   const [qaStatus, setQaStatus] = useState<{enabled:boolean;reason:string;freeLeft:number;left:number;cost:number;unlimited?:boolean}|null>(null);
   const [pendingQa,setPendingQa] = useState<{id:string;phase:'starting'|'typing'}|null>(null);
   const [qaNotice,setQaNotice] = useState('');
@@ -315,10 +319,15 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
+    if(qaMode!=='off'&&speakerOptions.length>1&&!speakerOptions.includes(qaTargetSpeaker)){
+      setErrorMessage('多人演講請先選擇要召喚的演講者');
+      return;
+    }
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
-      await onAddComment(inputText.trim(), replyingTo?.id, replyingTo?.authorName, qaMode);
+      const question=qaMode!=='off'&&speakerOptions.length>1?'@'+qaTargetSpeaker+' '+inputText.trim():inputText.trim();
+      await onAddComment(question, replyingTo?.id, replyingTo?.authorName, qaMode);
       if (qaMode !== 'off') {
         window.setTimeout(() => {
           void fetch('/api/qa/status?trackId=' + encodeURIComponent(trackId), {credentials:'same-origin',cache:'no-store'})
@@ -403,7 +412,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             <span className="shrink-0">分享學習心得獲得</span><span className="rainbow-admin-text font-black shrink-0">電池</span>
           </> : <>
             <span className="shrink-0">召喚</span><AiBadge/>
-            <span className="rainbow-admin-text font-black shrink-0"><SpeakerNameLink name={speakerName || '演講者'}/></span><span className="shrink-0">問問題</span>
+            <span className="rainbow-admin-text font-black shrink-0"><SpeakerNameLink name={qaTargetSpeaker || speakerName || '演講者'}/></span><span className="shrink-0">問問題</span>
           </>} 
         </h3>
         <fieldset className="mt-2 flex flex-wrap items-center gap-3 text-xs sm:text-sm" aria-label="召喚範圍">
@@ -416,6 +425,12 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             </label>
           ))}
         </fieldset>
+        {qaMode!=='off' && speakerOptions.length>1 && <label className="block mt-2 text-sm font-bold text-slate-700 dark:text-slate-200">本次召喚哪位演講者？
+          <select aria-label="選擇要召喚的演講者" required value={qaTargetSpeaker} onChange={e=>setQaTargetSpeaker(e.target.value)} className="block mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm">
+            <option value="">請選擇一位演講者</option>
+            {speakerOptions.map(person=><option key={person} value={person}>{person}</option>)}
+          </select>
+        </label>}
         {qaStatus?.reason && <div className="mt-1 text-xs text-amber-700 dark:text-amber-300" role="status">已自動關閉 <AiBadge/>：{qaStatus.reason}（一般心得留言仍可使用）</div>}
         {qaStatus?.enabled && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{qaStatus.unlimited ? '超級管理員：網站內召喚不限次數、不扣電池' : <>今日免費剩餘 {qaStatus.freeLeft} 次／總共剩餘 {qaStatus.left} 次{qaStatus.freeLeft===0 ? ' · 每次 '+qaStatus.cost+' 顆電池':''}</>}</p>}
       </div>

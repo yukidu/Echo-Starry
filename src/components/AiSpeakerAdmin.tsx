@@ -1,4 +1,5 @@
 import { SpeakerNameLink } from './SpeakerNameLink';
+import { AiSpeakerStoryAdmin } from './AiSpeakerStoryAdmin';
 import { speakerBiographyStatusLabel, type SpeakerBiographyStatus } from '../../shared/speakerBiographyStatus';
 import React,{useEffect,useMemo,useState} from 'react';
 import {Search,RefreshCcw,Save} from 'lucide-react';
@@ -67,5 +68,6 @@ export const AiSpeakerAdmin:React.FC=()=>{
         </div>;
       })}
     </div>
+    <AiSpeakerStoryAdmin />
   </section>;
 };

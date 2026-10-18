@@ -1,4 +1,4 @@
-const CACHE_NAME = 'echostars-shell-v184';
+const CACHE_NAME = 'echostars-shell-v185';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-monochrome.svg', '/icon-192.png', '/icon-512.png'];
 const FORCE_STALE_CLIENT_REFRESH = true;
 
@@ -16,7 +16,7 @@ self.addEventListener('activate', event => {
     await Promise.all(oldShellKeys.map(key => caches.delete(key)));
     await self.clients.claim();
 
-    // v184: refresh speaker summaries with truthful availability and completion status.
+    // v185: refresh the multi-speaker QA selection and evidence review UI.
     // This prevents a successfully deployed Production build from looking stale merely
     // because an already-open tab is still executing the previous in-memory bundle.
     if (FORCE_STALE_CLIENT_REFRESH && upgradingExistingClient) {
