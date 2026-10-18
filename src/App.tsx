@@ -204,6 +204,12 @@ function trackMatchesHomeBaseFilters(
 export default function App() {
   // Navigation & View States
   const [currentTab, setCurrentTab] = useState<NavTab>('home');
+  // Let lightweight legacy UI enhancements skip DOM scanning while the inbox is open.
+  // Without this marker, the global observer's notification guard cannot work.
+  useEffect(() => {
+    document.body.dataset.mainTab = currentTab;
+    return () => { delete document.body.dataset.mainTab; };
+  }, [currentTab]);
   const [speakerProfileName,setSpeakerProfileName] = useState<string|null>(()=>{
     if(typeof window==='undefined'||!window.location.hash.startsWith('#/speaker/'))return null;
     try{return decodeURIComponent(window.location.hash.slice('#/speaker/'.length)).slice(0,100);}catch{return null;}
