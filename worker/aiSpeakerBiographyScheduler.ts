@@ -8,12 +8,12 @@ const day=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
 export async function generateNextSpeakerBiography(env:SpeakerEnv){
   if(!env.DB||!env.AI||!env.R2_BUCKET)return {status:'unavailable'};
   const cfg=await speakerSummaryOptions(env);
-  const p:any=await env.DB.prepare("SELECT * FROM ai_speaker_profiles WHERE bioStatus IN ('pending','failed') AND updatedAt<? ORDER BY CASE WHEN bioStatus='pending' THEN 0 ELSE 1 END,updatedAt ASC LIMIT 1").bind(Date.now()-30000).first();
+  const p:any=await env.DB.prepare("SELECT * FROM ai_speaker_profiles WHERE bioStatus='pending' AND updatedAt<? ORDER BY updatedAt DESC LIMIT 1").bind(Date.now()-30000).first();
   if(!p)return {status:'empty'};
   const today=day();
   const permit:any=await env.DB.prepare('INSERT INTO ai_speaker_generation_daily(day,used) VALUES (?,1) ON CONFLICT(day) DO UPDATE SET used=used+1 WHERE used<? RETURNING used').bind(today,cfg.dailyLimit).first();
   if(!permit)return {status:'budget',message:'今日摘要額度已達上限'};
-  const claim:any=await env.DB.prepare("UPDATE ai_speaker_profiles SET bioStatus='processing',updatedAt=? WHERE id=? AND bioStatus IN ('pending','failed') RETURNING id").bind(Date.now(),p.id).first();
+  const claim:any=await env.DB.prepare("UPDATE ai_speaker_profiles SET bioStatus='processing',updatedAt=? WHERE id=? AND bioStatus='pending' RETURNING id").bind(Date.now(),p.id).first();
   if(!claim){
     await env.DB.prepare('UPDATE ai_speaker_generation_daily SET used=max(0,used-1) WHERE day=?').bind(today).run();
     return {status:'busy'};
