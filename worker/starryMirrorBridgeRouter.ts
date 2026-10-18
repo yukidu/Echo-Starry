@@ -1,4 +1,5 @@
 import type { Env } from './index';
+import { checkStarryAppAccess } from './starryAppAccess';
 import { sessionContext } from './starryIdProfileDirectoryRouter';
 import { recordAiActivity } from './starryAiManagement';
 import { calculateNumerology } from '../src/utils/numerology';
@@ -176,6 +177,8 @@ async function issueSession(request: Request, env: Env) {
   if (!cors) return json({ error: 'origin_not_allowed' }, 403);
   const session = await sessionContext(request, env);
   if (!session) return json({ authenticated: false }, 401, cors);
+  const access = await checkStarryAppAccess((env as any).STARRY_ID_DB,session.userId,APP_ID);
+  if (!access.allowed) return json({ error: '您沒有使用權限', code: 'APP_ACCESS_DENIED' }, 403, cors);
   await ensureSchema(env);
   const identity = await identityForUser(env, session.userId);
   if (!identity) return json({ authenticated: false }, 401, cors);
@@ -201,6 +204,8 @@ async function verifyToken(request: Request, env: Env) {
   const row: any = await db.prepare(`SELECT userId,expiresAt FROM app_access_tokens
     WHERE tokenHash=? AND appId=? LIMIT 1`).bind(tokenHash, APP_ID).first();
   if (!row || Number(row.expiresAt || 0) <= Date.now()) return null;
+  const access = await checkStarryAppAccess(db,text(row.userId),APP_ID);
+  if (!access.allowed) return null;
   return identityForUser(env, text(row.userId));
 }
 
