@@ -80,3 +80,11 @@ test('All member entrypoints are guarded upstream; Google login honors central p
   assert.match(auth,/denied \? 403/);
   assert.match(auth,/central_id_unavailable/);
 });
+
+test('Legacy login and sync never silently reactivate centrally blocked Echo App memberships',()=>{
+  const gateway=read('worker/echoCentralProfileGateway.ts');
+  const sync=read('worker/starryIdSync.ts');
+  assert.match(gateway,/status=CASE WHEN app_memberships\.status='active' THEN excluded\.status ELSE app_memberships\.status END/);
+  assert.match(sync,/status=CASE WHEN app_memberships\.status='active' THEN excluded\.status ELSE app_memberships\.status END/);
+  assert.doesNotMatch(gateway,/status='active',role=excluded\.role/);
+});
