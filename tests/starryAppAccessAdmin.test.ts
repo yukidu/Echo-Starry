@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { renderStarryIdMemberCenterPage } from '../worker/starryIdMemberCenterPage';
-import { canManageStarryAppAccess } from '../worker/starryIdCentralRouter';
+import { canManageStarryAppAccess, resolveCentralStarryAdmin } from '../worker/starryIdCentralRouter';
 import { handleStarryAppAccessAdminRequest } from '../worker/starryAppAccess';
 
 const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
@@ -89,12 +89,48 @@ test('Mirror checks central member policy when granting and validating app token
   assert.match(mirror,/您沒有使用權限/);
 });
 
-test('Central membership role is accepted consistently for App management', () => {
+test('Central super-admin status works with either App-issued session', () => {
   assert.equal(canManageStarryAppAccess({appId:'starry-id',isSuperAdmin:true}),true);
+  assert.equal(canManageStarryAppAccess({appId:'echostars',isSuperAdmin:true}),true);
+  assert.equal(canManageStarryAppAccess({appId:'gostarry',isSuperAdmin:true}),true);
   assert.equal(canManageStarryAppAccess({appId:'starry-id',isSuperAdmin:false}),false);
-  assert.equal(canManageStarryAppAccess({appId:'echostars',isSuperAdmin:true}),false);
+  assert.equal(canManageStarryAppAccess({appId:'echostars',isSuperAdmin:false}),false);
   assert.equal(canManageStarryAppAccess(null),false);
+  assert.match(router,/const isSuperAdmin = await resolveCentralStarryAdmin\(/);
   assert.match(router,/if \(!session\.isSuperAdmin\) return json\(request, \{ error: '只有超級管理員可以管理全部會員。' \}, 403\)/);
+});
+
+test('Only central Starry ID membership or its central allowlist grants administrator rights', async () => {
+  const neverQuery = { prepare: () => {throw new Error('Starry ID session should reuse its membership');} };
+  assert.equal(await resolveCentralStarryAdmin(neverQuery,'central-admin','starry-id',
+    {status:'active',role:'super-admin'},false),true);
+  assert.equal(await resolveCentralStarryAdmin(neverQuery,'ordinary-member','starry-id',
+    {status:'active',role:'member'},false),false);
+  assert.equal(await resolveCentralStarryAdmin(neverQuery,'revoked-admin','starry-id',
+    {status:'inactive',role:'super-admin'},true),false);
+
+  const dbWith = (central: {status:string;role:string}|null) => ({
+    prepare(query: string) {
+      assert.match(query,/WHERE userId=\? AND appId='starry-id'/);
+      return {bind(userId: string) {
+        assert.equal(userId,'cross-app-user');
+        return {first: async () => central};
+      }};
+    }
+  });
+  const appRole = {status:'active',role:'super-admin'};
+  assert.equal(await resolveCentralStarryAdmin(dbWith({status:'active',role:'super-admin'}),
+    'cross-app-user','echostars',{status:'active',role:'member'},false),true);
+  assert.equal(await resolveCentralStarryAdmin(dbWith({status:'active',role:'member'}),
+    'cross-app-user','echostars',appRole,false),false);
+  assert.equal(await resolveCentralStarryAdmin(dbWith({status:'inactive',role:'super-admin'}),
+    'cross-app-user','downloadstarry',appRole,false),false);
+  assert.equal(await resolveCentralStarryAdmin(dbWith(null),
+    'cross-app-user','gostarry',appRole,false),false);
+  assert.equal(await resolveCentralStarryAdmin(neverQuery,
+    'cross-app-user','gostarry',{status:'active',role:'member'},true),true);
+  assert.equal(await resolveCentralStarryAdmin(neverQuery,
+    'cross-app-user','gostarry',{status:'suspended',role:'super-admin'},true),false);
 });
 
 test('Authorized catalog is readable without any D1 writes', async () => {
