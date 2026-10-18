@@ -28,7 +28,7 @@ async function ensure(db:Db) {
       db.prepare('CREATE TABLE IF NOT EXISTS starry_ai_config (key TEXT PRIMARY KEY, value TEXT NOT NULL, updatedAt INTEGER NOT NULL, updatedBy TEXT NOT NULL)'),
       db.prepare('CREATE TABLE IF NOT EXISTS starry_ai_audit (id TEXT PRIMARY KEY, actorId TEXT NOT NULL, beforeValue TEXT NOT NULL, afterValue TEXT NOT NULL, createdAt INTEGER NOT NULL)'),
       db.prepare('CREATE TABLE IF NOT EXISTS starry_ai_activity (taskId TEXT PRIMARY KEY, lastStartedAt INTEGER NOT NULL)')
-    ]).then(()=>undefined).catch(e=>{schemaReady=null;throw e;});
+    ]).then(()=>undefined).catch((e:unknown)=>{schemaReady=null;throw e;});
   }
   await schemaReady;
 }
