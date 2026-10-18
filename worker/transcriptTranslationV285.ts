@@ -1,3 +1,4 @@
+import { recordAiActivity } from './starryAiManagement';
 import type { Env } from './index';
 import transcriptWorker from './transcriptMemberNotificationsRouter';
 
@@ -64,6 +65,7 @@ function parseStringArray(raw: string, count: number) {
 
 async function translateBatch(env: Env, source: string[], target: string) {
   if (!source.length) return [];
+  await recordAiActivity(env as any,'echo.translation');
   const prompt = `Translate each JSON array item into ${target}. Return ONLY one JSON array of exactly ${source.length} strings in the same order. Do not merge, split, number, explain, or add notes. Preserve names, Amway terminology, ranks, product names and meaning naturally. Empty input stays empty.`;
   const result: any = await (env as any).AI.run(MODEL, {
     messages: [
