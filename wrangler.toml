@@ -86,7 +86,7 @@ storage = "sqlite"
 
 # 每 15 分鐘檢查一次；排程器本身保證同時間只處理一份逐字稿。
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["*/15 * * * *", "*/5 * * * *"]
 
 [vars]
 ENVIRONMENT = "production"

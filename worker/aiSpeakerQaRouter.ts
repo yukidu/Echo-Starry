@@ -213,7 +213,7 @@ async function excerpts(env:Env,track:any,u:any,mode:string,question:string){
       for(const fact of facts.results||[]){
         const text=txt(fact.text)+(fact.kind==='shared'?'（夫妻共同經歷）':fact.kind==='retold'?'（由另一位講者轉述）':'');
         const score=terms.reduce((sum,x)=>sum+(text.toLowerCase().includes(x)?1:0),0);
-        found.push({score,part:'【'+txt(row.title)+'｜已核對人物：'+selectedSpeaker+'】'+text,title:txt(row.title)});
+        found.push({score,part:'【'+txt(row.title)+'｜AI 故事歸屬（未經獨立查證）：'+selectedSpeaker+'】'+text,title:txt(row.title)});
       }
       continue;
     }
@@ -407,7 +407,7 @@ export async function handleQaRequest(req:Request,env:Env):Promise<Response|null
       if(trackId&&(!track||!await mayUseTranscript(env,u,track)))q.reason='沒有此音檔的問答權限';
       else if(trackId&&!q.reason){
         const pilot:any=await env.DB.prepare("SELECT p.status,p.revision,t.speaker,i.updatedAt,i.r2Key FROM ai_story_pilots p JOIN tracks t ON t.id=p.trackId LEFT JOIN transcript_index i ON i.trackId=p.trackId WHERE p.trackId=? LIMIT 1").bind(trackId).first();
-        if(pilot&&!pilotReady(pilot,pilot.updatedAt,pilot.r2Key,pilot.speaker))q.reason='多人故事尚待管理員核對，暫停此場 AI 問答';
+        if(pilot&&!pilotReady(pilot,pilot.updatedAt,pilot.r2Key,pilot.speaker))q.reason='多人故事正在自動分析，完成可靠歸屬前暫停此場 AI 問答';
       }
       else if(trackId&&!q.reason){
         const index:any=await env.DB.prepare("SELECT status FROM transcript_index WHERE trackId=? LIMIT 1").bind(trackId).first().catch(()=>null);

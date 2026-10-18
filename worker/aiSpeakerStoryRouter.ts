@@ -6,6 +6,7 @@ import {
   pilotSourceRevision,parseStoryClaims,expandedApprovedOwners,storyText
 } from '../shared/storyAttribution';
 import {markSpeakerBiosDirty} from './aiSpeakerProfileRouter';
+import {storyPilot,storyRevision,storyLoad,storyDraftKey,editStoryOwner,isStoryPilotId} from './aiSpeakerStoryAutoScheduler';
 
 type Env={DB:any;R2_BUCKET?:any;AI?:any;[key:string]:any};
 const json=(v:any,status=200)=>new Response(JSON.stringify(v),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'private, no-store'}});
@@ -40,8 +41,34 @@ export async function handleStoryAttributionRequest(req:Request,env:Env):Promise
       if(!id)return json({items});
       const selected=items.find((x:any)=>x.trackId===id);
       if(!selected)return json({error:'此音檔不在五場測試名單中'},404);
-      const draft=await load(env,draftKey(id));
-      return json({items,selected,draft:draft?.revision===revision(selected)?draft:null});
+      const draft=await storyLoad(env,storyDraftKey(id));
+      const manual=await env.DB.prepare('SELECT segmentId,owner,editedAt FROM ai_story_manual_overrides WHERE trackId=?').bind(id).all();
+      return json({items,selected,draft:draft?.revision===revision(selected)?draft:null,manualOverrides:manual.results||[]});
+    }
+    if(path==='/api/speaker-stories/start'&&method==='POST'){
+      const b:any=await req.json().catch(()=>null),id=storyText(b?.trackId);
+      if(!isStoryPilotId(id))return json({error:'目前只開放原本五場多人演講試點'},403);
+      const row:any=await storyPilot(env,id);
+      if(!row||row.transcriptStatus!=='ready'||!row.transcriptR2Key)return json({error:'目前沒有可用逐字稿'},409);
+      if(splitSpeakerNames(row.speaker).length<2)return json({error:'沒有兩位以上演講者'},400);
+      if(row.status==='approved'&&row.revision===storyRevision(row))return json({error:'已完成分析。如要修改人物，請直接使用下方人物歸屬編輯'},409);
+      const rev=storyRevision(row),now=Date.now();
+      const claimed=await env.DB.prepare("UPDATE ai_story_pilots SET autoRun=1,status='pending',cursor=CASE WHEN revision=? THEN cursor ELSE 0 END,revision=?,error=NULL,updatedAt=? WHERE trackId=? AND status IN ('pending','failed','needs_review') RETURNING trackId,cursor")
+        .bind(rev,rev,now,id).first();
+      if(!claimed)return json({error:'這場錄音正執行中或已完成'},409);
+      return json({success:true,cursor:claimed.cursor,message:'已加入背景自動分析，關閉手機也會繼續，整場完成後自動歸屬人物'});
+    }
+    if(path==='/api/speaker-stories/pause'&&method==='POST'){
+      const b:any=await req.json().catch(()=>null),id=storyText(b?.trackId);
+      if(!isStoryPilotId(id))return json({error:'不在五場測試名單內'},404);
+      await env.DB.prepare("UPDATE ai_story_pilots SET autoRun=0,updatedAt=? WHERE trackId=? AND status IN ('pending','processing')").bind(Date.now(),id).run();
+      return json({success:true,message:'已暫停。當前小批次可能仍會完成，已完成進度保留'});
+    }
+    if(path==='/api/speaker-stories/edit'&&method==='POST'){
+      const b:any=await req.json().catch(()=>null),id=storyText(b?.trackId),factId=storyText(b?.factId),owner=storyText(b?.owner);
+      if(!isStoryPilotId(id)||!factId||!owner)return json({error:'請提供錄音、故事及正確歸屬'},400);
+      const result=await editStoryOwner(env,id,factId,owner,storyText(user.email)||'superadmin');
+      return json({success:true,...result,message:'人物歸屬已更新，人工修正會優先於下次 AI 重算'});
     }
     if(path==='/api/speaker-stories/analyze'&&method==='POST'){
       if(!env.AI)return json({error:'AI 尚未啟用'},503);
@@ -120,9 +147,10 @@ export async function handleStoryAttributionRequest(req:Request,env:Env):Promise
     if(path==='/api/speaker-stories/reset'&&method==='POST'){
       const b:any=await req.json().catch(()=>null),id=storyText(b?.trackId),row:any=id?await pilot(env,id):null;
       if(!row)return json({error:'非試點錄音'},404);
+      if(row.status==='processing')return json({error:'請等待目前批次完成後再重設'},409);
       await env.DB.batch([
         env.DB.prepare('DELETE FROM ai_story_facts WHERE trackId=?').bind(id),
-        env.DB.prepare("UPDATE ai_story_pilots SET status='pending',revision='',cursor=0,r2Key='',error=NULL,reviewer='',approvedAt=0,updatedAt=? WHERE trackId=?").bind(Date.now(),id)
+        env.DB.prepare("UPDATE ai_story_pilots SET status='pending',autoRun=0,revision='',cursor=0,r2Key='',error=NULL,reviewer='',approvedAt=0,updatedAt=? WHERE trackId=?").bind(Date.now(),id)
       ]);
       await markSpeakerBiosDirty(env,id);
       return json({success:true,message:'已重置，原始逐字稿完全不受影響'});
