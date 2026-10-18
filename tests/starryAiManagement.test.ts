@@ -11,7 +11,7 @@ test('central AI scheduler lists only active tasks across Echo and Mirror',()=>{
   assert.ok(AI_TASK_CATALOG.some(t=>t.id==='echo.qa'));
   assert.ok(AI_TASK_CATALOG.some(t=>t.id==='echo.transcribe'));
   assert.ok(AI_TASK_CATALOG.some(t=>t.id==='echo.normalize'));
-  assert.ok(!AI_TASK_CATALOG.some(t=>t.id==='echo.translation'));
+  assert.ok(!AI_TASK_CATALOG.some(t=>String(t.id)==='echo.translation'));
   assert.ok(INACTIVE_AI_TASKS.some(t=>t.id==='echo.translation'));
   assert.ok(AI_TASK_CATALOG.every(t=>t.url.startsWith('https://')));
 });
