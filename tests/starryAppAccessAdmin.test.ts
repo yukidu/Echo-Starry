@@ -13,6 +13,7 @@ const page = read('worker/starryIdMemberCenterPage.ts');
 test('Only the verified Starry ID super-admin can reach app access management', () => {
   assert.match(router, /path\.startsWith\('\/api\/admin\/app-access\/'\)/);
   assert.match(router, /if \(!canManageStarryAppAccess\(session\)\)/);
+  assert.match(router, /origin && origin !== 'https:\/\/id\.starry\.phd'/);
   assert.match(access, /request\.headers\.get\('Origin'\)!=='https:\/\/id\.starry\.phd'/);
 });
 
