@@ -213,7 +213,7 @@ async function excerpts(env:Env,track:any,u:any,mode:string,question:string){
       for(const fact of facts.results||[]){
         const text=txt(fact.text)+(fact.kind==='shared'?'（夫妻共同經歷）':fact.kind==='retold'?'（由另一位講者轉述）':'');
         const score=terms.reduce((sum,x)=>sum+(text.toLowerCase().includes(x)?1:0),0);
-        found.push({score,part:'【'+txt(row.title)+'｜已核對人物：'+selectedSpeaker+'】'+text,title:txt(row.title)});
+        found.push({score,part:'【'+txt(row.title)+'｜AI 故事歸屬（未經獨立查證）：'+selectedSpeaker+'】'+text,title:txt(row.title)});
       }
       continue;
     }
