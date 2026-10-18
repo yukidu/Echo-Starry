@@ -1,3 +1,4 @@
+import { SpeakerNameLink } from './SpeakerNameLink';
 import React, { useRef, useState } from 'react';
 import { Play, Pause, ArrowUp, Home, X } from 'lucide-react';
 import { Track, PlayerDisplayMode } from '../types';
@@ -112,7 +113,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             {track.title}
           </p>
           <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-            {track.speaker}{track.speakerRank || ''}
+            <SpeakerNameLink name={track.speaker}/>{track.speakerRank || ''}
           </p>
           <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5 whitespace-nowrap">
             {formatTime(currentTime)} / {formatTime(safeDuration)}
