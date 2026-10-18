@@ -26,7 +26,8 @@ async function ensureIndex(env: SchedulerEnv) {
 export async function queueNextTranscriptV293(env: SchedulerEnv, options: QueueNextOptions = {}) {
   await ensureIndex(env);
   const now = Date.now();
-  const includeFailed = options.includeFailed !== false;
+  // Never retry failed recordings automatically. Only an explicit admin recovery action may opt in.
+  const includeFailed = options.includeFailed === true;
 
   // 防止異常中斷永久卡住：超過 3 小時仍 queued/processing 才釋放重排。
   await env.DB.prepare(`UPDATE transcript_index
