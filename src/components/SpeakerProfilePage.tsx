@@ -2,9 +2,10 @@ import React, {useEffect,useState} from 'react';
 import {ChevronLeft, Headphones, BookOpenText, MessageCircle, RefreshCw} from 'lucide-react';
 import {AiBadge} from './AiBadge';
 import {formatSpeakerRecordingDate} from '../utils/speakerRecordingDate';
+import type { SpeakerBiographyStatus } from '../../shared/speakerBiographyStatus';
 type TrackSummary={id:string;title:string;speakerRank?:string;speakerAvatar?:string;uploadDate?:string;durationSeconds?:number;requiredRank?:string};
 type QaPair={answerId:string;questionId:string;trackId:string;title:string;rank?:string;asker:string;question:string;answer:string;createdAt:number};
-type ProfileData={speaker:{id:string;name:string;avatar:string;biography:string;bioStatus:string;bioUpdatedAt:number};tracks:TrackSummary[];replies:QaPair[];hasMore:boolean;nextOffset:number;hasMoreReplies:boolean;nextReplyOffset:number};
+type ProfileData={speaker:{id:string;name:string;avatar:string;biography:string;bioStatus:SpeakerBiographyStatus;bioUpdatedAt:number};tracks:TrackSummary[];replies:QaPair[];hasMore:boolean;nextOffset:number;hasMoreReplies:boolean;nextReplyOffset:number};
 export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrack:(trackId:string,commentId?:string)=>void;onPlayTrack?:(trackId:string)=>void;compact?:boolean}>=({name,onBack,onOpenTrack,onPlayTrack,compact=false})=>{
   const [data,setData]=useState<ProfileData|null>(null);
   const [error,setError]=useState('');
@@ -67,8 +68,14 @@ export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrac
       </div>
       <div className="mt-4 space-y-2">
         <h2 className="flex items-center gap-2 font-bold"><BookOpenText size={18}/>綜合人物摘要</h2>
-        {data.speaker.biography?<p className="whitespace-pre-wrap text-sm leading-7">{data.speaker.biography}</p>:<p className="text-sm text-slate-500">{data.speaker.bioStatus==='failed'?'摘要暫時無法生成，管理員可重新排隊':'正在整理演講逐字稿，摘要產生後會自動顯示'}</p>}
-        {data.speaker.bioUpdatedAt>0&&<p className="text-xs text-slate-500">最近整理：{new Date(data.speaker.bioUpdatedAt).toLocaleDateString('zh-TW')}</p>}
+        {data.speaker.biography.trim()?<p className="whitespace-pre-wrap text-sm leading-7">{data.speaker.biography}</p>:<p className="text-sm text-slate-500">{
+          data.speaker.bioStatus==='waiting_sources'?'目前沒有可用的公開逐字稿，尚無法產生摘要':
+          data.speaker.bioStatus==='missing_summary'?'摘要內容缺失，請管理員檢查來源與處理狀態':
+          data.speaker.bioStatus==='failed'?'摘要暫時無法生成，管理員可重新排隊':
+          data.speaker.bioStatus==='processing'?'正在產生演講者摘要…':
+          '等待產生摘要，完成後會自動顯示'
+        }</p>}
+        {data.speaker.biography.trim()&&data.speaker.bioUpdatedAt>0&&<p className="text-xs text-slate-500">最近整理：{new Date(data.speaker.bioUpdatedAt).toLocaleDateString('zh-TW')}</p>}
         <p className="text-xs text-amber-600 dark:text-amber-400">摘要依可公開使用的逐字稿自動整理，可能不完整，請以原始錄音為準。</p>
       </div>
     </header>
