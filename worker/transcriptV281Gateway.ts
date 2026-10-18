@@ -1,6 +1,7 @@
 import type { Env } from './index';
 import transcriptWorker from './transcriptMemberNotificationsRouter';
 import { queueAllPendingTranscripts, transcriptBulkStatus } from './transcriptBulkScheduler';
+import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
 import { batteriesToUnits, unitsToBatteries } from '../shared/battery';
 
 const SESSION_COOKIE = 'echostars_session';
@@ -299,6 +300,39 @@ async function extendSettings(request: Request, env: Env, ctx: any) {
 export default {
   async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
     const url = new URL(request.url);
+    // Admin-only per-track relistening. Old completed transcripts are never bulk rewritten.
+    if (url.pathname === '/api/v281/transcript-management/status') {
+      if (request.method.toUpperCase() !== 'GET') return json({ error: 'Method not allowed' }, 405);
+      if (!await superAdmin(request, env)) return json({ error: '只有超級管理員可以查看逐字稿狀態' }, 403);
+      const rows: any = await (env as any).DB.prepare('SELECT trackId,status FROM transcript_index').all();
+      return json({ statuses: Object.fromEntries((rows.results || []).map((row: any) => [text(row.trackId), text(row.status)])) });
+    }
+    const relisten = url.pathname.match(/^\\/api\\/v281\\/transcript-management\\/relisten\\/([^/]+)$/);
+    if (relisten) {
+      if (request.method.toUpperCase() !== 'POST') return json({ error: 'Method not allowed' }, 405);
+      if (!await superAdmin(request, env)) return json({ error: '只有超級管理員可以重聽逐字稿' }, 403);
+      const trackId = decodeURIComponent(relisten[1]);
+      const db = (env as any).DB;
+      const track: any = await db.prepare('SELECT id,audioUrl,durationSeconds FROM tracks WHERE id=? LIMIT 1').bind(trackId).first();
+      if (!track || !text(track.audioUrl)) return json({ error: '找不到可重聽的原始音檔' }, 404);
+      const now = Date.now();
+      // Single atomic D1 statement: pending/queued/processing cannot be queued twice.
+      // Preserve the old R2 key, corrections and reward history until the replacement finishes.
+      const claimed: any = await db.prepare(`INSERT INTO transcript_index
+        (trackId,status,r2Key,model,chunkCount,segmentCount,wordCount,durationSeconds,error,createdAt,updatedAt)
+        VALUES (?,'pending',NULL,'@cf/openai/whisper-large-v3-turbo',0,0,0,?,NULL,?,?)
+        ON CONFLICT(trackId) DO UPDATE SET
+          status='pending',error=NULL,updatedAt=excluded.updatedAt
+        WHERE transcript_index.status IN ('ready','failed')
+        RETURNING trackId`)
+        .bind(trackId, Math.max(0, Number(track.durationSeconds || 0)), now, now).all();
+      if (!claimed?.results?.length) return json({ error: '這份逐字稿已在排隊或處理中，不能重複啟動' }, 409);
+      // Queue promptly but preserve the existing central concurrency policy.
+      ctx.waitUntil(queueNextTranscriptV293(env as any, { includeFailed: false }).catch((error: unknown) => {
+        console.error('Transcript relisten scheduling failed', error);
+      }));
+      return json({ success: true, trackId, status: 'pending', message: '已排入重聽逐字稿隊列' }, 202);
+    }
     if (url.pathname === '/api/v281/transcripts/bulk-start') {
       if (request.method.toUpperCase() !== 'POST') return json({ error: 'Method not allowed' }, 405);
       const actor = await superAdmin(request, env);
