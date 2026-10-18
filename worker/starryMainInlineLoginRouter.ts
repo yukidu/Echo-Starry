@@ -7,6 +7,7 @@ import { handleQaRequest, processQaAfterComment } from './aiSpeakerQaRouter';
 import { handleSpeakerProfileRequest } from './aiSpeakerProfileRouter';
 import { handleStoryAttributionRequest } from './aiSpeakerStoryRouter';
 import { generateNextSpeakerBiography } from './aiSpeakerBiographyScheduler';
+import { runNextStoryAttribution } from './aiSpeakerStoryAutoScheduler';
 
 // Workflow / Container named handlers 必須由正式安全入口匯出，不改既有網站路由。
 export { TranscriptWorkflow } from './transcriptWorkflowV282';
@@ -338,9 +339,13 @@ export default {
     }
     return appWorker.fetch(request, env, ctx);
   },
-  async scheduled(_controller: any, env: Env, ctx: any) {
+  async scheduled(controller: any, env: Env, ctx: any) {
+    // Separate bounded five-track analysis from transcription / biography priority.
+    if(controller.cron==='*/5 * * * *'){
+      ctx.waitUntil(runNextStoryAttribution(env as any));
+      return;
+    }
     ctx.waitUntil(queueNextTranscriptV293(env as any));
-    // Budgeted and scheduled; biography AI never blocks the playback site.
     ctx.waitUntil(generateNextSpeakerBiography(env as any));
   }
 };
