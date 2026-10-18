@@ -15,7 +15,7 @@ test('v299 workflow immediately hands off after success or failure', () => {
   assert.match(workflow, /status='failed'/);
 });
 
-test('v299 scheduler keeps at most five transcript workflows active and fills empty slots atomically', () => {
+test('v299 scheduler caps transcript workflows dynamically and fills available slots atomically', () => {
   const scheduler = read('worker/transcriptSequentialSchedulerV293.ts');
   assert.match(scheduler, /MAX_CONCURRENT_TRANSCRIPTS\s*=\s*5/);
   assert.match(scheduler, /INSERT OR IGNORE INTO transcript_index/);
@@ -23,7 +23,8 @@ test('v299 scheduler keeps at most five transcript workflows active and fills em
   assert.match(scheduler, /LIMIT \(SELECT MAX\(0, \? - COUNT\(\*\)\) FROM transcript_index WHERE status IN \('queued','processing'\)\)/);
   assert.match(scheduler, /RETURNING trackId,durationSeconds/);
   assert.match(scheduler, /echo-v299-auto-/);
-  assert.match(scheduler, /targetConcurrency:\s*MAX_CONCURRENT_TRANSCRIPTS/);
+  assert.match(scheduler, /targetConcurrency:\s*maxConcurrent/);
+  assert.match(scheduler, /transcriptTargetConcurrency\(env\)/);
 });
 
 test('v299 automatic handoff skips failed recordings while watchdog may retry them', () => {
