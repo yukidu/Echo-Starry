@@ -5,7 +5,7 @@ type Db = any;
 type ControlEnv = { STARRY_ID_DB?: Db; DB?: Db; [key:string]:any };
 
 export const AI_TASK_CATALOG = Object.freeze([
-  { id:'mirror.reading',app:'繁星心鏡',title:'AI 個人化解籤',description:'生命靈數、金句、個人資料交叉解籤',model:'Qwen 3.8 27B → GPT-OSS 120B → GLM 4.7 Flash',path:'繁星心鏡 → 翻卡 → AI 解籤',url:'https://mirror.starry.phd/',mode:'realtime' },
+  { id:'mirror.reading',app:'繁星心鏡',title:'AI 個人化解籤',description:'生命靈數、金句、個人資料交叉解籤',model:'Qwen 3.8 27B → GPT-OSS 120B → GLM 4.7 Flash',path:'繁星心鏡 → 主選單 → 超級管理員 → AI 設定',url:'https://mirror.starry.phd/admin',mode:'realtime' },
   { id:'echo.qa',app:'繁星回聲',title:'AI 演講者留言答覆',description:'以逐字稿為根據回覆會員提問',model:'Gemma 4 26B（後台可切換）',path:'繁星回聲 → 管理後台 → 逐字稿管理 → AI 問答設定',url:'https://echo.starry.phd/?starryAiTarget=qa',mode:'realtime' },
   { id:'echo.translation',app:'繁星回聲',title:'逐字稿翻譯',description:'依會員要求翻譯已完成逐字稿',model:'GPT-OSS 20B',path:'繁星回聲 → 音檔 → 逐字稿 → 翻譯',url:'https://echo.starry.phd/',mode:'interactive' },
   { id:'echo.bio',app:'繁星回聲',title:'演講者 AI 簡介摘要',description:'綜合公開逐字稿產生演講者介紹',model:'GLM 4.7 Flash',path:'繁星回聲 → 管理後台 → 演講者管理',url:'https://echo.starry.phd/?starryAiTarget=speaker',mode:'background' },
@@ -47,13 +47,27 @@ export function validateAiOrder(input:unknown):AiTaskOrder[] {
   }
   return output.sort((a,b)=>a.tier-b.tier||a.order-b.order).map((a,i)=>({...a,order:i}));
 }
+// Preserve existing administrator priorities when a registered App adds a new AI task.
+export function mergeAiOrder(raw:unknown):AiTaskOrder[] {
+  if(!Array.isArray(raw))return DEFAULT_AI_ORDER;
+  const known=new Set<string>(AI_TASK_CATALOG.map(x=>x.id));
+  const seen=new Set<string>();
+  const ordered:AiTaskOrder[]=[];
+  for(const value of raw){
+    if(typeof value?.id!=='string'||!known.has(value.id)||seen.has(value.id)||![1,2,3].includes(value.tier))continue;
+    seen.add(value.id);
+    ordered.push({id:value.id,tier:value.tier,order:ordered.length});
+  }
+  for(const entry of DEFAULT_AI_ORDER)if(!seen.has(entry.id))ordered.push({...entry,order:ordered.length});
+  return validateAiOrder(ordered);
+}
 async function readConfig(env:ControlEnv) {
   const now=Date.now();
   if(now-configCache.at<10_000) return configCache;
   try {
     const db=store(env);await ensure(db);
     const row=await db.prepare("SELECT value,updatedAt FROM starry_ai_config WHERE key='priority' LIMIT 1").first();
-    const entries=row?validateAiOrder(JSON.parse(row.value)):DEFAULT_AI_ORDER;
+    const entries=row?mergeAiOrder(JSON.parse(row.value)):DEFAULT_AI_ORDER;
     configCache.at=now;configCache.entries=entries;configCache.source=row?'saved':'default';
     configCache.updatedAt=Number(row?.updatedAt||0);
   }catch(e){ console.warn('AI priority default or last-known retained');configCache.at=now; }
