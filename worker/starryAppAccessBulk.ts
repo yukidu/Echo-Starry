@@ -53,7 +53,7 @@ function failure(message:string, status=409){
 function success(value:any){
   return new Response(JSON.stringify(value),{headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 }
-function parseSelection(raw:any):Selection{
+export function parseBulkSelection(raw:any):Selection{
   if(!raw||typeof raw!=='object'||!['filtered','manual'].includes(raw.scope))throw Error('請重新選取會員');
   if(raw.scope==='manual'){
     const ids=raw.userIds;
@@ -78,7 +78,7 @@ function selectionSQL(selection:Selection):{where:string;params:any[]}{
   }
   if(selection.rank){
     clauses.push(RANK_EXPR+'=?');
-    params.push(selection.rank);
+    params.push(selection.rank==='__unapproved__'?'':selection.rank);
   }
   return {where:clauses.join(' AND '),params};
 }
@@ -94,7 +94,7 @@ function describe(job:any){
     createdAt:Number(job.createdAt),expiresAt:Number(job.expiresAt)};
 }
 async function preview(db:any,actor:string,input:Intent,apps:string[]){
-  const selection=parseSelection(input?.selection);
+  const selection=parseBulkSelection(input?.selection);
   if(!['grant','revoke','replace'].includes(input?.mode))throw Error('設定方式不正確');
   if(!Array.isArray(input.appIds)||new Set(input.appIds).size!==input.appIds.length||!input.appIds.every(v=>typeof v==='string'&&apps.includes(v)))throw Error('App 名稱不正確');
   if(input.mode!=='replace'&&!input.appIds.length)throw Error('請勾選至少一個 App');
@@ -229,6 +229,16 @@ async function step(db:any,actor:string,id:string){
     await db.prepare('UPDATE starry_app_access_bulk_jobs SET lockUntil=NULL WHERE id=? AND actorUserId=?').bind(id,actor).run().catch(()=>undefined);
   }
 }
+async function details(db:any,actor:string,id:string,offset:number){
+  const job=await loadJob(db,id,actor);
+  const safeOffset=Number.isSafeInteger(offset)&&offset>=0?Math.min(offset,100000):0;
+  const rows:any=await db.prepare(`SELECT b.userId,p.name,b.appId,b.beforeDecision,b.afterDecision,b.applied,b.reverted
+    FROM starry_app_access_bulk_items b LEFT JOIN profiles p ON p.userId=b.userId
+    WHERE b.jobId=? ORDER BY b.userId,b.appId LIMIT 200 OFFSET ?`).bind(job.id,safeOffset).all();
+  const items=rows?.results||[];
+  return {jobId:job.id,totalChanges:Number(job.totalChanges),items,nextOffset:safeOffset+items.length,
+    hasMore:safeOffset+items.length<Number(job.totalChanges)};
+}
 async function recent(db:any,actor:string){
   const r:any=await db.prepare(`SELECT id,mode,status,memberCount,totalChanges,doneChanges,revertedChanges,createdAt,expiresAt,lastError
     FROM starry_app_access_bulk_jobs WHERE actorUserId=? AND status<>'preview'
@@ -248,6 +258,8 @@ export async function handleStarryAppAccessBulk(request:Request,env:BulkEnv,acto
     if(path==='/api/admin/app-access/bulk/confirm'&&method==='POST')return success(await confirm(db,actor,input));
     if(path==='/api/admin/app-access/bulk/step'&&method==='POST')return success(await step(db,actor,id));
     if(path==='/api/admin/app-access/bulk/status'&&method==='GET')return success(await report(db,actor,id));
+    if(path==='/api/admin/app-access/bulk/details'&&method==='GET')
+      return success(await details(db,actor,id,Number(new URL(request.url).searchParams.get('offset')||0)));
     if(path==='/api/admin/app-access/bulk/history'&&method==='GET')return success(await recent(db,actor));
     if(path==='/api/admin/app-access/bulk/undo-preview'&&method==='POST')return success(await undoPreview(db,actor,id));
     if(path==='/api/admin/app-access/bulk/undo-confirm'&&method==='POST')return success(await confirmUndo(db,actor,input));
