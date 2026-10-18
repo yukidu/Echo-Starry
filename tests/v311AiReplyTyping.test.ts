@@ -38,8 +38,8 @@ test('answer model has room for reasoning and does not spend user batteries on f
 });
 test('reusable transparent Ai emblem has mixed-case letters and animated rainbow outline',()=>{
   assert.match(badge,/>Ai<\/span>/);
-  assert.match(badgeCss,/conic-gradient/);
-  assert.match(badgeCss,/hue-rotate/);
+  assert.match(badgeCss,/linear-gradient/);
+  assert.match(badgeCss,/starry-ai-border-flow/);
   assert.match(badgeCss,/prefers-reduced-motion/);
   assert.match(comments,/AiBadge/);
 });

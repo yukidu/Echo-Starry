@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { createRoot, Root } from 'react-dom/client';
 import { Edit2, Search, Trash2, X, Users, UserRound } from 'lucide-react';
 import { TranscriptQaAdmin } from './components/TranscriptQaAdmin';
+import { SpeakerNameLink } from './components/SpeakerNameLink';
 import { AiSpeakerAdmin } from './components/AiSpeakerAdmin';
 import { AiBadge } from './components/AiBadge';
 import { UploadModal } from './components/UploadModal';
@@ -355,7 +356,7 @@ function TrackManagement() {
               <div className="v161-track-row" key={track.id}>
                 <div className="min-w-0">
                   <div className="v161-track-title">{track.title || '未命名音檔'}</div>
-                  <div className="v161-track-meta">{track.speaker || '未設定講者'}{speakerRank} · {permission} · 上傳 {formatDate(track.uploadDate)}</div>
+                  <div className="v161-track-meta">{track.speaker ? <SpeakerNameLink name={track.speaker}/> : '未設定講者'}{speakerRank} · {permission} · 上傳 {formatDate(track.uploadDate)}</div>
                   {transcriptBadge && (
                     <div
                       className={`v161-transcript-status ${transcriptBadge.className}`}

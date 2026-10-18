@@ -1,4 +1,5 @@
 import { effectiveMemberRank } from '../utils/ranks';
+import { SpeakerNameLink } from './SpeakerNameLink';
 import React, { useState, useEffect } from 'react';
 import {
   X,
@@ -352,7 +353,7 @@ export const MemberPreviewModal: React.FC<MemberPreviewModalProps> = ({
                         {track.title}
                       </p>
                       <p className="text-[10px] text-slate-500">
-                        主講：{track.speaker}{track.speakerRank ? `·${track.speakerRank}` : ''}
+                        主講：<SpeakerNameLink name={track.speaker}/>{track.speakerRank ? `·${track.speakerRank}` : ''}
                       </p>
                     </div>
                     <div className="flex items-center gap-0.5 text-amber-400 shrink-0">
@@ -431,7 +432,7 @@ export const MemberPreviewModal: React.FC<MemberPreviewModalProps> = ({
                             {track.title}
                           </p>
                           <p className="text-[10px] text-slate-500">
-                            主講：{track.speaker}{track.speakerRank ? `·${track.speakerRank}` : ''}
+                            主講：<SpeakerNameLink name={track.speaker}/>{track.speakerRank ? `·${track.speakerRank}` : ''}
                           </p>
                         </div>
                         {isCompleted ? (

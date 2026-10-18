@@ -315,7 +315,9 @@ function syncAll() {
 function queueSync() {
   if (syncQueued) return;
   syncQueued = true;
-  queueMicrotask(() => {
+  // Never synchronously schedule another microtask from the MutationObserver.
+  // One pass per animation frame avoids starving touch/click handling on Android.
+  requestAnimationFrame(() => {
     syncQueued = false;
     syncAll();
   });
@@ -346,8 +348,25 @@ document.addEventListener('click', event => {
 installV139Styles();
 syncAll();
 
-const observer = new MutationObserver(queueSync);
-observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+const observer = new MutationObserver(records => {
+  // Notifications, chat comments and profile data do not require upload-tab
+  // synchronization. Ignore their DOM mutations instead of rescanning the
+  // complete document and creating a feedback loop.
+  if (document.body.dataset.mainTab === 'notifications') return;
+  const relevant = records.some(record => {
+    const target = record.target instanceof Element ? record.target : record.target.parentElement;
+    if (target?.closest('.upload-page,.audio-card,.brand-logo-glow,.navbar-menu-panel,[title="點擊展開分類選單"]')) return true;
+    if (record.type === 'characterData') return false;
+    return Array.from(record.addedNodes).some(node =>
+      node instanceof Element && (
+        node.matches('.upload-page,.audio-card,.brand-logo-glow,.navbar-menu-panel,[title="點擊展開分類選單"]') ||
+        !!node.querySelector('.upload-page,.audio-card,.brand-logo-glow,[title="點擊展開分類選單"]')
+      )
+    );
+  });
+  if(relevant)queueSync();
+});
+observer.observe(document.body, {childList:true,subtree:true,characterData:true});
 window.addEventListener('pageshow', syncAll);
 window.addEventListener('storage', event => {
   if (event.key === 'sq_current_user_v1') syncAll();

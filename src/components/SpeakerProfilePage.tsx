@@ -4,7 +4,7 @@ import {AiBadge} from './AiBadge';
 type TrackSummary={id:string;title:string;speakerRank?:string;speakerAvatar?:string;uploadDate?:string;durationSeconds?:number;requiredRank?:string};
 type QaPair={answerId:string;questionId:string;trackId:string;title:string;rank?:string;asker:string;question:string;answer:string;createdAt:number};
 type ProfileData={speaker:{id:string;name:string;avatar:string;biography:string;bioStatus:string;bioUpdatedAt:number};tracks:TrackSummary[];replies:QaPair[];hasMore:boolean;nextOffset:number;hasMoreReplies:boolean;nextReplyOffset:number};
-export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrack:(trackId:string,commentId?:string)=>void}>=({name,onBack,onOpenTrack})=>{
+export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrack:(trackId:string,commentId?:string)=>void;compact?:boolean}>=({name,onBack,onOpenTrack,compact=false})=>{
   const [data,setData]=useState<ProfileData|null>(null);
   const [error,setError]=useState('');
   const [loading,setLoading]=useState(true);
@@ -38,8 +38,8 @@ export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrac
     }catch(e){setError(e instanceof Error?e.message:'載入失敗');}
     finally{setMore(false);}
   };
-  return <main data-echo-page="speaker-profile" className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-5 pb-28 space-y-5 text-slate-800 dark:text-slate-100">
-    <button type="button" onClick={onBack} className="inline-flex items-center gap-1 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm"><ChevronLeft size={17}/>返回上一頁</button>
+  return <main data-echo-page="speaker-profile" className={'w-full max-w-4xl mx-auto px-4 sm:px-6 space-y-5 text-slate-800 dark:text-slate-100 '+(compact?'py-3 pb-5':'py-5 pb-28')}>
+    {!compact&&<button type="button" onClick={onBack} className="inline-flex items-center gap-1 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm"><ChevronLeft size={17}/>返回上一頁</button>}
     {loading&&<p role="status" className="text-center py-12">正在載入演講者資料…</p>}
     {error&&<p role="alert" className="text-rose-600">{error}</p>}
     {data&&<><header className="rounded-2xl p-4 bg-white/90 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-sm">

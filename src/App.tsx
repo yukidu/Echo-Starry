@@ -204,11 +204,32 @@ function trackMatchesHomeBaseFilters(
 export default function App() {
   // Navigation & View States
   const [currentTab, setCurrentTab] = useState<NavTab>('home');
+  // Let lightweight legacy UI enhancements skip DOM scanning while the inbox is open.
+  // Without this marker, the global observer's notification guard cannot work.
+  useEffect(() => {
+    document.body.dataset.mainTab = currentTab;
+    return () => { delete document.body.dataset.mainTab; };
+  }, [currentTab]);
   const [speakerProfileName,setSpeakerProfileName] = useState<string|null>(()=>{
     if(typeof window==='undefined'||!window.location.hash.startsWith('#/speaker/'))return null;
     try{return decodeURIComponent(window.location.hash.slice('#/speaker/'.length)).slice(0,100);}catch{return null;}
   });
 
+  // Names across every route use the same compact speaker overlay.
+  useEffect(() => {
+    const open=(event:Event)=>{
+      const name=(event as CustomEvent<{name?:string}>).detail?.name?.trim();
+      if(name && name.length<=100)setSpeakerProfileName(name);
+    };
+    window.addEventListener('echostars:open-speaker',open);
+    return ()=>window.removeEventListener('echostars:open-speaker',open);
+  },[]);
+  useEffect(()=>{
+    if(!speakerProfileName)return;
+    const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')setSpeakerProfileName(null);};
+    document.addEventListener('keydown',onKey);
+    return ()=>document.removeEventListener('keydown',onKey);
+  },[speakerProfileName]);
   // Dynamic Categories (Requirement 5: 後台修改或刪除分類標籤後，首頁下拉選單同步更新)
   const [categoryOptions, setCategoryOptions] = useState<string[]>(() => {
     const cached = readHomeCache();
@@ -798,7 +819,7 @@ export default function App() {
       closeTransientUi();
 
       const state = event.state as AppHistoryState | null;
-      setSpeakerProfileName(state?.view==='speaker' ? state.speakerName||null : null);
+      setSpeakerProfileName(null);
       setIsProfileOpen(state?.tab === 'profile');
       setIsStickersOpen(state?.tab === 'stickers');
 
@@ -861,9 +882,7 @@ export default function App() {
       (currentTrack && playerMode === 'expanded' ? currentTrack : null);
 
     let nextState: AppHistoryState;
-    if (speakerProfileName) {
-      nextState={echostars:true,view:'speaker',speakerName:speakerProfileName};
-    } else if (isUploadOpen) {
+    if (isUploadOpen) {
       nextState={echostars:true,view:'tab',tab:'upload'};
     } else if (isProfileOpen || isStickersOpen) {
       nextState={echostars:true,view:'tab',tab:isProfileOpen?'profile':'stickers'};
@@ -890,7 +909,6 @@ export default function App() {
     }
   }, [
     currentTab,
-    speakerProfileName,
     isUploadOpen,
     isProfileOpen,
     isStickersOpen,
@@ -2619,14 +2637,7 @@ export default function App() {
           setSelectedDetailTrack(prev => prev ? byId.get(prev.id) || prev : prev);
         }}
       />
-      </Suspense>) : speakerProfileName ? (<Suspense fallback={<p role="status" className="p-8 text-center">正在載入講者資料…</p>}><SpeakerProfilePage name={speakerProfileName} onBack={()=>{
-          if(window.history.state?.view==='speaker')window.history.back();
-          else setSpeakerProfileName(null);
-        }} onOpenTrack={(id,commentId)=>{
-          const t=tracks.find(v=>v.id===id);
-          setSpeakerProfileName(null);
-          if(t)openTrackDetail(t,commentId);
-        }}/></Suspense>) : currentTab === 'install' ? (<IOSInstallPage onBack={handleReturnToHomePlaylist}/>) : currentTab === 'stats' ? (
+      </Suspense>) : currentTab === 'install' ? (<IOSInstallPage onBack={handleReturnToHomePlaylist}/>) : currentTab === 'stats' ? (
           <StatisticsView
             tracks={tracks}
             users={allUsers}
@@ -2713,7 +2724,7 @@ export default function App() {
                   setIsBwExportOpen(true);
                 }}
                 onViewMember={user => setPreviewMember(user)}
-                onViewSpeaker={name=>{setSpeakerProfileName(name);window.scrollTo({top:0,behavior:'auto'});}}
+                onViewSpeaker={name=>setSpeakerProfileName(name)}
                 onUpdateTrack={handleUpdateTrack}
                 isVipUnlocked={isTrackVipUnlocked(activeTrack)}
                 onVipBlocked={(anchor) => showPermissionAlert('此錄音檔為【私密VIP】專屬內容，請向上傳者取得專屬授權連結後再播放。', anchor)}
@@ -3341,6 +3352,28 @@ export default function App() {
 
       {stickerSpend && <StickerSpendDialog {...stickerSpend} balance={stickerSummary?.balance} onResolve={resolveStickerSpend} />}
 
+
+      {/* Compact speaker profile above whichever page is currently open. */}
+      {speakerProfileName && <div role="presentation" className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/55 px-3 py-5 sm:px-6"
+        onMouseDown={event=>{if(event.currentTarget===event.target)setSpeakerProfileName(null);}}>
+        <section role="dialog" aria-modal="true" aria-label={speakerProfileName+' 的演講者個人資訊'}
+          className="relative w-full max-w-[570px] max-h-[79dvh] flex flex-col overflow-hidden rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-700">
+          <div className="flex items-center justify-between shrink-0 border-b border-slate-200 dark:border-slate-700 px-4 py-2">
+            <strong className="text-sm text-slate-700 dark:text-slate-200">演講者個人資訊</strong>
+            <button type="button" aria-label="關閉演講者資料視窗" onClick={()=>setSpeakerProfileName(null)}
+              className="rounded-xl p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"><X size={22}/></button>
+          </div>
+          <div className="min-h-0 overflow-y-auto overscroll-contain">
+            <Suspense fallback={<p role="status" className="p-8 text-center">正在載入演講者資訊…</p>}>
+              <SpeakerProfilePage compact name={speakerProfileName} onBack={()=>setSpeakerProfileName(null)} onOpenTrack={(id,commentId)=>{
+                const target=tracks.find(t=>t.id===id);
+                setSpeakerProfileName(null);
+                if(target)openTrackDetail(target,commentId);
+              }}/>
+            </Suspense>
+          </div>
+        </section>
+      </div>}
 
       {/* Version Changelog Modal */}
       {isChangelogOpen && <Suspense fallback={<div role="status" className="fixed inset-0 z-50 grid place-items-center bg-black/50 text-white">載入功能中…</div>}>

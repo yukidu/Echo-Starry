@@ -1,4 +1,5 @@
 import { effectiveMemberRank } from '../utils/ranks';
+import { SpeakerNameLink } from './SpeakerNameLink';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Trophy,
@@ -842,7 +843,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
                           {t.title}
                         </p>
                         <p className="text-[10px] text-slate-400 truncate">
-                          {t.speaker}{t.speakerRank ? ` · ${t.speakerRank}` : ''}
+                          <SpeakerNameLink name={t.speaker}/>{t.speakerRank ? ` · ${t.speakerRank}` : ''}
                         </p>
                       </div>
                     </div>
@@ -884,7 +885,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
                           {t.title}
                         </p>
                         <p className="text-[10px] text-slate-400 truncate">
-                          {t.speaker}{t.speakerRank ? ` · ${t.speakerRank}` : ''}
+                          <SpeakerNameLink name={t.speaker}/>{t.speakerRank ? ` · ${t.speakerRank}` : ''}
                         </p>
                       </div>
                     </div>
@@ -932,7 +933,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
                           {t.title}
                         </p>
                         <p className="text-[10px] text-slate-400 truncate">
-                          {t.speaker}{t.speakerRank ? ` · ${t.speakerRank}` : ''}
+                          <SpeakerNameLink name={t.speaker}/>{t.speakerRank ? ` · ${t.speakerRank}` : ''}
                         </p>
                       </div>
                     </div>
@@ -1216,7 +1217,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
                                   <div className="flex items-center gap-2 min-w-0 pr-2">
                                     <Radio className="w-3.5 h-3.5 text-teal-500 shrink-0" />
                                     <span className="font-bold text-slate-800 dark:text-slate-200 truncate">{t.title}</span>
-                                    <span className="text-[11px] text-slate-400 shrink-0">· {t.speaker}</span>
+                                    <span className="text-[11px] text-slate-400 shrink-0">· <SpeakerNameLink name={t.speaker}/></span>
                                   </div>
                                   <div className="flex items-center gap-2 shrink-0">
                                     <span className="text-[10px] text-slate-400 font-mono">{t.playCount || 0} 次點播</span>
@@ -1282,7 +1283,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1 flex-wrap pl-8">
-                        <span className="text-[10px] text-slate-400 mr-1">講師: {t.speaker}</span>
+                        <span className="text-[10px] text-slate-400 mr-1">講師: <SpeakerNameLink name={t.speaker}/></span>
                         {(t.keywords || []).slice(0, 4).map(kw => (
                           <span
                             key={kw}
