@@ -302,24 +302,34 @@ async function adjustBattery(request: Request, env: Env) {
     balanceUnits: Number(existing.balanceAfterUnits || 0)
   });
 
-  const before = await batteryBalance(db, identity.userId);
-  const after = before + deltaUnits;
-  if (after < 0) return json({ error: 'insufficient_battery', balanceUnits: before }, 402);
+  // Ensure the member account exists, then conditionally insert a transaction
+  // and adjust its balance in one atomic D1 batch. This prevents other app
+  // requests from overwriting a concurrent balance update.
+  await batteryBalance(db, identity.userId);
   const now = Date.now();
   const id = `mirror-${crypto.randomUUID()}`;
   try {
-    await db.batch([
-      db.prepare('UPDATE battery_accounts SET balanceUnits=?,updatedAt=? WHERE userId=?').bind(after, now, identity.userId),
+    const results: any[] = await db.batch([
       db.prepare(`INSERT INTO battery_transactions
         (id,userId,deltaUnits,balanceAfterUnits,type,sourceApp,sourceId,description,actorUserId,uniqueKey,createdAt,sourceLabel)
-        VALUES(?,?,?,?,?,'starry-mirror',?,?,?,?,?,'繁星心鏡')`)
-        .bind(id, identity.userId, deltaUnits, after, type, sourceId || null, description, identity.userId, uniqueKey, now)
+        SELECT ?,a.userId,?,a.balanceUnits+?,?,'starry-mirror',?,?,?,?,?,'繁星心鏡'
+        FROM battery_accounts a
+        WHERE a.userId=? AND a.balanceUnits+?>=0`)
+        .bind(id,deltaUnits,deltaUnits,type,sourceId||null,description,identity.userId,uniqueKey,now,identity.userId,deltaUnits),
+      db.prepare(`UPDATE battery_accounts SET balanceUnits=balanceUnits+?,updatedAt=?
+        WHERE userId=? AND EXISTS (SELECT 1 FROM battery_transactions WHERE uniqueKey=?)`)
+        .bind(deltaUnits,now,identity.userId,uniqueKey)
     ]);
+    if(Number(results?.[0]?.meta?.changes||0)!==1){
+      const balance = await batteryBalance(db, identity.userId);
+      return json({error:'insufficient_battery',balanceUnits:balance},402);
+    }
   } catch (error: any) {
     const raced: any = await db.prepare('SELECT deltaUnits,balanceAfterUnits FROM battery_transactions WHERE uniqueKey=? LIMIT 1').bind(uniqueKey).first().catch(() => null);
     if (raced) return json({ success: true, duplicate: true, deltaUnits: Number(raced.deltaUnits || 0), balanceUnits: Number(raced.balanceAfterUnits || 0) });
     throw error;
   }
+  const after = await batteryBalance(db, identity.userId);
   return json({ success: true, duplicate: false, deltaUnits, balanceUnits: after });
 }
 
