@@ -33,6 +33,8 @@ type TranscriptFile = {
   durationSeconds: number;
   text: string;
   segments: TranscriptSegment[];
+  cleanedSegments?: {id:string;text:string}[];
+  cleanupVersion?: number;
 };
 
 type BatteryResult = { inserted: boolean; insufficient?: boolean; balanceUnits: number; transaction?: any };
@@ -220,6 +222,10 @@ async function loadTranscript(env: TranscriptEnv, trackId: string): Promise<Tran
   return JSON.parse(await object.text()) as TranscriptFile;
 }
 
+function cleanedBaseline(transcript: TranscriptFile,segmentId:string,original:string){
+  const cleaned=transcript.cleanedSegments?.find(s=>s.id===segmentId);
+  return cleaned?.text || original;
+}
 async function applyCorrections(env: TranscriptEnv, transcript: TranscriptFile) {
   const rows = await env.DB.prepare(`SELECT c.segmentId,c.newText FROM transcript_corrections c
     JOIN (SELECT segmentId,MAX(createdAt) AS newest FROM transcript_corrections
@@ -228,7 +234,7 @@ async function applyCorrections(env: TranscriptEnv, transcript: TranscriptFile) 
     .bind(transcript.trackId, Number(transcript.createdAt || 0), transcript.trackId, Number(transcript.createdAt || 0)).all();
   const map = new Map<string, string>();
   for (const row of rows.results || []) map.set(text(row.segmentId), text(row.newText));
-  return transcript.segments.map(seg => ({ ...seg, text: map.get(seg.id) || seg.text }));
+  return transcript.segments.map(seg => ({ ...seg, text: map.get(seg.id) || cleanedBaseline(transcript,seg.id,seg.text) }));
 }
 
 async function getTranscriptApi(request: Request, env: TranscriptEnv, trackId: string) {
@@ -315,8 +321,8 @@ async function correctSegmentApi(request: Request, env: TranscriptEnv, ctx: Exec
   if (!transcript) return json({ error: '逐字稿尚未完成' }, 409);
   const base = transcript.segments.find(seg => seg.id === segmentId);
   if (!base) return json({ error: '找不到這一句逐字稿' }, 404);
-  const latest: any = await env.DB.prepare('SELECT newText FROM transcript_corrections WHERE trackId=? AND segmentId=? ORDER BY createdAt DESC LIMIT 1').bind(trackId, segmentId).first();
-  const currentText = text(latest?.newText || base.text);
+  const latest: any = await env.DB.prepare('SELECT newText FROM transcript_corrections WHERE trackId=? AND segmentId=? AND createdAt>=? ORDER BY createdAt DESC LIMIT 1').bind(trackId, segmentId,Number(transcript.createdAt||0)).first();
+  const currentText = text(latest?.newText || cleanedBaseline(transcript,segmentId,base.text));
   if (expectedText && expectedText !== currentText) return json({ error: '這一句剛被其他會員更新，請重新讀取後再修正', currentText }, 409);
   if (newText === currentText) return json({ success: true, text: currentText, rewardGranted: false, reward: 0 });
   const correctionId = 'transcript-correction-' + crypto.randomUUID();
