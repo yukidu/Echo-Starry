@@ -18,7 +18,7 @@ const memberRouter = readFileSync('worker/transcriptMemberNotificationsRouter.ts
 test('v302 loads one consolidated transcript client, stable UI layer and refreshed battery settings', () => {
   assert.doesNotThrow(() => new Function(ui));
   assert.doesNotThrow(() => new Function(batteryUi));
-  assert.match(html, /transcript-client-v290\.js\?v=293[\s\S]*transcript-ui-v297\.js\?v=301[\s\S]*transcript-battery-settings-v301\.js\?v=302/);
+  assert.match(html, /transcript-client-v290\.js\?v=317[\s\S]*transcript-ui-v297\.js\?v=301[\s\S]*transcript-battery-settings-v301\.js\?v=302/);
   assert.doesNotMatch(html, /transcript-ui-v293\.js\?v=296|transcript-ui-v292|transcript-presentation-v28[4589]|transcript-client\.js/);
 });
 
