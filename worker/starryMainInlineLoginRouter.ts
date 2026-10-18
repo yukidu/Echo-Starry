@@ -4,6 +4,7 @@ import { handleStarryIdRandomMotto } from './starryIdRandomMottoRouter';
 import { handleStarryEcosystemAuthEntry } from './starryEcosystemAuthEntryRouter';
 import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
 import { handleQaRequest, processQaAfterComment } from './aiSpeakerQaRouter';
+import { handleQaTestRequest } from './aiSpeakerQaTestRouter';
 import { handleSpeakerProfileRequest } from './aiSpeakerProfileRouter';
 import { handleStoryAttributionRequest } from './aiSpeakerStoryRouter';
 import { generateNextSpeakerBiography } from './aiSpeakerBiographyScheduler';
@@ -290,6 +291,12 @@ export default {
     if (url.pathname.startsWith('/api/speaker-profiles/')) {
       const speakerProfile = await handleSpeakerProfileRequest(request, env as any);
       if (speakerProfile) return speakerProfile;
+    }
+
+    // Isolated owner-only A/B tests must bypass public comment creation.
+    if (url.pathname === '/api/qa/test' || url.pathname === '/api/qa/test/status') {
+      const trial = await handleQaTestRequest(request, env as any);
+      if (trial) return trial;
     }
 
     // First-party transcript QA management and public quota status.

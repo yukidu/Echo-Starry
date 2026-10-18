@@ -187,7 +187,7 @@ async function fail(env:Env,q:any,id:string,msg:string){
   await env.DB.prepare("UPDATE qa_claims SET status='failed',error=? WHERE commentId=? AND status='pending'").bind(msg.slice(0,300),id).run();
   await releaseCounters(env,q);
 }
-async function excerpts(env:Env,track:any,u:any,mode:string,question:string){
+export async function excerpts(env:Env,track:any,u:any,mode:string,question:string){
   let rows=[track];
   if(mode==='all'){
     const data=await env.DB.prepare("SELECT * FROM tracks WHERE audioUrl IS NOT NULL AND TRIM(audioUrl)<>'' ORDER BY uploadDate DESC LIMIT 180").all();
