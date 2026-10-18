@@ -572,7 +572,7 @@ async function updateProfile(
   return publicMember(await readMember(db, userId));
 }
 
-async function listMembers(db: any, search: string) {
+async function listMembers(db: any, search: string, offset = 0) {
   const q = text(search).slice(0, 80);
   const like = `%${q}%`;
   const where = q
@@ -584,7 +584,7 @@ async function listMembers(db: any, search: string) {
     FROM users u LEFT JOIN profiles p ON p.userId=u.id
     ${where}
     ORDER BY LOWER(COALESCE(p.name,'')),LOWER(u.primaryEmail)
-    LIMIT 100`).bind(...params).all();
+    LIMIT 100 OFFSET ?`).bind(...params,offset).all();
   const countRow: any = await db.prepare(`SELECT COUNT(*) AS count
     FROM users u LEFT JOIN profiles p ON p.userId=u.id ${where}`).bind(...params).first();
   return {
@@ -750,8 +750,11 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
     const session = await sessionUser(request, env);
     if (!session) return json(request, { error: '請先登入 Starry ID' }, 401);
     if (!session.isSuperAdmin) return json(request, { error: '只有超級管理員可以管理全部會員。' }, 403);
-    const search = new URL(request.url).searchParams.get('search') || '';
-    return json(request, await listMembers(db, search));
+    const url = new URL(request.url);
+    const search = url.searchParams.get('search') || '';
+    const rawOffset = Number(url.searchParams.get('offset') || 0);
+    const offset = Number.isSafeInteger(rawOffset) && rawOffset >= 0 ? Math.min(rawOffset, 100000) : 0;
+    return json(request, await listMembers(db, search, offset));
   }
 
   const adminMemberMatch = path.match(/^\/api\/admin\/members\/([^/]+)$/);
