@@ -28,6 +28,28 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     .access-toggle.allow{border-color:#408e78;color:#97efce}
     .access-toggle.deny{border-color:#9b5662;color:#ffc4c9}
     .access-single-actions{display:flex;gap:7px;flex-wrap:wrap;margin-left:auto}
+    /* Dense member directory only; keep buttons usable on narrow touch screens. */
+    .layout.admin-open{grid-template-columns:minmax(320px,410px) minmax(0,1fr)}
+    .admin-panel{padding:9px 10px}
+    .admin-title{margin-bottom:6px}
+    .admin-title h3{font-size:15px}
+    .admin-panel .search{padding:7px 9px;border-radius:8px;font-size:13px}
+    .member-filter-row{display:flex;align-items:center;gap:5px;margin:4px 0}
+    .member-filter-row select{flex:1;min-width:0;padding:6px 8px;background:#0b1528;color:var(--text);border:1px solid var(--line);border-radius:8px;font-size:12px}
+    .member-filter-row .btn{padding:6px 7px;font-size:11px}
+    .admin-panel .access-toolbar{margin-top:3px;gap:3px}
+    .admin-panel .access-toolbar .btn{padding:7px 9px;font-size:12px}
+    .member-select-label{display:flex;align-items:center;gap:5px;font-size:12px;min-height:30px;cursor:pointer}
+    .member-select-label input{width:19px;height:19px;accent-color:#91b0ff}
+    .admin-panel .members{gap:2px;margin-top:4px}
+    .admin-panel .access-member-row{gap:6px;min-height:42px}
+    .admin-panel .access-member-row>input{margin:0;width:19px;height:19px}
+    .admin-panel .member-item{padding:4px 7px;border-radius:7px;min-height:39px}
+    .admin-panel .member-item strong{font-size:14px;line-height:1.25}
+    .admin-panel .member-item span{font-size:11px;line-height:1.15;margin-top:1px}
+    .member-directory-loading{font-size:12px;color:var(--muted);text-align:center;min-height:24px;padding:4px}
+    .bulk-progress{background:#172844;border:1px solid #536b91;border-radius:10px;padding:10px;margin:8px 0;font-size:13px;line-height:1.6}
+    @media(max-width:760px){.layout.admin-open{grid-template-columns:1fr}.admin-panel{position:static;max-height:none;overflow:visible}.admin-panel .member-item{min-height:42px}}
     .access-toolbar{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-top:10px}
     .access-toolbar span,.access-help{font-size:12px;color:var(--muted)}
     .access-member-row{display:flex;gap:8px;align-items:center}
@@ -78,10 +100,19 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     <main class="layout hidden" id="memberView">
       <aside class="admin-panel hidden" id="adminPanel">
         <div class="admin-title"><h3>全部會員</h3><span id="memberCount"></span></div>
-        <input class="search" id="memberSearch" placeholder="搜尋姓名或 Email" autocomplete="off">
-        <div class="access-toolbar"><span id="accessSelectedCount">已選 0 位</span><button type="button" class="btn primary" id="bulkAccessButton">批次設定 App 權限</button></div>
+        <input class="search" id="memberSearch" placeholder="搜尋姓名／Email／會員編號" autocomplete="off">
+        <div class="member-filter-row">
+          <label for="memberRankFilter" class="access-help">獎銜</label>
+          <select id="memberRankFilter"><option value="">全部已核准獎銜</option><option value="__unapproved__">未核准／未填寫</option></select>
+          <button type="button" class="btn" id="memberClearSelection">清除勾選</button>
+        </div>
+        <div class="access-toolbar">
+          <label class="member-select-label"><input id="memberSelectAll" type="checkbox">全選目前篩選結果</label>
+          <span id="accessSelectedCount">已選 0 位</span>
+          <button type="button" class="btn primary" id="bulkAccessButton">批次設定 App 權限</button>
+        </div>
         <div class="members" id="members"></div>
-        <div class="access-pager"><button type="button" class="btn" id="memberPrev">上一頁</button><span id="memberPage" class="access-help">第 1 頁</span><button type="button" class="btn" id="memberNext">下一頁</button></div>
+        <div class="member-directory-loading" id="memberLoadMore" aria-live="polite"></div>
       </aside>
       <section class="card" id="profileCard">
         <div class="identity" id="memberIdentity">
@@ -115,6 +146,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
           <section class="access-preview hidden" id="appAccessReview">
             <strong>請再次確認</strong>
             <div id="appAccessReviewText"></div>
+            <button class="btn hidden" id="appAccessDownloadPreviewBtn" type="button">下載完整變更清單（CSV）</button>
             <label for="appAccessConfirmText">輸入「確認變更」才能套用</label>
             <input id="appAccessConfirmText" autocomplete="off" placeholder="確認變更">
             <div class="access-fields">
@@ -122,6 +154,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
               <button class="btn" id="appAccessCancelBtn" type="button">取消</button>
             </div>
           </section>
+          <div class="bulk-progress hidden" id="appAccessBulkProgress" role="status" aria-live="polite"></div>
           <section class="access-history">
             <h3>操作紀錄與還原</h3>
             <div class="access-help">還原前也會再次顯示預覽。只有權限未被其他操作覆蓋時才可還原。</div>
@@ -147,7 +180,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
   <script>
   (() => {
     const CLIENT_ID = ${safeClientId};
-    const state = { session:null, user:null, isSuperAdmin:false, targetUserId:null, adminOpen:false, members:[], visibility:null, selectedIds:new Set(), memberOffset:0, accessApps:[], accessUserIds:[], accessPreview:null, accessLoadToken:0, accessLastRequest:null };
+    const state = { session:null, user:null, isSuperAdmin:false, targetUserId:null, adminOpen:false, members:[], visibility:null, selectedIds:new Set(), excludedIds:new Set(), selectionMode:'manual', memberOffset:0, memberTotal:0, memberHasMore:false, memberLoading:false, memberLoadToken:0, memberRanksLoaded:false, accessApps:[], accessUserIds:[], accessBulkSelection:null, accessPreview:null, accessLoadToken:0, accessLastRequest:null, bulkRunning:false };
     const $ = (id) => document.getElementById(id);
     const editable = [
       ['name','姓名',false],['amwayId','會員編號 / Amway ID',false],['phone','電話',false],['residence','居住地',false],
