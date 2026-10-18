@@ -5,7 +5,7 @@ type Db = any;
 type ControlEnv = { STARRY_ID_DB?: Db; DB?: Db; [key:string]:any };
 
 export const AI_TASK_CATALOG = Object.freeze([
-  { id:'mirror.reading',app:'繁星心鏡',title:'AI 個人化解籤',description:'生命靈數、金句、個人資料交叉解籤',model:'Qwen 3.8 27B → GPT-OSS 120B → GLM 4.7 Flash',path:'繁星心鏡 → 主選單 → 超級管理員 → AI 設定',url:'https://mirror.starry.phd/admin',mode:'realtime' },
+  { id:'mirror.reading',app:'繁星心鏡',title:'AI 個人化解籤',description:'生命靈數、金句、個人資料交叉解籤',model:'Qwen 3.8 27B → GPT-OSS 120B → GLM 4.7 Flash',path:'繁星心鏡 → 超級管理員 → AI 模型',url:'https://mirror.starry.phd/admin#ai-models',mode:'realtime' },
   { id:'echo.qa',app:'繁星回聲',title:'AI 演講者留言答覆',description:'以逐字稿為根據回覆會員提問',model:'Gemma 4 26B（後台可切換）',path:'繁星回聲 → 管理後台 → 逐字稿管理 → AI 問答設定',url:'https://echo.starry.phd/?starryAiTarget=qa',mode:'realtime' },
   { id:'echo.bio',app:'繁星回聲',title:'演講者 AI 簡介摘要',description:'綜合公開逐字稿產生演講者介紹',model:'GLM 4.7 Flash',path:'繁星回聲 → 管理後台 → 演講者管理',url:'https://echo.starry.phd/?starryAiTarget=speaker',mode:'background' },
   { id:'echo.transcribe',app:'繁星回聲',title:'錄音／影片轉逐字稿',description:'長音檔分段處理；已開始的工作不強制中斷',model:'Whisper Large V3 Turbo',path:'繁星回聲 → 管理後台 → 逐字稿',url:'https://echo.starry.phd/?starryAiTarget=transcript',mode:'background' },

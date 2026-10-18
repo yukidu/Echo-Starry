@@ -1,6 +1,7 @@
 import type { Env } from './index';
 import { sessionContext } from './starryIdProfileDirectoryRouter';
 import { recordAiActivity } from './starryAiManagement';
+import { calculateNumerology } from '../src/utils/numerology';
 
 const PUBLIC_HOST = 'id.starry.phd';
 const INTERNAL_HOST = 'starry-id.internal';
@@ -147,6 +148,7 @@ async function identityForUser(env: Env, userId: string) {
   const numerology = numerologyFromBirthday(row.birthday, row.talentNumber, row.lifeNumber);
   return {
     userId: text(row.id),
+    birthday: text(row.birthday),
     name: text(row.name),
     rank: text(row.rank),
     approvedRank: text(row.approvedRank),
@@ -200,6 +202,42 @@ async function verifyToken(request: Request, env: Env) {
     WHERE tokenHash=? AND appId=? LIMIT 1`).bind(tokenHash, APP_ID).first();
   if (!row || Number(row.expiresAt || 0) <= Date.now()) return null;
   return identityForUser(env, text(row.userId));
+}
+
+// A member may fill a missing birthday inside Mirror without exposing central profile writes
+// to the client. Only the bearer token's own profile is editable through this route.
+async function saveMirrorBirthday(request: Request, env: Env) {
+  const identity: any = await verifyToken(request, env);
+  if (!identity) return json({ error: '請先登入 Starry ID' }, 401);
+  if (identity.birthday) return json({ success: true, birthday: identity.birthday, alreadySaved: true, numerology: identity.numerology });
+  const body = await request.json().catch(() => ({}));
+  const birthday = text(body.birthday);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthday);
+  if (!match) return json({ error: '請選擇有效的出生年月日' }, 400);
+  const year = Number(match[1]), month = Number(match[2]), day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const now = new Date();
+  if (year < 1900 || date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day || date.getTime() > Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate())) {
+    return json({ error: '出生日期不能是未來日期，請重新選擇' }, 400);
+  }
+  const n = calculateNumerology(birthday);
+  if (!n) return json({ error: '請選擇有效的出生年月日' }, 400);
+  const db = (env as any).STARRY_ID_DB;
+  const stamp = Date.now();
+  const result: any = await db.prepare(`UPDATE profiles
+    SET birthday=?,zodiac=?,talentNumber=?,lifeNumber=?,updatedAt=?
+    WHERE userId=? AND (birthday IS NULL OR TRIM(birthday)='')`)
+    .bind(birthday,n.zodiac,n.talentNumber,n.lifeNumber,stamp,identity.userId).run();
+  if (Number(result?.meta?.changes || 0) === 1) {
+    await db.prepare(`INSERT INTO profile_audit_logs
+      (id,userId,appId,actorUserId,fieldName,oldValue,newValue,createdAt)
+      VALUES (?,?,?,?,?,?,?,?)`).bind(crypto.randomUUID(),identity.userId,APP_ID,identity.userId,'birthday','',birthday,stamp).run();
+  }
+  const latest: any = await identityForUser(env, identity.userId);
+  return latest?.birthday
+    ? json({ success: true, birthday: latest.birthday, numerology: latest.numerology })
+    : json({ error: '生日儲存失敗，請稍後再試' }, 503);
 }
 
 async function aiContext(request: Request, env: Env) {
@@ -264,24 +302,34 @@ async function adjustBattery(request: Request, env: Env) {
     balanceUnits: Number(existing.balanceAfterUnits || 0)
   });
 
-  const before = await batteryBalance(db, identity.userId);
-  const after = before + deltaUnits;
-  if (after < 0) return json({ error: 'insufficient_battery', balanceUnits: before }, 402);
+  // Ensure the member account exists, then conditionally insert a transaction
+  // and adjust its balance in one atomic D1 batch. This prevents other app
+  // requests from overwriting a concurrent balance update.
+  await batteryBalance(db, identity.userId);
   const now = Date.now();
   const id = `mirror-${crypto.randomUUID()}`;
   try {
-    await db.batch([
-      db.prepare('UPDATE battery_accounts SET balanceUnits=?,updatedAt=? WHERE userId=?').bind(after, now, identity.userId),
+    const results: any[] = await db.batch([
       db.prepare(`INSERT INTO battery_transactions
         (id,userId,deltaUnits,balanceAfterUnits,type,sourceApp,sourceId,description,actorUserId,uniqueKey,createdAt,sourceLabel)
-        VALUES(?,?,?,?,?,'starry-mirror',?,?,?,?,?,'繁星心鏡')`)
-        .bind(id, identity.userId, deltaUnits, after, type, sourceId || null, description, identity.userId, uniqueKey, now)
+        SELECT ?,a.userId,?,a.balanceUnits+?,?,'starry-mirror',?,?,?,?,?,'繁星心鏡'
+        FROM battery_accounts a
+        WHERE a.userId=? AND a.balanceUnits+?>=0`)
+        .bind(id,deltaUnits,deltaUnits,type,sourceId||null,description,identity.userId,uniqueKey,now,identity.userId,deltaUnits),
+      db.prepare(`UPDATE battery_accounts SET balanceUnits=balanceUnits+?,updatedAt=?
+        WHERE userId=? AND EXISTS (SELECT 1 FROM battery_transactions WHERE uniqueKey=?)`)
+        .bind(deltaUnits,now,identity.userId,uniqueKey)
     ]);
+    if(Number(results?.[0]?.meta?.changes||0)!==1){
+      const balance = await batteryBalance(db, identity.userId);
+      return json({error:'insufficient_battery',balanceUnits:balance},402);
+    }
   } catch (error: any) {
     const raced: any = await db.prepare('SELECT deltaUnits,balanceAfterUnits FROM battery_transactions WHERE uniqueKey=? LIMIT 1').bind(uniqueKey).first().catch(() => null);
     if (raced) return json({ success: true, duplicate: true, deltaUnits: Number(raced.deltaUnits || 0), balanceUnits: Number(raced.balanceAfterUnits || 0) });
     throw error;
   }
+  const after = await batteryBalance(db, identity.userId);
   return json({ success: true, duplicate: false, deltaUnits, balanceUnits: after });
 }
 
@@ -304,6 +352,7 @@ export async function handleStarryMirrorBridge(request: Request, env: Env): Prom
     return identity ? json({ authenticated: true, identity }) : json({ authenticated: false }, 401);
   }
   if (url.pathname === '/internal/starry-mirror/context') return aiContext(request, env);
+  if (url.pathname === '/internal/starry-mirror/birthday') return saveMirrorBirthday(request, env);
   if (url.pathname === '/internal/starry-mirror/ai-activity') {
     const identity=await verifyToken(request,env);
     if(!identity)return json({error:'invalid_app_session'},401);
