@@ -4,6 +4,8 @@
  * admin decisions take precedence. Cross-App enforcement is enabled only
  * after each App's server integration passes its own regression checks.
  */
+import { handleStarryAppAccessBulk } from './starryAppAccessBulk';
+
 type AccessEnv = {
   STARRY_ID_DB?: any;
   STARRY_ID_ALLOWED_APPS?: string;
@@ -231,6 +233,8 @@ export async function handleStarryAppAccessAdminRequest(request:Request, env:Acc
     if(path==='/api/admin/app-access/catalog'&&request.method==='GET')
       return api({apps:apps.map(id=>({id,label:APP_LABELS[id]||id})),protectedApp:PROTECTED_APP,maxMembers:MEMBER_LIMIT});
     await ensureAccessSchema(db);
+    if(path.startsWith('/api/admin/app-access/bulk/'))
+      return handleStarryAppAccessBulk(request,env,actorUserId,apps);
     const memberPath=path.match(/^\/api\/admin\/app-access\/member\/([A-Za-z0-9._:-]+)$/);
     if(memberPath && request.method==='GET'){
       const userId=memberPath[1];

@@ -46,11 +46,13 @@ test('Preview and a second confirmation are required to change member App permis
   assert.match(access, /revertedBy/);
 });
 
-test('Bulk selection is limited, supports paging and displays revert history', () => {
-  assert.match(router, /LIMIT 100 OFFSET \?/);
+test('Bulk selection supports unlimited visible scrolling and audited batch operations', () => {
+  assert.match(router, /LIMIT \? OFFSET \?/);
   assert.match(page, /access-member-row/);
   assert.match(page, /selectedIds:new Set\(\)/);
-  assert.match(page, /state\.selectedIds\.size>=50/);
+  assert.match(page, /全選目前篩選結果/);
+  assert.match(page, /selectedMemberCount\(\)/);
+  assert.match(page, /\/api\/admin\/app-access\/bulk\/preview/);
   assert.match(page, /option value="grant"/);
   assert.match(page, /option value="revoke"/);
   assert.match(page, /option value="replace"/);

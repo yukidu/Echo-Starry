@@ -28,6 +28,28 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     .access-toggle.allow{border-color:#408e78;color:#97efce}
     .access-toggle.deny{border-color:#9b5662;color:#ffc4c9}
     .access-single-actions{display:flex;gap:7px;flex-wrap:wrap;margin-left:auto}
+    /* Dense member directory only; keep buttons usable on narrow touch screens. */
+    .layout.admin-open{grid-template-columns:minmax(320px,410px) minmax(0,1fr)}
+    .admin-panel{padding:9px 10px}
+    .admin-title{margin-bottom:6px}
+    .admin-title h3{font-size:15px}
+    .admin-panel .search{padding:7px 9px;border-radius:8px;font-size:13px}
+    .member-filter-row{display:flex;align-items:center;gap:5px;margin:4px 0}
+    .member-filter-row select{flex:1;min-width:0;padding:6px 8px;background:#0b1528;color:var(--text);border:1px solid var(--line);border-radius:8px;font-size:12px}
+    .member-filter-row .btn{padding:6px 7px;font-size:11px}
+    .admin-panel .access-toolbar{margin-top:3px;gap:3px}
+    .admin-panel .access-toolbar .btn{padding:7px 9px;font-size:12px}
+    .member-select-label{display:flex;align-items:center;gap:5px;font-size:12px;min-height:30px;cursor:pointer}
+    .member-select-label input{width:19px;height:19px;accent-color:#91b0ff}
+    .admin-panel .members{gap:2px;margin-top:4px}
+    .admin-panel .access-member-row{gap:6px;min-height:42px}
+    .admin-panel .access-member-row>input{margin:0;width:19px;height:19px}
+    .admin-panel .member-item{padding:4px 7px;border-radius:7px;min-height:39px}
+    .admin-panel .member-item strong{font-size:14px;line-height:1.25}
+    .admin-panel .member-item span{font-size:11px;line-height:1.15;margin-top:1px}
+    .member-directory-loading{font-size:12px;color:var(--muted);text-align:center;min-height:24px;padding:4px}
+    .bulk-progress{background:#172844;border:1px solid #536b91;border-radius:10px;padding:10px;margin:8px 0;font-size:13px;line-height:1.6}
+    @media(max-width:760px){.layout.admin-open{grid-template-columns:1fr}.admin-panel{position:static;max-height:none;overflow:visible}.admin-panel .member-item{min-height:42px}}
     .access-toolbar{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-top:10px}
     .access-toolbar span,.access-help{font-size:12px;color:var(--muted)}
     .access-member-row{display:flex;gap:8px;align-items:center}
@@ -78,10 +100,19 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     <main class="layout hidden" id="memberView">
       <aside class="admin-panel hidden" id="adminPanel">
         <div class="admin-title"><h3>全部會員</h3><span id="memberCount"></span></div>
-        <input class="search" id="memberSearch" placeholder="搜尋姓名或 Email" autocomplete="off">
-        <div class="access-toolbar"><span id="accessSelectedCount">已選 0 位</span><button type="button" class="btn primary" id="bulkAccessButton">批次設定 App 權限</button></div>
+        <input class="search" id="memberSearch" placeholder="搜尋姓名／Email／會員編號" autocomplete="off">
+        <div class="member-filter-row">
+          <label for="memberRankFilter" class="access-help">獎銜</label>
+          <select id="memberRankFilter"><option value="">全部已核准獎銜</option><option value="__unapproved__">未核准／未填寫</option></select>
+          <button type="button" class="btn" id="memberClearSelection">清除勾選</button>
+        </div>
+        <div class="access-toolbar">
+          <label class="member-select-label"><input id="memberSelectAll" type="checkbox">全選目前篩選結果</label>
+          <span id="accessSelectedCount">已選 0 位</span>
+          <button type="button" class="btn primary" id="bulkAccessButton">批次設定 App 權限</button>
+        </div>
         <div class="members" id="members"></div>
-        <div class="access-pager"><button type="button" class="btn" id="memberPrev">上一頁</button><span id="memberPage" class="access-help">第 1 頁</span><button type="button" class="btn" id="memberNext">下一頁</button></div>
+        <div class="member-directory-loading" id="memberLoadMore" aria-live="polite"></div>
       </aside>
       <section class="card" id="profileCard">
         <div class="identity" id="memberIdentity">
@@ -115,6 +146,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
           <section class="access-preview hidden" id="appAccessReview">
             <strong>請再次確認</strong>
             <div id="appAccessReviewText"></div>
+            <button class="btn hidden" id="appAccessDownloadPreviewBtn" type="button">下載完整變更清單（CSV）</button>
             <label for="appAccessConfirmText">輸入「確認變更」才能套用</label>
             <input id="appAccessConfirmText" autocomplete="off" placeholder="確認變更">
             <div class="access-fields">
@@ -122,6 +154,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
               <button class="btn" id="appAccessCancelBtn" type="button">取消</button>
             </div>
           </section>
+          <div class="bulk-progress hidden" id="appAccessBulkProgress" role="status" aria-live="polite"></div>
           <section class="access-history">
             <h3>操作紀錄與還原</h3>
             <div class="access-help">還原前也會再次顯示預覽。只有權限未被其他操作覆蓋時才可還原。</div>
@@ -147,7 +180,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
   <script>
   (() => {
     const CLIENT_ID = ${safeClientId};
-    const state = { session:null, user:null, isSuperAdmin:false, targetUserId:null, adminOpen:false, members:[], visibility:null, selectedIds:new Set(), memberOffset:0, accessApps:[], accessUserIds:[], accessPreview:null, accessLoadToken:0, accessLastRequest:null };
+    const state = { session:null, user:null, isSuperAdmin:false, targetUserId:null, adminOpen:false, members:[], visibility:null, selectedIds:new Set(), excludedIds:new Set(), selectionMode:'manual', memberOffset:0, memberTotal:0, memberHasMore:false, memberLoading:false, memberLoadToken:0, memberRanksLoaded:false, activeSearch:'', activeRank:'', memberFilterPending:false, accessApps:[], accessUserIds:[], accessBulkSelection:null, accessPreview:null, accessLoadToken:0, accessLastRequest:null, bulkRunning:false };
     const $ = (id) => document.getElementById(id);
     const editable = [
       ['name','姓名',false],['amwayId','會員編號 / Amway ID',false],['phone','電話',false],['residence','居住地',false],
@@ -242,50 +275,144 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     async function handleCredential(response){ $('loginStatus').textContent='正在登入…'; try{ await api('/api/google-sync',{method:'POST',body:JSON.stringify({credential:response.credential,appId:'starry-id'})}); $('loginStatus').textContent='登入成功'; await loadSession(); }catch(e){ $('loginStatus').textContent=e.message||'登入失敗'; toast(e.message||'登入失敗',true); } }
     function initGoogle(){ const start=Date.now(); const tick=()=>{ if(window.google?.accounts?.id){ try{ google.accounts.id.initialize({client_id:CLIENT_ID,callback:handleCredential,auto_select:false,cancel_on_tap_outside:true}); $('googleButton').replaceChildren(); google.accounts.id.renderButton($('googleButton'),{theme:'outline',size:'large',shape:'pill',text:'signin_with',locale:'zh_TW',width:280}); $('loginStatus').textContent=''; }catch(e){ $('loginStatus').textContent='Google 登入載入失敗，請重新整理。'; } return; } if(Date.now()-start<8000) setTimeout(tick,120); else $('loginStatus').textContent='Google 登入載入較慢，請重新整理再試。'; }; tick(); }
 
-    function showSelectedCount(){ $('accessSelectedCount').textContent='已選 '+state.selectedIds.size+' 位（單次最多 50 位）'; }
-    async function loadMembers(search='',offset=0){
-      try{
-        const data=await api('/api/admin/members?search='+encodeURIComponent(search)+'&offset='+offset);
-        state.memberOffset=offset;state.members=data.members||[];
-        $('memberCount').textContent=String(data.total||0);
-        $('memberPage').textContent='第 '+(Math.floor(offset/100)+1)+' 頁';
-        $('memberPrev').disabled=offset<=0;
-        $('memberNext').disabled=offset+state.members.length>=Number(data.total||0);
-        const root=$('members');root.replaceChildren();
-        for(const member of state.members){
-          const line=document.createElement('div');line.className='access-member-row';
-          const check=document.createElement('input');check.type='checkbox';
-          check.checked=state.selectedIds.has(member.id);
-          check.setAttribute('aria-label','批次選取 '+(member.name||member.email));
-          check.addEventListener('change',()=>{
-            if(check.checked&&state.selectedIds.size>=50){check.checked=false;toast('一次最多選擇 50 位會員',true);return;}
-            if(check.checked)state.selectedIds.add(member.id);else state.selectedIds.delete(member.id);
-            showSelectedCount();
-          });
-          const b=document.createElement('button');b.className='member-item';b.type='button';b.dataset.id=member.id;
-          const n=document.createElement('strong');n.textContent=member.name||'(未填姓名)';
-          const meta=document.createElement('span');meta.textContent=[member.email,member.approvedRank||member.rank].filter(Boolean).join(' · ');
-          b.append(n,meta);b.addEventListener('click',()=>openMember(member.id));
-          line.append(check,b);root.appendChild(line);
-        }
-        renderMemberActive();showSelectedCount();
-      }catch(e){toast(e.message||'會員清單讀取失敗',true);}
+    function selectedMemberCount(){
+      return state.selectionMode==='filtered' ? Math.max(0,state.memberTotal-state.excludedIds.size) : state.selectedIds.size;
     }
+    function showSelectedCount(){
+      const selected=selectedMemberCount();
+      $('accessSelectedCount').textContent='已選 '+selected+'／符合 '+state.memberTotal+' 人';
+      $('memberSelectAll').checked=state.selectionMode==='filtered'&&state.excludedIds.size===0&&state.memberTotal>0;
+      $('memberSelectAll').indeterminate=state.selectionMode==='filtered'&&state.excludedIds.size>0;
+      $('memberSelectAll').disabled=state.memberFilterPending||(state.memberLoading&&!state.members.length);
+      $('bulkAccessButton').disabled=state.memberFilterPending||selected===0||(state.memberLoading&&!state.members.length);
+    }
+    function selectedMember(memberId){
+      return state.selectionMode==='filtered' ? !state.excludedIds.has(memberId) : state.selectedIds.has(memberId);
+    }
+    function resetMemberSelection(){
+      state.selectionMode='manual';state.selectedIds.clear();state.excludedIds.clear();
+      document.querySelectorAll('.access-member-row input[type="checkbox"]').forEach(check=>{check.checked=false;});
+      showSelectedCount();
+    }
+    function memberCard(member){
+      const line=document.createElement('div');line.className='access-member-row';
+      const check=document.createElement('input');check.type='checkbox';check.checked=selectedMember(member.id);
+      check.setAttribute('aria-label','選取 '+(member.name||member.email));
+      check.addEventListener('change',()=>{
+        if(state.selectionMode==='filtered'){
+          if(check.checked)state.excludedIds.delete(member.id);else state.excludedIds.add(member.id);
+        }else{
+          if(check.checked)state.selectedIds.add(member.id);else state.selectedIds.delete(member.id);
+        }
+        showSelectedCount();
+      });
+      const b=document.createElement('button');b.className='member-item';b.type='button';b.dataset.id=member.id;
+      const title=document.createElement('strong');title.textContent=member.name||'(未填姓名)';
+      const details=document.createElement('span');
+      details.textContent=(member.approvedRank||'未核准獎銜')+' · 直銷商中心：'+(member.center||'未填寫');
+      const email=document.createElement('span');email.textContent=member.email||'';
+      b.append(title,details,email);b.addEventListener('click',()=>openMember(member.id));
+      line.append(check,b);return line;
+    }
+    async function loadMemberRanks(){
+      if(state.memberRanksLoaded)return;
+      try{
+        const data=await api('/api/admin/member-ranks');
+        const select=$('memberRankFilter');
+        for(const item of data.ranks||[]){
+          if(!item.rank)continue;
+          const option=document.createElement('option');option.value=item.rank;option.textContent=item.rank+'（'+item.members+'）';
+          select.appendChild(option);
+        }
+        state.memberRanksLoaded=true;
+      }catch(e){toast('獎銜選項讀取失敗：'+(e.message||'稍後重試'),true);}
+    }
+    async function loadNextMembers(){
+      if(!state.adminOpen||state.memberLoading||!state.memberHasMore)return;
+      state.memberLoading=true;const token=state.memberLoadToken;
+      $('memberLoadMore').textContent='正在載入會員…';showSelectedCount();
+      try{
+        const search=state.activeSearch,rank=state.activeRank;
+        const url='/api/admin/members?search='+encodeURIComponent(search)+'&rank='+encodeURIComponent(rank)+'&offset='+state.memberOffset;
+        const data=await api(url);
+        if(token!==state.memberLoadToken)return;
+        const batch=data.members||[];
+        state.members.push(...batch);
+        state.memberOffset=Number(data.nextOffset||state.memberOffset+batch.length);
+        state.memberTotal=Number(data.total||0);
+        state.memberHasMore=Boolean(data.hasMore);
+        $('memberCount').textContent='共 '+state.memberTotal+' 人';
+        const root=$('members');
+        const fragment=document.createDocumentFragment();
+        for(const member of batch)fragment.appendChild(memberCard(member));
+        root.appendChild(fragment);
+        renderMemberActive();
+        $('memberLoadMore').textContent=state.memberHasMore?'繼續向下捲動載入更多會員':'已顯示全部 '+state.memberTotal+' 位會員';
+      }catch(e){
+        if(token===state.memberLoadToken){
+          $('memberLoadMore').textContent='讀取失敗，點此重新載入';
+          toast(e.message||'會員清單讀取失敗',true);
+        }
+      }finally{
+        if(token===state.memberLoadToken){state.memberLoading=false;showSelectedCount();}
+      }
+    }
+    async function resetMemberList(){
+      ++state.memberLoadToken;
+      state.activeSearch=$('memberSearch').value.trim();state.activeRank=$('memberRankFilter').value;
+      state.memberFilterPending=false;
+      state.memberOffset=0;state.memberTotal=0;state.memberHasMore=true;state.memberLoading=false;state.members=[];
+      $('members').replaceChildren();$('memberCount').textContent='載入中…';
+      resetMemberSelection();
+      await loadNextMembers();
+    }
+    $('memberLoadMore').addEventListener('click',()=>void loadNextMembers());
+    const memberObserver=new IntersectionObserver(entries=>{
+      if(entries.some(entry=>entry.isIntersecting))void loadNextMembers();
+    },{root:null,rootMargin:'160px 0px'});
+    memberObserver.observe($('memberLoadMore'));
+    $('adminPanel').addEventListener('scroll',()=>{
+      const panel=$('adminPanel');
+      if(panel.scrollTop+panel.clientHeight>=panel.scrollHeight-120)void loadNextMembers();
+    });
+    window.addEventListener('scroll',()=>{
+      if(window.innerWidth<761){
+        const rect=$('memberLoadMore').getBoundingClientRect();
+        if(rect.top<window.innerHeight+140)void loadNextMembers();
+      }
+    },{passive:true});
 
     async function openMember(id){ try{ const data=await api('/api/admin/members/'+encodeURIComponent(id)); renderProfile(data.user); }catch(e){ toast(e.message||'會員資料讀取失敗',true); } }
-    function toggleAdmin(force){ if(!state.isSuperAdmin)return; state.adminOpen=typeof force==='boolean'?force:!state.adminOpen; $('adminPanel').classList.toggle('hidden',!state.adminOpen); $('memberView').classList.toggle('admin-open',state.adminOpen); if(state.adminOpen) loadMembers($('memberSearch').value.trim(),0); }
+    function toggleAdmin(force){ if(!state.isSuperAdmin)return; state.adminOpen=typeof force==='boolean'?force:!state.adminOpen; $('adminPanel').classList.toggle('hidden',!state.adminOpen); $('memberView').classList.toggle('admin-open',state.adminOpen); if(state.adminOpen){void loadMemberRanks();void resetMemberList();} }
     $('adminBtn').addEventListener('click',()=>toggleAdmin());
     $('myCardBtn').addEventListener('click',async()=>{ if(state.session?.user){ await loadOwnVisibility(); renderProfile(state.session.user); if(window.innerWidth<761) toggleAdmin(false); } });
     $('logoutBtn').addEventListener('click',async()=>{ try{await api('/api/logout',{method:'POST',body:'{}'});}catch{} showLoggedOut(); });
-    let searchTimer; $('memberSearch').addEventListener('input',()=>{clearTimeout(searchTimer);state.selectedIds.clear();showSelectedCount();searchTimer=setTimeout(()=>loadMembers($('memberSearch').value.trim(),0),220);});
-    $('memberPrev').addEventListener('click',()=>loadMembers($('memberSearch').value.trim(),Math.max(0,state.memberOffset-100)));
-    $('memberNext').addEventListener('click',()=>loadMembers($('memberSearch').value.trim(),state.memberOffset+100));
-    $('bulkAccessButton').addEventListener('click',()=>{
-      if(!state.selectedIds.size){toast('請先勾選會員',true);return;}
-      void showAppAccess([...state.selectedIds], '已選取 '+state.selectedIds.size+' 位會員', true);
+    let searchTimer;
+    $('memberSearch').addEventListener('input',()=>{
+      state.memberFilterPending=true;resetMemberSelection();
+      clearTimeout(searchTimer);searchTimer=setTimeout(()=>void resetMemberList(),220);
     });
-    document.addEventListener('click',(event)=>{const target=event.target;if(target?.id==='v211Close'||target?.classList?.contains('v211-settings'))setTimeout(async()=>{if(isOwnProfile()){await loadOwnVisibility();renderProfile(state.user);}},120);});
-
+    $('memberRankFilter').addEventListener('change',()=>void resetMemberList());
+    $('memberClearSelection').addEventListener('click',resetMemberSelection);
+    $('memberSelectAll').addEventListener('change',checked=>{
+      if($('memberSelectAll').checked){
+        state.selectionMode='filtered';state.selectedIds.clear();state.excludedIds.clear();
+      }else{
+        state.selectionMode='manual';state.selectedIds.clear();state.excludedIds.clear();
+      }
+      document.querySelectorAll('.access-member-row input[type="checkbox"]').forEach(c=>{c.checked=selectedMember(c.parentNode.querySelector('.member-item').dataset.id);});
+      showSelectedCount();
+    });
+    $('bulkAccessButton').addEventListener('click',()=>{
+      if(!selectedMemberCount()){toast('請先選取會員',true);return;}
+      state.accessBulkSelection=state.selectionMode==='filtered'
+        ? {scope:'filtered',search:state.activeSearch,rank:state.activeRank,excludedIds:[...state.excludedIds]}
+        : {scope:'manual',userIds:[...state.selectedIds]};
+      const selected=selectedMemberCount();
+      const first=state.members.find(m=>selectedMember(m.id))?.id||[...state.selectedIds][0];
+      if(!first){toast('請等待會員名單載入完成',true);return;}
+      void showAppAccess([first],'已選取 '+selected+' 位會員',true);
+    });
     function hideAccessPreview(){state.accessPreview=null;$('appAccessReview').classList.add('hidden');$('appAccessConfirmText').value='';$('appAccessCommitBtn').disabled=true;}
     async function ensureAccessCatalog(){
       if(state.accessApps.length)return;
@@ -353,7 +480,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         if(requestToken!==state.accessLoadToken)return;
         if(!state.accessApps.length)throw new Error('尚未設定任何 App，請檢查 Starry ID 應用清單');
         let current=[];
-        if(keys.length===1){
+        if(keys.length===1&&!bulk){
           const record=await api('/api/admin/app-access/member/'+encodeURIComponent(keys[0]));
           if(requestToken!==state.accessLoadToken)return;
           current=record.apps||[];
@@ -361,7 +488,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         state.accessUserIds=keys;
         if(bulk)renderAppChoices([]);else renderSingleAppChoices(current);
         $('appAccessPreviewBtn').disabled=false;
-        $('appAccessScope').textContent=label+'｜共 '+keys.length+' 位會員';
+        $('appAccessScope').textContent=label+(bulk?'｜批次管理':'｜單一會員');
         await loadAccessHistory();
       }catch(error){
         if(requestToken!==state.accessLoadToken)return;
@@ -377,6 +504,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
       try{
         const result=await api('/api/admin/app-access/preview',{method:'POST',body:JSON.stringify(input)});
         state.accessPreview=result;
+        $('appAccessDownloadPreviewBtn').classList.add('hidden');
         const labels={grant:'開放勾選的 App（其他不變）',revoke:'禁止勾選的 App（其他不變）',replace:'只開放勾選的 App，未勾選全部禁止',undo:'還原'};
         const lines=['操作：'+(labels[result.kind]||result.kind),'影響會員：'+result.memberCount+' 位','實際變更：'+result.changeCount+' 項',
           '會員：'+(result.members||[]).map(x=>x.name+' ('+x.id+')').join('、')+(result.memberCount>15?'…':''),
@@ -388,6 +516,98 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         $('appAccessReview').scrollIntoView({behavior:'smooth',block:'nearest'});
       }catch(e){hideAccessPreview();toast(e.message||'預覽失敗',true);}
     }
+    function displayBulkProgress(progress){
+      const node=$('appAccessBulkProgress');node.classList.remove('hidden');
+      const action=progress.status==='reverting'?'正在還原':'正在設定';
+      const done=progress.status==='reverting'?progress.reverted:progress.done;
+      const total=progress.status==='reverting'?progress.done:progress.changeCount;
+      const doneStatus={completed:'全部完成',reverted:'全部還原',conflict:'已暫停，請檢查權限',undo_conflict:'還原已暫停，請檢查權限'};
+      node.textContent=(doneStatus[progress.status]||action)+'：'+done+'／'+total+' 項權限｜作業還原碼：'+progress.jobId+
+        (progress.lastError?'｜'+progress.lastError:'');
+    }
+    async function continueBulkJob(jobId){
+      if(state.bulkRunning){toast('已有一項批次作業正在執行',true);return;}
+      state.bulkRunning=true;
+      try{
+        let progress=await api('/api/admin/app-access/bulk/status?jobId='+encodeURIComponent(jobId));
+        displayBulkProgress(progress);
+        while(progress.status==='running'||progress.status==='reverting'){
+          progress=await api('/api/admin/app-access/bulk/step',{method:'POST',body:JSON.stringify({jobId})});
+          displayBulkProgress(progress);
+        }
+        if(progress.status==='completed')toast('批次設定全部完成。還原碼：'+jobId);
+        if(progress.status==='reverted')toast('已還原完成：'+jobId);
+        if(progress.status==='conflict'||progress.status==='undo_conflict')toast('作業已暫停，請查看操作紀錄',true);
+      }catch(e){
+        $('appAccessBulkProgress').classList.remove('hidden');
+        $('appAccessBulkProgress').textContent='執行中斷：'+(e.message||'連線不穩')+'。已完成的部分都有紀錄，可按「繼續執行」或「預覽還原」。';
+        toast('可從操作紀錄恢復作業，不會重複套用已完成項目',true);
+      }finally{
+        state.bulkRunning=false;
+        await loadAccessHistory();
+      }
+    }
+    async function previewBulkAccess(input){
+      try{
+        const result=await api('/api/admin/app-access/bulk/preview',{method:'POST',body:JSON.stringify(input)});
+        if(!result.changeCount){toast('所選會員的權限已符合設定，沒有需要修改的項目');return;}
+        state.accessPreview={...result,kind:'bulk'};
+        const labels={grant:'只開放勾選的 App（其他不變）',revoke:'只禁止勾選的 App（其他不變）',replace:'只開放勾選的 App（未勾選全部禁止）'};
+        const examples=(result.examples||[]).map(x=>(x.name||x.userId)+' · '+x.appId+'：'+(x.beforeDecision||'原有規則')+' → '+x.afterDecision);
+        $('appAccessReviewText').textContent=[
+          '操作：'+labels[result.mode],
+          '符合條件：'+result.memberCount+' 位會員',
+          '實際權限變更：'+result.changeCount+' 項',
+          '變更範例：'+examples.join('；'),
+          '完整明細可先下載 CSV 檢查，確認後才會開始分批套用。中途離開可從操作紀錄恢復。'
+        ].join(String.fromCharCode(10));
+        $('appAccessReviewText').style.whiteSpace='pre-wrap';
+        $('appAccessDownloadPreviewBtn').classList.remove('hidden');
+        $('appAccessReview').classList.remove('hidden');
+        $('appAccessConfirmText').value='';$('appAccessCommitBtn').disabled=true;
+        $('appAccessReview').scrollIntoView({behavior:'smooth',block:'nearest'});
+      }catch(e){hideAccessPreview();toast(e.message||'批次預覽失敗',true);}
+    }
+    async function previewBulkUndo(jobId){
+      try{
+        const data=await api('/api/admin/app-access/bulk/undo-preview',{method:'POST',body:JSON.stringify({jobId})});
+        state.accessPreview={...data,kind:'bulk_undo'};
+        $('appAccessReviewText').textContent='還原作業：'+jobId+String.fromCharCode(10)+
+          '本次僅還原該批次已完成的 '+data.done+' 項修改，未執行的權限不變。'+String.fromCharCode(10)+
+          '還原前請確認沒有其他管理員更新相同的權限。輸入「確認變更」後開始分批還原。';
+        $('appAccessReviewText').style.whiteSpace='pre-wrap';
+        $('appAccessDownloadPreviewBtn').classList.add('hidden');
+        $('appAccessReview').classList.remove('hidden');
+        $('appAccessConfirmText').value='';$('appAccessCommitBtn').disabled=true;
+        $('appAccessReview').scrollIntoView({behavior:'smooth',block:'nearest'});
+      }catch(e){toast(e.message||'無法預覽還原',true);}
+    }
+    async function downloadBulkPreview(){
+      const preview=state.accessPreview;
+      if(!preview||preview.kind!=='bulk')return;
+      const button=$('appAccessDownloadPreviewBtn');button.disabled=true;
+      const esc=value=>{
+        const t=String(value===null||value===undefined?'':value);
+        const safe=/^[=+@-]/.test(t)?"'"+t:t;
+        return '"'+safe.replace(/"/g,'""')+'"';
+      };
+      try{
+        let offset=0,more=true;
+        const lines=[['會員ID','姓名','App','原權限','新權限'].map(esc).join(',')];
+        while(more){
+          const data=await api('/api/admin/app-access/bulk/details?jobId='+encodeURIComponent(preview.jobId)+'&offset='+offset);
+          for(const item of data.items||[])lines.push([item.userId,item.name,item.appId,item.beforeDecision||'原有規則',item.afterDecision].map(esc).join(','));
+          offset=data.nextOffset;more=data.hasMore;
+        }
+        const blob=new Blob([String.fromCharCode(65279)+lines.join(String.fromCharCode(13,10))],{type:'text/csv;charset=utf-8'});
+        const url=URL.createObjectURL(blob);
+        const link=document.createElement('a');link.href=url;link.download='Starry-ID-權限預覽-'+preview.jobId+'.csv';
+        document.body.appendChild(link);link.click();link.remove();
+        URL.revokeObjectURL(url);
+      }catch(e){toast('完整清單下載失敗：'+(e.message||'請重試'),true);}
+      finally{button.disabled=false;}
+    }
+    $('appAccessDownloadPreviewBtn').addEventListener('click',()=>void downloadBulkPreview());
     async function loadAccessHistory(){
       const box=$('appAccessHistory');box.replaceChildren();
       try{
@@ -407,7 +627,26 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
           }
           box.appendChild(line);
         }
-      }catch(e){box.textContent='無法讀取操作紀錄';}
+      }catch(e){box.textContent='無法讀取單人操作紀錄';}
+      try{
+        const data=await api('/api/admin/app-access/bulk/history');
+        for(const item of data.jobs||[]){
+          const line=document.createElement('div');line.className='access-history-row';
+          const label=document.createElement('span');
+          const status={running:'執行中／可續跑',reverting:'還原中／可續跑',completed:'已完成',reverted:'已還原',conflict:'已暫停',undo_conflict:'還原衝突'}[item.status]||item.status;
+          label.textContent='批次 '+new Date(item.createdAt).toLocaleString('zh-TW')+'｜'+status+'｜'+item.done+'/'+item.changeCount+'｜還原碼：'+item.jobId;
+          line.appendChild(label);
+          if(item.status==='running'||item.status==='reverting'){
+            const resume=document.createElement('button');resume.type='button';resume.className='btn';
+            resume.textContent='繼續執行';resume.addEventListener('click',()=>void continueBulkJob(item.jobId));line.appendChild(resume);
+          }
+          if(['completed','running','conflict','undo_conflict'].includes(item.status)&&item.done>item.reverted){
+            const undo=document.createElement('button');undo.type='button';undo.className='btn';
+            undo.textContent='預覽還原';undo.addEventListener('click',()=>void previewBulkUndo(item.jobId));line.appendChild(undo);
+          }
+          box.appendChild(line);
+        }
+      }catch(e){toast('批次操作紀錄讀取失敗：'+(e.message||'請重試'),true);}
     }
     $('appAccessRetryBtn').addEventListener('click',()=>{
       const last=state.accessLastRequest;
@@ -415,7 +654,8 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     });
     $('appAccessPreviewBtn').addEventListener('click',()=>{
       const apps=[...document.querySelectorAll('.access-app-choice:checked')].map(el=>el.value);
-      void previewAccess({userIds:state.accessUserIds,appIds:apps,mode:$('appAccessMode').value});
+      if(!state.accessBulkSelection){toast('請先在左側勾選會員',true);return;}
+      void previewBulkAccess({selection:state.accessBulkSelection,appIds:apps,mode:$('appAccessMode').value});
     });
     $('appAccessMode').addEventListener('change',()=>{hideAccessPreview();$('appAccessBulkHelp').textContent=$('appAccessMode').value==='replace'?'注意：未勾選的 App 全部禁止，請仔細確認勾選清單。':'只有勾選的 App 會變更，其他 App 不會受到影響。';});
     $('appAccessConfirmText').addEventListener('input',()=>{
@@ -426,12 +666,21 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
       const preview=state.accessPreview;if(!preview)return;
       $('appAccessCommitBtn').disabled=true;
       try{
+        if(preview.kind==='bulk'||preview.kind==='bulk_undo'){
+          const endpoint=preview.kind==='bulk'?'confirm':'undo-confirm';
+          const done=await api('/api/admin/app-access/bulk/'+endpoint,{
+            method:'POST',body:JSON.stringify({jobId:preview.jobId,confirm:true,confirmationText:$('appAccessConfirmText').value})
+          });
+          hideAccessPreview();
+          void continueBulkJob(done.jobId);
+          return;
+        }
         const applied=await api('/api/admin/app-access/commit',{method:'POST',body:JSON.stringify({
           previewId:preview.previewId,confirm:true,confirmationText:$('appAccessConfirmText').value
         })});
         hideAccessPreview();
         toast('已變更 '+applied.changed+' 項權限。還原碼：'+applied.operationId);
-        if(state.accessUserIds.length===1)await showAppAccess(state.accessUserIds,state.user?.name||'會員',!$('appAccessBulk').classList.contains('hidden'));
+        if(state.accessUserIds.length===1)await showAppAccess(state.accessUserIds,state.user?.name||'會員',false);
         else await loadAccessHistory();
       }catch(e){toast(e.message||'設定失敗',true);$('appAccessCommitBtn').disabled=false;}
     });
