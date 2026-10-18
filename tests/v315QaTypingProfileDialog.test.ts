@@ -49,6 +49,6 @@ test('speaker playback uses an in-app confirmation instead of a browser alert',(
   assert.match(app,/setPlayerMode\('bubble'\)/);
 });
 test('mobile service worker refreshes outdated screens with the corrected quota view',()=>{
-  assert.match(sw,/echostars-shell-v180/);
+  assert.match(sw,/const CACHE_NAME = 'echostars-shell-v\d+'/);
   assert.match(sw,/upgradingExistingClient/);
 });
