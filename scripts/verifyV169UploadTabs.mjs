@@ -95,7 +95,7 @@ async function main() {
           '<div class="v161-manage-tabs">' +
             '<button type="button" class="v161-manage-tab" aria-selected="true">我的音檔</button>' +
             '<button type="button" class="v161-manage-tab" aria-selected="false">網友音檔</button>' +
-            '<button type="button" class="v161-manage-tab" aria-selected="false">🤖 逐字稿</button>' +
+            '<button type="button" class="v161-manage-tab" aria-selected="false">逐字稿</button>' +
           '</div>' +
         '</section>' +
       '</div>';
@@ -174,7 +174,7 @@ async function main() {
     if (state.manage.pageTab !== 'manage' || state.manage.selected !== '管理音檔' || state.manage.innerSelected !== '我的音檔') {
       throw new Error(`Manage tab mismatch: ${JSON.stringify(state.manage)}`);
     }
-    if (state.qa.pageTab !== 'qa' || state.qa.selected !== '🤖 逐字稿' || state.qa.innerSelected !== '🤖 逐字稿' || state.qa.formDisplay !== 'none' || state.qa.innerTabsDisplay !== 'none') {
+    if (state.qa.pageTab !== 'qa' || state.qa.selected !== '🤖 逐字稿' || state.qa.innerSelected !== '逐字稿' || state.qa.formDisplay !== 'none' || state.qa.innerTabsDisplay !== 'none') {
       throw new Error(`Transcript QA tab mismatch: ${JSON.stringify(state.qa)}`);
     }
     if (state.upload.pageTab !== 'upload' || state.upload.selected !== '上傳音檔' || state.upload.formDisplay === 'none') {
