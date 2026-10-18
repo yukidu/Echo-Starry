@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AI_TASK_CATALOG, DEFAULT_AI_ORDER, validateAiOrder } from '../worker/starryAiManagement';
+import { AI_TASK_CATALOG, DEFAULT_AI_ORDER, validateAiOrder, mergeAiOrder } from '../worker/starryAiManagement';
 import { renderStarryAiManagementPage } from '../worker/starryAiManagementPage';
 
 test('central AI catalogue enumerates all six known tasks across Echo and Mirror',()=>{
@@ -39,4 +39,15 @@ test('AI management page is noindex, contains cross-tier drag and read-only cata
   assert.match(html,/pointerdown/);
   assert.match(html,/儲存並套用/);
   assert.match(html,/還原推薦排序/);
+});
+
+test('new AI functions are registered without losing custom priorities',()=>{
+  const prior=DEFAULT_AI_ORDER.slice(0,-1).map((x,i)=>({
+    ...x,order:i,tier:x.id==='mirror.reading'?3:x.tier
+  }));
+  const next=mergeAiOrder(prior);
+  assert.equal(next.length,DEFAULT_AI_ORDER.length);
+  assert.equal(next.find(x=>x.id==='mirror.reading')?.tier,3);
+  assert.ok(next.some(x=>x.id==='echo.normalize'));
+  assert.equal(new Set(next.map(x=>x.id)).size,next.length);
 });
