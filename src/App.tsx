@@ -3368,7 +3368,9 @@ export default function App() {
               <SpeakerProfilePage compact name={speakerProfileName} onBack={()=>setSpeakerProfileName(null)} onPlayTrack={id=>{
                 const target=tracks.find(t=>t.id===id);
                 if(!target)return;
-                // Keep the speaker popup and the current route intact.
+                // Return to the SAME underlying page so the bottom floating
+                // player remains visible and controllable after confirmation.
+                setSpeakerProfileName(null);
                 setPlayerMode('bubble');
                 if(currentTrack?.id===target.id){
                   if(!isPlaying)void handleTogglePlay();
