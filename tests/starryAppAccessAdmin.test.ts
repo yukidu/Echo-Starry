@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { renderStarryIdMemberCenterPage } from '../worker/starryIdMemberCenterPage';
 
 const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 const access = read('worker/starryAppAccess.ts');
@@ -57,4 +58,11 @@ test('Public and anonymous app browsing remain outside this member-only rollout'
   assert.match(access, /Phase 1 is non-disruptive/);
   assert.doesNotMatch(access, /DELETE FROM users|UPDATE users SET status/i);
   assert.doesNotMatch(access, /DROP TABLE|DELETE FROM auth_sessions/i);
+});
+
+test('Embedded member-center JavaScript remains valid after adding bulk interface', async () => {
+  const html=await renderStarryIdMemberCenterPage('123-abc.apps.googleusercontent.com').text();
+  const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(script);
+  assert.doesNotThrow(()=>new Function(script));
 });
