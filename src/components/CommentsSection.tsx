@@ -14,8 +14,7 @@ import {
   Reply,
   AtSign,
   Radio,
-  Mic,
-  Bot
+  Mic
 } from 'lucide-react';
 import { Comment, UserProfile, Track } from '../types';
 import { VisitorIdentity } from '../utils/visitor';
