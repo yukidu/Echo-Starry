@@ -21,7 +21,7 @@ export function speakerBiographyStatusLabel(status: SpeakerBiographyStatus): str
     case 'failed': return '摘要異常';
     case 'waiting_sources': return '尚無可用的公開逐字稿';
     case 'missing_summary': return '摘要內容缺失';
-    case 'review_required': return '多人故事待人工核對';
+    case 'review_required': return '多人故事自動分析中';
     default: return '等待產生摘要';
   }
 }
