@@ -2,6 +2,7 @@ import type { Env } from './index';
 import transcriptWorker from './transcriptMemberNotificationsRouter';
 import { queueAllPendingTranscripts, transcriptBulkStatus } from './transcriptBulkScheduler';
 import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
+import { handleCleanupAdmin } from './transcriptCleanupService';
 import { batteriesToUnits, unitsToBatteries } from '../shared/battery';
 
 const SESSION_COOKIE = 'echostars_session';
@@ -300,6 +301,11 @@ async function extendSettings(request: Request, env: Env, ctx: any) {
 export default {
   async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === '/api/v281/transcript-cleanup' || url.pathname.startsWith('/api/v281/transcript-cleanup/')) {
+      const actor=await superAdmin(request,env);
+      if(!actor) return json({error:'只有超級管理員能設定口語淨化規則'},403);
+      return handleCleanupAdmin(request,env as any,String(actor.id));
+    }
     const languageHintRoute = url.pathname.match(/^\/api\/v281\/transcript-language-hints\/([^/]+)$/);
     if (languageHintRoute) {
       const trackId = decodeURIComponent(languageHintRoute[1]);
