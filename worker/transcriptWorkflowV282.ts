@@ -156,14 +156,14 @@ async function traditionalizeBatch(env: Env, values: string[]) {
 }
 
 async function traditionalizeBatchRobust(env: Env, values: string[]): Promise<string[]> {
+  // Text normalization must NEVER erase hours of successful Whisper transcription.
+  // Invalid/truncated AI JSON is a formatting failure, not an audio-transcription failure.
+  // Limit to one normalization request per batch (Workflow itself may retry transient errors).
   try {
     return await traditionalizeBatch(env, values);
   } catch (error) {
-    if (values.length <= 1) throw error;
-    const middle = Math.ceil(values.length / 2);
-    const left = await traditionalizeBatchRobust(env, values.slice(0, middle));
-    const right = await traditionalizeBatchRobust(env, values.slice(middle));
-    return [...left, ...right];
+    console.warn('Transcript normalization skipped; preserving original recognized text:', error instanceof Error ? error.message.slice(0,120) : 'unknown');
+    return values;
   }
 }
 
@@ -253,8 +253,8 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
         if (!track) throw new Error('Track not found');
         const key = audioR2Key(track.audioUrl);
         if (!key) throw new Error('Audio R2 key not found');
-        const object = await this.env.R2_BUCKET.head(key);
-        if (!object) throw new Error('Audio object not found');
+        // Avoid R2.head here: it previously hit Cloudflare subrequest-depth 10034.
+        // prepare-audio-container will GET and validate the actual source before transcribing.
         const now = Date.now();
         await this.env.DB.prepare(`INSERT INTO transcript_index(trackId,status,r2Key,model,chunkCount,segmentCount,wordCount,durationSeconds,error,createdAt,updatedAt)
           VALUES (?,'processing',NULL,?,0,0,0,?,NULL,?,?)
@@ -262,7 +262,7 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
           .bind(trackId, MODEL, Number(track.durationSeconds || 0), now, now).run();
         const hintRow: any = await this.env.DB.prepare('SELECT languageHint FROM transcript_language_hints WHERE trackId=? LIMIT 1')
           .bind(trackId).first().catch(() => null);
-        return { track, key, size: Number(object.size || 0), ext: audioExtension(key), languageHint: text(hintRow?.languageHint) || 'auto' };
+        return { track, key, size: 0, ext: audioExtension(key), languageHint: text(hintRow?.languageHint) || 'auto' };
       });
 
       const duration = Math.max(1, Number(info.track.durationSeconds || 1));
