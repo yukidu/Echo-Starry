@@ -602,33 +602,53 @@ async function updateProfile(
   return publicMember(await readMember(db, userId));
 }
 
-async function listMembers(db: any, search: string, offset = 0) {
+const APPROVED_RANK_SQL = "CASE WHEN p.rankApproved=1 THEN TRIM(COALESCE(p.approvedRank,'')) ELSE '' END";
+const MEMBER_BATCH_SIZE = 80;
+
+/** Progressive scrolling, exact approved-rank filtering and a stable cursor order. */
+async function listMembers(db: any, search: string, offset = 0, rank = '') {
   const q = text(search).slice(0, 80);
-  const like = `%${q}%`;
-  const where = q
-    ? `WHERE LOWER(COALESCE(p.name,'')) LIKE LOWER(?) OR LOWER(u.primaryEmail) LIKE LOWER(?) OR LOWER(COALESCE(p.amwayId,'')) LIKE LOWER(?)`
-    : '';
-  const params = q ? [like, like, like] : [];
+  const targetRank = text(rank).slice(0, 100);
+  const clauses: string[] = [];
+  const params: any[] = [];
+  if (q) {
+    const like = `%${q}%`;
+    clauses.push(`(LOWER(COALESCE(p.name,'')) LIKE LOWER(?) OR LOWER(u.primaryEmail) LIKE LOWER(?) OR LOWER(COALESCE(p.amwayId,'')) LIKE LOWER(?))`);
+    params.push(like, like, like);
+  }
+  if (targetRank) {
+    clauses.push(`${APPROVED_RANK_SQL}=?`);
+    params.push(targetRank === '__unapproved__' ? '' : targetRank);
+  }
+  const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
   const rows: any = await db.prepare(`SELECT
-      u.id,u.primaryEmail,u.status,p.name,p.rank,p.approvedRank,p.amwayId
+      u.id,u.primaryEmail,u.status,p.name,p.rank,p.approvedRank,p.rankApproved,p.amwayId,p.center
     FROM users u LEFT JOIN profiles p ON p.userId=u.id
     ${where}
-    ORDER BY LOWER(COALESCE(p.name,'')),LOWER(u.primaryEmail)
-    LIMIT 100 OFFSET ?`).bind(...params,offset).all();
+    ORDER BY LOWER(COALESCE(p.name,'')),LOWER(u.primaryEmail),u.id
+    LIMIT ? OFFSET ?`).bind(...params,MEMBER_BATCH_SIZE,offset).all();
   const countRow: any = await db.prepare(`SELECT COUNT(*) AS count
     FROM users u LEFT JOIN profiles p ON p.userId=u.id ${where}`).bind(...params).first();
-  return {
-    total: Number(countRow?.count || 0),
-    members: (rows?.results || []).map((row: any) => ({
-      id: row.id,
-      email: row.primaryEmail,
-      status: row.status,
-      name: row.name || '',
-      amwayId: row.amwayId || '',
-      rank: row.rank || '',
-      approvedRank: row.approvedRank || ''
-    }))
-  };
+  const total = Number(countRow?.count || 0);
+  const members=(rows?.results || []).map((row: any) => ({
+    id: row.id,
+    email: row.primaryEmail,
+    status: row.status,
+    name: row.name || '',
+    amwayId: row.amwayId || '',
+    rank: Number(row.rankApproved||0)===1 ? (row.approvedRank || '') : '',
+    approvedRank: Number(row.rankApproved||0)===1 ? (row.approvedRank || '') : '',
+    center: row.center || ''
+  }));
+  return { total, members, nextOffset: offset + members.length, hasMore: offset + members.length < total };
+}
+
+async function listMemberApprovedRanks(db:any) {
+  const rows:any=await db.prepare(`SELECT TRIM(p.approvedRank) AS rank, COUNT(*) AS members
+    FROM profiles p JOIN users u ON u.id=p.userId
+    WHERE p.rankApproved=1 AND TRIM(COALESCE(p.approvedRank,''))<>''
+    GROUP BY TRIM(p.approvedRank) ORDER BY members DESC,rank COLLATE NOCASE`).all();
+  return {ranks: rows?.results || []};
 }
 
 function servicePage(env: StarryEnv) {
@@ -788,15 +808,23 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
     }
   }
 
+  if (path === '/api/admin/member-ranks' && method === 'GET') {
+    const session = await sessionUser(request, env);
+    if (!session) return json(request, { error: '請先登入 Starry ID' }, 401);
+    if (!session.isSuperAdmin) return json(request, { error: '只有超級管理員可以管理全部會員。' }, 403);
+    return json(request, await listMemberApprovedRanks(db));
+  }
+
   if (path === '/api/admin/members' && method === 'GET') {
     const session = await sessionUser(request, env);
     if (!session) return json(request, { error: '請先登入 Starry ID' }, 401);
     if (!session.isSuperAdmin) return json(request, { error: '只有超級管理員可以管理全部會員。' }, 403);
     const url = new URL(request.url);
     const search = url.searchParams.get('search') || '';
+    const rank = url.searchParams.get('rank') || '';
     const rawOffset = Number(url.searchParams.get('offset') || 0);
     const offset = Number.isSafeInteger(rawOffset) && rawOffset >= 0 ? Math.min(rawOffset, 100000) : 0;
-    return json(request, await listMembers(db, search, offset));
+    return json(request, await listMembers(db, search, offset, rank));
   }
 
   const adminMemberMatch = path.match(/^\/api\/admin\/members\/([^/]+)$/);
