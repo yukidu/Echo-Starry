@@ -817,6 +817,9 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
   }
 
   if (path === '/api/admin/member-selection' && method === 'GET') {
+    // Sensitive member-ID snapshots are readable only from the ID console.
+    if (origin && origin !== 'https://id.starry.phd')
+      return json(request,{error:'請從 Starry ID 官網選取會員'},403);
     // Identical central-super-admin gate to the normal member directory.
     const session = await sessionUser(request, env);
     if (!session) return json(request, { error: '請先登入 Starry ID' }, 401);
