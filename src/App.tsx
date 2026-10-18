@@ -96,7 +96,7 @@ type AppHistoryState = {
   echostars?: true;
   view?: 'guard' | 'home' | 'detail' | 'tab';
   trackId?: string;
-  tab?: 'stats' | 'notifications' | 'profile' | 'stickers' | 'install';
+  tab?: 'stats' | 'notifications' | 'profile' | 'stickers' | 'install' | 'upload';
 };
 
 function shouldProtectBrowserBack() {
@@ -805,11 +805,12 @@ export default function App() {
       } else if (
         state?.echostars &&
         state.view === 'tab' &&
-        (['stats','notifications','profile','stickers','install'].includes(state.tab || ''))
+        (['stats','notifications','profile','stickers','install','upload'].includes(state.tab || ''))
       ) {
         setSelectedDetailTrack(null);
         setPlayerModeState(savedPreferredModeHistoryRef.current);
         setCurrentTab(state.tab!);
+        if (state.tab === 'upload') setIsUploadOpen(true);
       } else {
         showHomeFromHistory();
       }
@@ -850,7 +851,9 @@ export default function App() {
       (currentTrack && playerMode === 'expanded' ? currentTrack : null);
 
     let nextState: AppHistoryState;
-    if (isProfileOpen || isStickersOpen) {
+    if (isUploadOpen) {
+      nextState={echostars:true,view:'tab',tab:'upload'};
+    } else if (isProfileOpen || isStickersOpen) {
       nextState={echostars:true,view:'tab',tab:isProfileOpen?'profile':'stickers'};
     } else if (detailTrack) {
       nextState = { echostars: true, view: 'detail', trackId: detailTrack.id };
@@ -872,6 +875,7 @@ export default function App() {
     }
   }, [
     currentTab,
+    isUploadOpen,
     isProfileOpen,
     isStickersOpen,
     selectedDetailTrack?.id,
@@ -3187,14 +3191,22 @@ export default function App() {
         }}
       />
 
-      {/* Upload Modal (Cloudflare R2 Direct Upload & Multi-Category & Edit Support) */}
-      {isUploadOpen && <Suspense fallback={<div role="status" className="fixed inset-0 z-50 grid place-items-center bg-black/50 text-white">載入功能中…</div>}>
+      {/* Upload & management document page (the nested editor remains a separate modal) */}
+      {isUploadOpen && <main data-echo-page="audio-management" className="flex-1 w-full max-w-6xl mx-auto px-0 sm:px-6 py-0 sm:py-5 pb-28">
+      <Suspense fallback={<div role="status" className="py-14 text-center text-slate-500">載入音檔管理中…</div>}>
       <UploadModal
+        presentation="page"
         isOpen={isUploadOpen}
         onClose={() => {
-          setIsUploadOpen(false);
-          setTrackToEdit(null);
-          if (currentTab === 'upload') setCurrentTab('home');
+          // Native browser Back should return to the previous page rather than
+          // keeping a stale upload entry that re-opens the workspace.
+          if (window.history.state?.echostars && window.history.state?.tab === 'upload') {
+            window.history.back();
+          } else {
+            setIsUploadOpen(false);
+            setTrackToEdit(null);
+            if (currentTab === 'upload') setCurrentTab('home');
+          }
         }}
         currentUser={currentUser}
         isAdmin={isAdmin}
@@ -3215,7 +3227,8 @@ export default function App() {
           }
         }}
       />
-      </Suspense>}
+      </Suspense>
+      </main>}
 
       {/* Profile & Google Binding Modal (With Amway Fields & Numerology) */}
 
