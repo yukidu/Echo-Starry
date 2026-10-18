@@ -470,7 +470,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
         <div role="status" aria-live="polite" className="mb-3 min-w-0 max-w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 px-3 py-3 text-sm">
           <div className="flex items-start gap-2 min-w-0">
             <span className="shrink-0 mt-0.5"><AiBadge/></span>
-            <span className="rainbow-admin-text font-bold min-w-0 flex-1 break-words [overflow-wrap:anywhere]"><SpeakerNameLink name={speakerName}/></span>
+            <span className="rainbow-admin-text font-bold min-w-0 flex-1 break-words [overflow-wrap:anywhere]"><SpeakerNameLink name={speakerName} className="break-all [overflow-wrap:anywhere]"/></span>
           </div>
           <p className="mt-2 leading-normal text-slate-700 dark:text-slate-200 break-keep">
             {pendingQa?.phase==='typing'?'正在輸入訊息中':'正在準備回答'}<span className="inline-block animate-pulse">…</span>
