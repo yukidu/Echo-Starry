@@ -467,10 +467,12 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
       </form>
 
       {(isSubmitting && qaMode !== 'off' || pendingQa) && (
-        <div role="status" aria-live="polite" className="mb-3 flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 px-3 py-3 text-sm">
-          <AiBadge/>
-          <span className="rainbow-admin-text font-bold"><SpeakerNameLink name={speakerName}/></span>
-          <span>{pendingQa?.phase==='typing'?'正在輸入訊息中':'正在準備回答'}<span className="inline-block animate-pulse">…</span></span>
+        <div role="status" aria-live="polite" className="mb-3 min-w-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 px-3 py-3 text-sm">
+          <div className="flex min-w-0 items-start gap-2">
+            <span className="shrink-0"><AiBadge/></span>
+            <span className="rainbow-admin-text min-w-0 flex-1 font-bold break-all whitespace-normal"><SpeakerNameLink name={speakerName}/></span>
+          </div>
+          <p className="mt-2 whitespace-nowrap text-sm leading-6">{pendingQa?.phase==='typing'?'正在輸入訊息中':'正在準備回答'}<span className="inline-block animate-pulse">…</span></p>
         </div>
       )}
       {qaNotice && !pendingQa && (
