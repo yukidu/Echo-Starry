@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { renderStarryIdMemberCenterPage } from '../worker/starryIdMemberCenterPage';
+import { canManageStarryAppAccess } from '../worker/starryIdCentralRouter';
+import { handleStarryAppAccessAdminRequest } from '../worker/starryAppAccess';
 
 const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 const access = read('worker/starryAppAccess.ts');
@@ -10,7 +12,7 @@ const page = read('worker/starryIdMemberCenterPage.ts');
 
 test('Only the verified Starry ID super-admin can reach app access management', () => {
   assert.match(router, /path\.startsWith\('\/api\/admin\/app-access\/'\)/);
-  assert.match(router, /session\.appId !== 'starry-id' \|\| !configuredSuperAdmin\(env,session\.member\.email\)/);
+  assert.match(router, /if \(!canManageStarryAppAccess\(session\)\)/);
   assert.match(access, /request\.headers\.get\('Origin'\)!=='https:\/\/id\.starry\.phd'/);
 });
 
@@ -85,4 +87,42 @@ test('Mirror checks central member policy when granting and validating app token
   assert.match(mirror,/checkStarryAppAccess\(\(env as any\)\.STARRY_ID_DB,session\.userId,APP_ID\)/);
   assert.match(mirror,/checkStarryAppAccess\(db,text\(row\.userId\),APP_ID\)/);
   assert.match(mirror,/您沒有使用權限/);
+});
+
+test('Central membership role is accepted consistently for App management', () => {
+  assert.equal(canManageStarryAppAccess({appId:'starry-id',isSuperAdmin:true}),true);
+  assert.equal(canManageStarryAppAccess({appId:'starry-id',isSuperAdmin:false}),false);
+  assert.equal(canManageStarryAppAccess({appId:'echostars',isSuperAdmin:true}),false);
+  assert.equal(canManageStarryAppAccess(null),false);
+  assert.match(router,/if \(!session\.isSuperAdmin\) return json\(request, \{ error: '只有超級管理員可以管理全部會員。' \}, 403\)/);
+});
+
+test('Authorized catalog is readable without any D1 writes', async () => {
+  const db={prepare:()=>{throw new Error('Catalog must not access D1')},batch:()=>{throw new Error('Catalog must not modify D1')}};
+  const response=await handleStarryAppAccessAdminRequest(
+    new Request('https://id.starry.phd/api/admin/app-access/catalog'),
+    {STARRY_ID_DB:db,STARRY_ID_ALLOWED_APPS:'starry-id,echostars,gostarry,starry-mirror'},
+    'admin-user'
+  );
+  assert.equal(response.status,200);
+  const data=await response.json();
+  assert.deepEqual(data.apps.map((app: any)=>app.id),['echostars','gostarry','starry-mirror']);
+  assert.equal(data.protectedApp,'starry-id');
+});
+
+test('Member and bulk catalog load failures show reason and retry safely',async () => {
+  const html=await renderStarryIdMemberCenterPage('123.apps.googleusercontent.com').text();
+  assert.match(html,/id="appAccessError"[^>]*role="alert"/);
+  assert.match(html,/id="appAccessErrorText"/);
+  assert.match(html,/id="appAccessRetryBtn"/);
+  assert.match(html,/重新讀取 App 清單/);
+  assert.match(page,/error\.status/);
+  assert.match(page,/state\.accessLastRequest=\{ids:keys,label,bulk\}/);
+  assert.match(page,/requestToken!==state\.accessLoadToken/);
+  assert.match(page,/appAccessErrorText'\)\.textContent='讀取 App 清單失敗'/);
+  assert.match(page,/appAccessPreviewBtn'\)\.disabled=true/);
+  assert.match(page,/if\(!state\.accessApps\.length\)throw new Error/);
+  const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(script);
+  assert.doesNotThrow(()=>new Function(script));
 });
