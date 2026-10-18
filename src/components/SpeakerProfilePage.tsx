@@ -4,7 +4,7 @@ import {AiBadge} from './AiBadge';
 type TrackSummary={id:string;title:string;speakerRank?:string;speakerAvatar?:string;uploadDate?:string;durationSeconds?:number;requiredRank?:string};
 type QaPair={answerId:string;questionId:string;trackId:string;title:string;rank?:string;asker:string;question:string;answer:string;createdAt:number};
 type ProfileData={speaker:{id:string;name:string;avatar:string;biography:string;bioStatus:string;bioUpdatedAt:number};tracks:TrackSummary[];replies:QaPair[];hasMore:boolean;nextOffset:number;hasMoreReplies:boolean;nextReplyOffset:number};
-export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrack:(trackId:string,commentId?:string)=>void;compact?:boolean}>=({name,onBack,onOpenTrack,compact=false})=>{
+export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrack:(trackId:string,commentId?:string)=>void;onPlayTrack?:(trackId:string)=>void;compact?:boolean}>=({name,onBack,onOpenTrack,onPlayTrack,compact=false})=>{
   const [data,setData]=useState<ProfileData|null>(null);
   const [error,setError]=useState('');
   const [loading,setLoading]=useState(true);
@@ -62,8 +62,8 @@ export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrac
       <button type="button" role="tab" aria-selected={section==='qa'} onClick={()=>setSection('qa')} className={"flex-1 rounded-xl border px-3 py-3 text-sm font-bold "+(section==='qa'?'bg-rose-600 text-white':'border-slate-300 dark:border-slate-700')}><MessageCircle className="inline w-4 h-4 mr-1"/>歷史問答（{data.replies.length}）</button>
     </div>
     {section==='audio'&&<section className="space-y-2" aria-label="全部可查閱錄音">
-      <p className="text-xs text-slate-500">跨所有獎銜時期，依你的會員權限顯示可以查閱的錄音。</p>
-      {data.tracks.map(t=><button key={t.id} type="button" onClick={()=>onOpenTrack(t.id)} className="block w-full text-left rounded-xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900 p-3 hover:border-rose-400">
+      <p className="text-xs text-slate-500">跨所有獎銜時期，依你的會員權限顯示可以查閱的錄音。點擊標題會詢問是否播放；確認後使用原有浮動播放器，不離開此頁。</p>
+      {data.tracks.map(t=><button key={t.id} type="button" onClick={()=>{const display=[data.speaker.name,t.speakerRank,t.title].filter(Boolean).join(' ');if(window.confirm('是否播放 '+display+'？'))(onPlayTrack||onOpenTrack)(t.id);}} className="block w-full text-left rounded-xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900 p-3 hover:border-rose-400">
         <strong className="text-sm">{t.title}</strong><span className="block text-xs mt-1 text-slate-500">{t.speakerRank||'公開'} · {t.uploadDate||'日期未設定'}</span>
       </button>)}
       {!data.tracks.length&&<p className="p-5 text-center text-sm text-slate-500">目前沒有可查閱的錄音</p>}
