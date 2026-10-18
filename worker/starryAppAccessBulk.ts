@@ -28,7 +28,7 @@ export async function ensureBulkAccessSchema(db:any):Promise<void>{
       db.prepare(`CREATE TABLE IF NOT EXISTS starry_app_access_bulk_jobs (
         id TEXT PRIMARY KEY, actorUserId TEXT NOT NULL, mode TEXT NOT NULL,
         selectionJson TEXT NOT NULL, appIdsJson TEXT NOT NULL,
-        status TEXT NOT NULL CHECK(status IN ('preview','running','completed','conflict','reverting','reverted')),
+        status TEXT NOT NULL CHECK(status IN ('preview','running','completed','conflict','reverting','reverted','undo_conflict')),
         memberCount INTEGER NOT NULL DEFAULT 0, totalChanges INTEGER NOT NULL DEFAULT 0,
         doneChanges INTEGER NOT NULL DEFAULT 0, revertedChanges INTEGER NOT NULL DEFAULT 0,
         createdAt INTEGER NOT NULL, expiresAt INTEGER NOT NULL, confirmedAt INTEGER,
@@ -147,7 +147,7 @@ async function confirm(db:any,actor:string,input:any){
 async function report(db:any,actor:string,id:string){return describe(await loadJob(db,id,actor));}
 async function undoPreview(db:any,actor:string,id:string){
   const job=await loadJob(db,id,actor);
-  if(!['running','completed','conflict'].includes(job.status)||Number(job.doneChanges)<1)throw Error('這項作業目前沒有可以還原的修改');
+  if(!['running','completed','conflict','undo_conflict'].includes(job.status)||Number(job.doneChanges)<=Number(job.revertedChanges)throw Error('這項作業目前沒有可以還原的修改');
   if(Number(job.lockUntil||0)>Date.now())throw Error('作業進行中，請稍後再試');
   const mismatches:any=await db.prepare(`SELECT COUNT(*) AS count FROM starry_app_access_bulk_items b
     LEFT JOIN starry_app_access_decisions d ON d.userId=b.userId AND d.appId=b.appId
@@ -163,10 +163,10 @@ async function confirmUndo(db:any,actor:string,input:any){
   if(input?.confirm!==true||input?.confirmationText!=='確認變更')throw Error('請再次確認還原');
   const job=await loadJob(db,String(input.jobId||''),actor);
   const now=Date.now();
-  if(!['running','completed','conflict'].includes(job.status)||!job.undoPreviewAt||
+  if(!['running','completed','conflict','undo_conflict'].includes(job.status)||!job.undoPreviewAt||
     now-Number(job.undoPreviewAt)>PREVIEW_MS)throw Error('還原預覽已失效');
   if(Number(job.lockUntil||0)>now)throw Error('作業仍在執行，請稍後重試');
-  const changed:any=await db.prepare("UPDATE starry_app_access_bulk_jobs SET status='reverting',updatedAt=?,undoPreviewAt=NULL,lastError=NULL WHERE id=? AND actorUserId=? AND status IN ('running','completed','conflict') AND (lockUntil IS NULL OR lockUntil<?)")
+  const changed:any=await db.prepare("UPDATE starry_app_access_bulk_jobs SET status='reverting',updatedAt=?,undoPreviewAt=NULL,lastError=NULL WHERE id=? AND actorUserId=? AND status IN ('running','completed','conflict','undo_conflict') AND (lockUntil IS NULL OR lockUntil<?)")
     .bind(now,job.id,actor,now).run();
   if(Number(changed?.meta?.changes||0)!==1)throw Error('作業狀態已改變，請重新整理');
   return describe({...job,status:'reverting'});
@@ -193,8 +193,8 @@ async function step(db:any,actor:string,id:string){
     }
     const collision=rows.find(r=>(r.currentDecision||null)!==(reverse?r.afterDecision:(r.beforeDecision||null)));
     if(collision){
-      await db.prepare("UPDATE starry_app_access_bulk_jobs SET status='conflict',lastError=?,lockUntil=NULL,updatedAt=? WHERE id=? AND actorUserId=?")
-        .bind('會員權限已被其他操作修改，作業已安全停止；請檢查及還原',Date.now(),id,actor).run();
+      await db.prepare("UPDATE starry_app_access_bulk_jobs SET status=?,lastError=?,lockUntil=NULL,updatedAt=? WHERE id=? AND actorUserId=?")
+        .bind(reverse?'undo_conflict':'conflict','會員權限已被其他操作修改，作業已安全停止；請檢查及還原',Date.now(),id,actor).run();
       throw Error('會員權限已經改變，作業已停止。已完成部分可透過操作紀錄預覽還原');
     }
     const keys=JSON.stringify(rows.map(x=>x.userId+'|'+x.appId));
