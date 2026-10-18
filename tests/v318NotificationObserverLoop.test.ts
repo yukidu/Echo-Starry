@@ -17,7 +17,7 @@ test('injected transcript notice widget never installs the former recursive docu
   assert.match(app, /window\.dispatchEvent\(new Event\('echostars:notifications-mounted'\)\)/);
   assert.match(app, /setMentionsLoadError\(true\);\s*setMentionsLoading\(false\);/);
   assert.match(html, /transcript-user-notifications\.js\?v=318/);
-  assert.match(serviceWorker, /echostars-shell-v183/);
+  assert.match(serviceWorker, /const CACHE_NAME = 'echostars-shell-v\d+'/);
 });
 
 test('populated notifications render once despite repeated mount signals, then render on a new screen', async () => {
