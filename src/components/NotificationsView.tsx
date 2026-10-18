@@ -66,6 +66,12 @@ const NotificationsViewComponent: React.FC<NotificationsViewProps> = ({
   const [visibleRows,setVisibleRows] = useState(25);
   React.useEffect(()=>setVisibleRows(25),[activeTab]);
   const tabsContainerRef = useRef<HTMLDivElement>(null);
+  // Notify the optional transcription notices widget only after this page is mounted.
+  // One targeted event replaces its costly document-wide MutationObserver.
+  React.useEffect(() => {
+    const id = window.setTimeout(() => window.dispatchEvent(new Event('echostars:notifications-mounted')), 0);
+    return () => window.clearTimeout(id);
+  }, []);
   const [replyingCommentId, setReplyingCommentId] = useState<string | null>(null);
   const [quickReplyText, setQuickReplyText] = useState('');
   const [isQuickReplying, setIsQuickReplying] = useState(false);
@@ -124,27 +130,43 @@ const NotificationsViewComponent: React.FC<NotificationsViewProps> = ({
       return;
     }
     const controller = new AbortController();
+    let cancelled = false;
     setMentionsLoading(true);
     setMentionsLoadError(false);
-    // Slow requests should not leave the page stuck at a spinner.
-    const timeout = window.setTimeout(() => controller.abort(), 12000);
+
+    // Never let a stalled fetch/JSON reader keep the spinner forever.
+    // Stop waiting directly; do not rely on an aborted Promise settling.
+    const timeout = window.setTimeout(() => {
+      if (cancelled) return;
+      controller.abort();
+      setMentionsLoadError(true);
+      setMentionsLoading(false);
+    }, 12000);
+
     void fetch(`/api/comments?mention=${encodeURIComponent(name)}`, { signal: controller.signal })
       .then(res => {
         if (!res.ok) throw new Error('通知讀取失敗');
         return res.json();
       })
       .then(data => {
-        if (!controller.signal.aborted) setInternalComments(Array.isArray(data) ? data : []);
+        if (!cancelled && !controller.signal.aborted) {
+          setInternalComments(Array.isArray(data) ? data : []);
+          setMentionsLoadError(false);
+        }
       })
       .catch(() => {
-        if (controller.signal.aborted && !document.hidden) setMentionsLoadError(true);
-        else if (!controller.signal.aborted) setMentionsLoadError(true);
+        if (!cancelled) setMentionsLoadError(true);
       })
       .finally(() => {
         window.clearTimeout(timeout);
-        setMentionsLoading(false);
+        if (!cancelled) setMentionsLoading(false);
       });
-    return () => { window.clearTimeout(timeout); controller.abort(); };
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
   }, [currentUser?.name, mentionsRetry]);
 
   const dismissMention = (commentId: string) => {
