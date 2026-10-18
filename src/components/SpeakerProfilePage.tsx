@@ -107,6 +107,7 @@ export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrac
       <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-950/55 px-4 py-4" role="presentation"
         onMouseDown={event=>{if(event.target===event.currentTarget)setConfirmTrack(null);}}>
         <section role="alertdialog" aria-modal="true" aria-labelledby="speaker-play-title" aria-describedby="speaker-play-question"
+          onKeyDown={event=>{if(event.key==='Escape'){event.stopPropagation();setConfirmTrack(null);}}}
           className="w-full max-w-sm rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-2xl text-slate-900 dark:text-slate-100">
           <h2 id="speaker-play-title" className="text-lg font-black">確認播放錄音</h2>
           <p id="speaker-play-question" className="mt-3 text-sm leading-7 break-words [overflow-wrap:anywhere]">
