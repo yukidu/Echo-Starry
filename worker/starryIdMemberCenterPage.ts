@@ -275,50 +275,140 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     async function handleCredential(response){ $('loginStatus').textContent='正在登入…'; try{ await api('/api/google-sync',{method:'POST',body:JSON.stringify({credential:response.credential,appId:'starry-id'})}); $('loginStatus').textContent='登入成功'; await loadSession(); }catch(e){ $('loginStatus').textContent=e.message||'登入失敗'; toast(e.message||'登入失敗',true); } }
     function initGoogle(){ const start=Date.now(); const tick=()=>{ if(window.google?.accounts?.id){ try{ google.accounts.id.initialize({client_id:CLIENT_ID,callback:handleCredential,auto_select:false,cancel_on_tap_outside:true}); $('googleButton').replaceChildren(); google.accounts.id.renderButton($('googleButton'),{theme:'outline',size:'large',shape:'pill',text:'signin_with',locale:'zh_TW',width:280}); $('loginStatus').textContent=''; }catch(e){ $('loginStatus').textContent='Google 登入載入失敗，請重新整理。'; } return; } if(Date.now()-start<8000) setTimeout(tick,120); else $('loginStatus').textContent='Google 登入載入較慢，請重新整理再試。'; }; tick(); }
 
-    function showSelectedCount(){ $('accessSelectedCount').textContent='已選 '+state.selectedIds.size+' 位（單次最多 50 位）'; }
-    async function loadMembers(search='',offset=0){
-      try{
-        const data=await api('/api/admin/members?search='+encodeURIComponent(search)+'&offset='+offset);
-        state.memberOffset=offset;state.members=data.members||[];
-        $('memberCount').textContent=String(data.total||0);
-        $('memberPage').textContent='第 '+(Math.floor(offset/100)+1)+' 頁';
-        $('memberPrev').disabled=offset<=0;
-        $('memberNext').disabled=offset+state.members.length>=Number(data.total||0);
-        const root=$('members');root.replaceChildren();
-        for(const member of state.members){
-          const line=document.createElement('div');line.className='access-member-row';
-          const check=document.createElement('input');check.type='checkbox';
-          check.checked=state.selectedIds.has(member.id);
-          check.setAttribute('aria-label','批次選取 '+(member.name||member.email));
-          check.addEventListener('change',()=>{
-            if(check.checked&&state.selectedIds.size>=50){check.checked=false;toast('一次最多選擇 50 位會員',true);return;}
-            if(check.checked)state.selectedIds.add(member.id);else state.selectedIds.delete(member.id);
-            showSelectedCount();
-          });
-          const b=document.createElement('button');b.className='member-item';b.type='button';b.dataset.id=member.id;
-          const n=document.createElement('strong');n.textContent=member.name||'(未填姓名)';
-          const meta=document.createElement('span');meta.textContent=[member.email,member.approvedRank||member.rank].filter(Boolean).join(' · ');
-          b.append(n,meta);b.addEventListener('click',()=>openMember(member.id));
-          line.append(check,b);root.appendChild(line);
-        }
-        renderMemberActive();showSelectedCount();
-      }catch(e){toast(e.message||'會員清單讀取失敗',true);}
+    function selectedMemberCount(){
+      return state.selectionMode==='filtered' ? Math.max(0,state.memberTotal-state.excludedIds.size) : state.selectedIds.size;
     }
+    function showSelectedCount(){
+      const selected=selectedMemberCount();
+      $('accessSelectedCount').textContent='已選 '+selected+'／符合 '+state.memberTotal+' 人';
+      $('memberSelectAll').checked=state.selectionMode==='filtered'&&state.excludedIds.size===0&&state.memberTotal>0;
+      $('memberSelectAll').indeterminate=state.selectionMode==='filtered'&&state.excludedIds.size>0;
+      $('bulkAccessButton').disabled=selected===0||state.memberLoading&&!state.members.length;
+    }
+    function selectedMember(memberId){
+      return state.selectionMode==='filtered' ? !state.excludedIds.has(memberId) : state.selectedIds.has(memberId);
+    }
+    function resetMemberSelection(){
+      state.selectionMode='manual';state.selectedIds.clear();state.excludedIds.clear();
+      document.querySelectorAll('.access-member-row input[type="checkbox"]').forEach(check=>{check.checked=false;});
+      showSelectedCount();
+    }
+    function memberCard(member){
+      const line=document.createElement('div');line.className='access-member-row';
+      const check=document.createElement('input');check.type='checkbox';check.checked=selectedMember(member.id);
+      check.setAttribute('aria-label','選取 '+(member.name||member.email));
+      check.addEventListener('change',()=>{
+        if(state.selectionMode==='filtered'){
+          if(check.checked)state.excludedIds.delete(member.id);else state.excludedIds.add(member.id);
+        }else{
+          if(check.checked)state.selectedIds.add(member.id);else state.selectedIds.delete(member.id);
+        }
+        showSelectedCount();
+      });
+      const b=document.createElement('button');b.className='member-item';b.type='button';b.dataset.id=member.id;
+      const title=document.createElement('strong');title.textContent=member.name||'(未填姓名)';
+      const details=document.createElement('span');
+      details.textContent=(member.approvedRank||'未核准獎銜')+' · 直銷商中心：'+(member.center||'未填寫');
+      const email=document.createElement('span');email.textContent=member.email||'';
+      b.append(title,details,email);b.addEventListener('click',()=>openMember(member.id));
+      line.append(check,b);return line;
+    }
+    async function loadMemberRanks(){
+      if(state.memberRanksLoaded)return;
+      try{
+        const data=await api('/api/admin/member-ranks');
+        const select=$('memberRankFilter');
+        for(const item of data.ranks||[]){
+          if(!item.rank)continue;
+          const option=document.createElement('option');option.value=item.rank;option.textContent=item.rank+'（'+item.members+'）';
+          select.appendChild(option);
+        }
+        state.memberRanksLoaded=true;
+      }catch(e){toast('獎銜選項讀取失敗：'+(e.message||'稍後重試'),true);}
+    }
+    async function loadNextMembers(){
+      if(!state.adminOpen||state.memberLoading||!state.memberHasMore)return;
+      state.memberLoading=true;const token=state.memberLoadToken;
+      $('memberLoadMore').textContent='正在載入會員…';showSelectedCount();
+      try{
+        const search=$('memberSearch').value.trim(),rank=$('memberRankFilter').value;
+        const url='/api/admin/members?search='+encodeURIComponent(search)+'&rank='+encodeURIComponent(rank)+'&offset='+state.memberOffset;
+        const data=await api(url);
+        if(token!==state.memberLoadToken)return;
+        const batch=data.members||[];
+        state.members.push(...batch);
+        state.memberOffset=Number(data.nextOffset||state.memberOffset+batch.length);
+        state.memberTotal=Number(data.total||0);
+        state.memberHasMore=Boolean(data.hasMore);
+        $('memberCount').textContent='共 '+state.memberTotal+' 人';
+        const root=$('members');
+        const fragment=document.createDocumentFragment();
+        for(const member of batch)fragment.appendChild(memberCard(member));
+        root.appendChild(fragment);
+        renderMemberActive();
+        $('memberLoadMore').textContent=state.memberHasMore?'繼續向下捲動載入更多會員':'已顯示全部 '+state.memberTotal+' 位會員';
+      }catch(e){
+        if(token===state.memberLoadToken){
+          $('memberLoadMore').textContent='讀取失敗，點此重新載入';
+          toast(e.message||'會員清單讀取失敗',true);
+        }
+      }finally{
+        if(token===state.memberLoadToken){state.memberLoading=false;showSelectedCount();}
+      }
+    }
+    async function resetMemberList(){
+      ++state.memberLoadToken;
+      state.memberOffset=0;state.memberTotal=0;state.memberHasMore=true;state.memberLoading=false;state.members=[];
+      $('members').replaceChildren();$('memberCount').textContent='載入中…';
+      resetMemberSelection();
+      await loadNextMembers();
+    }
+    $('memberLoadMore').addEventListener('click',()=>void loadNextMembers());
+    const memberObserver=new IntersectionObserver(entries=>{
+      if(entries.some(entry=>entry.isIntersecting))void loadNextMembers();
+    },{root:null,rootMargin:'160px 0px'});
+    memberObserver.observe($('memberLoadMore'));
+    $('adminPanel').addEventListener('scroll',()=>{
+      const panel=$('adminPanel');
+      if(panel.scrollTop+panel.clientHeight>=panel.scrollHeight-120)void loadNextMembers();
+    });
+    window.addEventListener('scroll',()=>{
+      if(window.innerWidth<761){
+        const rect=$('memberLoadMore').getBoundingClientRect();
+        if(rect.top<window.innerHeight+140)void loadNextMembers();
+      }
+    },{passive:true});
 
     async function openMember(id){ try{ const data=await api('/api/admin/members/'+encodeURIComponent(id)); renderProfile(data.user); }catch(e){ toast(e.message||'會員資料讀取失敗',true); } }
-    function toggleAdmin(force){ if(!state.isSuperAdmin)return; state.adminOpen=typeof force==='boolean'?force:!state.adminOpen; $('adminPanel').classList.toggle('hidden',!state.adminOpen); $('memberView').classList.toggle('admin-open',state.adminOpen); if(state.adminOpen) loadMembers($('memberSearch').value.trim(),0); }
+    function toggleAdmin(force){ if(!state.isSuperAdmin)return; state.adminOpen=typeof force==='boolean'?force:!state.adminOpen; $('adminPanel').classList.toggle('hidden',!state.adminOpen); $('memberView').classList.toggle('admin-open',state.adminOpen); if(state.adminOpen){void loadMemberRanks();void resetMemberList();} }
     $('adminBtn').addEventListener('click',()=>toggleAdmin());
     $('myCardBtn').addEventListener('click',async()=>{ if(state.session?.user){ await loadOwnVisibility(); renderProfile(state.session.user); if(window.innerWidth<761) toggleAdmin(false); } });
     $('logoutBtn').addEventListener('click',async()=>{ try{await api('/api/logout',{method:'POST',body:'{}'});}catch{} showLoggedOut(); });
-    let searchTimer; $('memberSearch').addEventListener('input',()=>{clearTimeout(searchTimer);state.selectedIds.clear();showSelectedCount();searchTimer=setTimeout(()=>loadMembers($('memberSearch').value.trim(),0),220);});
-    $('memberPrev').addEventListener('click',()=>loadMembers($('memberSearch').value.trim(),Math.max(0,state.memberOffset-100)));
-    $('memberNext').addEventListener('click',()=>loadMembers($('memberSearch').value.trim(),state.memberOffset+100));
-    $('bulkAccessButton').addEventListener('click',()=>{
-      if(!state.selectedIds.size){toast('請先勾選會員',true);return;}
-      void showAppAccess([...state.selectedIds], '已選取 '+state.selectedIds.size+' 位會員', true);
+    let searchTimer;
+    $('memberSearch').addEventListener('input',()=>{
+      clearTimeout(searchTimer);searchTimer=setTimeout(()=>void resetMemberList(),220);
     });
-    document.addEventListener('click',(event)=>{const target=event.target;if(target?.id==='v211Close'||target?.classList?.contains('v211-settings'))setTimeout(async()=>{if(isOwnProfile()){await loadOwnVisibility();renderProfile(state.user);}},120);});
-
+    $('memberRankFilter').addEventListener('change',()=>void resetMemberList());
+    $('memberClearSelection').addEventListener('click',resetMemberSelection);
+    $('memberSelectAll').addEventListener('change',checked=>{
+      if($('memberSelectAll').checked){
+        state.selectionMode='filtered';state.selectedIds.clear();state.excludedIds.clear();
+      }else{
+        state.selectionMode='manual';state.selectedIds.clear();state.excludedIds.clear();
+      }
+      document.querySelectorAll('.access-member-row input[type="checkbox"]').forEach(c=>{c.checked=selectedMember(c.parentNode.querySelector('.member-item').dataset.id);});
+      showSelectedCount();
+    });
+    $('bulkAccessButton').addEventListener('click',()=>{
+      if(!selectedMemberCount()){toast('請先選取會員',true);return;}
+      state.accessBulkSelection=state.selectionMode==='filtered'
+        ? {scope:'filtered',search:$('memberSearch').value.trim(),rank:$('memberRankFilter').value,excludedIds:[...state.excludedIds]}
+        : {scope:'manual',userIds:[...state.selectedIds]};
+      const selected=selectedMemberCount();
+      const first=state.members.find(m=>selectedMember(m.id))?.id||[...state.selectedIds][0];
+      if(!first){toast('請等待會員名單載入完成',true);return;}
+      void showAppAccess([first],'已選取 '+selected+' 位會員',true);
+    });
     function hideAccessPreview(){state.accessPreview=null;$('appAccessReview').classList.add('hidden');$('appAccessConfirmText').value='';$('appAccessCommitBtn').disabled=true;}
     async function ensureAccessCatalog(){
       if(state.accessApps.length)return;
