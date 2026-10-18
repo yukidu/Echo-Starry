@@ -66,6 +66,38 @@ export async function readAppAccessDecision(db: any, userId: string, appId: stri
   return row?.decision === 'allow' || row?.decision === 'deny' ? row.decision : null;
 }
 
+// Access-policy activation date: first production deployment of central App controls.
+// Historical members remain grandfathered; an explicit admin 'deny' always wins.
+// A new member receives Starry ID only until an administrator explicitly grants each App.
+export const NEW_MEMBER_GRANT_CUTOFF_MS = Date.parse('2026-10-18T16:30:14.903Z');
+
+export type AppAccessResult = {
+  allowed: boolean;
+  reason: 'allowed' | 'explicitly_denied' | 'new_member_requires_grant' | 'inactive' | 'membership_blocked' | 'unknown_member';
+};
+
+export async function checkStarryAppAccess(db: any, userId: string, appId: string): Promise<AppAccessResult> {
+  if (!db || !ID_RE.test(userId) || !APP_RE.test(appId)) return {allowed:false,reason:'unknown_member'};
+  await ensureAccessSchema(db);
+  const row:any = await db.prepare(`SELECT u.id,u.status,u.createdAt,
+      a.decision AS explicitDecision,m.status AS membershipStatus
+    FROM users u
+    LEFT JOIN starry_app_access_decisions a ON a.userId=u.id AND a.appId=?
+    LEFT JOIN app_memberships m ON m.userId=u.id AND m.appId=?
+    WHERE u.id=? LIMIT 1`).bind(appId,appId,userId).first();
+  if (!row) return {allowed:false,reason:'unknown_member'};
+  if (row.status!=='active') return {allowed:false,reason:'inactive'};
+  if (appId===PROTECTED_APP) return {allowed:true,reason:'allowed'};
+  if (row.explicitDecision==='deny') return {allowed:false,reason:'explicitly_denied'};
+  if (row.membershipStatus && row.membershipStatus!=='active') return {allowed:false,reason:'membership_blocked'};
+  if (row.explicitDecision==='allow') return {allowed:true,reason:'allowed'};
+  const createdAt=Number(row.createdAt);
+  // Treat missing/unparseable historical timestamps as existing users; never lock out legacy accounts.
+  if (Number.isFinite(createdAt) && createdAt>=NEW_MEMBER_GRANT_CUTOFF_MS)
+    return {allowed:false,reason:'new_member_requires_grant'};
+  return {allowed:true,reason:'allowed'};
+}
+
 async function getDecisions(db: any, ids: string[]): Promise<Map<string, Decision>> {
   const map = new Map<string, Decision>();
   if (!ids.length) return map;
