@@ -47,7 +47,7 @@ const shortDate = (value?: string | number | null) => {
   return parsed.toLocaleDateString('zh-TW', { year: 'numeric', month: 'numeric', day: 'numeric' });
 };
 
-export const NotificationsView: React.FC<NotificationsViewProps> = ({
+const NotificationsViewComponent: React.FC<NotificationsViewProps> = ({
   users,
   currentUser,
   isAdmin,
@@ -67,6 +67,9 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   const canSeePending = canAudit || isPlatinumOrAbove;
 
   const [activeTab, setActiveTab] = useState<NotificationTab>('messages');
+  // Mobile devices must not render hundreds of complex cards at the same time.
+  const [visibleRows,setVisibleRows] = useState(25);
+  React.useEffect(()=>setVisibleRows(25),[activeTab]);
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   const [replyingCommentId, setReplyingCommentId] = useState<string | null>(null);
   const [quickReplyText, setQuickReplyText] = useState('');
@@ -308,7 +311,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               <p className="font-bold text-slate-500 dark:text-slate-300">目前沒有新訊息</p>
               <p className="mt-1">有人在心得中標記你時，會顯示在這裡。</p>
             </div>
-          ) : mentionNotifications.map(m => {
+          ) : mentionNotifications.slice(0,visibleRows).map(m => {
             const displayAuthorName = m.authorUser?.name || m.comment.authorName;
             const displayAvatar = m.authorUser?.avatar || m.comment.authorAvatar;
             const displayBadge = m.authorUser
@@ -441,6 +444,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               </div>
             );
           })}
+          {mentionNotifications.length>visibleRows&&<button type="button" onClick={()=>setVisibleRows(n=>n+25)} className="w-full py-3 text-sm font-bold rounded-xl border border-slate-200 dark:border-slate-700">顯示更多訊息</button>}
         </div>
       )}
 
@@ -455,7 +459,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               <CheckCircle className="w-8 h-8 mx-auto text-emerald-400 mb-2" />
               <p className="font-bold text-slate-500 dark:text-slate-300">目前沒有未審核會員</p>
             </div>
-          ) : pendingUsers.map(user => (
+          ) : pendingUsers.slice(0,visibleRows).map(user => (
             <div key={user.id} className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-amber-200/80 dark:border-amber-900/70 shadow-2xs">
               <div className="flex items-start gap-2.5">
                 <button
@@ -525,6 +529,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               </div>
             </div>
           ))}
+          {pendingUsers.length>visibleRows&&<button type="button" onClick={()=>setVisibleRows(n=>n+25)} className="w-full py-3 text-sm font-bold rounded-xl border border-slate-200 dark:border-slate-700">顯示更多待審核會員</button>}
         </div>
       )}
 
@@ -539,7 +544,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               <Bell className="w-8 h-8 mx-auto text-slate-300 mb-2" />
               <p className="font-bold text-slate-500 dark:text-slate-300">目前沒有新會員資料</p>
             </div>
-          ) : newMembers.map(user => {
+          ) : newMembers.slice(0,visibleRows).map(user => {
             const displayRank = effectiveMemberRank(user, user.rank || '無');
             return (
               <div key={user.id} className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 shadow-2xs">
@@ -579,9 +584,21 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               </div>
             );
           })}
+          {newMembers.length>visibleRows&&<button type="button" onClick={()=>setVisibleRows(n=>n+25)} className="w-full py-3 text-sm font-bold rounded-xl border border-slate-200 dark:border-slate-700">顯示更多新會員</button>}
         </div>
       )}
     </div>
   );
 };
+
+// The audio player can update App many times per second. Inbox data remains the
+// same during those updates, so avoid regenerating notification cards every tick.
+export const NotificationsView = React.memo(NotificationsViewComponent,(oldProps,newProps)=>
+  oldProps.users===newProps.users &&
+  oldProps.currentUser===newProps.currentUser &&
+  oldProps.tracks===newProps.tracks &&
+  oldProps.isAdmin===newProps.isAdmin &&
+  oldProps.isAdministrator===newProps.isAdministrator &&
+  oldProps.comments===newProps.comments
+);
 
