@@ -1,5 +1,6 @@
 import { effectiveMemberRank } from '../utils/ranks';
 import { ThemedSelect } from './ThemedSelect';
+import { SpeakerNameLink, openSpeakerProfile } from './SpeakerNameLink';
 import React, { useMemo, useRef, useState } from 'react';
 import {
   Bell,
@@ -312,7 +313,8 @@ const NotificationsViewComponent: React.FC<NotificationsViewProps> = ({
               <p className="mt-1">有人在心得中標記你時，會顯示在這裡。</p>
             </div>
           ) : mentionNotifications.slice(0,visibleRows).map(m => {
-            const displayAuthorName = m.authorUser?.name || m.comment.authorName;
+            const isSpeakerAnswer = m.comment.id.startsWith('qa-') && m.comment.authorBadge === 'AI_SPEAKER';
+             const displayAuthorName = isSpeakerAnswer ? m.comment.authorName : (m.authorUser?.name || m.comment.authorName);
             const displayAvatar = m.authorUser?.avatar || m.comment.authorAvatar;
             const displayBadge = m.authorUser
               ? m.authorUser.role === '超級管理員'
@@ -327,7 +329,7 @@ const NotificationsViewComponent: React.FC<NotificationsViewProps> = ({
                 <div className="flex items-start gap-2.5">
                   <button
                     type="button"
-                    onClick={() => m.authorUser && onViewMember?.(m.authorUser)}
+                    onClick={() => isSpeakerAnswer ? openSpeakerProfile(displayAuthorName) : m.authorUser && onViewMember?.(m.authorUser)}
                     className="w-9 h-9 rounded-full overflow-hidden shrink-0 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
                     title={m.authorUser ? `查看 ${displayAuthorName}` : undefined}
                   >
@@ -341,7 +343,7 @@ const NotificationsViewComponent: React.FC<NotificationsViewProps> = ({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                        <span className="font-extrabold text-sm text-slate-900 dark:text-slate-100 truncate">{displayAuthorName}</span>
+                        <span className="font-extrabold text-sm text-slate-900 dark:text-slate-100 truncate">{isSpeakerAnswer ? <SpeakerNameLink name={displayAuthorName}/> : displayAuthorName}</span>
                         {displayBadge && displayBadge !== '無' && displayBadge !== '訪客稱號' && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">{displayBadge}</span>
                         )}
