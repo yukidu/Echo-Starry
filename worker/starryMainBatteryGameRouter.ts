@@ -1,6 +1,7 @@
 import type { Env } from './index';
 import appWorker from './privacyCrawlerRouter';
 import { sessionContext } from './starryIdProfileDirectoryRouter';
+import { meteorRewardHundredths } from '../shared/meteorReward';
 import { handleStarryEcosystemSso } from './starryEcosystemSsoRouter';
 
 const ID_HOST = 'id.starry.phd';
@@ -156,6 +157,14 @@ async function handleGame(request: Request, env: Env) {
   const input: any = await request.clone().json().catch(() => ({}));
   const targetId = cleanTargetId(input?.targetId);
   if (!targetId) return json(request, { error: '無效的隕石編號' }, 400);
+  // Old deployed browsers may still send targetId only. Do not break them
+  // while the two independent Cloudflare workers deploy in sequence.
+  const gradedReward = input?.sizeLevel === undefined
+    ? null
+    : meteorRewardHundredths(input.sizeLevel);
+  if (input?.sizeLevel !== undefined && gradedReward === null) {
+    return json(request, { error: '無效的隕石大小等級' }, 400);
+  }
 
   const duplicate: any = await db.prepare(`SELECT id FROM battery_hundredth_transactions
     WHERE uniqueKey=? LIMIT 1`).bind(`starryphd:meteor:${session.userId}:${targetId}`).first();
@@ -172,7 +181,9 @@ async function handleGame(request: Request, env: Env) {
     return json(request, { authenticated: true, success: false, error: '點擊速度太快，請再試一次', ...balance }, 429);
   }
 
-  const rewardHundredths = randomRewardHundredths();
+  // All authenticated grants are computed server-side from an allowlisted
+  // 12-tier reward table. Never accept a client-supplied battery amount.
+  const rewardHundredths = gradedReward ?? randomRewardHundredths();
   const added = Number((rewardHundredths / 100).toFixed(2));
   const uniqueKey = `starryphd:meteor:${session.userId}:${targetId}`;
   const insert: any = await db.prepare(`INSERT OR IGNORE INTO battery_hundredth_transactions

@@ -6,10 +6,12 @@ const game = readFileSync(new URL('../worker/starryMainBatteryGameRouter.ts', im
 const login = readFileSync(new URL('../worker/starryMainInlineLoginRouter.ts', import.meta.url), 'utf8');
 const wrangler = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
 
-test('Starry main meteor reward is generated server-side between 0.01 and 0.09', () => {
+test('Starry main grants size-based 12-tier rewards and keeps legacy clients compatible', () => {
   assert.match(game, /crypto\.getRandomValues\(bytes\)/);
   assert.match(game, /\(bytes\[0\] % 9\) \+ 1/);
   assert.match(game, /deltaHundredths/);
+  assert.match(game, /meteorRewardHundredths\(input.sizeLevel\)/);
+  assert.match(game, /gradedReward \?\? randomRewardHundredths\(\)/);
   assert.match(game, /rewardHundredths/);
   assert.match(game, /const added = Number\(\(rewardHundredths \/ 100\)\.toFixed\(2\)\)/);
 });
