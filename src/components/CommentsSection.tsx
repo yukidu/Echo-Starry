@@ -23,6 +23,7 @@ import { AiBadge } from './AiBadge';
 import { SpeakerNameLink } from './SpeakerNameLink';
 import { splitSpeakerNames } from '../../shared/speakers';
 import { formatCommentTimestampDisplay } from '../../shared/commentTime';
+import { isDuduDragonComment } from '../../shared/commentAuthorStyle';
 
 const stripLegacyAutoReplyMention = (content: string, replyToAuthor?: string) => {
   const value = typeof content === 'string' ? content : '';
@@ -574,7 +575,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                       className={`${isClickable ? 'cursor-pointer hover:opacity-85 transition-opacity' : 'cursor-default pointer-events-none'} min-w-0`}
                       title={isClickable ? `點擊查看【${displayAuthorName}】個人資料頁` : undefined}
                     >
-                      {isAiSpeaker ? <span className="inline-flex items-center gap-1 font-bold text-base leading-tight break-words"><AiBadge/><span className="rainbow-admin-text"><SpeakerNameLink name={displayAuthorName}/></span></span> : c.isAdmin || displayAuthorBadge === '貢獻者' ? <span className="rainbow-admin-text font-bold text-base leading-tight break-words">{displayAuthorName}</span> : isClickable ? <span className="font-bold text-slate-800 dark:text-slate-100 text-base underline decoration-dotted underline-offset-2 hover:text-rose-600 transition-colors leading-tight break-words">{displayAuthorName}</span> : <span className="font-bold text-slate-700 dark:text-slate-300 text-base select-none leading-tight break-words">{displayAuthorName}</span>}
+                      {isAiSpeaker ? <span className="inline-flex items-center gap-1 font-bold text-base leading-tight break-words"><AiBadge/><span className="rainbow-admin-text"><SpeakerNameLink name={displayAuthorName}/></span></span> : !isDuduDragonComment(c) && (c.isAdmin || displayAuthorBadge === '貢獻者') ? <span className="rainbow-admin-text font-bold text-base leading-tight break-words">{displayAuthorName}</span> : isClickable ? <span className="font-bold text-slate-800 dark:text-slate-100 text-base underline decoration-dotted underline-offset-2 hover:text-rose-600 transition-colors leading-tight break-words">{displayAuthorName}</span> : <span className="font-bold text-slate-700 dark:text-slate-300 text-base select-none leading-tight break-words">{displayAuthorName}</span>}
                     </div>
 
                     <div className="mt-1 flex items-center gap-1 min-w-0 flex-nowrap">

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'echostars-shell-v187';
+const CACHE_NAME = 'echostars-shell-v188';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-monochrome.svg', '/icon-192.png', '/icon-512.png'];
 const FORCE_STALE_CLIENT_REFRESH = true;
 
@@ -16,7 +16,7 @@ self.addEventListener('activate', event => {
     await Promise.all(oldShellKeys.map(key => caches.delete(key)));
     await self.clients.claim();
 
-    // v187: refresh speaker QA model ordering and fixed no-sources footer.
+    // Refresh existing PWA tabs so all historical comments immediately receive owner-only regular name styling.
     // This prevents a successfully deployed Production build from looking stale merely
     // because an already-open tab is still executing the previous in-memory bundle.
     if (FORCE_STALE_CLIENT_REFRESH && upgradingExistingClient) {
