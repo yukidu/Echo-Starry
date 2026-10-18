@@ -201,8 +201,8 @@ async function remapDerivedCorrection(request: Request, env: Env, ctx: any, trac
   const transcript: any = JSON.parse(await object.text());
   const base = Array.isArray(transcript?.segments) ? transcript.segments.find((item: any) => text(item?.id) === derived.sourceId) : null;
   if (!base) return json({ error: '找不到原始逐字稿句子' }, 404);
-  const latest: any = await db.prepare('SELECT newText FROM transcript_corrections WHERE trackId=? AND segmentId=? ORDER BY createdAt DESC LIMIT 1')
-    .bind(trackId, derived.sourceId).first().catch(() => null);
+  const latest: any = await db.prepare('SELECT newText FROM transcript_corrections WHERE trackId=? AND segmentId=? AND createdAt>=? ORDER BY createdAt DESC LIMIT 1')
+    .bind(trackId, derived.sourceId, Number(transcript?.createdAt || 0)).first().catch(() => null);
   const currentFull = String(latest?.newText ?? base.text ?? '');
   const currentChars = Array.from(currentFull);
   if (derived.from < 0 || derived.to > currentChars.length || derived.from >= derived.to) {
