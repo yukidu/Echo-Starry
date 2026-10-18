@@ -1,6 +1,7 @@
 import { effectiveMemberRank } from '../utils/ranks';
 import { commentThreads } from '../utils/comments';
 import { apiJson, identityKeys } from '../utils/api';
+import { SpeakerNameLink } from './SpeakerNameLink';
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   MessageSquare,
@@ -277,7 +278,7 @@ export const CommentPreviewModal: React.FC<CommentPreviewModalProps> = ({
       } else if (matchedSpeaker) {
         elements.push(
           <span key={`mention-speaker-${match.index}`} className="inline-flex items-center gap-1 text-purple-700 dark:text-purple-300 font-bold bg-purple-50 dark:bg-purple-950/70 border border-purple-200/60 dark:border-purple-900/60 px-1.5 py-0.2 rounded-lg mx-0.5 text-xs select-none" title={`音檔演講者：${matchedSpeaker.speaker}`}>
-            <Mic className="w-3 h-3 shrink-0 text-purple-500" /><span>@{matchedSpeaker.speaker}</span><span className="text-[9px] px-1 rounded-sm bg-purple-200/60 dark:bg-purple-900/60 text-purple-700 dark:text-purple-200 font-medium">演講者</span>
+            <Mic className="w-3 h-3 shrink-0 text-purple-500" /><span>@<SpeakerNameLink name={matchedSpeaker.speaker}/></span><span className="text-[9px] px-1 rounded-sm bg-purple-200/60 dark:bg-purple-900/60 text-purple-700 dark:text-purple-200 font-medium">演講者</span>
           </span>
         );
       } else if (matchedTrack) {
@@ -305,7 +306,7 @@ export const CommentPreviewModal: React.FC<CommentPreviewModalProps> = ({
             <div className="w-8 h-8 rounded-xl bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] flex items-center justify-center shrink-0"><MessageSquare className="w-4 h-4" /></div>
             <div className="min-w-0">
               <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 flex flex-wrap items-center gap-1.5"><span>心得即時預覽</span><span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-light-pill,#fae8ed)] text-[var(--color-primary,#c06c84)] font-mono font-bold">共 {comments.length} 則</span></h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-xs sm:max-w-sm mt-0.5">{track.speaker} · 《{track.title}》</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-xs sm:max-w-sm mt-0.5"><SpeakerNameLink name={track.speaker}/> · 《{track.title}》</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"><X className="w-5 h-5" /></button>
