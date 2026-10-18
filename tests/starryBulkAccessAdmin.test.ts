@@ -35,7 +35,7 @@ test('Approved rank and center are read from central Starry ID, not app copies',
   assert.match(router,/rank = url\.searchParams\.get\('rank'\)/);
   assert.match(router,/hasMore: offset \+ members\.length < total/);
   assert.match(router,/MEMBER_BATCH_SIZE = 80/);
-  assert.match(bulk,/selection\.rank==='__unapproved__'\?'':selection\.rank/);
+  assert.match(bulk,/memberDirectoryFilter\(selection\.search\|\|'',selection\.rank\|\|''\)/);
 });
 
 test('One scrollable compact directory with full filtered selection and no visible paging',async()=>{
@@ -47,8 +47,9 @@ test('One scrollable compact directory with full filtered selection and no visib
   assert.match(html,/IntersectionObserver/);
   assert.match(html,/id="memberLoadMore"/);
   assert.doesNotMatch(html,/id="memberPrev"|id="memberNext"|id="memberPage"/);
-  assert.match(page,/selectionMode==='filtered'/);
-  assert.match(page,/excludedIds:new Set\(\)/);
+  assert.match(page,/selectedIds:new Set\(\)/);
+  assert.match(page,/currentFilterIds:null/);
+  assert.match(page,/toggleCurrentFilterSelection/);
   const js=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
   assert.ok(js);
   assert.doesNotThrow(()=>new Function(js));
