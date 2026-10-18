@@ -1,9 +1,23 @@
 import React, {useEffect,useState} from 'react';
+import {createPortal} from 'react-dom';
 import {ChevronLeft, Headphones, BookOpenText, MessageCircle, RefreshCw} from 'lucide-react';
 import {AiBadge} from './AiBadge';
 type TrackSummary={id:string;title:string;speakerRank?:string;speakerAvatar?:string;uploadDate?:string;durationSeconds?:number;requiredRank?:string};
 type QaPair={answerId:string;questionId:string;trackId:string;title:string;rank?:string;asker:string;question:string;answer:string;createdAt:number};
 type ProfileData={speaker:{id:string;name:string;avatar:string;biography:string;bioStatus:string;bioUpdatedAt:number};tracks:TrackSummary[];replies:QaPair[];hasMore:boolean;nextOffset:number;hasMoreReplies:boolean;nextReplyOffset:number};
+/** Taiwan-localized date for ISO upload timestamps, with a clean date-only fallback. */
+export function formatSpeakerUploadDate(value?:string){
+  if(!value)return '日期未設定';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(value))return value.replace(/-/g,'/');
+  const date=new Date(value);
+  if(!Number.isFinite(date.getTime()))return '日期未設定';
+  const parts=new Intl.DateTimeFormat('en-GB',{
+    timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',
+    hour:'2-digit',minute:'2-digit',hour12:false
+  }).formatToParts(date);
+  const get=(key:string)=>parts.find(x=>x.type===key)?.value||'';
+  return get('year')+'/'+get('month')+'/'+get('day')+' '+get('hour')+':'+get('minute');
+}
 export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrack:(trackId:string,commentId?:string)=>void;onPlayTrack?:(trackId:string)=>void;compact?:boolean}>=({name,onBack,onOpenTrack,onPlayTrack,compact=false})=>{
   const [data,setData]=useState<ProfileData|null>(null);
   const [error,setError]=useState('');
@@ -11,6 +25,14 @@ export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrac
   const [more,setMore]=useState(false);
   const [moreReplies,setMoreReplies]=useState(false);
   const [section,setSection]=useState<'audio'|'qa'>('audio');
+  const [confirmTrack,setConfirmTrack]=useState<TrackSummary|null>(null);
+  useEffect(()=>{
+    if(!confirmTrack)return;
+    const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')setConfirmTrack(null);};
+    document.addEventListener('keydown',onKey);
+    return()=>document.removeEventListener('keydown',onKey);
+  },[confirmTrack]);
+  useEffect(()=>setConfirmTrack(null),[name]);
   useEffect(()=>{
     let live=true;setLoading(true);setError('');setData(null);
     void fetch('/api/speaker-profiles/view?name='+encodeURIComponent(name),{credentials:'same-origin',cache:'no-store'})
@@ -63,8 +85,8 @@ export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrac
     </div>
     {section==='audio'&&<section className="space-y-2" aria-label="全部可查閱錄音">
       <p className="text-xs text-slate-500">跨所有獎銜時期，依你的會員權限顯示可以查閱的錄音。點擊標題會詢問是否播放；確認後使用原有浮動播放器，不離開此頁。</p>
-      {data.tracks.map(t=><button key={t.id} type="button" onClick={()=>{const display=[data.speaker.name,t.speakerRank,t.title].filter(Boolean).join(' ');if(window.confirm('是否播放 '+display+'？'))(onPlayTrack||onOpenTrack)(t.id);}} className="block w-full text-left rounded-xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900 p-3 hover:border-rose-400">
-        <strong className="text-sm">{t.title}</strong><span className="block text-xs mt-1 text-slate-500">{t.speakerRank||'公開'} · {t.uploadDate||'日期未設定'}</span>
+      {data.tracks.map(t=><button key={t.id} type="button" onClick={()=>setConfirmTrack(t)} className="block w-full text-left rounded-xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900 p-3 hover:border-rose-400">
+        <strong className="text-sm">{t.title}</strong><span className="block text-xs mt-1 text-slate-500">{t.speakerRank||'公開'} · {formatSpeakerUploadDate(t.uploadDate)}</span>
       </button>)}
       {!data.tracks.length&&<p className="p-5 text-center text-sm text-slate-500">目前沒有可查閱的錄音</p>}
       {data.hasMore&&<button type="button" onClick={()=>void loadMore()} disabled={more} className="w-full p-3 rounded-xl border text-sm flex items-center justify-center gap-1"><RefreshCw size={15}/>{more?'載入中…':'載入更多錄音'}</button>}
@@ -81,5 +103,28 @@ export const SpeakerProfilePage:React.FC<{name:string;onBack:()=>void;onOpenTrac
       {data.hasMoreReplies&&<button type="button" disabled={moreReplies} onClick={()=>void loadMoreReplies()} className="w-full p-3 rounded-xl border text-sm">{moreReplies?'載入中…':'載入更多歷史問答'}</button>}
     </section>}
     </>}
+    {confirmTrack&&createPortal(
+      <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-950/55 px-4 py-4" role="presentation"
+        onMouseDown={event=>{if(event.target===event.currentTarget)setConfirmTrack(null);}}>
+        <section role="alertdialog" aria-modal="true" aria-labelledby="speaker-play-title" aria-describedby="speaker-play-question"
+          className="w-full max-w-sm rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-2xl text-slate-900 dark:text-slate-100">
+          <h2 id="speaker-play-title" className="text-lg font-black">確認播放錄音</h2>
+          <p id="speaker-play-question" className="mt-3 text-sm leading-7 break-words [overflow-wrap:anywhere]">
+            是否播放 {data?.speaker.name} {confirmTrack.speakerRank||''} {confirmTrack.title}？
+          </p>
+          <div className="flex justify-end gap-3 mt-6">
+            <button type="button" autoFocus className="rounded-xl border border-slate-300 dark:border-slate-600 px-5 py-2.5"
+              onClick={()=>setConfirmTrack(null)}>取消</button>
+            <button type="button" className="rounded-xl bg-rose-600 text-white font-bold px-5 py-2.5"
+              onClick={()=>{
+                const id=confirmTrack.id;
+                setConfirmTrack(null);
+                (onPlayTrack||onOpenTrack)(id);
+              }}>確定播放</button>
+          </div>
+        </section>
+      </div>,
+      document.body
+    )}
   </main>;
 };
