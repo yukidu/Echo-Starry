@@ -609,6 +609,11 @@ function servicePage(env: StarryEnv) {
   return renderStarryIdMemberCenterPage(clientId);
 }
 
+/** A verified central session must authorize every App-access admin request. */
+export function canManageStarryAppAccess(session: { appId: string; isSuperAdmin: boolean } | null): boolean {
+  return Boolean(session && session.appId === 'starry-id' && session.isSuperAdmin === true);
+}
+
 async function handleApi(request: Request, env: StarryEnv, path: string) {
   const method = request.method.toUpperCase();
   const origin = request.headers.get('Origin');
@@ -620,8 +625,9 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
   if (path.startsWith('/api/admin/app-access/')) {
     const session = await sessionUser(request,env);
     if (!session) return json(request,{error:'請先登入 Starry ID'},401);
-    // Access administration is deliberately stricter than ordinary profile editing.
-    if (session.appId !== 'starry-id' || !configuredSuperAdmin(env,session.member.email))
+    // Reuse the same centrally verified super-admin decision as member management.
+    // A Starry ID super-admin membership is valid even without an email allowlist entry.
+    if (!canManageStarryAppAccess(session))
       return json(request,{error:'只有 Starry ID 超級管理員可以設定 App 權限'},403);
     return handleStarryAppAccessAdminRequest(request,env,session.member.id);
   }
