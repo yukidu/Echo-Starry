@@ -6,7 +6,7 @@ import { renderStarryAiManagementPage } from '../worker/starryAiManagementPage';
 
 test('central AI scheduler lists only active tasks across Echo and Mirror',()=>{
   assert.equal(AI_TASK_CATALOG.length,5);
-  assert.equal(new Set(AI_TASK_CATALOG.map(t=>t.id)).size,6);
+  assert.equal(new Set(AI_TASK_CATALOG.map(t=>t.id)).size,5);
   assert.ok(AI_TASK_CATALOG.some(t=>t.id==='mirror.reading'));
   assert.ok(AI_TASK_CATALOG.some(t=>t.id==='echo.qa'));
   assert.ok(AI_TASK_CATALOG.some(t=>t.id==='echo.transcribe'));
@@ -18,7 +18,7 @@ test('central AI scheduler lists only active tasks across Echo and Mirror',()=>{
 
 test('all AI tasks can freely move across tiers and in-tier order',()=>{
   const moved=DEFAULT_AI_ORDER.map((entry,i)=>({
-    ...entry,tier:i===0?3:i===4?1:entry.tier,order:i===0?0:i===4?0:i+1
+    ...entry,tier:entry.id==='mirror.reading'?3:entry.id==='echo.transcribe'?1:entry.tier,order:i===0?0:entry.id==='echo.transcribe'?0:i+1
   }));
   const result=validateAiOrder(moved);
   assert.equal(result.find(x=>x.id==='mirror.reading')?.tier,3);
