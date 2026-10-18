@@ -1,10 +1,10 @@
 import { mayStartAiBackground } from './starryAiManagement';
 import { aiText } from './aiSpeakerQaRouter';
 import {publicSpeakerSources,speakerSummaryOptions,speakerText,type SpeakerEnv} from './aiSpeakerProfileRouter';
-const day=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
 /**
- * Slow/background-only materialization. One speaker per 15-minute cron tick,
- * hard daily limit to protect the Workers AI free allowance.
+ * Background-only biography generation. One speaker per scheduled run,
+ * with the existing global AI work-priority gate to protect Cloudflare resources.
+ * No arbitrary per-day cap. Never run inference while visitors read profiles.
  */
 export async function generateNextSpeakerBiography(env:SpeakerEnv){
   if(!env.DB||!env.AI||!env.R2_BUCKET)return {status:'unavailable'};
@@ -12,14 +12,10 @@ export async function generateNextSpeakerBiography(env:SpeakerEnv){
   const cfg=await speakerSummaryOptions(env);
   const p:any=await env.DB.prepare("SELECT * FROM ai_speaker_profiles WHERE bioStatus='pending' AND updatedAt<? ORDER BY updatedAt DESC LIMIT 1").bind(Date.now()-30000).first();
   if(!p)return {status:'empty'};
-  const today=day();
-  const permit:any=await env.DB.prepare('INSERT INTO ai_speaker_generation_daily(day,used) VALUES (?,1) ON CONFLICT(day) DO UPDATE SET used=used+1 WHERE used<? RETURNING used').bind(today,cfg.dailyLimit).first();
-  if(!permit)return {status:'budget',message:'今日摘要額度已達上限'};
+  // A single atomic claim protects against overlapping cron runs and manual
+  // admin refresh requests. The daily generation-count setting is removed.
   const claim:any=await env.DB.prepare("UPDATE ai_speaker_profiles SET bioStatus='processing',updatedAt=? WHERE id=? AND bioStatus='pending' RETURNING id").bind(Date.now(),p.id).first();
-  if(!claim){
-    await env.DB.prepare('UPDATE ai_speaker_generation_daily SET used=max(0,used-1) WHERE day=?').bind(today).run();
-    return {status:'busy'};
-  }
+  if(!claim)return {status:'busy'};
   try{
     const {sources,revision}=await publicSpeakerSources(env,p.displayName);
     if(!sources.length){
