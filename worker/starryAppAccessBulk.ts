@@ -9,6 +9,8 @@
  * Interruptions leave an explicit resumable/undoable operation, never a
  * falsely reported all-or-nothing success.
  */
+import { memberDirectoryFilter } from './starryMemberDirectoryFilter';
+
 type BulkEnv = { STARRY_ID_DB?: any };
 type Selection = {scope:'filtered'|'manual'; search?:string;rank?:string;excludedIds?:string[];userIds?:string[]};
 type Intent = {selection:Selection;mode:'grant'|'revoke'|'replace';appIds:string[]};
@@ -65,22 +67,14 @@ export function parseBulkSelection(raw:any):Selection{
   if(!Array.isArray(excludes)||excludes.length>MAX_MEMBERS||!excludes.every((v:any)=>typeof v==='string'&&ID.test(v))||new Set(excludes).size!==excludes.length)throw Error('全選排除清單不正確');
   return {scope:'filtered',search:raw.search.trim(),rank:raw.rank,excludedIds:excludes};
 }
-const RANK_EXPR="CASE WHEN p.rankApproved=1 THEN TRIM(COALESCE(p.approvedRank,'')) ELSE '' END";
 function selectionSQL(selection:Selection):{where:string;params:any[]}{
-  if(selection.scope==='manual')return {where:'u.id IN (SELECT value FROM json_each(?))',params:[JSON.stringify(selection.userIds)]};
-  const clauses=['u.id NOT IN (SELECT value FROM json_each(?))'];
-  const params:any[]=[JSON.stringify(selection.excludedIds)];
-  const search=(selection.search||'').trim();
-  if(search){
-    const like='%'+search+'%';
-    clauses.push("(LOWER(COALESCE(p.name,'')) LIKE LOWER(?) OR LOWER(u.primaryEmail) LIKE LOWER(?) OR LOWER(COALESCE(p.amwayId,'')) LIKE LOWER(?))");
-    params.push(like,like,like);
-  }
-  if(selection.rank){
-    clauses.push(RANK_EXPR+'=?');
-    params.push(selection.rank==='__unapproved__'?'':selection.rank);
-  }
-  return {where:clauses.join(' AND '),params};
+  if(selection.scope==='manual')
+    return {where:'u.id IN (SELECT value FROM json_each(?))',params:[JSON.stringify(selection.userIds)]};
+  const directory=memberDirectoryFilter(selection.search||'',selection.rank||'');
+  return {
+    where:['u.id NOT IN (SELECT value FROM json_each(?))',...directory.conditions].join(' AND '),
+    params:[JSON.stringify(selection.excludedIds),...directory.params]
+  };
 }
 async function loadJob(db:any,id:string,actor:string){
   if(!ID.test(id))throw Error('作業代碼不正確');
