@@ -33,6 +33,7 @@ import { CommentsSection } from './CommentsSection';
 import { SocialLinkList } from './SocialLinkList';
 import { TwinklingStars } from './TwinklingStars';
 import { speakerRankBadge } from '../utils/speakerRankBadge';
+import { SpeakerNameLink } from './SpeakerNameLink';
 
 interface DetailViewProps {
   track: Track;
@@ -777,7 +778,7 @@ export const DetailView: React.FC<DetailViewProps> = ({
 
           {/* Speaker & Rank */}
           <p className="text-sm text-slate-600 dark:text-slate-400 font-medium mb-2">
-            {track.speaker} · {track.speakerRank}
+            <SpeakerNameLink name={track.speaker}/> · {track.speakerRank}
           </p>
 
           {/* Requirement 4 (v2.8): 評價、心得、按讚排列極致緊密，星星更緊密，心得顯示 icon+數字，刪除「則心得」，圖標放大與愛心星星一致 */}
