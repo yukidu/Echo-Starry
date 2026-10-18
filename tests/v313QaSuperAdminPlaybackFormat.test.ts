@@ -53,7 +53,10 @@ test('AI answer is readable and ends with trusted recording source titles only',
   assert.match(router,/max_tokens:1400/);
 });
 test('speaker recordings require confirmation and play through existing bubble, preserving view',()=>{
-  assert.match(profile,/window\.confirm\('是否播放 '/);
+  assert.doesNotMatch(profile,/window\.confirm/);
+  assert.match(profile,/role="alertdialog"/);
+  assert.match(profile,/createPortal\(/);
+  assert.match(profile,/onClick=\{\(\)=>setConfirmTrack\(t\)\}/);
   assert.match(profile,/onPlayTrack\|\|onOpenTrack/);
   assert.match(app,/onPlayTrack=\{id=>/);
   assert.match(app,/handlePlayTrack\(target,'bubble'\)/);
