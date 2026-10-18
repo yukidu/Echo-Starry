@@ -27,11 +27,11 @@ test('v299 scheduler caps transcript workflows dynamically and fills available s
   assert.match(scheduler, /transcriptTargetConcurrency\(env\)/);
 });
 
-test('v299 automatic handoff skips failed recordings while watchdog may retry them', () => {
+test('v299 automatic handoff and watchdog never retry failed recordings without explicit opt-in', () => {
   const scheduler = read('worker/transcriptSequentialSchedulerV293.ts');
   assert.match(scheduler, /type QueueNextOptions/);
   assert.match(scheduler, /includeFailed\?: boolean/);
-  assert.match(scheduler, /options\.includeFailed !== false/);
+  assert.match(scheduler, /options\.includeFailed === true/);
   assert.match(scheduler, /i\.status IN \('pending','failed'\)/);
   assert.match(scheduler, /i\.status='pending'/);
 });
