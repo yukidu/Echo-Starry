@@ -63,7 +63,7 @@ export const AiSpeakerStoryAdmin:React.FC=()=>{
         <button type="button" disabled={busy} onClick={()=>void load(selected).catch(e=>setError(e.message))} className="rounded-lg border px-3 py-2 text-sm">更新狀態</button>
       </div>
       {draft&&<p className="text-xs text-slate-500">已讀取 {draft.cursor||0}／{draft.total||'？'} 段，找到 {draft.items?.length||0} 項候選經歷。每按一次「分析下一段」只處理一部分，以控制 AI 用量。</p>}
-      {draft?.items?.length>0&&<div className="max-h-[600px] overflow-auto space-y-2">
+      {draft && draft.items.length>0 && <div className="max-h-[600px] overflow-auto space-y-2">
         {draft.items.map(f=>{
           const decision=decisions[f.id]||{include:false,owner:f.owner};
           return <div key={f.id} className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-2">
