@@ -61,6 +61,16 @@ async function settings(env:Env){
   const model=map.get('model')||MODELS[0].id;
   return {enabled:map.get('enabled')==='true',model:MODELS.some(x=>x.id===model)?model:MODELS[0].id,policies,globalDaily:Math.max(1,Math.min(100,Number(map.get('globalDaily')||12))),replyDirections:map.get('replyDirections')||''};
 }
+/**
+ * Older mobile/PWA clients omit replyDirections entirely. Do not reject their
+ * five-tier saves or erase the instructions already stored by a newer client.
+ */
+export function parseReplyDirectionsUpdate(body:any):string|undefined{
+  if(!body || !Object.prototype.hasOwnProperty.call(body,'replyDirections') || body.replyDirections===undefined)return undefined;
+  if(typeof body.replyDirections!=='string' || Array.from(body.replyDirections).length>2000)
+    throw new Error('回答格式指令不得超過2000字');
+  return body.replyDirections;
+}
 function validatePolicy(p:Policy){
   return Number.isInteger(p.daily)&&p.daily>=0&&p.daily<=200&&Number.isInteger(p.free)&&p.free>=0&&p.free<=p.daily&&Number.isInteger(p.cost)&&p.cost>=0&&p.cost<=1000;
 }
@@ -383,8 +393,16 @@ export async function handleQaRequest(req:Request,env:Env):Promise<Response|null
       if(pp.some((x:any)=>!validatePolicy(x)))return json({error:'請確認每日上限、免費次數與電池數量'},400);
       const globalDaily=Number(body.globalDaily);
       if(!Number.isInteger(globalDaily)||globalDaily<1||globalDaily>100)return json({error:'每日總預算需介於 1～100'},400);
-      if(typeof body.replyDirections!=='string'||body.replyDirections.length>2000)return json({error:'回答格式指令不得超過2000字'},400);
-      await env.DB.batch(Object.entries({enabled:String(body.enabled===true),model:body.model,policies:JSON.stringify(pp),globalDaily:String(globalDaily),replyDirections:body.replyDirections}).map(([k,v])=>env.DB.prepare('INSERT INTO qa_settings(key,value,updatedAt) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updatedAt=excluded.updatedAt').bind(k,v,Date.now())));
+      let replyDirections:string|undefined;
+      try{replyDirections=parseReplyDirectionsUpdate(body);}
+      catch{return json({error:'回答格式指令不得超過2000字'},400);}
+      const updatedSettings:Record<string,string>={
+        enabled:String(body.enabled===true),model:body.model,
+        policies:JSON.stringify(pp),globalDaily:String(globalDaily)
+      };
+      if(replyDirections!==undefined) updatedSettings.replyDirections=replyDirections;
+      // Preserve the saved formatting when older clients omit this field.
+      await env.DB.batch(Object.entries(updatedSettings).map(([k,v])=>env.DB.prepare('INSERT INTO qa_settings(key,value,updatedAt) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updatedAt=excluded.updatedAt').bind(k,v,Date.now())));
       return json({success:true});
     }
     const match=path.match(/^\/api\/qa\/transcripts\/([^/]+)$/);

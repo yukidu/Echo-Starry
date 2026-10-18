@@ -1,14 +1,14 @@
-/* One lightweight, reusable AI mark. The animation uses only transform. */
+/* Shared Ai mark: cap-height sized frame and full-size rainbow letters. */
 .starry-ai-badge {
   display: inline-flex;
   position: relative;
   vertical-align: middle;
   align-items: center;
   justify-content: center;
-  width: 1.05em;
-  height: 1.05em;
+  width: 0.9em;
+  height: 0.9em;
   flex: none;
-  border-radius: 0.18em;
+  border-radius: 0.14em;
   isolation: isolate;
   overflow: hidden;
   color: currentColor;
@@ -21,7 +21,7 @@
   position: absolute;
   z-index: -1;
   inset: 0;
-  padding: 1px;
+  padding: 1px; /* Match the one-pixel '新人' category outline */
   border-radius: inherit;
   /* Match the same 1px moving rainbow used by the home "新人" badge. */
   background: linear-gradient(45deg,#ff3b30 0%,#ff9500 7.14%,#ffcc00 14.28%,#34c759 21.42%,#00c7be 28.56%,#007aff 35.70%,#af52de 42.84%,#ff3b30 50%,#ff9500 57.14%,#ffcc00 64.28%,#34c759 71.42%,#00c7be 78.56%,#007aff 85.70%,#af52de 92.84%,#ff3b30 100%);
@@ -35,7 +35,7 @@
 }
 .starry-ai-badge-text {
   display: inline-block;
-  font-size: 0.94em;
+  font-size: 1em;
   font-weight: 900;
   letter-spacing: -0.04em;
   /* The Ai letters themselves have the same moving rainbow as the Newcomer badge. */
