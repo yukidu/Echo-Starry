@@ -18,6 +18,7 @@ export const AiSpeakerAdmin:React.FC=()=>{
   const [profiles,setProfiles]=useState<Snapshot[]>([]);
   const [cfg,setCfg]=useState<Setting>({keywords:'',direction:'',maxChars:500});
   const [query,setQuery]=useState('');
+  const [subtab,setSubtab]=useState<'summary'|'multiple'>('summary');
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -44,6 +45,11 @@ export const AiSpeakerAdmin:React.FC=()=>{
   return <section className="space-y-4 p-3 sm:p-5 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-800 dark:text-slate-100" aria-label="Ai 演講者管理">
     <h2 className="flex items-center gap-2 text-xl font-black"><AiBadge/>演講者管理</h2>
     <p className="text-xs text-slate-500">不修改原本音檔與會員資料庫。綜合摘要只引用可公開的逐字稿，錄音與問答仍遵守各會員權限。</p>
+    <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="AI 演講者管理子分頁">
+      <button type="button" role="tab" aria-selected={subtab==='summary'} onClick={()=>setSubtab('summary')} className={'rounded-xl p-3 text-sm font-black '+(subtab==='summary'?'bg-rose-600 text-white':'border border-slate-300 dark:border-slate-700')}>個人摘要</button>
+      <button type="button" role="tab" aria-selected={subtab==='multiple'} onClick={()=>setSubtab('multiple')} className={'rounded-xl p-3 text-sm font-black '+(subtab==='multiple'?'bg-rose-600 text-white':'border border-slate-300 dark:border-slate-700')}>多人演講</button>
+    </div>
+    {subtab==='summary'?<div role="tabpanel" aria-label="個人摘要" className="space-y-4">
     {error&&<p role="alert" className="text-rose-600 text-sm">{error}</p>}
     {notice&&<p role="status" className="text-emerald-600 text-sm">{notice}</p>}
     <div className="grid gap-3">
@@ -68,6 +74,6 @@ export const AiSpeakerAdmin:React.FC=()=>{
         </div>;
       })}
     </div>
-    <AiSpeakerStoryAdmin />
+    </div>:<div role="tabpanel" aria-label="多人演講"><AiSpeakerStoryAdmin/></div>}
   </section>;
 };
