@@ -208,8 +208,8 @@ async function currentSegmentState(env: Env, trackId: string, segmentId: string)
   const base = transcript?.segments.find(segment => segment.id === segmentId);
   if (!base) return null;
   const latest: any = await env.DB.prepare(`SELECT * FROM transcript_correction_events
-    WHERE trackId=? AND segmentId=? AND status<>'revoked' ORDER BY createdAt DESC,id DESC LIMIT 1`)
-    .bind(trackId, segmentId).first();
+    WHERE trackId=? AND segmentId=? AND createdAt>=? AND status<>'revoked' ORDER BY createdAt DESC,id DESC LIMIT 1`)
+    .bind(trackId, segmentId, Number((transcript as any)?.createdAt || 0)).first();
   return {
     base,
     latest: latest || null,
@@ -221,7 +221,8 @@ async function resolvedSegments(env: Env, trackId: string) {
   const transcript = await baseTranscript(env, trackId);
   if (!transcript) return null;
   const rows = await env.DB.prepare(`SELECT segmentId,newText,adminText FROM transcript_correction_events
-    WHERE trackId=? AND status<>'revoked' ORDER BY createdAt ASC,id ASC`).bind(trackId).all();
+    WHERE trackId=? AND createdAt>=? AND status<>'revoked' ORDER BY createdAt ASC,id ASC`)
+    .bind(trackId, Number((transcript as any)?.createdAt || 0)).all();
   const latest = new Map<string, string>();
   for (const row of rows.results || []) latest.set(text(row.segmentId), activeText(row));
   return transcript.segments.map(segment => ({ ...segment, text: latest.get(segment.id) || text(segment.text) }));
