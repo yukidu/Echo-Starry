@@ -386,7 +386,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       stats: { label: '排行榜', icon: <BarChart3 className="w-4 h-4" />, onClick: () => handleMobileNav('stats') },
       notifications: { label: '通知', icon: <Bell className="w-4 h-4" />, onClick: () => handleMobileNav('notifications') },
       stickers: { label: '我的貼紙', icon: <Trophy className="w-4 h-4" />, onClick: handleOpenStickers },
-      upload: { label: '上傳音檔', icon: <UploadCloud className="w-4 h-4" />, onClick: () => handleMobileNav('upload') },
+      upload: { label: '音檔管理', icon: <UploadCloud className="w-4 h-4" />, onClick: () => handleMobileNav('upload') },
       profile: { label: '個人中心', icon: <User className="w-4 h-4" />, onClick: () => handleMobileNav('profile') },
       install: { label: '安裝到桌面', icon: <Download className="w-4 h-4" />, onClick: handlePinnedInstall },
       admin: { label: '後台管理', icon: <Settings className="w-4 h-4" />, onClick: () => handleMobileNav('admin') },
@@ -603,9 +603,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {canUpload && (
               <div className={menuRowClass(currentTab === 'upload')}>
-                {renderPinControl('upload', '上傳音檔')}
+                {renderPinControl('upload', '音檔管理')}
                 <button onClick={() => handleMobileNav('upload')} className={menuActionClass}>
-                  <UploadCloud className="w-4 h-4 shrink-0" /><span>上傳音檔</span>
+                  <UploadCloud className="w-4 h-4 shrink-0" /><span>音檔管理</span>
                 </button>
               </div>
             )}
