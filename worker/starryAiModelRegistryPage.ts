@@ -26,6 +26,7 @@ dt{color:#b9cce5}dd{margin:0;white-space:pre-wrap}strong{font-weight:700}
 <main><a href="/ai-management">← 返回 AI 中央管理</a>
 <h1>AI 模型資料庫</h1>
 <p class="muted intro">中央模型目錄與費用詳情｜僅供 Starry ID 超級管理員查看。本頁只展示資料，不會呼叫或啟用付費 AI 模型。</p>
+<p><a href="/ai-model-setup">＋ 新增／修改模型・查看歷史版本・安全還原</a></p>
 <nav class="tabs" aria-label="AI 管理分頁">
 <a class="tab" href="/ai-management">AI 工作優先權</a><span class="tab active" aria-current="page">AI 模型資料庫</span>
 </nav><p id="status" role="status" aria-live="polite">正在取得已核准權限的模型清單…</p>
@@ -33,7 +34,7 @@ dt{color:#b9cce5}dd{margin:0;white-space:pre-wrap}strong{font-weight:700}
 <section class="panel" aria-label="模型清單"><h2>模型清單</h2><div id="modelList"></div></section>
 <section class="panel" aria-label="模型詳情"><h2>模型詳情與成本</h2><div id="modelDetail" aria-live="polite">選擇左側模型查看詳情。</div></section>
 </div>
-<p class="muted">此階段 A01／A03 僅建立資料庫及可稽核的模型詳情；模型新增、測試、啟用及備援選型會在 A02／A04 獨立開發。</p>
+<p class="muted">A02／A05 已提供安全新增、編輯、停用及版本還原；真實 AI 測試、正式啟用、備援選型和各 App 本地備用設定仍未開放，須另外授權及整合。</p>
 </main><script nonce="${nonce}">
 'use strict';
 const list=document.getElementById('modelList');
