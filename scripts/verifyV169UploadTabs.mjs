@@ -119,6 +119,19 @@ async function main() {
             sessionExpiresAt:Date.now()+3600000
           }),{status:200,headers:{'Content-Type':'application/json'}}));
         }
+        if(path==='/api/qa/admin'){
+          return Promise.resolve(new Response(JSON.stringify({
+            items:[],models:[{id:'@cf/qwen/qwen3-30b-a3b-fp8',label:'Qwen3 30B',strength:'test'}],
+            policies:[],model:'@cf/qwen/qwen3-30b-a3b-fp8',
+            openAiConfigured:false,enabled:true,globalDaily:12,globalUsed:0,
+            qaRules:{roleDirections:'第一人稱回答',styleDirections:'自然鼓勵學員',
+              qualityDirections:'以問句結尾',qualityEnabled:true,emojiMin:3},
+            history:[]
+          }),{status:200,headers:{'Content-Type':'application/json'}}));
+        }
+        if(path==='/api/qa/settings/history'||path==='/api/speaker-profiles/admin'){
+          return Promise.resolve(new Response(JSON.stringify(path.endsWith('history')?{items:[]}:{speakers:[],profiles:[],settings:{}}),{status:200,headers:{'Content-Type':'application/json'}}));
+        }
         if(path==='/api/tracks'){
           const fixture={
             id:'qa-fixture-001',title:'React 頁面測試音檔',speaker:'測試演講者',
@@ -172,7 +185,17 @@ async function main() {
     if(JSON.stringify(initial.labels)!==JSON.stringify(expected)||initial.rows!==1||initial.legacy!==0||initial.forms!==1||initial.viewport>initial.screen+3)throw Error('Six-tab workspace mismatch: '+JSON.stringify(initial));
     const select = async label => {
       await evaluate(`Array.from(document.querySelectorAll('.audio-workspace-tab')).find(b=>b.textContent.trim()===${JSON.stringify(label)})?.click()`);
-      await waitFor(`Array.from(document.querySelectorAll('.audio-workspace-tab')).some(b=>b.textContent.trim()===${JSON.stringify(label)}&&b.getAttribute('aria-selected')==='true')`,label+' selected');
+      try{
+        await waitFor(`Array.from(document.querySelectorAll('.audio-workspace-tab')).some(b=>b.textContent.trim()===${JSON.stringify(label)}&&b.getAttribute('aria-selected')==='true')`,label+' selected',35);
+      }catch(error){
+        const diagnostic=await evaluate(`(() => ({
+          label:${JSON.stringify(label)},
+          selected:Array.from(document.querySelectorAll('.audio-workspace-tab')).map(b=>({text:b.textContent.trim(),selected:b.getAttribute('aria-selected')})),
+          errors:window.__audioTestErrors||[],
+          alerts:Array.from(document.querySelectorAll('[role=alert]')).map(x=>x.textContent.trim().slice(0,250))
+        }))()`);
+        throw new Error('Tab selection failure: '+JSON.stringify(diagnostic)+' / '+error.message);
+      }
       const count=await evaluate("document.querySelectorAll('#track-upload-form').length");
       if(count!==(label==='上傳音檔'?1:0))throw Error('Unexpected mounted form count in '+label+': '+count);
     };
