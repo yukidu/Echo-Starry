@@ -446,22 +446,8 @@ function applyUploadPresentation(root: ParentNode = document) {
   }
 }
 
-installUploadPresentationStyle();
-applyUploadPresentation();
-
-const uploadPresentationObserver = new MutationObserver(mutations => {
-  if (applyingUploadPolicy) return;
-  const relevant = mutations.some(mutation =>
-    mutation.type === 'childList' ||
-    (mutation.type === 'characterData' && mutation.target.parentElement?.closest('#track-upload-form'))
-  );
-  if (relevant) applyUploadPresentation();
-});
-
-uploadPresentationObserver.observe(document.documentElement, {
-  childList: true,
-  subtree: true,
-  characterData: true
-});
-
-window.addEventListener('resize', () => applyUploadPresentation());
+/** Invoked by the owning React form after a render, never by a global DOM observer. */
+export function prepareAudioFormPresentation(form:HTMLFormElement){
+  installUploadPresentationStyle();
+  applyUploadPresentation(form);
+}
