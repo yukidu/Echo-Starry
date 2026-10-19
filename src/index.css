@@ -503,48 +503,27 @@ input[type="range"].audio-scrubber::-moz-range-thumb {
 .sticker-spend-overlay { z-index: 210 !important; }
 
 
-/* Audio management and transcript QA are document pages, not floating dialogs.
-   Leave nested "edit track" dialogs with the existing modal presentation. */
-main[data-echo-page="audio-management"] .upload-modal-overlay.upload-standalone-page {
-  position: static !important;
-  inset: auto !important;
-  top: auto !important;
-  left: auto !important;
-  right: auto !important;
-  bottom: auto !important;
-  transform: none !important;
-  display: block !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-  height: auto !important;
-  max-height: none !important;
-  min-height: 0 !important;
-  z-index: auto !important;
-  overflow: visible !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  background: transparent !important;
-  backdrop-filter: none !important;
-  box-shadow: none !important;
+/* Upload and edit forms are now normal React document sections.
+   Overlay styling applies only to the explicitly requested dialog presentation. */
+.audio-form-document {
+  position:static;
+  display:block;
+  width:100%;
+  min-width:0;
+  margin:0;
+  padding:0;
+  background:transparent;
 }
-main[data-echo-page="audio-management"] .upload-standalone-page > div {
-  width: 100% !important;
-  max-width: 100% !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  overflow: visible !important;
-  box-shadow: none !important;
-  border: none !important;
-  border-radius: 0 !important;
+.audio-form-document > div {
+  width:100%;
+  min-width:0;
+  border:0;
+  border-radius:0;
+  box-shadow:none;
 }
 main[data-echo-page="audio-management"] .v161-track-list {
-  max-height: none;
-  overflow-y: visible;
+  max-height:none;
+  overflow:visible;
 }
-@media (max-width: 639px) {
-  main[data-echo-page="audio-management"] .upload-standalone-page,
-  main[data-echo-page="audio-management"] .upload-standalone-page > div {
-    border-radius: 0 !important;
-  }
+
 }
