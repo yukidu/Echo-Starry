@@ -56,14 +56,14 @@ function option(value,label){return new Option(label,value)}
 function setupSelect(el,models,primary){
  el.replaceChildren();
  el.add(option('',primary?'尚無已核准且相容的模型':'不設定備援'));
- for(const m of models)el.add(option(m.name+' · '+m.modelId,m.modelId));
+ for(const m of models)el.add(option(m.modelId,m.name+' · '+m.modelId));
  el.disabled=primary&&!models.length;
 }
 function tasksForApp(){
  const app=$('app').value;
  const list=(data?.tasks||[]).filter(t=>t.appId===app);
  $('task').replaceChildren();
- for(const t of list)$('task').add(option(t.title,t.taskId));
+ for(const t of list)$('task').add(option(t.taskId,t.title));
  $('task').disabled=!list.length;
  updateTask();
 }
