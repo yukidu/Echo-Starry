@@ -23,3 +23,10 @@
 
 ## 驗收
 Regression、TypeScript、Build、CodeQL；新增 I31/I32 草稿與禁止執行測試。正式資料不受本 PR 影響。
+
+## 與中央AI3 PR #458（B07-01）的合併相容檢查
+- 本次於 PR #457 分支重新檢查 main `60fc222f` 和 PR #458 `a867b0e`，兩者目前尚未合併。
+- 共用修改檔只有 `worker/starryIdCentralRouter.ts`。AI7 已把 imports 移至既有 imports 最末端、私有備份 API 分支移至 API handler 最末端、備份頁路由移至其他 AI 管理頁之後；三處皆不修改或覆蓋 B07 專用 API、頁面或原有 A04 選型。
+- **合併前仍需由中央AI2於先合併一方後，以當下最新 main 對後合併一方重跑差異、衝突、全回歸、CodeQL、Preview**；兩個 PR 各自 CI 通過不能代替合併後的整合測試。
+- AI3 B07 的帳本屬 `starry_id_db`，未來正式備份／還原需保留 `starry_ai_b07_calls`、`starry_ai_b07_usage`、`starry_ai_b07_events`、政策、費率、風控及歷史為**同一一致性時間點**，不可只還原政策而遺失預留款、已結算和防重識別碼。
+- AI7 I31/I32 現階段只提供設定草稿與資訊架構，**沒有**任何可啟動的排程及正式覆蓋還原；正式備份與任何正式 D1 migration 都需額外授權。
