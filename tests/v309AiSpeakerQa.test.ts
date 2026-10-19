@@ -56,7 +56,7 @@ test('main comments keeps a single line speaker name with shared icon and inline
 test('audio management has an actual dedicated transcript tab, full text, keyword search, and admin pricing',()=>{
   assert.match(page,/active==='transcript'/);
   assert.match(page,/active==='transcript'&&<TranscriptQaAdmin\/>/);
-  assert.match(page,/<AiQuestionSettingsAdmin \/>/);
+  assert.match(page,/active==='ai-question'&&<AiQuestionSettingsAdmin\/>/);
   assert.match(router,/path==='\/api\/qa\/search'/);
   assert.ok(router.includes('const match=path.match('));
   assert.match(router,/chineseCount/);
