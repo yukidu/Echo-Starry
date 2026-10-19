@@ -72,6 +72,23 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
     .access-history{margin-top:20px;border-top:1px solid var(--line);padding-top:10px}
     .access-history-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #233450;font-size:12px}
     .access-history-row span{overflow-wrap:anywhere;min-width:0}
+    .guest-entry{position:sticky;top:0;z-index:2;margin:10px 0 4px;
+      border:1px solid #7d91c0;background:#1b3150;border-radius:12px;
+      color:#fff;display:flex;align-items:center;gap:10px;padding:12px;
+      cursor:pointer;width:100%;text-align:left}
+    .guest-entry.active,.guest-entry:focus-visible{border-color:#d6c5ff;background:#30486a}
+    .guest-entry strong{display:block;font-size:15px}
+    .guest-entry small{display:block;color:#b8c9e6;font-size:12px}
+    .guest-policy-list{display:grid;gap:9px;margin:16px 0}
+    .guest-policy-row{border:1px solid #38516f;border-radius:12px;
+      display:flex;justify-content:space-between;align-items:center;
+      gap:12px;padding:12px;background:#11233c}
+    .guest-policy-row strong{display:block}
+    .guest-policy-row small{display:block;color:#c5d0e2;font-size:12px;line-height:1.5;margin-top:4px}
+    .guest-policy-row .btn{flex-shrink:0}
+    .guest-policy-row .btn:disabled{opacity:.5;cursor:not-allowed}
+    .guest-policy-help{color:#c5d0e2;font-size:13px;line-height:1.65}
+    @media(max-width:760px){.guest-policy-row{flex-wrap:wrap}}
     @media(max-width:760px){.access-apps{grid-template-columns:1fr}.access-section{padding:12px}}
   </style>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -111,9 +128,37 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
           <span id="accessSelectedCount">已選 0 位</span>
           <button type="button" class="btn primary" id="bulkAccessButton">批次設定 App 權限</button>
         </div>
+        <!-- Fixed first entry: a policy principal, not a row from the users table.
+             Deliberately outside paginated member results/checkboxes/counts. -->
+        <button type="button" id="guestAccessEntry" class="guest-entry"
+          aria-label="訪客使用權限管理">
+          <span aria-hidden="true">👥</span><span>
+          <strong>訪客</strong><small>未登入使用者｜不計入會員人數</small>
+          </span>
+        </button>
         <div class="members" id="members"></div>
         <div class="member-directory-loading" id="memberLoadMore" aria-live="polite"></div>
       </aside>
+      <section class="card hidden" id="guestAccessCard" aria-label="訪客 App 權限管理">
+        <h2>👥 訪客｜App 使用權限</h2>
+        <p class="guest-policy-help">「訪客」不是會員，不會建立會員資料或加入批次勾選。預設全部禁止；僅已完成安全整合的 App 能開放已註明的公開功能。</p>
+        <p class="guest-policy-help">繁星下載：開放後僅限公開首頁非會員互動；下載、收藏、紀錄及私人資料仍需會員登入並取得授權。</p>
+        <div class="guest-policy-list" id="guestAppPolicies" aria-live="polite">正在載入訪客權限…</div>
+        <section class="access-preview hidden" id="guestAccessPreview" aria-label="訪客權限變更確認">
+          <strong>請確認訪客權限變更</strong>
+          <div id="guestAccessPreviewText"></div>
+          <label for="guestAccessConfirmText">輸入「確認變更」後才能執行</label>
+          <input id="guestAccessConfirmText" autocomplete="off" placeholder="確認變更">
+          <div class="access-fields">
+            <button class="btn primary" id="guestAccessCommitBtn" type="button" disabled>確認套用</button>
+            <button class="btn" id="guestAccessCancelBtn" type="button">取消</button>
+          </div>
+        </section>
+        <div class="access-history">
+          <h3>訪客權限操作紀錄與還原</h3>
+          <div id="guestAccessHistory" aria-live="polite"></div>
+        </div>
+      </section>
       <section class="card" id="profileCard">
         <div class="identity" id="memberIdentity">
           <div id="avatarWrap"></div>
@@ -265,12 +310,12 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         root.appendChild(card);
       }
     }
-    function renderProfile(user){ state.user=user; state.targetUserId=user.id; renderAvatar(user); $('displayName').textContent=user.name||'尚未填寫姓名'; $('displayEmail').textContent=user.email||''; renderBadges(user); renderFields(user); renderMemberActive(); $('memberIdentity').classList.toggle('access-mode',state.isSuperAdmin); if(state.isSuperAdmin)void showAppAccess([user.id],user.name||user.email||'會員',false); }
+    function renderProfile(user){ state.guestOpen=false; $('guestAccessCard').classList.add('hidden'); $('profileCard').classList.remove('hidden'); $('guestAccessEntry').classList.remove('active'); state.user=user; state.targetUserId=user.id; renderAvatar(user); $('displayName').textContent=user.name||'尚未填寫姓名'; $('displayEmail').textContent=user.email||''; renderBadges(user); renderFields(user); renderMemberActive(); $('memberIdentity').classList.toggle('access-mode',state.isSuperAdmin); if(state.isSuperAdmin)void showAppAccess([user.id],user.name||user.email||'會員',false); }
     async function saveField(field,value,card){ card.classList.add('saving'); try{ const path=state.isSuperAdmin && state.targetUserId!==state.session.user.id ? '/api/admin/members/'+encodeURIComponent(state.targetUserId) : '/api/profile'; const data=await api(path,{method:'PUT',body:JSON.stringify({[field]:value})}); renderProfile(data.user); toast('已儲存 '+editable.find(x=>x[0]===field)?.[1]); }catch(e){ card.classList.remove('saving'); renderFields(state.user); toast(e.message||'儲存失敗',true); } }
     function beginEdit(card,field,label,wide){ if(card.querySelector('.field-editor')) return; const value=state.user[field]===null||state.user[field]===undefined?'':String(state.user[field]); const display=card.querySelector('.field-value'); const edit=card.querySelector('.edit'); if(edit) edit.classList.add('hidden'); const input=wide?document.createElement('textarea'):document.createElement('input'); input.className='field-editor'; if(wide) input.rows=3; if(isNumeric(field)) input.inputMode='numeric'; input.value=value; display.replaceWith(input); let done=false; const cancel=()=>{ if(done)return; done=true; renderFields(state.user); }; const commit=()=>{ if(done)return; done=true; const next=input.value.trim(); if(next===value){renderFields(state.user);return;} saveField(field,next,card); }; input.addEventListener('keydown',(event)=>{ if(event.key==='Escape'){event.preventDefault();cancel();return;} if(event.key==='Enter' && (!wide || event.ctrlKey || event.metaKey)){event.preventDefault();commit();} }); input.addEventListener('blur',()=>{ if(!done) commit(); }); input.focus(); input.select(); }
     function renderMemberActive(){ document.querySelectorAll('.member-item').forEach(el=>el.classList.toggle('active',el.dataset.id===state.targetUserId)); }
     function showLoggedIn(){ $('loginView').classList.add('hidden'); $('memberView').classList.remove('hidden'); $('topActions').hidden=false; $('adminBtn').classList.toggle('hidden',!state.isSuperAdmin); }
-    function showLoggedOut(){ resetMemberSelection(); state.session=null; state.user=null; state.targetUserId=null; state.visibility=null; $('topActions').hidden=true; $('memberView').classList.add('hidden'); $('loginView').classList.remove('hidden'); initGoogle(); }
+    function showLoggedOut(){ state.guestOpen=false; $('guestAccessCard').classList.add('hidden'); $('profileCard').classList.remove('hidden'); resetMemberSelection(); state.session=null; state.user=null; state.targetUserId=null; state.visibility=null; $('topActions').hidden=true; $('memberView').classList.add('hidden'); $('loginView').classList.remove('hidden'); initGoogle(); }
     async function loadSession(){ try{ const data=await api('/api/session'); state.session=data; state.isSuperAdmin=Boolean(data.isSuperAdmin); state.targetUserId=data.user.id; await loadOwnVisibility(); showLoggedIn(); renderProfile(data.user); }catch{ showLoggedOut(); } }
     async function handleCredential(response){ $('loginStatus').textContent='正在登入…'; try{ await api('/api/google-sync',{method:'POST',body:JSON.stringify({credential:response.credential,appId:'starry-id'})}); $('loginStatus').textContent='登入成功'; await loadSession(); }catch(e){ $('loginStatus').textContent=e.message||'登入失敗'; toast(e.message||'登入失敗',true); } }
     function initGoogle(){ const start=Date.now(); const tick=()=>{ if(window.google?.accounts?.id){ try{ google.accounts.id.initialize({client_id:CLIENT_ID,callback:handleCredential,auto_select:false,cancel_on_tap_outside:true}); $('googleButton').replaceChildren(); google.accounts.id.renderButton($('googleButton'),{theme:'outline',size:'large',shape:'pill',text:'signin_with',locale:'zh_TW',width:280}); $('loginStatus').textContent=''; }catch(e){ $('loginStatus').textContent='Google 登入載入失敗，請重新整理。'; } return; } if(Date.now()-start<8000) setTimeout(tick,120); else $('loginStatus').textContent='Google 登入載入較慢，請重新整理再試。'; }; tick(); }
