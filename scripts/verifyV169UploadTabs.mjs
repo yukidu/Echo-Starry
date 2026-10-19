@@ -81,6 +81,17 @@ async function main() {
     // No production account is accessed and no API data is mutated.
     await send('Page.addScriptToEvaluateOnNewDocument', {source:`(() => {
       window.__audioTestErrors=[];
+      window.__audioIdentityTrace=[];
+      const nativeRemove=Storage.prototype.removeItem;
+      const nativeClear=Storage.prototype.clear;
+      Storage.prototype.removeItem=function(key){
+        if(key==='sq_current_user_v1')window.__audioIdentityTrace.push({kind:'remove',stack:(new Error()).stack?.slice(0,600)});
+        return nativeRemove.apply(this,arguments);
+      };
+      Storage.prototype.clear=function(){
+        window.__audioIdentityTrace.push({kind:'clear',stack:(new Error()).stack?.slice(0,600)});
+        return nativeClear.apply(this,arguments);
+      };
       window.addEventListener('error',e=>window.__audioTestErrors.push(String(e?.error?.stack||e?.message||'unknown').slice(0,800)));
       window.addEventListener('unhandledrejection',e=>window.__audioTestErrors.push(String(e?.reason?.stack||e?.reason||'promise').slice(0,800)));
       localStorage.setItem('sq_current_user_v1', JSON.stringify({
@@ -114,7 +125,7 @@ async function main() {
     };
     await waitFor("document.readyState==='complete'&&!!document.querySelector('[data-main-menu=\\\"hamburger\\\"]')",'React navbar');
     await delay(350);
-    const beforeMenu=await evaluate("({role:JSON.parse(localStorage.getItem('sq_current_user_v1')||'null')?.role,allKeys:Object.keys(localStorage),errors:window.__audioTestErrors||[],url:location.href,aria:document.querySelector('[data-main-menu=\\\"hamburger\\\"]')?.getAttribute('aria-expanded')})");
+    const beforeMenu=await evaluate("({role:JSON.parse(localStorage.getItem('sq_current_user_v1')||'null')?.role,allKeys:Object.keys(localStorage),identityTrace:window.__audioIdentityTrace||[],errors:window.__audioTestErrors||[],url:location.href,aria:document.querySelector('[data-main-menu=\\\"hamburger\\\"]')?.getAttribute('aria-expanded')})");
     await evaluate("document.querySelector('[data-main-menu=\\\"hamburger\\\"]').click()");
     await delay(120);
     const afterMenu=await evaluate("({aria:document.querySelector('[data-main-menu=\\\"hamburger\\\"]')?.getAttribute('aria-expanded'),count:document.querySelectorAll('.mobile-menu-panel').length})");
