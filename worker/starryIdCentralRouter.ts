@@ -9,6 +9,8 @@ import { renderStarryAiManagementPage } from './starryAiManagementPage';
 import { renderStarryAiModelRegistryPage } from './starryAiModelRegistryPage';
 import { readCentralAiModels } from './starryAiModelRegistry';
 import { renderStarryAiModelAdminPage } from './starryAiModelAdminPage';
+import { renderStarryAiB07BudgetPage } from './starryAiB07BudgetPage';
+import { b07Dashboard, saveB07Policy, b07Simulation, B07Error } from './starryAiB07Budget';
 import { renderStarryAiTaskRoutingPage } from './starryAiTaskRoutingPage';
 import { readAiRoutingControl, previewAiRouting, saveAiRouting, RoutingInputError } from './starryAiTaskRouting';
 import { modelAdminHistory, modelAdminSecretStatus, dryRunModelDraft, applyModelAdminAction, AdminInputError } from './starryAiModelAdmin';
@@ -692,6 +694,32 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
     return handleStarryAppAccessAdminRequest(request,env,session.member.id);
   }
 
+  if (path === '/api/ai-budget' || path === '/api/ai-budget/simulate') {
+    // B07-01: no runtime provider calls; NEVER treat demo data as real spend.
+    if (origin && origin !== 'https://id.starry.phd')
+      return json(request, {error:'請從 Starry ID 官方管理頁操作'},403);
+    const session=await sessionUser(request,env);
+    if(!session)return json(request,{error:'請先登入 Starry ID'},401);
+    if(!session.isSuperAdmin)return json(request,{error:'僅中央超級管理員可查看費用設定'},403);
+    try {
+      if(method==='GET'&&path==='/api/ai-budget')
+        return json(request,await b07Dashboard(env,new URL(request.url).searchParams.get('scope')||undefined));
+      if(method!=='POST')return json(request,{error:'Method not allowed'},405);
+      if(origin!=='https://id.starry.phd' ||
+         !(request.headers.get('Content-Type')||'').toLowerCase().startsWith('application/json'))
+        return json(request,{error:'請從 Starry ID 官方管理頁重新操作'},403);
+      const raw=await request.text();
+      if(raw.length>8192)return json(request,{error:'資料長度不符合安全限制'},413);
+      let body:any;
+      try{body=JSON.parse(raw)}catch{return json(request,{error:'JSON 格式錯誤'},400)}
+      if(path==='/api/ai-budget/simulate')return json(request,b07Simulation(body));
+      return json(request,await saveB07Policy(env,session.member.id,body));
+    }catch(e){
+      if(e instanceof B07Error)return json(request,{error:e.code},e.status);
+      return json(request,{error:'費用安全管理暫時無法使用'},503);
+    }
+  }
+
   if (path === '/api/ai-routing' || path === '/api/ai-routing/preview') {
     // A04-01: central administrative staging ONLY, never routes paid/active AI calls.
     if (origin && origin !== 'https://id.starry.phd')
@@ -974,6 +1002,12 @@ export async function handleStarryIdCentral(request: Request, env: StarryEnv): P
 
   if (url.pathname === '/' && request.method.toUpperCase() === 'GET') return servicePage(env);
   if (url.pathname === '/ai-management' && request.method.toUpperCase() === 'GET') return renderStarryAiManagementPage();
+  if (url.pathname === '/ai-budget' && request.method.toUpperCase() === 'GET') {
+    const session=await sessionUser(request,env);
+    if(!session)return new Response('請先登入 Starry ID',{status:401,headers:{'Cache-Control':'no-store'}});
+    if(!session.isSuperAdmin)return new Response('只有中央超級管理員可管理費用安全',{status:403,headers:{'Cache-Control':'no-store'}});
+    return renderStarryAiB07BudgetPage();
+  }
   if (url.pathname === '/ai-routing' && request.method.toUpperCase() === 'GET') {
     const session=await sessionUser(request,env);
     if(!session)return new Response('請先登入 Starry ID',{status:401,headers:{'Cache-Control':'no-store'}});
