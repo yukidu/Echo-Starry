@@ -500,6 +500,48 @@ export async function handleQaRequest(req:Request,env:Env):Promise<Response|null
       const used:any=await env.DB.prepare("SELECT used FROM qa_daily WHERE identity='__global__' AND day=?").bind(day()).first();
       return json({items,history:history.results||[],models:MODELS,openAiConfigured:!!String(env.OPENAI_API_KEY||'').trim(),policies:cfg.policies.map((p:any,i:number)=>({tier:i+1,label:LABELS[i],daily:p.daily,free:p.free,cost:units(p.cost)})),model:cfg.model,enabled:cfg.enabled,globalDaily:cfg.globalDaily,globalUsed:Number(used?.used||0),replyDirections:cfg.replyDirections,qaRules:cfg.qaRules});
     }
+    if(path==='/api/qa/settings/history'&&method==='GET'){
+      const rows=await env.DB.prepare('SELECT id,createdAt,changeType FROM qa_settings_history ORDER BY createdAt DESC LIMIT 20').all();
+      return json({items:rows.results||[]});
+    }
+    if(path==='/api/qa/settings/restore'&&method==='POST'){
+      const body:any=await req.json().catch(()=>null),id=txt(body?.id);
+      if(!id||id.length>100)return json({error:'請指定歷史版本'},400);
+      const row:any=await env.DB.prepare('SELECT configJson FROM qa_settings_history WHERE id=?').bind(id).first();
+      if(!row)return json({error:'歷史版本不存在'},404);
+      let prior:any;try{prior=JSON.parse(row.configJson);}catch{return json({error:'歷史版本內容無法讀取'},409);}
+      if(!prior||!MODELS.some(x=>x.id===prior.model)||!Array.isArray(prior.policies)||prior.policies.length!==5)return json({error:'歷史版本不相容'},409);
+      if(prior.model===OPENAI_SPEAKER_QA_MODEL&&!String(env.OPENAI_API_KEY||'').trim())return json({error:'OpenAI 金鑰目前未設定'},503);
+      let rules:QaRuleOptions;try{rules=validateQaRules(prior.qaRules);}catch{return json({error:'歷史指令不相容'},409);}
+      const pp=prior.policies.map((x:any)=>({daily:Number(x.daily),free:Number(x.free),cost:Number(x.cost)}));
+      if(pp.some((x:Policy)=>!validatePolicy(x))||!Number.isInteger(prior.globalDaily)||prior.globalDaily<1||prior.globalDaily>100)return json({error:'歷史額度不相容'},409);
+      await writeQaSettings(env,{
+        enabled:String(prior.enabled===true),model:prior.model,policies:JSON.stringify(pp),globalDaily:String(prior.globalDaily),
+        qaRoleDirections:rules.roleDirections,qaStyleDirections:rules.styleDirections,qaQualityDirections:rules.qualityDirections,
+        qaQualityEnabled:String(rules.qualityEnabled),qaEmojiMin:String(rules.emojiMin),replyDirections:rules.styleDirections.slice(0,2000)
+      },txt(user?.id)||'superadmin','restore');
+      return json({success:true,message:'已還原設定，往後的新回答將使用這個版本'});
+    }
+    if(path==='/api/qa/preview'&&method==='POST'){
+      const body:any=await req.json().catch(()=>null),trackId=txt(body?.trackId),question=txt(body?.question);
+      if(!trackId||trackId.length>128||!question||question.length>600)return json({error:'請選擇音檔並輸入不超過600字的問題'},400);
+      if(!MODELS.some(x=>x.id===body?.model))return json({error:'模型選擇無效'},400);
+      if(body.model===OPENAI_SPEAKER_QA_MODEL&&!String(env.OPENAI_API_KEY||'').trim())return json({error:'OpenAI 金鑰未設定'},503);
+      let rules:QaRuleOptions;try{rules=validateQaRules(body.qaRules);}catch(e){return json({error:e instanceof Error?e.message:'回答規則錯誤'},400);}
+      const track:any=await env.DB.prepare('SELECT * FROM tracks WHERE id=? LIMIT 1').bind(trackId).first();
+      if(!track||!await mayUseTranscript(env,user,track))return json({error:'沒有音檔使用權限'},403);
+      const source=await excerpts(env,track,user,'current',question);
+      if(!source.prompt)return json({error:'選定音檔沒有可用的逐字稿'},422);
+      const counter:any=await env.DB.prepare('INSERT INTO qa_admin_preview_daily(day,owner,used) VALUES (?,?,1) ON CONFLICT(day,owner) DO UPDATE SET used=used+1 WHERE used<10 RETURNING used').bind(day(),txt(user?.id)||'admin').first();
+      if(!counter)return json({error:'今日測試回答已達10次，請明天再試'},429);
+      const messages=[
+        {role:'system',content:buildQaSystemInstructions(rules)},
+        {role:'user',content:'學員問題：'+question+'\n\n演講者分享內容（僅供確認事實，不要提起素材來源）：\n'+source.prompt}
+      ];
+      const result=await generateQaWithQuality(env,body.model,messages,rules);
+      if(!result.reply)return json({success:false,answer:'',qualityIssues:result.qualityIssues,previewUsed:counter.used,message:'未產出符合條件的回答。沒有公開留言，也未扣會員電池'});
+      return json({success:true,answer:formatQaAnswer(result.reply,source.sources),modelUsed:result.model,previewUsed:counter.used,repaired:result.repaired,qualityIssues:[]});
+    }
     if(path==='/api/qa/settings'&&method==='PUT'){
       const body:any=await req.json().catch(()=>null);
       if(!body||!MODELS.some(x=>x.id===body.model)||!Array.isArray(body.policies)||body.policies.length!==5)return json({error:'設定內容不完整'},400);
