@@ -155,33 +155,8 @@ async function main() {
       throw new Error(`Active palette mismatch: ${JSON.stringify({ popularInactiveBg, ...activePaletteState })}`);
     }
 
-    // The audio editor remains a real full page below the navbar.
-    const editorState = await evaluate(`(async () => {
-      const fixture = document.createElement('div');
-      fixture.className = 'v161-track-editor-overlay';
-      fixture.innerHTML = '<div class="upload-modal-overlay upload-page"><div><h2>編輯音檔</h2><form id="track-upload-form"></form></div></div>';
-      document.body.appendChild(fixture);
-      await new Promise(resolve => setTimeout(resolve, 120));
-      const main = document.querySelector('#root main');
-      const nested = fixture.querySelector('.upload-modal-overlay');
-      const result = {
-        htmlClass: document.documentElement.classList.contains('echostars-v167-audio-editor-page'),
-        pageMarker: fixture.dataset.v167Page || '',
-        editorPosition: getComputedStyle(fixture).position,
-        nestedPosition: nested ? getComputedStyle(nested).position : '',
-        mainDisplay: main ? getComputedStyle(main).display : '',
-        aria: fixture.getAttribute('aria-label') || ''
-      };
-      fixture.remove();
-      await new Promise(resolve => setTimeout(resolve, 120));
-      result.restored = !document.documentElement.classList.contains('echostars-v167-audio-editor-page');
-      return result;
-    })()`);
-    if (!editorState.htmlClass || editorState.pageMarker !== 'audio-editor' || editorState.editorPosition !== 'static' || editorState.nestedPosition !== 'static' || editorState.mainDisplay !== 'none' || editorState.aria !== '編輯音檔頁面' || !editorState.restored) {
-      throw new Error(`Audio editor page mismatch: ${JSON.stringify(editorState)}`);
-    }
-
-    const state = { categoryState, advancedState, timeBefore, timeFirst, timeSecond, popularInactiveBg, popularFirst, popularSecond, activePaletteState, editorState };
+    // Audio management/editor are tested in verifyAudioWorkspace.mjs as real React pages.
+    const state={categoryState,advancedState,timeBefore,timeFirst,timeSecond,popularInactiveBg,popularFirst,popularSecond,activePaletteState};
     const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     await writeFile('/tmp/echostars-v169-filter-toolbar.png', Buffer.from(shot.data, 'base64'));
     await writeFile('/tmp/echostars-v169-filter-toolbar-state.json', JSON.stringify(state, null, 2));
