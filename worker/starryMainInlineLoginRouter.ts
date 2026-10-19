@@ -17,6 +17,7 @@ export { AudioSegmenterContainer } from './audioSegmenterContainer';
 const ID_HOST = 'id.starry.phd';
 const LOGIN_PATH = '/starry-main-login';
 const GOOGLE_SYNC_PATH = '/api/google-sync';
+const LOGOUT_PATH = '/api/logout';
 const MAIN_ORIGIN = 'https://starry.phd';
 const DEFAULT_GOOGLE_CLIENT_ID = '661055525630-ndcq5gtr16h7rqqprlqqkkvineea87lc.apps.googleusercontent.com';
 
@@ -329,7 +330,7 @@ export default {
 
     if (
       url.hostname === ID_HOST &&
-      url.pathname === GOOGLE_SYNC_PATH &&
+      (url.pathname === GOOGLE_SYNC_PATH || url.pathname === LOGOUT_PATH) &&
       (request.headers.get('Origin') || '') === MAIN_ORIGIN
     ) {
       const response = await appWorker.fetch(request, env, ctx);
