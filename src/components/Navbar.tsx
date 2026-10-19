@@ -23,6 +23,27 @@ import './Navbar.v124.css';
 export type NavTab = 'home' | 'stats' | 'notifications' | 'profile' | 'upload' | 'admin' | 'stickers' | 'install';
 
 const USER_FONT_ZOOM_KEY = 'echostars_user_font_zoom_v1';
+const VERIFIED_BALANCE_CACHE_PREFIX = 'echostars_last_verified_sticker_balance_v1:';
+const VERIFIED_BALANCE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+// A cached balance is a display hint only. The server always verifies spending
+// and unlock permissions; this value must never authorize any action.
+function readLastVerifiedBalance(userId: string | undefined): number | undefined {
+  if (!userId || typeof window === 'undefined') return undefined;
+  try {
+    const raw = localStorage.getItem(VERIFIED_BALANCE_CACHE_PREFIX + userId);
+    if (!raw) return undefined;
+    const data = JSON.parse(raw) as { balance?: unknown; savedAt?: unknown };
+    const balance = Number(data.balance);
+    const savedAt = Number(data.savedAt);
+    if (data.balance == null || !Number.isFinite(balance) || balance < 0 ||
+        !Number.isFinite(savedAt) || savedAt > Date.now() ||
+        Date.now() - savedAt > VERIFIED_BALANCE_MAX_AGE_MS) return undefined;
+    return balance;
+  } catch {
+    return undefined;
+  }
+}
 const QUICK_ACTION_ORDER: QuickActionId[] = [
   'font', 'theme', 'stats', 'notifications', 'stickers', 'upload', 'profile', 'admin', 'palette'
 ];
@@ -148,10 +169,24 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isSuperAdmin = isAdmin || cleanEmail === 'yukidu@gmail.com' || currentUser?.role === '超級管理員';
   const isAdministrator = currentUser?.isAdminUser === true || currentUser?.role === '管理員' || currentUser?.role === '獎銜審核員';
   const canAudit = isSuperAdmin || isAdministrator || cleanEmail === 'yukidu@gmail.com' || currentUser?.role === '獎銜審核員' || currentUser?.isAdminUser === true;
-  const stickerBalanceText = stickerBalance === undefined
-    ? '…'
-    : (Number.isInteger(stickerBalance) ? String(stickerBalance) : stickerBalance.toFixed(1));
+  const verifiedBalance = stickerBalance !== undefined && Number.isFinite(stickerBalance) ? stickerBalance : undefined;
+  const priorVerifiedBalance = verifiedBalance === undefined ? readLastVerifiedBalance(currentUser?.id) : undefined;
+  const visibleBalance = verifiedBalance ?? priorVerifiedBalance;
+  const balanceUpdating = verifiedBalance === undefined && priorVerifiedBalance !== undefined;
+  const stickerBalanceText = visibleBalance === undefined
+    ? '讀取中…'
+    : Number.isInteger(visibleBalance) ? String(visibleBalance) : visibleBalance.toFixed(1);
   const stickerMenuTitle = currentUser ? `我的貼紙 ${stickerBalanceText} 張` : '我的貼紙';
+
+  useEffect(() => {
+    if (!currentUser?.id || verifiedBalance === undefined) return;
+    try {
+      localStorage.setItem(VERIFIED_BALANCE_CACHE_PREFIX + currentUser.id,
+        JSON.stringify({ balance: verifiedBalance, savedAt: Date.now() }));
+    } catch {
+      // Offline/private browsing does not block the menu.
+    }
+  }, [currentUser?.id, verifiedBalance]);
 
   const displayName = currentUser?.name || visitor?.fullName || '勇敢的獅子';
   const displayRole = !currentUser
@@ -212,8 +247,10 @@ export const Navbar: React.FC<NavbarProps> = ({
       const inMenu=Boolean(target.closest('.navbar-menu-panel'));
       if(!inMenu||target.closest('button'))setIsMobileMenuOpen(false);
     };
-    document.addEventListener('click',dismiss,true);
-    return ()=>document.removeEventListener('click',dismiss,true);
+    // React's onClick handlers run at the root before document bubble handlers.
+    // Capture-phase dismissal unmounts the menu before most actions can fire.
+    document.addEventListener('click', dismiss);
+    return () => document.removeEventListener('click', dismiss);
   },[isMobileMenuOpen]);
 
   const handleMobileNav = (tab: NavTab) => {
@@ -610,7 +647,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               {renderPinControl('stickers', '我的貼紙')}
               <button type="button" onClick={handleOpenStickers} className={menuActionClass}>
                 <Trophy className="w-4 h-4 shrink-0" />
-                <span>{currentUser ? <>我的貼紙 <span className="mobile-menu-accent-number sticker-menu-amount">{stickerBalanceText}</span> 張</> : stickerMenuTitle}</span>
+                <span>{currentUser ? <>我的貼紙 <span className="mobile-menu-accent-number sticker-menu-amount">{stickerBalanceText}</span>{visibleBalance === undefined ? '' : ' 張'}{balanceUpdating ? <span className="text-xs font-normal">（上次餘額，更新中）</span> : null}</> : stickerMenuTitle}</span>
               </button>
             </div>
 
