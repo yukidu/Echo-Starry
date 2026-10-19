@@ -18,6 +18,7 @@ function fakeDb(){
  const calls:string[]=[];
  const key=(a:string,b:string)=>a+'|'+b;
  const bound=(sql:string,args:any[])=>({
+  sql,args,
   async first(){
    calls.push(sql);
    if(sql.includes('FROM starry_ai_task_routes WHERE'))return policies.get(key(args[0],args[1]))||null;
