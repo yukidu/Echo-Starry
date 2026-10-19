@@ -80,6 +80,13 @@ export function parseReplyDirectionsUpdate(body:any):string|undefined{
     throw new Error('回答格式指令不得超過2000字');
   return body.replyDirections;
 }
+async function writeQaSettings(env:Env,values:Record<string,string>,who:string,kind:string){
+  const now=Date.now(),prior=await settings(env);
+  const snapshot={enabled:prior.enabled,model:prior.model,policies:prior.policies,globalDaily:prior.globalDaily,qaRules:prior.qaRules};
+  const parts=Object.entries(values).map(([k,v])=>env.DB.prepare('INSERT INTO qa_settings(key,value,updatedAt) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updatedAt=excluded.updatedAt').bind(k,v,now));
+  parts.push(env.DB.prepare('INSERT INTO qa_settings_history(id,createdAt,actorId,changeType,configJson) VALUES (?,?,?,?,?)').bind('qa-'+crypto.randomUUID(),now,who,kind,JSON.stringify(snapshot)));
+  await env.DB.batch(parts);
+}
 function validatePolicy(p:Policy){
   return Number.isInteger(p.daily)&&p.daily>=0&&p.daily<=200&&Number.isInteger(p.free)&&p.free>=0&&p.free<=p.daily&&Number.isInteger(p.cost)&&p.cost>=0&&p.cost<=1000;
 }
@@ -509,8 +516,19 @@ export async function handleQaRequest(req:Request,env:Env):Promise<Response|null
         policies:JSON.stringify(pp),globalDaily:String(globalDaily)
       };
       if(replyDirections!==undefined) updatedSettings.replyDirections=replyDirections;
-      // Preserve the saved formatting when older clients omit this field.
-      await env.DB.batch(Object.entries(updatedSettings).map(([k,v])=>env.DB.prepare('INSERT INTO qa_settings(key,value,updatedAt) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updatedAt=excluded.updatedAt').bind(k,v,Date.now())));
+      // Older mobile/PWA clients may omit three new layers: preserve them.
+      if(body.qaRules!==undefined){
+        let rules:QaRuleOptions;try{rules=validateQaRules(body.qaRules);}catch(e){return json({error:e instanceof Error?e.message:'回答規則無效'},400);}
+        updatedSettings.qaRoleDirections=rules.roleDirections;
+        updatedSettings.qaStyleDirections=rules.styleDirections;
+        updatedSettings.qaQualityDirections=rules.qualityDirections;
+        updatedSettings.qaQualityEnabled=String(rules.qualityEnabled);
+        updatedSettings.qaEmojiMin=String(rules.emojiMin);
+        updatedSettings.replyDirections=rules.styleDirections.slice(0,2000);
+      }else if(replyDirections!==undefined){
+        updatedSettings.qaStyleDirections=replyDirections;
+      }
+      await writeQaSettings(env,updatedSettings,txt(user?.id)||'superadmin','save');
       return json({success:true});
     }
     const match=path.match(/^\/api\/qa\/transcripts\/([^/]+)$/);
