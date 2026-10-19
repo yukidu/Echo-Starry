@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
+const read=(p:string)=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const polish=read('src/v139HomeUploadPolish.ts'),workspace=read('src/components/AudioWorkspacePage.tsx');
 const css=read('src/audioWorkspace.css'),density=read('src/homeDensityPolicy.ts');
 const leaderboard=read('src/components/StickerLeaderboardTab.tsx'),privacyRouter=read('worker/privacyCrawlerRouter.ts'),html=read('index.html');
