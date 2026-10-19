@@ -3,6 +3,7 @@ import {Edit2,Search,Trash2,X,Users,UserRound} from 'lucide-react';
 import {SpeakerNameLink} from './SpeakerNameLink';
 import type {Track,UserProfile} from '../types';
 import '../audioWorkspace.css';
+const HOME_CACHE_KEY = 'echostars_home_cache_v3_3';
 type TranscriptProgressItem = {
   trackId: string;
   status: string;
