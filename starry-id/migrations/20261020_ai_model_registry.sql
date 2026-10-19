@@ -37,4 +37,7 @@ VALUES
 ('@cf/qwen/qwen3.8-27b','Qwen 3.8 27B','Cloudflare Workers AI',NULL,'["文字問答"]','["echo.qa","mirror.reading"]','workers_ai',1792454400000),
 ('@cf/zai-org/glm-4.7-flash','GLM-4.7 Flash','Cloudflare Workers AI',NULL,'["文字問答","摘要"]','["echo.qa","echo.bio"]','workers_ai',1792454400000),
 ('@cf/google/gemma-4-26b-a4b-it','Gemma 4','Cloudflare Workers AI',NULL,'["文字問答"]','["echo.qa"]','workers_ai',1792454400000),
-('@cf/meta/llama-3.1-8b-instruct-fp8','Llama 3.1 8B','Cloudflare Workers AI',NULL,'["文字問答"]','["echo.qa"]','workers_ai',1792454400000);
+('@cf/meta/llama-3.1-8b-instruct-fp8','Llama 3.1 8B','Cloudflare Workers AI',NULL,'["文字問答"]','["echo.qa"]','workers_ai',1792454400000),
+('@cf/nvidia/nemotron-3-120b-a12b','Nemotron 3','Cloudflare Workers AI',NULL,'["文字問答","推理"]','["echo.qa"]','workers_ai',1792454400000),
+('@cf/openai/whisper-large-v3-turbo','Whisper Large V3 Turbo','Cloudflare Workers AI',NULL,'["語音轉文字"]','["echo.transcribe"]','workers_ai',1792454400000),
+('@cf/openai/gpt-oss-20b','GPT-OSS 20B','Cloudflare Workers AI',NULL,'["文字整理","校正"]','["echo.normalize"]','workers_ai',1792454400000);
