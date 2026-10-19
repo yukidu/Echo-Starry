@@ -83,6 +83,9 @@ export const AudioWorkspacePage:React.FC<Props>=({currentUser,isAdmin,tracks,ini
    if(wasEditing){
      setEditing(null);editRef.current=null;onEditCancelled?.();setActive('manage');
      if(window.history.state?.audioEditorTrackId)window.history.replaceState({...window.history.state,audioEditorTrackId:undefined},'',window.location.href);
+   }else{
+     // Preserve existing upload behavior: return to the playlist after saving.
+     onClose();
    }
  };
  const closeWorkspace=()=>{if(discard())onClose();};
