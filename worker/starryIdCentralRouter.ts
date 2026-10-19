@@ -6,6 +6,8 @@ import { ensureSpouseSchema } from './starryIdSpouseSchema';
 import { renderStarryIdMemberCenterPage } from './starryIdMemberCenterPage';
 import { memberDirectoryFilter } from './starryMemberDirectoryFilter';
 import { renderStarryAiManagementPage } from './starryAiManagementPage';
+import { renderStarryAiModelRegistryPage } from './starryAiModelRegistryPage';
+import { readCentralAiModels } from './starryAiModelRegistry';
 import { loadAiPriorities, saveAiPriorities, collectAiCatalog, recentAiChanges, DEFAULT_AI_ORDER } from './starryAiManagement';
 
 type StarryEnv = Env & {
@@ -686,6 +688,21 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
     return handleStarryAppAccessAdminRequest(request,env,session.member.id);
   }
 
+  if (path === '/api/ai-models') {
+    // Private Starry ID inventory: never expose model pricing or route status to sibling Apps.
+    if (origin && origin !== 'https://id.starry.phd')
+      return json(request, { error: '請從 Starry ID 管理頁操作' }, 403);
+    const session = await sessionUser(request, env);
+    if (!session) return json(request, { error: '請先登入 Starry ID' }, 401);
+    if (!session.isSuperAdmin) return json(request, { error: '只有中央超級管理員可以查看模型資料庫' }, 403);
+    if (method !== 'GET') return json(request, { error: 'Method not allowed' }, 405);
+    try {
+      return json(request, await readCentralAiModels(env));
+    } catch {
+      return json(request, { error: '模型資料庫尚未準備完成，請確認安全資料庫遷移' }, 503);
+    }
+  }
+
   if (path === '/api/ai-management') {
     const session=await sessionUser(request,env);
     if(!session)return json(request,{error:'請先登入 Starry ID'},401);
@@ -887,6 +904,12 @@ export async function handleStarryIdCentral(request: Request, env: StarryEnv): P
 
   if (url.pathname === '/' && request.method.toUpperCase() === 'GET') return servicePage(env);
   if (url.pathname === '/ai-management' && request.method.toUpperCase() === 'GET') return renderStarryAiManagementPage();
+  if (url.pathname === '/ai-models' && request.method.toUpperCase() === 'GET') {
+    const session = await sessionUser(request, env);
+    if (!session) return new Response('請先登入 Starry ID', { status: 401, headers: { 'Cache-Control':'no-store' } });
+    if (!session.isSuperAdmin) return new Response('只有中央超級管理員可查看', { status: 403, headers: { 'Cache-Control':'no-store' } });
+    return renderStarryAiModelRegistryPage();
+  }
   if (url.pathname === '/robots.txt' && request.method.toUpperCase() === 'GET') {
     return new Response('User-agent: *\nDisallow: /\n', {
       headers: { 'Content-Type': 'text/plain; charset=utf-8', 'X-Robots-Tag': NOINDEX }
