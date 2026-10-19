@@ -1,33 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-
-const policy = readFileSync('src/v167PageNavigation.ts', 'utf8');
-const html = readFileSync('index.html', 'utf8');
-
-test('v167 audio-editor page policy remains loaded after the four-filter toolbar', () => {
-  const toolbarIndex = html.indexOf('/src/v145FourFilterToolbar.ts');
-  const policyIndex = html.indexOf('/src/v167PageNavigation.ts');
-  assert.ok(toolbarIndex >= 0, 'v145 toolbar script must remain loaded');
-  assert.ok(policyIndex > toolbarIndex, 'v167 audio-editor page policy must remain loaded after v145');
+import {readFileSync} from 'node:fs';
+const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
+const workspace=read('src/components/AudioWorkspacePage.tsx'),app=read('src/App.tsx'),html=read('index.html');
+test('audio editor is a standalone sibling document, without overlay and conflicting global page CSS',()=>{
+ assert.match(workspace,/data-audio-workspace-page="editor"/);
+ assert.match(workspace,/setEditing\(track\)/);
+ assert.match(workspace,/editBack/);
+ assert.match(workspace,/onDirtyChange=\{setDirty\}/);
+ assert.doesNotMatch(workspace,/createPortal|position:fixed|v161-track-editor-overlay/);
+ assert.doesNotMatch(html,/v167PageNavigation\.ts|v168AudioEditSaveFix\.ts/);
 });
-
-test('v169 leaves home filters to their direct toolbar dropdown/cycle behavior', () => {
-  assert.doesNotMatch(policy, /type FilterKey = 'category' \| 'time' \| 'popular' \| 'advanced'/);
-  assert.doesNotMatch(policy, /\.v145-filter-button\[data-v145-button\]/);
-  assert.doesNotMatch(policy, /event\.preventDefault\(\)/);
-  assert.doesNotMatch(policy, /event\.stopPropagation\(\)/);
-  assert.doesNotMatch(policy, /openFilterPage\(/);
-  assert.doesNotMatch(policy, /\.v167-filter-page\s*\{/);
-  assert.doesNotMatch(policy, /min-height: 70dvh/);
-  assert.match(policy, /home filters return to[\s\S]*direct toolbar behavior/);
+test('home navigation remains React-based with one audio workspace entry',()=>{
+ assert.match(app,/data-echo-page="audio-management"/);
+ assert.match(app,/<AudioWorkspacePage/);
+ assert.match(app,/window\.history\.back\(\)/);
+ assert.doesNotMatch(app,/<UploadModal/);
 });
-
-test('v167 full-page audio editor remains intact while its background upload UI is disabled', () => {
-  assert.match(policy, /echostars-v167-audio-editor-page/);
-  assert.match(policy, /\.v161-track-editor-overlay\[data-v167-page="audio-editor"\][\s\S]*position: static !important/);
-  assert.match(policy, /#root main \{ display: none !important; \}/);
-  assert.match(policy, /#root \.upload-modal-overlay\.upload-page \{ display: none !important; \}/);
-  assert.match(policy, /editor\.dataset\.v167Page = 'audio-editor'/);
-  assert.match(policy, /aria-label', '編輯音檔頁面'/);
+test('back and accidental close protect unsaved edits; returns to management',()=>{
+ assert.match(workspace,/popstate/);
+ assert.match(workspace,/beforeunload/);
+ assert.match(workspace,/尚未儲存/);
+ assert.match(workspace,/setActive\('manage'\)/);
+ assert.match(workspace,/history\.pushState/);
 });
