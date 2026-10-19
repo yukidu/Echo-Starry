@@ -29,14 +29,15 @@
 - 需 AI3 另外批准正式計費接入並有逐筆 commentId 對應和可信費率，F22 才能讀取成本；不修改 B07 表及其執行路由。
 
 ## 安全
-- 每次後端請求驗證 Echo 的有效 session，然後核對 Starry ID 中央 active 會員、active 中央角色為 super-admin 或中央設定允許的管理員 Email。Echo 本地角色不足以放行。
+- 每次後端請求驗證 Echo 的有效 session，再透過既有 legacy_links 或相同中央會員 ID 查核 Starry ID 中央 active 身分、相符 Email，及 active 的中央 app_memberships(role=super-admin)。只有資料庫中的中央角色可授權，**中央 Email allowlist、程式內建 Email、Echo 本地管理員角色一律不能授權**。
 - 回傳不包含會員私人問題、回答全文、逐字稿、身分識別或金鑰；HTTP GET 僅超管、無 CORS、private no-store。
 - 任何缺少中央連線的環境拒絕存取，不會降級為 Echo 本地管理員認證。
 
 ## 效能及成本
-- 每次查詢做 3 個只讀聚合：總覽、前60個排行、最多366個日期。
+- 每次先做 1 個使用既有 qa_claims_day 索引的有界計數：最多查看 6001 筆；資料超過 6000 筆即回 HTTP 422，**不進行** LAG/排行，也不回傳冒充全期的部分結果。D1 預查詢 rows_read 有回傳時再守住 30000 的讀取上限。只有通過門檻才執行 3 個只讀聚合：總覽、前60個排行、最多6000個日期。
 - 依 qa_claims_day 既有索引及範圍條件，不做 R2 讀取、KV 存取或 AI 呼叫，不修改 DB schema。
-- 全期間歷史日久可能增加 D1 讀取量。將來若需每日聚合表須另外取得授權，不在本批新增任何正式資料庫變更。
+- 代價：在正式總量達 6001 筆後，「全部」或較大範圍可能顯示需升級彙總。這是保護 2000+ 用戶與免費額度的刻意取捨，不會默默截斷數字。將來若需每日聚合表須另外取得授權，不在本批新增任何正式資料庫變更。
+- 新增隔離的 SQLite 6 萬筆、2000 位會員壓力測試；實際用於 CI 的 SQL 完全來自 F22 本身，檢查索引、SQL 執行時間、SQLite 指令步數、過載提前停止，以及 4200 筆多人/會員去重正確性。**SQLite VM 步數不等於 Cloudflare D1 rows_read**；上線前仍須正式隔離負載測試。
 
 ## 安全驗收
 - 應執行 npm run lint、npm test、npm run build，以及 GitHub PR Regression、CodeQL、Cloudflare Preview。
