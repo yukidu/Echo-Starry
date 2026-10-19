@@ -1,8 +1,8 @@
 /* One React owner controls the audio workspace, no injected overlay or hidden duplicate navigation. */
 .audio-workspace { width:100%; max-width:72rem; margin:0 auto; min-width:0; }
-.audio-workspace-tabs { display:flex; align-items:center; gap:.4rem; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none; padding:.55rem; border-bottom:1px solid #475569; }
+.audio-workspace-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.35rem; padding:.55rem; border-bottom:1px solid #475569; }
 .audio-workspace-tabs::-webkit-scrollbar { display:none; }
-.audio-workspace-tab { flex:0 0 auto; border:1px solid #94a3b8; border-radius:.8rem; padding:.6rem .8rem; font-size:.85rem; font-weight:800; white-space:nowrap; min-height:2.8rem; color:inherit; background:transparent; }
+.audio-workspace-tab { display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.25rem;min-width:0; border:1px solid #94a3b8; border-radius:.8rem; padding:.6rem .8rem; font-size:.85rem; font-weight:800; white-space:nowrap; min-height:2.8rem; color:inherit; background:transparent; }
 .audio-workspace-tab[aria-selected="true"] { color:white; border-color:var(--color-primary,#c06c84); background:var(--color-primary,#c06c84); }
 .audio-workspace-tab:focus-visible { outline:3px solid var(--color-primary,#c06c84); outline-offset:2px; }
 .audio-workspace-panel { min-width:0; padding:1rem .6rem; }
@@ -44,3 +44,66 @@
  .v161-track-row {grid-template-columns:minmax(0,1fr);gap:.3rem;}
  .v161-actions {justify-content:flex-end;flex-wrap:wrap;}
 }
+
+/* Keep the existing upload form presentation without legacy DOM injection. */
+    /* Upload page sits at z-index 160. Raise only the navbar while this page is active
+       so the hamburger drawer is never trapped underneath the upload content. */
+    body[data-main-tab="upload"] > #root header,
+    body[data-main-tab="upload"] header.sticky {
+      z-index: 240 !important;
+    }
+    body[data-main-tab="upload"] .mobile-menu-shell {
+      z-index: 260 !important;
+    }
+
+    /* The old cover presentation split the label and selected-cover area across two
+       grid rows while the parent still had a 1rem row gap. Bridge that gap so the
+       card reads as one continuous box. */
+    #track-upload-form[data-upload-presentation="1"] [data-upload-cover-label="1"] {
+      margin-bottom: -0.5rem !important;
+      padding-bottom: 0.75rem !important;
+      position: relative;
+      z-index: 2;
+    }
+    #track-upload-form[data-upload-presentation="1"] [data-upload-cover-selected="1"] {
+      margin-top: -0.5rem !important;
+      padding-top: 0.75rem !important;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Keep guest visibility visually inside the permission card without moving a
+       React-owned node in the DOM. */
+    #track-upload-form[data-upload-presentation="1"] [data-upload-permission="1"] {
+      padding-bottom: 3.35rem !important;
+    }
+    #track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility="true"] {
+      grid-column: 5 / 7 !important;
+      grid-row: 3 !important;
+      align-self: end !important;
+      z-index: 4 !important;
+      margin: 0 !important;
+      padding: 0 0.75rem 0.65rem !important;
+      background: transparent !important;
+      border: 0 !important;
+    }
+    #track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility="true"] > p {
+      display: none !important;
+    }
+    #track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility="true"] label {
+      font-size: 0.75rem !important;
+      line-height: 1.15rem !important;
+    }
+
+@media(max-width:767px){
+    @media (max-width: 767px) {
+      #track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility="true"] {
+        grid-column: 1 !important;
+        grid-row: 5 !important;
+      }
+      #track-upload-form[data-upload-presentation="1"] [data-upload-permission="1"] {
+        padding-bottom: 3.35rem !important;
+      }
+}
+@media(min-width:900px){.audio-workspace-tabs{grid-template-columns:repeat(6,minmax(0,1fr))}}
+#track-upload-form [data-upload-guest-visibility="true"] input[type="checkbox"] {width:2rem;height:2rem;accent-color:var(--color-primary,#c06c84)}
