@@ -519,7 +519,7 @@ export async function handleQaRequest(req:Request,env:Env):Promise<Response|null
         enabled:String(prior.enabled===true),model:prior.model,policies:JSON.stringify(pp),globalDaily:String(prior.globalDaily),
         qaRoleDirections:rules.roleDirections,qaStyleDirections:rules.styleDirections,qaQualityDirections:rules.qualityDirections,
         qaQualityEnabled:String(rules.qualityEnabled),qaEmojiMin:String(rules.emojiMin),replyDirections:rules.styleDirections.slice(0,2000)
-      },txt(user?.id)||'superadmin','restore');
+      },txt(u?.id)||'superadmin','restore');
       return json({success:true,message:'已還原設定，往後的新回答將使用這個版本'});
     }
     if(path==='/api/qa/preview'&&method==='POST'){
@@ -529,10 +529,10 @@ export async function handleQaRequest(req:Request,env:Env):Promise<Response|null
       if(body.model===OPENAI_SPEAKER_QA_MODEL&&!String(env.OPENAI_API_KEY||'').trim())return json({error:'OpenAI 金鑰未設定'},503);
       let rules:QaRuleOptions;try{rules=validateQaRules(body.qaRules);}catch(e){return json({error:e instanceof Error?e.message:'回答規則錯誤'},400);}
       const track:any=await env.DB.prepare('SELECT * FROM tracks WHERE id=? LIMIT 1').bind(trackId).first();
-      if(!track||!await mayUseTranscript(env,user,track))return json({error:'沒有音檔使用權限'},403);
-      const source=await excerpts(env,track,user,'current',question);
+      if(!track||!await mayUseTranscript(env,u,track))return json({error:'沒有音檔使用權限'},403);
+      const source=await excerpts(env,track,u,'current',question);
       if(!source.prompt)return json({error:'選定音檔沒有可用的逐字稿'},422);
-      const counter:any=await env.DB.prepare('INSERT INTO qa_admin_preview_daily(day,owner,used) VALUES (?,?,1) ON CONFLICT(day,owner) DO UPDATE SET used=used+1 WHERE used<10 RETURNING used').bind(day(),txt(user?.id)||'admin').first();
+      const counter:any=await env.DB.prepare('INSERT INTO qa_admin_preview_daily(day,owner,used) VALUES (?,?,1) ON CONFLICT(day,owner) DO UPDATE SET used=used+1 WHERE used<10 RETURNING used').bind(day(),txt(u?.id)||'admin').first();
       if(!counter)return json({error:'今日測試回答已達10次，請明天再試'},429);
       const messages=[
         {role:'system',content:buildQaSystemInstructions(rules)},
@@ -570,7 +570,7 @@ export async function handleQaRequest(req:Request,env:Env):Promise<Response|null
       }else if(replyDirections!==undefined){
         updatedSettings.qaStyleDirections=replyDirections;
       }
-      await writeQaSettings(env,updatedSettings,txt(user?.id)||'superadmin','save');
+      await writeQaSettings(env,updatedSettings,txt(u?.id)||'superadmin','save');
       return json({success:true});
     }
     const match=path.match(/^\/api\/qa\/transcripts\/([^/]+)$/);
