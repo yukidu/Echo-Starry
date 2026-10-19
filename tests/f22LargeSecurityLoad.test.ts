@@ -49,10 +49,12 @@ test('central-admin ACL: live central super-admin membership is mandatory',async
  assert.equal(await f22CentralSuperAdmin(request,mockedIdentity(
    {...centralAdmin,centralRole:'member'})),false,
    'Echo local super-admin must not override ordinary central membership');
- assert.equal(await f22CentralSuperAdmin(request,{
+ const forgedAllowlistEnv:any={
    ...mockedIdentity({...centralAdmin,centralRole:'member'}),
    STARRY_ID_SUPER_ADMIN_EMAILS:echoUser.email
- }),false,'Configured email allowlist is never an admin grant');
+ };
+ assert.equal(await f22CentralSuperAdmin(request,forgedAllowlistEnv),false,
+   'Configured email allowlist is never an admin grant');
  assert.equal(await f22CentralSuperAdmin(request,mockedIdentity(
    {...centralAdmin,centralStatus:'blocked'})),false);
  assert.equal(await f22CentralSuperAdmin(request,mockedIdentity(
