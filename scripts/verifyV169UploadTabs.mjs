@@ -96,12 +96,26 @@ async function main() {
       window.addEventListener('unhandledrejection',e=>window.__audioTestErrors.push(String(e?.reason?.stack||e?.reason||'promise').slice(0,800)));
       localStorage.setItem('sq_current_user_v1', JSON.stringify({
         id:'u-admin',email:'yukidu@gmail.com',role:'超級管理員',
-        name:'測試管理員',isAdminUser:true
+        name:'測試管理員',isAdminUser:true,
+        _authToken:'isolated-browser-ui-fixture',
+        _sessionExpiresAt:Date.now()+3600000
       }));
+      sessionStorage.setItem('echostars_auth_session_checked_at',String(Date.now()));
       const original=window.fetch;
       window.fetch=function(input,init){
         const url=typeof input==='string'?input:(input&&input.url)||'';
-        if(new URL(url,location.origin).pathname==='/api/tracks'){
+        const path=new URL(url,location.origin).pathname;
+        if(path==='/api/auth/session'||path==='/api/auth/verify'){
+          const user=JSON.parse(localStorage.getItem('sq_current_user_v1')||'null')||{
+            id:'u-admin',email:'yukidu@gmail.com',role:'超級管理員',
+            name:'測試管理員',isAdminUser:true
+          };
+          return Promise.resolve(new Response(JSON.stringify({
+            success:true,authenticated:true,user,authToken:'isolated-browser-ui-fixture',
+            sessionExpiresAt:Date.now()+3600000
+          }),{status:200,headers:{'Content-Type':'application/json'}}));
+        }
+        if(path==='/api/tracks'){
           const fixture={
             id:'qa-fixture-001',title:'React 頁面測試音檔',speaker:'測試演講者',
             speakerRank:'無',requiredRank:'無',guestVisible:true,isPrivateVip:false,
