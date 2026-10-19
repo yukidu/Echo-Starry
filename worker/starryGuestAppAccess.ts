@@ -13,6 +13,8 @@
  *    protection, short-lived preview, explicit confirmation and audit.
  */
 type GuestEnv = {STARRY_ID_DB?:any;STARRY_ID_ALLOWED_APPS?:string};
+// Special guest-only principal: never a real users.id or bulk member.
+export const GUEST_PRINCIPAL_ID='starry:guest';
 const ADMIN_ORIGIN='https://id.starry.phd';
 const VALID_APP=/^[a-z0-9][a-z0-9-]{0,39}$/;
 const PREVIEW_TTL_MS=5*60*1000;
