@@ -5,7 +5,7 @@
  * after each App's server integration passes its own regression checks.
  */
 import { handleStarryAppAccessBulk } from './starryAppAccessBulk';
-import { handleGuestAppPolicyAdmin } from './starryGuestAppAccess';
+import { handleGuestAppPolicyAdmin, GUEST_PRINCIPAL_ID } from './starryGuestAppAccess';
 
 type AccessEnv = {
   STARRY_ID_DB?: any;
@@ -123,6 +123,8 @@ function parseChanges(raw: string): Change[] {
   });
 }
 async function requireExistingMembers(db: any, ids: string[]): Promise<any[]> {
+  if(ids.includes(GUEST_PRINCIPAL_ID))
+    throw new Error('訪客不可被當作會員調整 App 權限');
   const holders = ids.map(() => '?').join(',');
   const found: any = await db.prepare('SELECT u.id,p.name FROM users u LEFT JOIN profiles p ON p.userId=u.id WHERE u.id IN ('+holders+')').bind(...ids).all();
   const rows:any[] = found?.results || [];
