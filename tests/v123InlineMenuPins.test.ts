@@ -21,7 +21,7 @@ test('eligible signed-in hamburger actions expose inline pin controls while fixe
     ['stats', '排行榜'],
     ['notifications', '通知'],
     ['stickers', '我的貼紙'],
-    ['upload', '上傳音檔'],
+    ['upload', '音檔管理'],
     ['profile', '個人中心'],
     ['admin', '後台管理']
   ]) {
