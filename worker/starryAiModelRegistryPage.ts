@@ -28,6 +28,7 @@ dt{color:#b9cce5}dd{margin:0;white-space:pre-wrap}strong{font-weight:700}
 <p class="muted intro">中央模型目錄與費用詳情｜僅供 Starry ID 超級管理員查看。本頁只展示資料，不會呼叫或啟用付費 AI 模型。</p>
 <p><a href="/ai-model-setup">＋ 新增／修改模型・查看歷史版本・安全還原</a></p>
 <p><a href="/ai-routing">⚙ 各 App／各功能獨立模型選型（僅中央草稿）</a></p>
+<p><a href="/ai-budget">🛡 AI 雙重費用保護預算（僅中央草稿）</a></p>
 <nav class="tabs" aria-label="AI 管理分頁">
 <a class="tab" href="/ai-management">AI 工作優先權</a><span class="tab active" aria-current="page">AI 模型資料庫</span>
 </nav><p id="status" role="status" aria-live="polite">正在取得已核准權限的模型清單…</p>
