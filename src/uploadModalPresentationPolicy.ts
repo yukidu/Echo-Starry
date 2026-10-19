@@ -194,32 +194,6 @@ function directLabelText(element: Element) {
   return normalizeText(label?.textContent);
 }
 
-function setReactInputValue(input: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-  if (setter) setter.call(input, value);
-  else input.value = value;
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
-function clearNewUploadDefaults(form: HTMLFormElement) {
-  if (form.dataset.uploadDefaultsCleared === '1') return;
-  const modal = form.closest('.upload-modal-overlay,.audio-form-document');
-  const heading = normalizeText(modal?.querySelector('h2')?.textContent);
-  if (heading !== '上傳音檔') return;
-
-  const fields = form.querySelectorAll<HTMLElement>('[data-upload-fields-grid="1"] > div');
-  fields.forEach(field => {
-    const label = normalizeText(field.querySelector('label')?.textContent);
-    const input = field.querySelector<HTMLInputElement>('input');
-    if (!input) return;
-    if (label.startsWith('演講日期') || label.startsWith('系列順序')) {
-      setReactInputValue(input, '');
-    }
-  });
-
-  form.dataset.uploadDefaultsCleared = '1';
-}
-
 function simplifyLabelText(form: HTMLFormElement) {
   const replacements: Array<[string, string]> = [
     ['音訊檔案 *', '音訊檔案 *'],
@@ -415,7 +389,6 @@ function markUploadForm(form: HTMLFormElement) {
 
   simplifyLabelText(form);
   hideExplanatoryNotes(form);
-  clearNewUploadDefaults(form);
 
   directChildren.forEach(child => {
     if (
