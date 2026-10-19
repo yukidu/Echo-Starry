@@ -137,7 +137,7 @@ test('Guest admin GET is SELECT-only and never performs DDL or db.batch during a
   const db={
     prepare(sql:string){
       sqls.push(sql);
-      if(!/^\\s*SELECT\\b/i.test(sql))throw Error('GET must never execute schema writes: '+sql);
+      if(!/^\s*SELECT\b/i.test(sql))throw Error('GET must never execute schema writes: '+sql);
       return {
         all:async()=>({results:[]}),
         bind(){return {first:async()=>null};}
@@ -153,7 +153,7 @@ test('Guest admin GET is SELECT-only and never performs DDL or db.batch during a
   assert.equal(history.status,200);
   assert.deepEqual(history.json.operations,[]);
   assert.equal(sqls.length,2);
-  assert.ok(sqls.every(sql=>/^\\s*SELECT\\b/i.test(sql)));
+  assert.ok(sqls.every(sql=>/^\s*SELECT\b/i.test(sql)));
 });
 test('Database failure returns 503 without leaking SQL internals or granting guest access',async()=>{
   const db={prepare(){throw Error('SQLITE_ERROR: no such table: starry_guest_app_policies');}};
