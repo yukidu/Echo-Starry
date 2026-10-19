@@ -203,7 +203,7 @@ function setReactInputValue(input: HTMLInputElement, value: string) {
 
 function clearNewUploadDefaults(form: HTMLFormElement) {
   if (form.dataset.uploadDefaultsCleared === '1') return;
-  const modal = form.closest('.upload-modal-overlay');
+  const modal = form.closest('.upload-modal-overlay,.audio-form-document');
   const heading = normalizeText(modal?.querySelector('h2')?.textContent);
   if (heading !== '上傳音檔') return;
 
