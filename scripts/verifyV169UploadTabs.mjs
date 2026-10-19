@@ -141,7 +141,7 @@ async function main() {
     await waitFor("!!document.querySelector('[data-audio-workspace-page=\\\"editor\\\"]')", 'independent audio editor');
     const editor=await evaluate(`(() => {
       const marker=document.querySelector('[data-audio-workspace-page="editor"]');
-      const shell=marker?.querySelector('.upload-modal-overlay');
+      const shell=marker?.querySelector('.audio-form-document');
       return {
         editor:!!marker,
         forms:document.querySelectorAll('#track-upload-form').length,
