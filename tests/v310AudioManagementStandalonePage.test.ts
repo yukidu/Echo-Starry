@@ -18,9 +18,9 @@ test('upload page is in document flow, editor is independent page and only one f
  assert.match(workspace,/key=\{'edit-'\+editing\.id\}/);
  assert.match(workspace,/key="audio-upload-create"/);
  assert.match(upload,/presentation\?: 'page' \| 'overlay'/);
- assert.match(upload,/presentation === 'page' \? 'upload-standalone-page'/);
- assert.match(css,/main\[data-echo-page="audio-management"\] \.upload-modal-overlay\.upload-standalone-page/);
- assert.match(css,/position: static !important/);
+ assert.match(upload,/audio-form-document upload-page/);
+ assert.match(css,/\.audio-form-document\s*\{/);
+ assert.doesNotMatch(css,/upload-modal-overlay\.upload-standalone-page/);
 });
 test('native mobile Back remains inside the PWA, returning from upload to home',()=>{
  assert.match(app,/tab\?: 'stats' \| 'notifications' \| 'profile' \| 'stickers' \| 'install' \| 'upload'/);
