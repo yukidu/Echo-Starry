@@ -1,8 +1,9 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:net';
 import { writeFile } from 'node:fs/promises';
 
 const APP_URL = process.env.ECHOSTARS_UI_CHECK_URL || 'http://127.0.0.1:4173/';
-const DEBUG_PORT = Number(process.env.ECHOSTARS_CHROME_DEBUG_PORT || 9222);
+const CONFIGURED_DEBUG_PORT = Number(process.env.ECHOSTARS_CHROME_DEBUG_PORT || 0);
 const SCREENSHOT_BEFORE = '/tmp/echostars-theme-menu-before.png';
 const SCREENSHOT_AFTER = '/tmp/echostars-theme-menu-after.png';
 const DEBUG_JSON = '/tmp/echostars-theme-menu-debug.json';
@@ -43,8 +44,41 @@ async function waitForJson(url, attempts = 60) {
   throw lastError || new Error(`Timed out waiting for ${url}`);
 }
 
+async function allocateDebugPort() {
+  if (CONFIGURED_DEBUG_PORT > 0) return CONFIGURED_DEBUG_PORT;
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      server.close(error => error ? reject(error) : resolve(port));
+    });
+  });
+}
+
+async function waitForChromeHost(port, attempts = 160) {
+  // Chromium may bind IPv4 or IPv6 depending on the CI runner.
+  const hosts = [`http://127.0.0.1:${port}`, `http://[::1]:${port}`];
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    for (const host of hosts) {
+      try {
+        const response = await fetch(`${host}/json/version`);
+        if (response.ok) return host;
+        lastError = new Error(`${host}: ${response.status}`);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    await delay(250);
+  }
+  throw lastError || new Error('Chrome debugging endpoint failed to start.');
+}
+
 async function main() {
   const chromeBinary = resolveChromeBinary();
+  const debugPort = await allocateDebugPort();
   const userDataDir = `/tmp/echostars-theme-ui-${process.pid}`;
   const chrome = spawn(chromeBinary, [
     '--headless=new',
@@ -54,7 +88,7 @@ async function main() {
     '--hide-scrollbars',
     '--window-size=412,915',
     '--remote-debugging-address=127.0.0.1',
-    `--remote-debugging-port=${DEBUG_PORT}`,
+    `--remote-debugging-port=${debugPort}`,
     `--user-data-dir=${userDataDir}`,
     'about:blank'
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -66,9 +100,9 @@ async function main() {
   });
 
   try {
-    await waitForJson(`http://127.0.0.1:${DEBUG_PORT}/json/version`);
+    const debugHost = await waitForChromeHost(debugPort);
     const targetResponse = await fetch(
-      `http://127.0.0.1:${DEBUG_PORT}/json/new?${encodeURIComponent(APP_URL)}`,
+      `${debugHost}/json/new?${encodeURIComponent(APP_URL)}`,
       { method: 'PUT' }
     );
     if (!targetResponse.ok) {
