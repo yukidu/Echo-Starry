@@ -77,43 +77,44 @@ async function main() {
 
     await send('Page.enable');
     await send('Runtime.enable');
-    await send('Page.navigate', { url: APP_URL });
-    for (let i = 0; i < 80; i += 1) {
-      if (await evaluate(`document.readyState === 'complete'`)) break;
-      await delay(100);
-    }
-
-
-    const waitFor = async (expression, label, limit = 100) => {
-      for (let attempt = 0; attempt < limit; attempt++) {
-        if (await evaluate(expression)) return;
-        await delay(150);
-      }
-      throw new Error('Timed out waiting for ' + label);
-    };
-
-    // Test the real React interface with local-only credentials and a mocked track.
-    await waitFor("!!document.querySelector('[data-main-menu=\\\"hamburger\\\"]')", 'initial navbar');
-    await evaluate("localStorage.setItem('sq_current_user_v1', JSON.stringify({id:'u-admin',email:'yukidu@gmail.com',role:'超級管理員',name:'測試管理員',isAdminUser:true}));");
-    await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
-      const original = window.fetch;
-      window.fetch = function(input,init){
-        const url = typeof input === 'string' ? input : (input && input.url) || '';
+    // Set up the isolated preview browser before React's first page load.
+    // No production account is accessed and no API data is mutated.
+    await send('Page.addScriptToEvaluateOnNewDocument', {source:`(() => {
+      localStorage.setItem('sq_current_user_v1', JSON.stringify({
+        id:'u-admin',email:'yukidu@gmail.com',role:'超級管理員',
+        name:'測試管理員',isAdminUser:true
+      }));
+      const original=window.fetch;
+      window.fetch=function(input,init){
+        const url=typeof input==='string'?input:(input&&input.url)||'';
         if(new URL(url,location.origin).pathname==='/api/tracks'){
-          const fixture = {id:'qa-fixture-001',title:'React 頁面測試音檔',speaker:'測試演講者',speakerRank:'無',requiredRank:'無',guestVisible:true,isPrivateVip:false,stickerUnlockCost:0,audioUrl:'',categories:['事業'],keywords:[],uploaderId:'u-admin',uploaderEmail:'yukidu@gmail.com',uploadDate:'2026/10/19'};
-          return Promise.resolve(new Response(JSON.stringify({tracks:[fixture]}),{status:200,headers:{'Content-Type':'application/json'}}));
+          const fixture={
+            id:'qa-fixture-001',title:'React 頁面測試音檔',speaker:'測試演講者',
+            speakerRank:'無',requiredRank:'無',guestVisible:true,isPrivateVip:false,
+            stickerUnlockCost:0,audioUrl:'',categories:['事業'],keywords:[],
+            uploaderId:'u-admin',uploaderEmail:'yukidu@gmail.com',uploadDate:'2026/10/19'
+          };
+          return Promise.resolve(new Response(JSON.stringify({tracks:[fixture]}),{
+            status:200,headers:{'Content-Type':'application/json'}
+          }));
         }
         return original.apply(this,arguments);
       };
     })();`});
-    await send('Page.reload',{ignoreCache:true});
-    // Wait for the *new* React document, not the still-existing DOM from before reload.
-    await delay(1250);
-    await waitFor("document.readyState==='complete'&&!!document.querySelector('[data-main-menu=\\\"hamburger\\\"]')", 'logged-in navbar');
-    const beforeMenu=await evaluate("({u:JSON.parse(localStorage.getItem('sq_current_user_v1')||'null')?.role,aria:document.querySelector('[data-main-menu=\\\"hamburger\\\"]')?.getAttribute('aria-expanded'),count:document.querySelectorAll('.mobile-menu-panel').length})");
+    await send('Page.navigate', {url:APP_URL});
+    const waitFor=async(expression,label,limit=140)=>{
+      for(let attempt=0;attempt<limit;attempt++){
+        if(await evaluate(expression))return;
+        await delay(150);
+      }
+      throw new Error('Timed out waiting for '+label);
+    };
+    await waitFor("document.readyState==='complete'&&!!document.querySelector('[data-main-menu=\\\"hamburger\\\"]')",'React navbar');
+    await delay(350);
+    const beforeMenu=await evaluate("({role:JSON.parse(localStorage.getItem('sq_current_user_v1')||'null')?.role,aria:document.querySelector('[data-main-menu=\\\"hamburger\\\"]')?.getAttribute('aria-expanded')})");
     await evaluate("document.querySelector('[data-main-menu=\\\"hamburger\\\"]').click()");
-    await delay(200);
-    const afterMenu=await evaluate("({aria:document.querySelector('[data-main-menu=\\\"hamburger\\\"]')?.getAttribute('aria-expanded'),count:document.querySelectorAll('.mobile-menu-panel').length,role:document.querySelector('.navbar-menu-identity-role')?.textContent,nav:document.querySelector('nav')?.textContent?.slice(0,120)})");
+    await delay(120);
+    const afterMenu=await evaluate("({aria:document.querySelector('[data-main-menu=\\\"hamburger\\\"]')?.getAttribute('aria-expanded'),count:document.querySelectorAll('.mobile-menu-panel').length})");
     console.log('Audio workspace menu diagnostic:',JSON.stringify({beforeMenu,afterMenu}));
     await waitFor("!!document.querySelector('.mobile-menu-panel')", 'hamburger menu');
     const navLabel = await evaluate("Array.from(document.querySelectorAll('.mobile-menu-panel button')).find(b=>b.textContent?.includes('音檔管理'))?.textContent?.trim()||''");
