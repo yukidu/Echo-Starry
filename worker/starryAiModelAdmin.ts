@@ -154,14 +154,12 @@ export async function applyModelAdminAction(env:ModelAdminEnv,actor:string,body:
   const revisionId='ai3-'+crypto.randomUUID();
   const opActor=actor.slice(0,120);
   const statements=[prepareUpsert(db,next,opActor,now,before?before.updatedAt:null)];
-  const compareBinding=action==='create'||action==='update';
-  if(compareBinding){
-    // Only persist an approved secret *name*; not its value. This has no inference effect.
-    statements.push(db.prepare(`INSERT INTO starry_ai_model_secret_refs(model_id,secret_binding,reviewed_at)
-      SELECT model_id,?,? FROM starry_ai_models WHERE model_id=? AND updated_at=? AND updated_by=?
-      ON CONFLICT(model_id) DO UPDATE SET secret_binding=excluded.secret_binding,reviewed_at=excluded.reviewed_at`)
-      .bind(requestedBinding,now,id,now,opActor));
-  }
+  // A restore/disable must discard prior secret references instead of trusting historical credentials.
+  const effectiveBinding=(action==='create'||action==='update')?requestedBinding:'none';
+  statements.push(db.prepare(`INSERT INTO starry_ai_model_secret_refs(model_id,secret_binding,reviewed_at)
+    SELECT model_id,?,? FROM starry_ai_models WHERE model_id=? AND updated_at=? AND updated_by=?
+    ON CONFLICT(model_id) DO UPDATE SET secret_binding=excluded.secret_binding,reviewed_at=excluded.reviewed_at`)
+    .bind(effectiveBinding,now,id,now,opActor));
   statements.push(db.prepare(`INSERT INTO starry_ai_model_revisions
     (revision_id,model_id,actor_id,action,before_json,after_json,restored_from,created_at)
     SELECT ?,?,?,?,?,?,?,? FROM starry_ai_models WHERE model_id=? AND updated_at=? AND updated_by=?`)
