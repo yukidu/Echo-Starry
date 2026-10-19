@@ -92,24 +92,28 @@ test('I32 no fake backup run or unverified billing claim',async()=>{
 });
 test('I31/I32 UI provides draft choices but hard-disables live restore',async()=>{
  const page=renderStarryBackupManagementPage(),html=await page.text();
- assert.match(html,/自動備份管理/);assert.match(html,/保存天數/);
- assert.match(html,/api\\/admin\\/backups\\/preview/);
- assert.match(html,/disabled>🔒 正式覆蓋還原/);
- assert.match(html,/Time Travel/);assert.match(html,/差異備份/);
+ assert.equal(html.includes('自動備份管理'),true);
+ assert.equal(html.includes('保存天數'),true);
+ assert.equal(html.includes('/api/admin/backups/preview'),true);
+ assert.equal(html.includes('disabled>🔒 正式覆蓋還原'),true);
+ assert.equal(html.includes('Time Travel'),true);
+ assert.equal(html.includes('差異備份'),true);
  assert.equal(page.headers.get('Cache-Control'),'private, no-store');
- assert.match(page.headers.get('Content-Security-Policy')||'',/frame-ancestors 'none'/);
+ assert.equal(page.headers.get('Content-Security-Policy')?.includes("frame-ancestors 'none'"),true);
 });
-test('I31 route is admin-only, same-origin; no A04 changes, additive migration',()=>{
+test('I31 route is superadmin-only, same-origin; A04 unchanged, migration additive',()=>{
  const router=readFileSync('worker/starryIdCentralRouter.ts','utf8');
- assert.match(router,/path === '\\/api\\/admin\\/backups'/);
- assert.match(router,/origin !== 'https:\\/\\/id.starry.phd'/);
- assert.match(router,/!session.isSuperAdmin/);
- assert.match(router,/url.pathname === '\\/backup-management'/);
- assert.match(router,/path === '\\/api\\/ai-routing'/);
+ assert.equal(router.includes("path === '/api/admin/backups'"),true);
+ assert.equal(router.includes("origin !== 'https://id.starry.phd'"),true);
+ assert.equal(router.includes('!session.isSuperAdmin'),true);
+ assert.equal(router.includes("url.pathname === '/backup-management'"),true);
+ assert.equal(router.includes("path === '/api/ai-routing'"),true);
  const ddl=readFileSync('starry-id/migrations/20261020_backup_policy_i31_i32.sql','utf8');
- assert.match(ddl,/CHECK\\(enabled=0\\)/);
- assert.match(ddl,/CREATE TABLE IF NOT EXISTS starry_backup_runs/);
- assert.doesNotMatch(ddl,/DROP TABLE|ALTER TABLE|DELETE FROM|TRUNCATE|CREATE TRIGGER/i);
+ assert.equal(ddl.includes('CHECK(enabled=0)'),true);
+ assert.equal(ddl.includes('CREATE TABLE IF NOT EXISTS starry_backup_runs'),true);
+ for(const forbidden of ['DROP TABLE','ALTER TABLE','DELETE FROM','TRUNCATE','CREATE TRIGGER'])
+  assert.equal(ddl.includes(forbidden),false);
  const core=readFileSync('worker/starryBackupPolicy.ts','utf8');
- assert.doesNotMatch(core,/\\.export\\(|\\.put\\(|\\.delete\\(|\\.restore\\(|cloudflare\\.request|time_travel\\/restore/);
+ for(const forbidden of ['.export(','.put(','.delete(','.restore(','cloudflare.request','time_travel/restore'])
+  assert.equal(core.includes(forbidden),false);
 });
