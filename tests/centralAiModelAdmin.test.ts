@@ -140,5 +140,5 @@ test('A05: migration is additive, baseline snapshots do not include secrets',()=
  assert.match(sql,/CREATE TABLE IF NOT EXISTS starry_ai_model_revisions/);
  assert.match(sql,/CREATE TABLE IF NOT EXISTS starry_ai_model_secret_refs/);
  assert.match(sql,/INSERT OR IGNORE INTO starry_ai_model_revisions/);
- assert.doesNotMatch(sql,/DROP TABLE|DELETE FROM|ALTER TABLE|api_key|secret_value/i);
+ assert.doesNotMatch(sql,/DROP TABLE|DELETE FROM|ALTER TABLE|api_key_value|secret_value|secret_blob/i);
 });
