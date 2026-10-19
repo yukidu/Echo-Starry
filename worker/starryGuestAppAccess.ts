@@ -13,6 +13,8 @@
  *    protection, short-lived preview, explicit confirmation and audit.
  */
 type GuestEnv = {STARRY_ID_DB?:any;STARRY_ID_ALLOWED_APPS?:string};
+// Special guest-only principal: never a real users.id or bulk member.
+export const GUEST_PRINCIPAL_ID='starry:guest';
 const ADMIN_ORIGIN='https://id.starry.phd';
 const VALID_APP=/^[a-z0-9][a-z0-9-]{0,39}$/;
 const PREVIEW_TTL_MS=5*60*1000;
@@ -28,34 +30,16 @@ const APP_LABELS:Record<string,string>={
 export const GUEST_ADAPTERS:Readonly<Record<string,string>>=Object.freeze({
   downloadstarry:'公開首頁與非會員互動（不含下載、收藏、紀錄及私人 API）'
 });
-const ready=new WeakMap<object,Promise<void>>();
+// Schema is provisioned with an explicit D1 migration, not on HTTP requests.
+// The three tables already exist in production. A read request must NEVER
+// issue CREATE TABLE / db.batch: doing DDL during a GET can lock the shared
+// D1 database, slow access decisions and leave the admin UI loading.
+// Other Apps read starry_guest_app_policies, so failing closed is essential.
+// See migrations/20261019_guest_app_access.sql.
 const respond=(value:unknown,status=200)=>new Response(JSON.stringify(value),{
   status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}
 });
 const reject=(message:string,status=400)=>respond({error:message},status);
-
-export async function ensureGuestPolicySchema(db:any):Promise<void>{
-  let task=ready.get(db as object);
-  if(!task){
-    const pending:Promise<void>=db.batch([
-      db.prepare(`CREATE TABLE IF NOT EXISTS starry_guest_app_policies(
-        appId TEXT PRIMARY KEY,allowed INTEGER NOT NULL CHECK(allowed IN (0,1)),
-        updatedAt INTEGER NOT NULL,updatedBy TEXT NOT NULL)`),
-      db.prepare(`CREATE TABLE IF NOT EXISTS starry_guest_app_previews(
-        id TEXT PRIMARY KEY,actorUserId TEXT NOT NULL,appId TEXT NOT NULL,
-        beforeAllowed INTEGER NOT NULL,afterAllowed INTEGER NOT NULL,
-        undoOperationId TEXT,createdAt INTEGER NOT NULL,expiresAt INTEGER NOT NULL,
-        consumedAt INTEGER)`),
-      db.prepare(`CREATE TABLE IF NOT EXISTS starry_guest_app_operations(
-        id TEXT PRIMARY KEY,actorUserId TEXT NOT NULL,appId TEXT NOT NULL,
-        beforeAllowed INTEGER NOT NULL,afterAllowed INTEGER NOT NULL,
-        createdAt INTEGER NOT NULL,sourceOperationId TEXT,undoneBy TEXT)`)
-    ]).then(()=>{}).catch((error:unknown)=>{ready.delete(db as object);throw error;});
-    ready.set(db as object,pending);
-    task=pending;
-  }
-  await task;
-}
 
 export async function guestAccessEnabled(db:any,appId:string):Promise<boolean>{
   if(!db || !Object.prototype.hasOwnProperty.call(GUEST_ADAPTERS,appId))return false;
@@ -168,7 +152,9 @@ export async function handleGuestAppPolicyAdmin(
     return reject('必須從 Starry ID 官網操作訪客權限',403);
   try{
     const db=env.STARRY_ID_DB;
-    await ensureGuestPolicySchema(db);
+    // Read-only requests must perform only SELECT queries. Schema changes
+    // belong in migrations; missing tables surface a clear error instead of
+    // starting DDL inside the admin request.
     const path=new URL(request.url).pathname;
     if(path==='/api/admin/app-access/guest'&&request.method==='GET')
       return respond({principal:'guest',countedAsMember:false,apps:await catalog(db,env)});
@@ -185,6 +171,10 @@ export async function handleGuestAppPolicyAdmin(
       return respond(await commit(db,actorUserId,await request.json().catch(()=>({}))));
     return reject('找不到訪客權限操作',404);
   }catch(error){
+    console.error('Starry guest access request failed', error instanceof Error?error.message:'unknown');
+    // Never leak raw database/SQL internals to clients.
+    if(error instanceof Error && /no such table|d1_|database|sqlite|syntax error|SQLITE/i.test(error.message))
+      return reject('訪客權限資料服務暫時無法使用，請稍後重新讀取',503);
     return reject(error instanceof Error?error.message:'訪客權限服務暫時無法使用',409);
   }
 }

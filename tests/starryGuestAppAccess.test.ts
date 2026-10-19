@@ -132,6 +132,36 @@ test('Central allowlist exposes only verified guest adapter, defaults all other 
   assert.equal(unsupported.integrated,false);
   assert.equal(unsupported.allowed,false);
 });
+test('Guest admin GET is SELECT-only and never performs DDL or db.batch during a request',async()=>{
+  const sqls:string[]=[];
+  const db={
+    prepare(sql:string){
+      sqls.push(sql);
+      if(!/^\s*SELECT\b/i.test(sql))throw Error('GET must never execute schema writes: '+sql);
+      return {
+        all:async()=>({results:[]}),
+        bind(){return {first:async()=>null};}
+      };
+    },
+    batch(){throw Error('Runtime schema initialization is forbidden');}
+  };
+  const catalog=await response(db,'/api/admin/app-access/guest');
+  assert.equal(catalog.status,200);
+  assert.equal(catalog.json.principal,'guest');
+  assert.equal(catalog.json.apps.length,4);
+  const history=await response(db,'/api/admin/app-access/guest/history');
+  assert.equal(history.status,200);
+  assert.deepEqual(history.json.operations,[]);
+  assert.equal(sqls.length,2);
+  assert.ok(sqls.every(sql=>/^\s*SELECT\b/i.test(sql)));
+});
+test('Database failure returns 503 without leaking SQL internals or granting guest access',async()=>{
+  const db={prepare(){throw Error('SQLITE_ERROR: no such table: starry_guest_app_policies');}};
+  const result=await response(db,'/api/admin/app-access/guest');
+  assert.equal(result.status,503);
+  assert.match(result.json.error,/暫時無法使用/);
+  assert.doesNotMatch(result.json.error,/SQLITE|starry_guest_app_policies/);
+});
 test('Guest access is fail-closed when database or table is unavailable',async()=>{
   const {db}=memoryDb();
   assert.equal(await guestAccessEnabled(db,'downloadstarry'),false);

@@ -102,6 +102,20 @@ test('Excessively broad snapshots fail safely and admin-only endpoint does not m
     {scope:'manual',userIds:['u1','u2','u3']});
 });
 
+test('Select-all always excludes the virtual guest principal and preserves existing checked members',async()=>{
+  const {state,merge}=await selectionMerger();
+  merge(['real-member-1','real-member-2'],true);
+  assert.throws(()=>merge(['real-member-3','starry:guest'],true),/非會員身分/);
+  assert.deepEqual([...state.selectedIds].sort(),['real-member-1','real-member-2']);
+  assert.throws(()=>parseBulkSelection({scope:'manual',userIds:['u1','starry:guest']}),/會員選取資料不正確/);
+  assert.throws(()=>parseBulkSelection({scope:'filtered',search:'',rank:'',excludedIds:['starry:guest']}),/全選排除清單不正確/);
+  assert.match(page,/全選目前篩選的真正會員（不含訪客）/);
+  assert.ok(page.indexOf('id="guestAccessEntry"')<page.indexOf('id="members"'));
+  assert.match(page,/GUEST_PRINCIPAL_ID='starry:guest'/);
+  assert.match(bulk,/GUEST_PRINCIPAL_ID/);
+  assert.match(bulk,/FROM users u/);
+});
+
 test('Logout and explicit clear discard previously selected members',()=>{
   assert.match(page,/function showLoggedOut\(\)\{ resetMemberSelection\(\)/);
   assert.match(page,/memberClearSelection'\)\.addEventListener\('click',resetMemberSelection\)/);

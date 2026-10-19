@@ -10,6 +10,7 @@
  * falsely reported all-or-nothing success.
  */
 import { memberDirectoryFilter } from './starryMemberDirectoryFilter';
+import { GUEST_PRINCIPAL_ID } from './starryGuestAppAccess';
 
 type BulkEnv = { STARRY_ID_DB?: any };
 type Selection = {scope:'filtered'|'manual'; search?:string;rank?:string;excludedIds?:string[];userIds?:string[]};
@@ -59,12 +60,12 @@ export function parseBulkSelection(raw:any):Selection{
   if(!raw||typeof raw!=='object'||!['filtered','manual'].includes(raw.scope))throw Error('請重新選取會員');
   if(raw.scope==='manual'){
     const ids=raw.userIds;
-    if(!Array.isArray(ids)||!ids.length||ids.length>MAX_MEMBERS||new Set(ids).size!==ids.length||!ids.every((id:any)=>typeof id==='string'&&ID.test(id)))throw Error('會員選取資料不正確');
+    if(!Array.isArray(ids)||!ids.length||ids.length>MAX_MEMBERS||new Set(ids).size!==ids.length||!ids.every((id:any)=>typeof id==='string'&&ID.test(id)&&id!==GUEST_PRINCIPAL_ID))throw Error('會員選取資料不正確');
     return {scope:'manual',userIds:ids};
   }
   if(typeof raw.search!=='string'||raw.search.length>80||typeof raw.rank!=='string'||raw.rank.length>100)throw Error('篩選條件不正確');
   const excludes=raw.excludedIds;
-  if(!Array.isArray(excludes)||excludes.length>MAX_MEMBERS||!excludes.every((v:any)=>typeof v==='string'&&ID.test(v))||new Set(excludes).size!==excludes.length)throw Error('全選排除清單不正確');
+  if(!Array.isArray(excludes)||excludes.length>MAX_MEMBERS||!excludes.every((v:any)=>typeof v==='string'&&ID.test(v)&&v!==GUEST_PRINCIPAL_ID)||new Set(excludes).size!==excludes.length)throw Error('全選排除清單不正確');
   return {scope:'filtered',search:raw.search.trim(),rank:raw.rank,excludedIds:excludes};
 }
 function selectionSQL(selection:Selection):{where:string;params:any[]}{

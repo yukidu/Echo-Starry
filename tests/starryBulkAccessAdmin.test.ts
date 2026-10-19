@@ -42,7 +42,7 @@ test('One scrollable compact directory with full filtered selection and no visib
   const html=await renderStarryIdMemberCenterPage('123.apps.googleusercontent.com').text();
   assert.match(html,/id="memberRankFilter"/);
   assert.match(html,/id="memberSelectAll"/);
-  assert.match(html,/全選目前篩選結果/);
+  assert.match(html,/全選目前篩選的真正會員（不含訪客）/);
   assert.match(html,/直銷商中心：/);
   assert.match(html,/IntersectionObserver/);
   assert.match(html,/id="memberLoadMore"/);

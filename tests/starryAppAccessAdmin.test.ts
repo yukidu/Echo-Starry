@@ -50,7 +50,7 @@ test('Bulk selection supports unlimited visible scrolling and audited batch oper
   assert.match(router, /LIMIT \? OFFSET \?/);
   assert.match(page, /access-member-row/);
   assert.match(page, /selectedIds:new Set\(\)/);
-  assert.match(page, /全選目前篩選結果/);
+  assert.match(page, /全選目前篩選的真正會員（不含訪客）/);
   assert.match(page, /selectedMemberCount\(\)/);
   assert.match(page, /\/api\/admin\/app-access\/bulk\/preview/);
   assert.match(page, /option value="grant"/);
