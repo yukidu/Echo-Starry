@@ -118,7 +118,8 @@ END;
 CREATE TRIGGER IF NOT EXISTS starry_ai_b07_usage_guard_update
 BEFORE UPDATE ON starry_ai_b07_usage
 BEGIN
-  SELECT CASE WHEN (NEW.scope_key NOT LIKE 'free:%' AND
+  -- Permit releasing prior holds even if administrators later tighten limits.
+  SELECT CASE WHEN (NEW.calls>OLD.calls OR NEW.held_micro_twd+NEW.settled_micro_twd>OLD.held_micro_twd+OLD.settled_micro_twd OR NEW.free_units>OLD.free_units) AND ((NEW.scope_key NOT LIKE 'free:%' AND
   (COALESCE(
  (SELECT enabled FROM starry_ai_b07_policies WHERE scope_key=NEW.scope_key),
  (SELECT enabled FROM starry_ai_b07_policies WHERE scope_key='member:default'
@@ -134,7 +135,7 @@ BEGIN
  OR (NEW.scope_key LIKE 'free:%' AND
   (NEW.free_units>COALESCE((SELECT daily_free_units FROM starry_ai_b07_tariffs
      WHERE model_id=substr(NEW.scope_key,6) AND billing_class='free_verified'
-       AND valid_until>CAST(strftime('%s','now') AS INTEGER)*1000),0))) THEN RAISE(ABORT,'b07_budget_or_free_quota_exceeded') END;
+       AND valid_until>CAST(strftime('%s','now') AS INTEGER)*1000),0)))) THEN RAISE(ABORT,'b07_budget_or_free_quota_exceeded') END;
 END;
 
 CREATE TRIGGER IF NOT EXISTS starry_ai_b07_request_guard
