@@ -62,7 +62,7 @@ test('dedicated subtab, no duplicate settings in transcript, preview and audit r
  const qa=read('src/components/AiQuestionSettingsAdmin.tsx');
  const route=read('worker/aiSpeakerQaRouter.ts');
  assert.match(page,/active==='ai-question'/);
- assert.match(page,/<AiQuestionSettingsAdmin \/>/);
+ assert.match(page,/active==='ai-question'&&<AiQuestionSettingsAdmin\/>/);
  assert.doesNotMatch(transcript,/演講者問答設定/);
  assert.match(qa,/第一層｜演講者角色與說話視角/);
  assert.match(qa,/歷史設定與還原/);
