@@ -1,0 +1,213 @@
+/**
+ * F22-S1: read-only AI speaker usage statistics.
+ * Does not create tables, invoke AI, touch member balances, or read private questions.
+ * Costs remain unknown until B07 has a LIVE, reconciled, per-request metering link.
+ */
+import { actor } from './aiSpeakerQaRouter';
+
+type Env = {
+  DB?: any; STARRY_ID_DB?: any;
+};
+const DAY=86_400_000;
+const timeZoneOffset=8*3_600_000;
+const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{
+  'Content-Type':'application/json; charset=utf-8',
+  'Cache-Control':'private, no-store',
+  'X-Robots-Tag':'noindex, nofollow',
+  'X-Content-Type-Options':'nosniff'
+}});
+const safeString=(v:unknown)=>String(v??'').trim();
+export type F22Period='today'|'7d'|'30d'|'all';
+export type F22Grouping='track'|'speaker';
+export type F22Sort='calls'|'members'|'repeat'|'cost';
+export function f22Window(period:F22Period,now=Date.now()){
+  const today=new Date(now+timeZoneOffset);
+  const midnight=Date.UTC(today.getUTCFullYear(),today.getUTCMonth(),today.getUTCDate())-timeZoneOffset;
+  const days=period==='today'?1:period==='7d'?7:period==='30d'?30:0;
+  const start=days?midnight-(days-1)*DAY:0;
+  return {start,end:now+1,startDay:new Date(start+timeZoneOffset).toISOString().slice(0,10),
+    endDay:today.toISOString().slice(0,10)};
+}
+/**
+ * Echo session proves possession of a valid Echo user session, not central admin role.
+ * Map it to an active Starry ID user and verify LIVE central membership on every request.
+ * Echo's local '超級管理員' role alone is never accepted.
+ */
+export async function f22CentralSuperAdmin(req:Request,env:Env){
+  if(!env.STARRY_ID_DB)return false;
+  const local=await actor(req,env as any).catch(()=>null);
+  if(!local?.id||!local.email)return false;
+  const db=env.STARRY_ID_DB;
+  // The Echo login is independently verified by actor(). Require a known
+  // central ID mapping (or the original identical ID) and exact central email.
+  // No Email allowlist, App-local super-admin role or built-in fallback grants access.
+  const link:any=await db.prepare(
+    "SELECT userId FROM legacy_links WHERE sourceApp='echostars' AND sourceUserId=? LIMIT 1"
+  ).bind(local.id).first();
+  const centralId=safeString(link?.userId||local.id);
+  if(!centralId)return false;
+  const row:any=await db.prepare(
+    "SELECT u.id,u.status,central.status AS centralStatus,central.role AS centralRole "+
+    "FROM users u "+
+    "JOIN app_memberships central ON central.userId=u.id AND central.appId='starry-id' "+
+    "WHERE u.id=? AND lower(trim(u.primaryEmail))=lower(trim(?)) LIMIT 1"
+  ).bind(centralId,local.email).first();
+  return row?.status==='active'&&row?.centralStatus==='active'&&
+    row?.centralRole==='super-admin';
+}
+
+export const F22_MAX_CLAIMS=6000;
+export const F22_MAX_D1_ROWS_READ=30000;
+/** Fail closed: a bounded indexed preflight prevents full historical scans.
+ * Returning a partial "all time" ranking would be misleading; require a
+ * future daily roll-up when the source exceeds this limit. */
+export class F22CapacityError extends Error{
+  constructor(public code:'statistics_requires_rollup'|'statistics_read_budget_exceeded'){
+    super(code);
+  }
+}
+export function f22CountSql(){
+  return "SELECT COUNT(*) AS n FROM ("+
+    "SELECT 1 FROM qa_claims INDEXED BY qa_claims_day "+
+    "WHERE day>=? AND day<=? AND createdAt>=? AND createdAt<? LIMIT ?)";
+}
+export async function f22Preflight(db:any,w:ReturnType<typeof f22Window>){
+  const res=await db.prepare(f22CountSql()).bind(
+    w.startDay,w.endDay,w.start,w.end,F22_MAX_CLAIMS+1).all();
+  const count=Number(res?.results?.[0]?.n);
+  if(!Number.isSafeInteger(count)||count<0||count>F22_MAX_CLAIMS)
+    throw new F22CapacityError('statistics_requires_rollup');
+  const rowsRead=Number(res?.meta?.rows_read);
+  if(Number.isFinite(rowsRead)&&rowsRead>F22_MAX_D1_ROWS_READ)
+    throw new F22CapacityError('statistics_read_budget_exceeded');
+  return {count,rowsRead:Number.isFinite(rowsRead)?rowsRead:null};
+}
+
+const base=(
+  "WITH scoped AS ("+
+    "SELECT commentId,identity,trackId,status,createdAt,"+
+      "LAG(createdAt) OVER (PARTITION BY identity,trackId ORDER BY createdAt,commentId) AS previousAt "+
+    "FROM qa_claims INDEXED BY qa_claims_day "+
+    "WHERE day>=? AND day<=? AND createdAt>=? AND createdAt<?"+
+  "), measured AS ("+
+    "SELECT *, CASE WHEN previousAt IS NULL THEN NULL ELSE createdAt-previousAt END AS gapMs FROM scoped"+
+  ") "
+);
+const measures=[
+  "COUNT(*) AS calls",
+  "COUNT(DISTINCT CASE WHEN identity LIKE 'member:%' THEN identity END) AS members",
+  "SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) AS successes",
+  "SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failures",
+  "SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) AS pending",
+  "SUM(CASE WHEN gapMs BETWEEN 0 AND 300000 THEN 1 ELSE 0 END) AS repeat5",
+  "SUM(CASE WHEN gapMs BETWEEN 0 AND 1800000 THEN 1 ELSE 0 END) AS repeat30",
+  "SUM(CASE WHEN gapMs BETWEEN 0 AND 3600000 THEN 1 ELSE 0 END) AS repeat60"
+].join(',');
+const orderBy:Record<F22Sort,string>={
+  calls:'calls DESC',members:'members DESC',repeat:'repeat30 DESC',
+  // Cost cannot be ranked until independently metered, B07-01 is staging-only.
+  cost:'calls DESC'
+};
+function makeSummarySql(){
+  return base+'SELECT '+measures+' FROM measured';
+}
+function makeTrendSql(){
+  return base+"SELECT strftime('%Y-%m-%d',createdAt/1000,'unixepoch','+8 hours') AS day,"+
+    "COUNT(*) AS calls FROM measured GROUP BY day ORDER BY day DESC LIMIT 6000";
+}
+function makeRankingSql(group:F22Grouping,sort:F22Sort){
+  if(group==='track'){
+    return base+"SELECT m.trackId AS id,COALESCE(t.title,'已刪除音檔') AS title,"+
+      "COALESCE(t.speaker,'') AS speaker,COALESCE(t.uploadDate,'') AS uploadDate,"+
+      "COALESCE((SELECT GROUP_CONCAT(ts.speakerName,'、') FROM track_speakers ts "+
+        "WHERE ts.trackId=m.trackId),'') AS linkedSpeakers,"+
+      measures+" FROM measured m LEFT JOIN tracks t ON t.id=m.trackId "+
+      "GROUP BY m.trackId ORDER BY "+orderBy[sort]+",m.trackId LIMIT 60";
+  }
+  // Join at most one canonical attribution per track BEFORE grouping claims.
+  // An unresolved multi-speaker session must never be credited to individuals.
+  return base+", speaker_count AS ("+
+    "SELECT trackId,COUNT(*) AS n,MIN(speakerName) AS onlySpeaker FROM track_speakers "+
+    "WHERE trackId IN (SELECT DISTINCT trackId FROM scoped) GROUP BY trackId"+
+  "), owned AS ("+
+    "SELECT m.*,"+
+      "CASE WHEN sc.n=1 THEN sc.onlySpeaker "+
+      "WHEN sc.n>1 OR instr(COALESCE(t.speaker,''),'&')>0 THEN '多人演講（未歸屬）' "+
+      "ELSE COALESCE(NULLIF(TRIM(t.speaker),''),'未指定講者') END AS speakerName "+
+    "FROM measured m LEFT JOIN tracks t ON t.id=m.trackId "+
+    "LEFT JOIN speaker_count sc ON sc.trackId=m.trackId"+
+  ") SELECT speakerName AS id,speakerName AS title,"+
+      "COUNT(DISTINCT trackId) AS trackCount,"+measures+
+      " FROM owned GROUP BY speakerName ORDER BY "+orderBy[sort]+",speakerName LIMIT 60";
+}
+/** Same exact SQL is exercised by isolated synthetic SQLite load tests. */
+export function f22LoadTestQueries(group:F22Grouping='track',sort:F22Sort='calls'){
+  return {preflight:f22CountSql(),summary:makeSummarySql(),
+    ranking:makeRankingSql(group,sort),trend:makeTrendSql()};
+}
+export function normalizedF22Metrics(r:any){
+  const n=(k:string)=>Number.isFinite(Number(r?.[k]))?Math.max(0,Number(r[k])):0;
+  return {calls:n('calls'),members:n('members'),successes:n('successes'),
+    failures:n('failures'),pending:n('pending'),
+    repeat5:n('repeat5'),repeat30:n('repeat30'),repeat60:n('repeat60'),
+    // Three independent states; NEVER replace unknown with zero.
+    actualTwd:null,estimatedTwd:null,costState:'no_history' as const,
+    costSource:'not_metered' as const,responseMs:null,tokenCount:null,fallbackCalls:null};
+}
+export async function f22Statistics(env:Env,period:F22Period,group:F22Grouping,sort:F22Sort,
+  now=Date.now()){
+  if(!env.DB)throw new Error('f22_echo_database_missing');
+  const w=f22Window(period,now);
+  const preflight=await f22Preflight(env.DB,w);
+  const bind=(sql:string)=>env.DB.prepare(sql).bind(w.startDay,w.endDay,w.start,w.end);
+  // Guarded at <=6,000 real events, then three read-only indexed queries.
+  const [summary,rankings,trend]=await Promise.all([
+    bind(makeSummarySql()).first(),
+    bind(makeRankingSql(group,sort)).all(),
+    bind(makeTrendSql()).all()
+  ]);
+  return {period,group,sort,range:{from:w.start,to:now},
+    totals:normalizedF22Metrics(summary),
+    rows:(rankings?.results||[]).map((r:any)=>({
+      id:safeString(r.id),title:safeString(r.title),
+      ...(group==='track'?{speaker:safeString(r.speaker),
+        uploadDate:safeString(r.uploadDate),
+        linkedSpeakers:safeString(r.linkedSpeakers).split('、').filter(Boolean)}:
+        {trackCount:Number(r.trackCount||0)}),
+      ...normalizedF22Metrics(r)
+    })),
+    trend:(trend?.results||[]).map((r:any)=>({day:safeString(r.day),calls:Number(r.calls||0)})).reverse(),
+    costDisclosure:{
+      actual:'無可靠的逐筆實際費用紀錄',
+      estimate:'尚無可驗證的逐筆估算',
+      b07:'B07-01 尚未接入正式 AI，預留不是實際成本；會員電池也不是台幣成本'
+    },
+    recordingDisclosure:'多人演講無明確對象記錄時歸類「多人演講（未歸屬）」，不重複分給個別講者',
+    historyDisclosure:'過去未保存的 Token、速度、備援與實際費用不能補算',
+    limit:60,queryBudget:{maxClaims:F22_MAX_CLAIMS,matchedClaims:preflight.count,
+      preflightRowsRead:preflight.rowsRead},
+  };
+}
+export async function handleF22SpeakerUsage(req:Request,env:Env):Promise<Response|null>{
+  const url=new URL(req.url);
+  if(url.pathname!=='/api/admin/ai-speaker-usage')return null;
+  if(req.method!=='GET')return json({error:'method_not_allowed'},405);
+  if(url.hostname!=='echo.starry.phd'&&!url.hostname.endsWith('.workers.dev')&&url.hostname!=='localhost')
+    return json({error:'invalid_host'},404);
+  try{
+    if(!await f22CentralSuperAdmin(req,env))return json({error:'central_super_admin_required'},403);
+    const p=url.searchParams.get('period')||'7d',g=url.searchParams.get('group')||'track';
+    const s=url.searchParams.get('sort')||'calls';
+    if(!['today','7d','30d','all'].includes(p)||!['track','speaker'].includes(g)||
+       !['calls','members','repeat','cost'].includes(s))
+      return json({error:'invalid_statistics_filter'},400);
+    return json(await f22Statistics(env,p as F22Period,g as F22Grouping,s as F22Sort));
+  }catch(e){
+    if(e instanceof F22CapacityError)return json({
+      error:e.code,message:'資料筆數超出安全查詢上限，需建立每日彙總後才能準確顯示；目前沒有返回不完整的排行',
+      maxClaims:F22_MAX_CLAIMS
+    },422);
+    // Never expose SQL, member data, provider internals or error stack.
+    return json({error:'statistics_temporarily_unavailable'},503);
+  }
+}

@@ -4,6 +4,7 @@ import { handleStarryIdRandomMotto } from './starryIdRandomMottoRouter';
 import { handleStarryEcosystemAuthEntry } from './starryEcosystemAuthEntryRouter';
 import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
 import { handleQaRequest, processQaAfterComment } from './aiSpeakerQaRouter';
+import { handleF22SpeakerUsage } from './f22SpeakerUsageStatistics';
 import { handleQaTestRequest } from './aiSpeakerQaTestRouter';
 import { handleSpeakerProfileRequest } from './aiSpeakerProfileRouter';
 import { handleStoryAttributionRequest } from './aiSpeakerStoryRouter';
@@ -292,6 +293,12 @@ export default {
     if (url.pathname.startsWith('/api/speaker-profiles/')) {
       const speakerProfile = await handleSpeakerProfileRequest(request, env as any);
       if (speakerProfile) return speakerProfile;
+    }
+
+    // F22 read-only central-super-admin usage stats. Keep out of public routes.
+    if (url.pathname === '/api/admin/ai-speaker-usage') {
+      const response = await handleF22SpeakerUsage(request, env as any);
+      if (response) return response;
     }
 
     // Isolated owner-only A/B tests must bypass public comment creation.
