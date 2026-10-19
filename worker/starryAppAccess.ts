@@ -5,6 +5,7 @@
  * after each App's server integration passes its own regression checks.
  */
 import { handleStarryAppAccessBulk } from './starryAppAccessBulk';
+import { handleGuestAppPolicyAdmin } from './starryGuestAppAccess';
 
 type AccessEnv = {
   STARRY_ID_DB?: any;
@@ -232,6 +233,10 @@ export async function handleStarryAppAccessAdminRequest(request:Request, env:Acc
     // Keep the picker available even if an unrelated audit/history table fails.
     if(path==='/api/admin/app-access/catalog'&&request.method==='GET')
       return api({apps:apps.map(id=>({id,label:APP_LABELS[id]||id})),protectedApp:PROTECTED_APP,maxMembers:MEMBER_LIMIT});
+    // Guest policies are deliberately NOT a fake member. They use separate
+    // tables and cannot be included in member/bulk/grant or search APIs.
+    if(path==='/api/admin/app-access/guest'||path.startsWith('/api/admin/app-access/guest/'))
+      return handleGuestAppPolicyAdmin(request,env,actorUserId);
     await ensureAccessSchema(db);
     if(path.startsWith('/api/admin/app-access/bulk/'))
       return handleStarryAppAccessBulk(request,env,actorUserId,apps);
