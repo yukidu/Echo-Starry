@@ -10,6 +10,8 @@ import { renderStarryAiModelRegistryPage } from './starryAiModelRegistryPage';
 import { readCentralAiModels } from './starryAiModelRegistry';
 import { renderStarryAiModelAdminPage } from './starryAiModelAdminPage';
 import { renderStarryAiTaskRoutingPage } from './starryAiTaskRoutingPage';
+import { readBackupManagement, previewBackupPolicy, stageBackupPolicy, BackupPolicyError } from './starryBackupPolicy';
+import { renderStarryBackupManagementPage } from './starryBackupManagementPage';
 import { readAiRoutingControl, previewAiRouting, saveAiRouting, RoutingInputError } from './starryAiTaskRouting';
 import { modelAdminHistory, modelAdminSecretStatus, dryRunModelDraft, applyModelAdminAction, AdminInputError } from './starryAiModelAdmin';
 import { loadAiPriorities, saveAiPriorities, collectAiCatalog, recentAiChanges, DEFAULT_AI_ORDER } from './starryAiManagement';
@@ -692,6 +694,32 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
     return handleStarryAppAccessAdminRequest(request,env,session.member.id);
   }
 
+  if (path === '/api/admin/backups' || path === '/api/admin/backups/preview') {
+    // I31/I32: admin-only staging metadata; NO backup/export/restore executor.
+    if (origin && origin !== 'https://id.starry.phd')
+      return json(request,{error:'請從 Starry ID 管理頁操作備份草稿'},403);
+    const session=await sessionUser(request,env);
+    if(!session)return json(request,{error:'請先登入 Starry ID'},401);
+    if(!session.isSuperAdmin)return json(request,{error:'只有中央超級管理員可以管理備份'},403);
+    try {
+      if(method==='GET' && path==='/api/admin/backups')
+        return json(request,await readBackupManagement(env),200,{'Cache-Control':'private, no-store'});
+      if(method!=='POST')return json(request,{error:'Method not allowed'},405);
+      if(origin!=='https://id.starry.phd' ||
+        !(request.headers.get('Content-Type')||'').toLowerCase().startsWith('application/json'))
+        return json(request,{error:'請從中央管理頁重新操作'},403);
+      const raw=await request.text();
+      if(raw.length>8192)return json(request,{error:'資料超過安全限制'},413);
+      let input:any;
+      try{input=JSON.parse(raw)}catch{return json(request,{error:'JSON 格式錯誤'},400)}
+      if(path==='/api/admin/backups/preview')return json(request,previewBackupPolicy(input));
+      return json(request,await stageBackupPolicy(env,session.member.id,input));
+    }catch(e){
+      if(e instanceof BackupPolicyError)return json(request,{error:e.code},e.status);
+      return json(request,{error:'備份草稿資料庫尚未準備完成或暫時不可用'},503);
+    }
+  }
+
   if (path === '/api/ai-routing' || path === '/api/ai-routing/preview') {
     // A04-01: central administrative staging ONLY, never routes paid/active AI calls.
     if (origin && origin !== 'https://id.starry.phd')
@@ -974,6 +1002,12 @@ export async function handleStarryIdCentral(request: Request, env: StarryEnv): P
 
   if (url.pathname === '/' && request.method.toUpperCase() === 'GET') return servicePage(env);
   if (url.pathname === '/ai-management' && request.method.toUpperCase() === 'GET') return renderStarryAiManagementPage();
+  if (url.pathname === '/backup-management' && request.method.toUpperCase() === 'GET') {
+    const session=await sessionUser(request,env);
+    if(!session)return new Response('請先登入 Starry ID',{status:401,headers:{'Cache-Control':'no-store'}});
+    if(!session.isSuperAdmin)return new Response('只有中央超級管理員可管理備份',{status:403,headers:{'Cache-Control':'no-store'}});
+    return renderStarryBackupManagementPage();
+  }
   if (url.pathname === '/ai-routing' && request.method.toUpperCase() === 'GET') {
     const session=await sessionUser(request,env);
     if(!session)return new Response('請先登入 Starry ID',{status:401,headers:{'Cache-Control':'no-store'}});
