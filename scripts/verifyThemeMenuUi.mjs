@@ -245,7 +245,19 @@ async function main() {
       throw new Error(`Theme toggle did not change action state. before=${JSON.stringify(before)} after=${JSON.stringify(after)}`);
     }
 
-    await writeFile(DEBUG_JSON, JSON.stringify({ before, after, menuClosedAfterToggle: true }, null, 2), 'utf8');
+    // Regression for the React hamburger menu: an inside action must navigate
+    // before the document-level outside-click dismiss handler unmounts the menu.
+    await evaluate(`(() => {
+      const panel = document.querySelector('.mobile-menu-panel');
+      const ranking = Array.from(panel?.querySelectorAll('button') || [])
+        .find(button => button.textContent?.trim() === '排行榜');
+      if (!ranking) throw new Error('排行榜 action is missing from hamburger menu');
+      ranking.click();
+    })()`);
+    await waitFor('document.body.dataset.mainTab === "stats"', 'ranking tab navigation from hamburger');
+    await waitFor('!document.querySelector(".mobile-menu-panel")', 'hamburger closure after ranking action');
+
+    await writeFile(DEBUG_JSON, JSON.stringify({ before, after, menuClosedAfterToggle: true, rankingClickNavigated: true }, null, 2), 'utf8');
     console.log(`Browser UI verified: ${before.kind} -> ${before.text}; menu closed; reopened -> ${after.kind} -> ${after.text}`);
     console.log(`Screenshots: ${SCREENSHOT_BEFORE}, ${SCREENSHOT_AFTER}`);
 
