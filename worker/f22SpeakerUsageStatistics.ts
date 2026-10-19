@@ -122,7 +122,6 @@ function makeRankingSql(group:F22Grouping,sort:F22Sort){
       "COALESCE((SELECT GROUP_CONCAT(ts.speakerName,'、') FROM track_speakers ts "+
         "WHERE ts.trackId=m.trackId),'') AS linkedSpeakers,"+
       measures+" FROM measured m LEFT JOIN tracks t ON t.id=m.trackId "+
-      ""+
       "GROUP BY m.trackId ORDER BY "+orderBy[sort]+",m.trackId LIMIT 60";
   }
   // Join at most one canonical attribution per track BEFORE grouping claims.
@@ -140,6 +139,11 @@ function makeRankingSql(group:F22Grouping,sort:F22Sort){
   ") SELECT speakerName AS id,speakerName AS title,"+
       "COUNT(DISTINCT trackId) AS trackCount,"+measures+
       " FROM owned GROUP BY speakerName ORDER BY "+orderBy[sort]+",speakerName LIMIT 60";
+}
+/** Same exact SQL is exercised by isolated synthetic SQLite load tests. */
+export function f22LoadTestQueries(group:F22Grouping='track',sort:F22Sort='calls'){
+  return {preflight:f22CountSql(),summary:makeSummarySql(),
+    ranking:makeRankingSql(group,sort),trend:makeTrendSql()};
 }
 export function normalizedF22Metrics(r:any){
   const n=(k:string)=>Number.isFinite(Number(r?.[k]))?Math.max(0,Number(r[k])):0;
