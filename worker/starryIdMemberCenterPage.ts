@@ -794,6 +794,131 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         else await loadAccessHistory();
       }catch(e){toast(e.message||'設定失敗',true);$('appAccessCommitBtn').disabled=false;}
     });
+    // Guest is deliberately NOT in state.members, selectedIds, memberCount
+    // or any per-member API. Guest access has its own endpoint and audit.
+    function closeGuestPreview(){
+      state.guestPreview=null;
+      $('guestAccessPreview').classList.add('hidden');
+      $('guestAccessConfirmText').value='';
+      $('guestAccessCommitBtn').disabled=true;
+    }
+    function guestPolicyRow(app){
+      const item=document.createElement('div');
+      item.className='guest-policy-row';
+      const info=document.createElement('div');
+      const heading=document.createElement('strong');
+      heading.textContent=app.label;
+      const note=document.createElement('small');
+      note.textContent=(app.integrated
+        ?app.capability+'｜目前：'+(app.allowed?'已開放':'預設不開放')
+        :'尚未接入訪客安全保護，不可開放');
+      info.append(heading,note);
+      const action=document.createElement('button');
+      action.className='btn';
+      action.type='button';
+      action.textContent=!app.integrated?'尚未接入':app.allowed?'禁止訪客':'允許公開功能';
+      action.disabled=!app.integrated;
+      action.addEventListener('click',()=>void previewGuestChange({appId:app.id,allowed:!app.allowed}));
+      item.append(info,action);
+      return item;
+    }
+    async function openGuestAccess(){
+      if(!state.isSuperAdmin)return;
+      state.guestOpen=true;
+      state.targetUserId=null;
+      renderMemberActive();
+      $('guestAccessEntry').classList.add('active');
+      $('guestAccessCard').classList.remove('hidden');
+      $('profileCard').classList.add('hidden');
+      closeGuestPreview();
+      // Click the first row, but do not insert a guest into members or totals.
+      if(window.innerWidth<761)toggleAdmin(false);
+      await loadGuestAccess();
+    }
+    async function loadGuestAccess(){
+      const content=$('guestAppPolicies');
+      content.textContent='正在讀取訪客 App 權限…';
+      try{
+        const data=await api('/api/admin/app-access/guest');
+        if(!state.guestOpen)return;
+        if(data.principal!=='guest'||data.countedAsMember!==false||
+          !Array.isArray(data.apps))
+          throw Error('訪客權限資料格式不正確');
+        const fragment=document.createDocumentFragment();
+        for(const app of data.apps)fragment.appendChild(guestPolicyRow(app));
+        content.replaceChildren(fragment);
+        await loadGuestHistory();
+      }catch(error){
+        content.textContent='讀取訪客權限失敗：'+(error.message||'請重試');
+      }
+    }
+    async function loadGuestHistory(){
+      const root=$('guestAccessHistory');root.replaceChildren();
+      try{
+        const data=await api('/api/admin/app-access/guest/history');
+        const history=data.operations||[];
+        if(!history.length){root.textContent='尚無變更紀錄';return;}
+        for(const event of history){
+          const line=document.createElement('div');line.className='access-history-row';
+          const label=document.createElement('span');
+          label.textContent=new Date(event.createdAt).toLocaleString('zh-TW')+
+            '｜'+event.label+'｜'+(event.afterAllowed?'開放':'禁止')+
+            '｜還原碼 '+event.id+(event.undoneBy?'（已還原）':'');
+          line.appendChild(label);
+          if(!event.undoneBy){
+            const button=document.createElement('button');
+            button.className='btn';button.type='button';button.textContent='預覽還原';
+            button.addEventListener('click',()=>void previewGuestChange({undoOperationId:event.id}));
+            line.appendChild(button);
+          }
+          root.appendChild(line);
+        }
+      }catch(error){root.textContent='讀取變更紀錄失敗：'+(error.message||'請重試');}
+    }
+    async function previewGuestChange(input){
+      closeGuestPreview();
+      try{
+        const data=await api('/api/admin/app-access/guest/preview',{
+          method:'POST',body:JSON.stringify(input)
+        });
+        if(!state.guestOpen)return;
+        state.guestPreview=data;
+        $('guestAccessPreviewText').textContent=
+          data.appLabel+'｜'+(data.beforeAllowed?'已開放':'未開放')+
+          ' → '+(data.afterAllowed?'允許公開功能':'禁止訪客')+
+          '\\n僅影響未登入者：'+data.capability+
+          '\\n不影響任何已登入會員、會員權限及私人資料。';
+        $('guestAccessPreviewText').style.whiteSpace='pre-wrap';
+        $('guestAccessPreview').classList.remove('hidden');
+        $('guestAccessPreview').scrollIntoView({behavior:'smooth',block:'nearest'});
+      }catch(error){toast(error.message||'訪客權限預覽失敗',true);}
+    }
+    $('guestAccessEntry').addEventListener('click',()=>void openGuestAccess());
+    $('guestAccessConfirmText').addEventListener('input',()=>{
+      $('guestAccessCommitBtn').disabled=
+        !state.guestPreview||$('guestAccessConfirmText').value!=='確認變更';
+    });
+    $('guestAccessCancelBtn').addEventListener('click',closeGuestPreview);
+    $('guestAccessCommitBtn').addEventListener('click',async()=>{
+      const preview=state.guestPreview;
+      if(!preview)return;
+      const confirmationText=$('guestAccessConfirmText').value;
+      $('guestAccessCommitBtn').disabled=true;
+      try{
+        const saved=await api('/api/admin/app-access/guest/commit',{
+          method:'POST',body:JSON.stringify({
+            previewId:preview.previewId,confirm:true,confirmationText
+          })
+        });
+        closeGuestPreview();
+        toast('訪客權限設定完成。還原碼：'+saved.operationId);
+        await loadGuestAccess();
+      }catch(error){
+        toast(error.message||'訪客權限設定失敗',true);
+        $('guestAccessCommitBtn').disabled=false;
+      }
+    });
+
     loadSession();
   })();
   </script>
