@@ -824,9 +824,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           if (!hintResponse.ok) console.warn('逐字稿語言提示未儲存，將使用自動辨識');
         } catch { console.warn('逐字稿語言提示未儲存，將使用自動辨識'); }
       }
+      onDirtyChange?.(false);
       onSuccess(normalizedTrack);
       window.dispatchEvent(new CustomEvent('echostars:sticker-changed'));
-      onClose();
+      // Document pages are navigated by AudioWorkspacePage; only true dialogs close themselves.
+      if(presentation==='overlay')onClose();
     } catch (err: any) {
       setErrorMessage(err.message || '上傳失敗，請檢查網路連線');
     } finally {
