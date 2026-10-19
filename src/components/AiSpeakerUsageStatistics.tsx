@@ -82,7 +82,7 @@ export const AiSpeakerUsageStatistics:React.FC=()=>{
      credentials:'same-origin',cache:'no-store',signal:controller.signal
    }).then(async response=>{
      const result=await response.json().catch(()=>({}));
-     if(!response.ok)throw new Error(response.status===403?'只有 Starry ID 中央超級管理員可以查詢':result.error||'統計讀取失敗');
+     if(!response.ok)throw new Error(response.status===403?'只有 Starry ID 中央超級管理員可以查詢':response.status===422?'紀錄量已超出安全查詢上限，需升級為每日彙總後才可準確顯示完整統計':result.error||'統計讀取失敗');
      return result as Usage;
    }).then(result=>setData(result)).catch(err=>{
      if(!controller.signal.aborted){setError(err instanceof Error?err.message:'讀取失敗');setData(null);}
