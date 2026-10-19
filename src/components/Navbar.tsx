@@ -201,6 +201,21 @@ export const Navbar: React.FC<NavbarProps> = ({
       : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
   }`;
 
+  // The navbar owns its dismissal; audio management no longer installs
+  // an unrelated document-wide click patch.
+  React.useEffect(()=>{
+    if(!isMobileMenuOpen)return;
+    const dismiss=(event:MouseEvent)=>{
+      const target=event.target instanceof Element?event.target:null;
+      if(!target)return;
+      if(target.closest('[data-main-menu="hamburger"], .navbar-menu-font-row, .navbar-menu-palette-shortcut, .navbar-inline-pin'))return;
+      const inMenu=Boolean(target.closest('.navbar-menu-panel'));
+      if(!inMenu||target.closest('button'))setIsMobileMenuOpen(false);
+    };
+    document.addEventListener('click',dismiss,true);
+    return ()=>document.removeEventListener('click',dismiss,true);
+  },[isMobileMenuOpen]);
+
   const handleMobileNav = (tab: NavTab) => {
     if (tab === 'home') {
       if (onLogoClick) onLogoClick();
