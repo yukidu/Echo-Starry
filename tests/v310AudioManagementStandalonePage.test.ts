@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
+const read=(p:string)=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const app=read('src/App.tsx'),workspace=read('src/components/AudioWorkspacePage.tsx'),upload=read('src/components/UploadModal.tsx'),css=read('src/index.css');
 test('six sibling tabs are visible on mobile; AI問問題 is top-level super-admin tab',()=>{
  assert.match(workspace,/\{id:'ai-question',name:'AI問問題'/);
