@@ -29,7 +29,10 @@ export const AiQuestionSettingsAdmin:React.FC=()=>{
  const [preview,setPreview]=useState<{answer:string;modelUsed?:string;repaired?:boolean;message?:string;qualityIssues?:string[]}|null>(null);
  const load=async()=>{
    const [settings,hist]=await Promise.all([call('/api/qa/admin'),call('/api/qa/settings/history')]);
-   setData(settings);setArchive(hist.items||[]);
+   if(!Array.isArray(settings?.items)||!Array.isArray(settings?.models)||!Array.isArray(settings?.policies)||!settings?.qaRules){
+     throw new Error('AI 問答設定尚未正常載入，請重新整理');
+   }
+   setData(settings);setArchive(Array.isArray(hist.items)?hist.items:[]);
  };
  useEffect(()=>{void load().catch(e=>setError(e.message));},[]);
  const ready=useMemo(()=>data?.items.filter(t=>t.status==='ready').slice(0,80)||[],[data]);
