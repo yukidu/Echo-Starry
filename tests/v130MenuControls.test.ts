@@ -41,12 +41,12 @@ test('reset menu and logout remain separate controls on the same footer row', ()
 });
 
 test('hamburger dismissal does not unmount React actions in click capture phase', () => {
-  assert.match(navbar, /document\\.addEventListener\\('click', dismiss\\)/);
-  assert.doesNotMatch(navbar, /document\\.addEventListener\\('click',\\s*dismiss,\\s*true\\)/);
+  assert.match(navbar, /document\.addEventListener\('click', dismiss\)/);
+  assert.doesNotMatch(navbar, /document\.addEventListener\('click',\s*dismiss,\s*true\)/);
 });
 
 test('the last verified sticker balance is display-only and refreshes from backend', () => {
-  assert.match(navbar, /readLastVerifiedBalance\\(currentUser\\?\\.id\\)/);
+  assert.match(navbar, /readLastVerifiedBalance\(currentUser\?\.id\)/);
   assert.match(navbar, /balanceUpdating/);
   assert.match(navbar, /上次餘額，更新中/);
   assert.match(navbar, /server always verifies spending/);
