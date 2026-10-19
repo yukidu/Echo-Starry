@@ -34,7 +34,7 @@ dt{color:#b9cce5}dd{margin:0;white-space:pre-wrap}strong{font-weight:700}
 <section class="panel" aria-label="模型清單"><h2>模型清單</h2><div id="modelList"></div></section>
 <section class="panel" aria-label="模型詳情"><h2>模型詳情與成本</h2><div id="modelDetail" aria-live="polite">選擇左側模型查看詳情。</div></section>
 </div>
-<p class="muted">此階段 A01／A03 僅建立資料庫及可稽核的模型詳情；模型新增、測試、啟用及備援選型會在 A02／A04 獨立開發。</p>
+<p class="muted">A02／A05 已提供安全新增、編輯、停用及版本還原；真實 AI 測試、正式啟用、備援選型和各 App 本地備用設定仍未開放，須另外授權及整合。</p>
 </main><script nonce="${nonce}">
 'use strict';
 const list=document.getElementById('modelList');
