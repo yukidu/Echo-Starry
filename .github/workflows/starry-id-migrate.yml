@@ -24,8 +24,8 @@ jobs:
       ECHOSTARS_D1_ID: e0a696a9-0233-4186-be4d-229435b19a27
       STARRY_ID_D1_ID: 01195c92-555e-4816-bddc-5b8cb2e795db
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Install dependencies
@@ -56,7 +56,7 @@ jobs:
           npx tsx starry-id/retireLegacyStickerLedger.ts | tee starry-id/audit-output/battery-retirement.json
       - name: Upload non-PII migration report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: starry-id-member-and-battery-migration
           path: starry-id/audit-output/*.json
