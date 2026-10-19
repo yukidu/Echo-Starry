@@ -838,7 +838,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   return (
-    <div className={`upload-modal-overlay upload-page ${presentation === 'page' ? 'upload-standalone-page' : ''}`} data-upload-page-presentation={presentation}>
+    <div className={presentation === 'page' ? 'audio-form-document upload-page' : 'upload-modal-overlay upload-page'} data-upload-page-presentation={presentation}>
       <div className="w-full bg-white dark:bg-slate-900">
         {/* Header - Requirement 20: 統一底色與麥克風相同色 */}
         <div
