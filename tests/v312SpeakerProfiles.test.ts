@@ -12,8 +12,8 @@ const app=read('src/App.tsx');
 const comments=read('src/components/CommentsSection.tsx');
 const speaker=read('src/components/SpeakerProfilePage.tsx');
 const admin=read('src/components/AiSpeakerAdmin.tsx');
-const audio=read('src/v161AudioManagementNavigation.tsx');
-const tabs=read('src/v139HomeUploadPolish.ts');
+const audio=read('src/components/AudioWorkspacePage.tsx');
+const tabs=read('src/components/AudioWorkspacePage.tsx');
 const badge=read('src/components/AiBadge.tsx');
 const badgeStyle=read('src/components/AiBadge.css');
 
@@ -66,8 +66,8 @@ test('speaker page is browser navigable and has a separate super-admin audio tab
   assert.match(app,/aria-modal="true" aria-label=\{speakerProfileName/);
   assert.match(app,/#\/speaker\//);
   assert.match(app,/<SpeakerProfilePage/);
-  assert.match(tabs,/addTab\('speaker', 'Ai 演講者'\)/);
-  assert.match(audio,/mode === 'speaker' && <AiSpeakerAdmin \/>/);
+  assert.match(tabs,/name:'AI演講者'/);
+  assert.match(audio,/active==='speaker'&&<AiSpeakerAdmin\/>/);
   assert.match(admin,/value=\{cfg\.maxChars\}/);
   assert.match(admin,/摘要關鍵字與重點/);
 });
