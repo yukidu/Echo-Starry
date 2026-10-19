@@ -851,27 +851,77 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
       if(window.innerWidth<761)toggleAdmin(false);
       await loadGuestAccess();
     }
+    // Guest GETs are read-only; abort after eight seconds rather than
+    // leaving the administrator on a permanent "正在讀取" screen. Never
+    // retry automatically (Cloudflare D1 usage, safe admin expectations).
+    const GUEST_READ_TIMEOUT_MS=8000;
+    async function guestRead(path,outerSignal){
+      const controller=new AbortController();
+      const onAbort=()=>controller.abort();
+      if(outerSignal?.aborted)controller.abort();
+      else outerSignal?.addEventListener('abort',onAbort,{once:true});
+      const timeout=setTimeout(()=>controller.abort(),GUEST_READ_TIMEOUT_MS);
+      try{
+        const response=await fetch(path,{
+          method:'GET',credentials:'same-origin',cache:'no-store',
+          headers:{Accept:'application/json'},signal:controller.signal
+        });
+        let data;
+        try{data=await response.json();}
+        catch{throw new Error('權限服務回傳資料異常，請重新讀取');}
+        if(!response.ok)
+          throw new Error(data?.error||'權限服務回應失敗（'+response.status+'）');
+        return data;
+      }catch(error){
+        if(controller.signal.aborted && !outerSignal?.aborted)
+          throw new Error('讀取超過 8 秒，請按「重新讀取」再試一次');
+        throw error;
+      }finally{
+        clearTimeout(timeout);
+        outerSignal?.removeEventListener('abort',onAbort);
+      }
+    }
     async function loadGuestAccess(){
+      if(!state.guestOpen)return;
       const content=$('guestAppPolicies');
+      const errorBox=$('guestAccessLoadError');
+      const controller=new AbortController();
+      state.guestLoadController?.abort();
+      state.guestLoadController=controller;
+      const generation=++state.guestReadGeneration;
+      const current=()=>state.guestOpen && generation===state.guestReadGeneration;
+      errorBox.classList.add('hidden');
+      content.setAttribute('aria-busy','true');
       content.textContent='正在讀取訪客 App 權限…';
       try{
-        const data=await api('/api/admin/app-access/guest');
-        if(!state.guestOpen)return;
+        const data=await guestRead('/api/admin/app-access/guest',controller.signal);
+        if(!current())return;
         if(data.principal!=='guest'||data.countedAsMember!==false||
-          !Array.isArray(data.apps))
-          throw Error('訪客權限資料格式不正確');
+           !Array.isArray(data.apps))
+          throw new Error('訪客權限資料格式不正確，請重新讀取');
         const fragment=document.createDocumentFragment();
         for(const app of data.apps)fragment.appendChild(guestPolicyRow(app));
         content.replaceChildren(fragment);
-        await loadGuestHistory();
+        // Loading history must not block the App permission list itself.
+        void loadGuestHistory(generation);
       }catch(error){
-        content.textContent='讀取訪客權限失敗：'+(error.message||'請重試');
+        if(!current())return;
+        content.textContent='';
+        $('guestAccessLoadErrorText').textContent=
+          '訪客權限讀取失敗：'+(error.message||'請稍後重新讀取');
+        errorBox.classList.remove('hidden');
+        $('guestAccessHistory').textContent='權限清單載入完成後，才會讀取操作紀錄。';
+      }finally{
+        if(current())content.setAttribute('aria-busy','false');
+        if(state.guestLoadController===controller)state.guestLoadController=null;
       }
     }
-    async function loadGuestHistory(){
-      const root=$('guestAccessHistory');root.replaceChildren();
+    async function loadGuestHistory(generation=state.guestReadGeneration){
+      const root=$('guestAccessHistory');root.textContent='正在讀取操作紀錄…';
       try{
-        const data=await api('/api/admin/app-access/guest/history');
+        const data=await guestRead('/api/admin/app-access/guest/history');
+        if(!state.guestOpen||generation!==state.guestReadGeneration)return;
+        root.replaceChildren();
         const history=data.operations||[];
         if(!history.length){root.textContent='尚無變更紀錄';return;}
         for(const event of history){
@@ -889,7 +939,10 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
           }
           root.appendChild(line);
         }
-      }catch(error){root.textContent='讀取變更紀錄失敗：'+(error.message||'請重試');}
+      }catch(error){
+        if(!state.guestOpen||generation!==state.guestReadGeneration)return;
+        root.textContent='操作紀錄讀取失敗：'+(error.message||'可重新讀取');
+      }
     }
     async function previewGuestChange(input){
       closeGuestPreview();
@@ -910,6 +963,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
       }catch(error){toast(error.message||'訪客權限預覽失敗',true);}
     }
     $('guestAccessEntry').addEventListener('click',()=>void openGuestAccess());
+    $('guestAccessRetryBtn').addEventListener('click',()=>void loadGuestAccess());
     $('guestAccessConfirmText').addEventListener('input',()=>{
       $('guestAccessCommitBtn').disabled=
         !state.guestPreview||$('guestAccessConfirmText').value!=='確認變更';
