@@ -370,7 +370,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
       return typeof id==='string' && id.length>0 && id!==GUEST_PRINCIPAL_ID;
     }
     function mergeMemberSelection(ids,shouldSelect){
-      if(!Array.isArray(ids)||!ids.every(isRealMemberSelectionId))
+      if(!Array.isArray(ids)||!ids.every(id=>typeof id==='string'&&id.length>0&&id!=='starry:guest'))
         throw new Error('全選資料包含非會員身分，已停止操作');
       const next=new Set(state.selectedIds);
       for(const id of ids){
