@@ -66,7 +66,11 @@ async function main() {
     });
     const send = (method, params = {}) => new Promise((resolve, reject) => {
       const callId = id++;
-      pending.set(callId, { resolve, reject });
+      const timeout = setTimeout(() => {
+        pending.delete(callId);
+        reject(new Error('Chrome stopped answering '+method+' after 12 seconds'));
+      },12000);
+      pending.set(callId, { resolve:value=>{clearTimeout(timeout);resolve(value)}, reject:error=>{clearTimeout(timeout);reject(error)} });
       socket.send(JSON.stringify({ id: callId, method, params }));
     });
     const evaluate = async expression => {
@@ -145,9 +149,14 @@ async function main() {
     const afterMenu=await evaluate("({aria:document.querySelector('[data-main-menu=\\\"hamburger\\\"]')?.getAttribute('aria-expanded'),count:document.querySelectorAll('.mobile-menu-panel').length})");
     console.log('Audio workspace menu diagnostic:',JSON.stringify({beforeMenu,afterMenu}));
     await waitFor("!!document.querySelector('.mobile-menu-panel')", 'hamburger menu');
+    console.log('Audio workspace browser: reading audio-management entry');
     const navLabel = await evaluate("Array.from(document.querySelectorAll('.mobile-menu-panel button')).find(b=>b.textContent?.includes('音檔管理'))?.textContent?.trim()||''");
+    console.log('Audio workspace browser: label=',navLabel);
     if(!navLabel)throw Error('音檔管理 entry missing from main navbar');
-    await evaluate("Array.from(document.querySelectorAll('.mobile-menu-panel button')).find(b=>b.textContent?.includes('音檔管理'))?.click()");
+    // Dispatch the real click on a separate browser task so DevTools can
+    // report React rendering problems instead of hanging forever in evaluate.
+    await evaluate("setTimeout(()=>Array.from(document.querySelectorAll('.mobile-menu-panel button')).find(b=>b.textContent?.includes('音檔管理'))?.click(),0)");
+    console.log('Audio workspace browser: clicked; waiting for workspace');
     await waitFor("!!document.querySelector('[data-audio-workspace-page=\\\"index\\\"]')", 'real React workspace');
     const initial = await evaluate(`(() => ({
       page:!!document.querySelector('[data-audio-workspace-page="index"]'),
