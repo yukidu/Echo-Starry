@@ -80,6 +80,9 @@ async function main() {
     // Set up the isolated preview browser before React's first page load.
     // No production account is accessed and no API data is mutated.
     await send('Page.addScriptToEvaluateOnNewDocument', {source:`(() => {
+      window.__audioTestErrors=[];
+      window.addEventListener('error',e=>window.__audioTestErrors.push(String(e?.error?.stack||e?.message||'unknown').slice(0,800)));
+      window.addEventListener('unhandledrejection',e=>window.__audioTestErrors.push(String(e?.reason?.stack||e?.reason||'promise').slice(0,800)));
       localStorage.setItem('sq_current_user_v1', JSON.stringify({
         id:'u-admin',email:'yukidu@gmail.com',role:'超級管理員',
         name:'測試管理員',isAdminUser:true
@@ -111,7 +114,7 @@ async function main() {
     };
     await waitFor("document.readyState==='complete'&&!!document.querySelector('[data-main-menu=\\\"hamburger\\\"]')",'React navbar');
     await delay(350);
-    const beforeMenu=await evaluate("({role:JSON.parse(localStorage.getItem('sq_current_user_v1')||'null')?.role,aria:document.querySelector('[data-main-menu=\\\"hamburger\\\"]')?.getAttribute('aria-expanded')})");
+    const beforeMenu=await evaluate("({role:JSON.parse(localStorage.getItem('sq_current_user_v1')||'null')?.role,allKeys:Object.keys(localStorage),errors:window.__audioTestErrors||[],url:location.href,aria:document.querySelector('[data-main-menu=\\\"hamburger\\\"]')?.getAttribute('aria-expanded')})");
     await evaluate("document.querySelector('[data-main-menu=\\\"hamburger\\\"]').click()");
     await delay(120);
     const afterMenu=await evaluate("({aria:document.querySelector('[data-main-menu=\\\"hamburger\\\"]')?.getAttribute('aria-expanded'),count:document.querySelectorAll('.mobile-menu-panel').length})");
