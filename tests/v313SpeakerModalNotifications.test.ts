@@ -13,7 +13,7 @@ const audio=load('src/components/AudioCard.tsx');
 const detail=load('src/components/DetailView.tsx');
 const mini=load('src/components/MiniPlayer.tsx');
 const stats=load('src/components/StatisticsView.tsx');
-const manage=load('src/v161AudioManagementNavigation.tsx');
+const manage=load('src/components/AudioTrackList.tsx');
 const comments=load('src/components/CommentsSection.tsx');
 
 test('speaker names across the app use a reusable accessible link opening an in-place dialog',()=>{
