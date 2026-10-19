@@ -152,8 +152,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [previewUser, setPreviewUser] = useState<UserProfile | null>(null);
 
   // Deletion confirm state without window.confirm (Requirement 17)
-  const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
 
@@ -741,21 +739,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
               >
                 <Users className="w-3.5 h-3.5" />
                 <span>會員</span>
-              </button>
-            )}
-
-            {/* 3. 音檔：僅超級管理員 */}
-            {isEffectiveAdmin && (
-              <button
-                onClick={() => setActiveTab('tracks')}
-                className={`pb-1.5 px-1.5 sm:px-2 font-bold border-b-2 flex items-center gap-0.5 transition-colors shrink-0 ${
-                  activeTab === 'tracks'
-                    ? 'border-[var(--color-primary,#c06c84)] text-[var(--color-primary,#c06c84)]'
-                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
-                }`}
-              >
-                <Music className="w-3.5 h-3.5" />
-                <span>音檔</span>
               </button>
             )}
 
@@ -1460,105 +1443,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   })
                 )}
               </div>
-            </div>
-          )}
-
-          {/* TAB 2: Tracks Management (Requirement 5: 貢獻者只能修改刪除自己上傳的錄音檔；管理員無限制) */}
-          {activeTab === 'tracks' && isEffectiveAdmin && (
-            <div className="space-y-2.5">
-              {tracks
-                .filter(t => (isContributorOnly ? t.uploaderEmail === currentUser?.email : true))
-                .map(t => {
-                  const badgeText = t.requiredRank === '無' ? '公開' : t.requiredRank;
-                  const canManageThisTrack = isEffectiveAdmin || (isContributorOnly && t.uploaderEmail === currentUser?.email);
-
-                  return (
-                    <div
-                      key={t.id}
-                      className="p-3 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 flex items-center justify-between gap-2.5"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <img
-                          src={t.speakerAvatar}
-                          alt={t.speaker}
-                          className="w-10 h-10 rounded-xl object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-semibold">
-                              {badgeText}
-                            </span>
-                            {t.categories?.map((cat, i) => (
-                              <span key={i} className="text-[10px] text-slate-400">
-                                {cat}
-                              </span>
-                            ))}
-                          </div>
-                          <h4 className="font-bold text-xs text-slate-800 dark:text-slate-100 truncate mt-0.5">
-                            {t.title}
-                          </h4>
-                          <p className="text-[10px] text-slate-400">
-                            {t.speaker} • 上傳者: {t.uploaderEmail || '管理員'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {canManageThisTrack && (
-                        <div className="flex items-center gap-1 shrink-0">
-                          {/* Requirement 17: 修改按鈕正常開啟修改視窗 */}
-                          <button
-                            onClick={() => onEditTrack(t)}
-                            title="修改錄音檔資料"
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-1"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                            <span className="text-[11px] hidden sm:inline">修改</span>
-                          </button>
-
-                          {/* Requirement 17: 刪除按鈕安全確認 (不呼叫 window.confirm 以免 iframe 阻擋) */}
-                          {deletingTrackId === t.id ? (
-                            <div className="flex items-center gap-1 bg-rose-50 dark:bg-rose-950 p-1 rounded-xl border border-rose-200 dark:border-rose-900">
-                              <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold">
-                                確定刪除？
-                              </span>
-                              <button
-                                disabled={isDeleting}
-                                onClick={async () => {
-                                  setIsDeleting(true);
-                                  try {
-                                    await onDeleteTrack(t.id);
-                                    setDeletingTrackId(null);
-                                  } catch (error) {
-                                    alert(error instanceof Error ? error.message : '刪除失敗，請稍後再試');
-                                  } finally {
-                                    setIsDeleting(false);
-                                  }
-                                }}
-                                className="px-2 py-0.5 rounded-lg bg-rose-600 text-white text-[10px] font-bold hover:bg-rose-700 disabled:opacity-50"
-                              >
-                                {isDeleting ? '刪除中...' : '確認'}
-                              </button>
-                              <button
-                                onClick={() => setDeletingTrackId(null)}
-                                className="px-1.5 py-0.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px]"
-                              >
-                                取消
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => setDeletingTrackId(t.id)}
-                              title="刪除錄音檔"
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
             </div>
           )}
 
