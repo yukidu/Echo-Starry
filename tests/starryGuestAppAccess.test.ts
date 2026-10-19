@@ -17,6 +17,7 @@ function memoryDb(){
   const operations=new Map<string,any>();
   const statements:string[]=[];
   const prepare=(sql:string)=>({
+    run:async()=>({meta:{changes:0}}), // DDL statements are unbound
     bind(...params:any[]){
       return {
         async first(){
