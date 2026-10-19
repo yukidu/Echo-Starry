@@ -1,4 +1,5 @@
 import { recordAiActivity } from './starryAiManagement';
+import { findQaIndexedPassages } from './qaTranscriptSearchIndex';
 /**
  * Echo Starry transcript QA.  Server-side-only permissions, pricing and model.
  * No new app/database: transcripts in R2, indexes/comments in Echo D1, batteries in Starry ID D1.
@@ -217,6 +218,37 @@ export async function excerpts(env:Env,track:any,u:any,mode:string,question:stri
   const pilotMap=new Map((approvals.results||[]).map((x:any)=>[x.trackId,x]));
   const selectedSpeaker=selectQaSpeaker(question,track.speaker);
   const found:{score:number;part:string;title:string}[]=[];
+  // C09/C10 opt-in: never query an index before the explicit D1 migration and
+  // reviewed backfill. The current member/rank/sticker and pilot gates are reused.
+  let indexed:Awaited<ReturnType<typeof findQaIndexedPassages>>|null=null;
+  if(env.QA_CHINESE_SEARCH_ENABLED==='true' && candidates.length){
+    const eligible:string[]=[];
+    for(const row of candidates){
+      if(pilotMap.has(row.id))continue; // approved speaker stories use their existing, reviewed facts
+      if(mode==='all'&&splitSpeakerNames(row.speaker).length>1)continue;
+      if(await mayUseTranscript(env,u,row))eligible.push(row.id);
+    }
+    if(eligible.length){
+      try {
+        indexed=await findQaIndexedPassages(env.DB,question,eligible);
+        const allowed=new Map(candidates.filter((r:any)=>eligible.includes(r.id)).map((r:any)=>[r.id,r]));
+        for(const hit of indexed.hits){
+          const source:any=allowed.get(hit.trackId);
+          if(!source)continue;
+          found.push({
+            score:hit.score,
+            part:'【'+txt(source.title)+'｜'+txt(source.speaker)+'】'+hit.content,
+            title:txt(source.title)
+          });
+        }
+      }catch(error){
+        // A broken index cannot bypass access checks or prevent the old reader.
+        console.warn('C09 search index unavailable',error instanceof Error?error.name:'unknown');
+        indexed=null;
+      }
+    }
+  }
+  let fallbackReads=0;
   for(const row of candidates){
     if(!await mayUseTranscript(env,u,row))continue;
     const pilot:any=pilotMap.get(row.id);
@@ -233,6 +265,11 @@ export async function excerpts(env:Env,track:any,u:any,mode:string,question:stri
     }
     // All-talk search must not reintroduce unreviewed multi-speaker recordings.
     if(mode==='all'&&splitSpeakerNames(row.speaker).length>1)continue;
+    if(indexed?.covered.has(row.id))continue; // search directly from D1; no R2 read
+    // In mixed-generation rollout, at most 2 R2 fallbacks per question once
+    // some paragraphs are indexed; with zero coverage preserve legacy behaviour.
+    if(indexed?.covered.size && fallbackReads>=2)continue;
+    fallbackReads++;
     const idx:any=await env.DB.prepare("SELECT r2Key FROM transcript_index WHERE trackId=? AND status='ready' LIMIT 1").bind(row.id).first();
     if(!idx?.r2Key)continue;
     const object=await env.R2_BUCKET?.get(idx.r2Key);
