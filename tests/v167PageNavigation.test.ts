@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
+const read=(p:string)=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const workspace=read('src/components/AudioWorkspacePage.tsx'),app=read('src/App.tsx'),html=read('index.html');
 test('audio editor is a standalone sibling document, without overlay and conflicting global page CSS',()=>{
  assert.match(workspace,/data-audio-workspace-page="editor"/);
