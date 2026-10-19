@@ -75,7 +75,7 @@ test('official replies never add sources back via prompt or admin guidance',()=>
   const admin=read('src/components/AiQuestionSettingsAdmin.tsx');
   assert.match(admin,/AI問問題/);
   assert.match(read('src/components/TranscriptQaAdmin.tsx'),/AI問問題/);
-  assert.match(router,/系統將於結尾加上固定 AI 免責聲明/);
+  assert.match(read('shared/qaAnswerRules.ts'),/系統會另行附上固定 AI 免責聲明/);
   assert.match(router,/formatQaAnswer\(reply,source\.sources\)/);
   assert.match(router,/mayUseTranscript/);
   assert.match(router,/battery_transactions/);
