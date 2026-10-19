@@ -1,5 +1,6 @@
 import type { Env } from './index';
 import appWorker from './starryMainBatteryGameRouter';
+import { guardEchoAppAccess } from './echoAppAccessGuard';
 import { handleStarryIdRandomMotto } from './starryIdRandomMottoRouter';
 import { handleStarryEcosystemAuthEntry } from './starryEcosystemAuthEntryRouter';
 import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
@@ -275,6 +276,10 @@ function isTranscriptV281Path(pathname: string) {
 export default {
   async fetch(request: Request, env: Env, ctx?: any): Promise<Response> {
     const url = new URL(request.url);
+
+    // Member-only access guard runs before every downstream Echo router.
+    const deniedEchoAccess = await guardEchoAppAccess(request,env);
+    if (deniedEchoAccess) return deniedEchoAccess;
 
     const ecosystemAuthResponse = handleStarryEcosystemAuthEntry(request, env);
     if (ecosystemAuthResponse) return ecosystemAuthResponse;

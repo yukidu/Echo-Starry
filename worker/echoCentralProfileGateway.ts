@@ -140,7 +140,8 @@ export async function ensureCentralEchoMember(env: Env, echoUser: any) {
         .bind(SOURCE_APP,echoId,userId,email,now),
       db.prepare(`INSERT INTO app_memberships(userId,appId,status,role,isAdminUser,isContributor,canUpload,joinedAt,updatedAt)
         VALUES(?,?,'active',?,?,?,?,?,?) ON CONFLICT(userId,appId) DO UPDATE SET
-        status='active',role=excluded.role,isAdminUser=excluded.isAdminUser,isContributor=excluded.isContributor,
+        status=CASE WHEN app_memberships.status='active' THEN excluded.status ELSE app_memberships.status END,
+        role=excluded.role,isAdminUser=excluded.isAdminUser,isContributor=excluded.isContributor,
         canUpload=excluded.canUpload,updatedAt=excluded.updatedAt`)
         .bind(userId,SOURCE_APP,clean(echoUser.role),echoUser.isAdminUser?1:0,echoUser.isContributor?1:0,echoUser.canUpload?1:0,now,now)
     ]);

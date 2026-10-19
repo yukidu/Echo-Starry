@@ -1,4 +1,5 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { checkStarryAppAccess } from './starryAppAccess';
 import appWorker from './shareRouter';
 import { syncVerifiedMember, MemberIdentityError, normalizeMember } from './memberRepository';
 import { validateCentralProfilePatch } from './starryProfileSchemaService';
@@ -20,6 +21,7 @@ const jsonHeaders = {
 };
 
 const authSchemaReady = new WeakMap<object, Promise<void>>();
+class EchoAppAccessDeniedError extends Error { constructor(){ super('您沒有使用權限'); } }
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: jsonHeaders });
@@ -175,8 +177,12 @@ async function handleGoogleLogin(request: Request, env: Env) {
     const data = await syncVerifiedMember(env.DB, identity);
     stage = 'central-profile';
     let canonicalUser = data.user;
+    // Echo member privileges never fall back to a local-only decision.
+    if (!(env as any).STARRY_ID_DB) throw new Error('central_id_unavailable');
     if ((env as any).STARRY_ID_DB) {
-      await ensureCentralEchoMember(env, { ...data.user, googleSubject: identity.subject });
+      const centralId = await ensureCentralEchoMember(env, { ...data.user, googleSubject: identity.subject });
+      const access = await checkStarryAppAccess((env as any).STARRY_ID_DB,centralId,'echostars');
+      if (!access.allowed) throw new EchoAppAccessDeniedError();
       canonicalUser = await overlayEchoMemberWithCentral(env, { ...data.user, googleSubject: identity.subject });
     }
 
@@ -192,10 +198,11 @@ async function handleGoogleLogin(request: Request, env: Env) {
   } catch (error) {
     const code = String((error as any)?.code || '');
     const temporary = stage !== 'credential' || code === 'ERR_JWKS_TIMEOUT' || error instanceof TypeError;
-    const status = error instanceof MemberIdentityError ? error.status : temporary ? 503 : 401;
+    const denied = error instanceof EchoAppAccessDeniedError;
+    const status = denied ? 403 : error instanceof MemberIdentityError ? error.status : temporary ? 503 : 401;
     console.warn('Google login failed', { requestId, stage, status, code, elapsedMs: Date.now() - startedAt });
-    return json({ requestId, code: status === 503 ? 'LOGIN_SERVICE_UNAVAILABLE' : 'LOGIN_REJECTED',
-      error: error instanceof MemberIdentityError ? error.message : status === 503
+    return json({ requestId, code: denied ? 'APP_ACCESS_DENIED' : status === 503 ? 'LOGIN_SERVICE_UNAVAILABLE' : 'LOGIN_REJECTED',
+      error: denied ? '您沒有使用權限' : error instanceof MemberIdentityError ? error.message : status === 503
         ? '登入服務暫時忙碌，請稍後重試。' : 'Google 登入驗證失敗，請重新選擇 Google 帳號。' }, status);
   }
 }
