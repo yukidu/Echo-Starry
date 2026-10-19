@@ -37,6 +37,8 @@ interface UploadModalProps {
   /** The main upload/management workspace is an actual page, while editor dialogs stay overlays. */
   presentation?: 'page' | 'overlay';
   onClose: () => void;
+  /** Inform the single owning workspace about user edits for back/leave protection. */
+  onDirtyChange?: (dirty:boolean) => void;
   onSuccess: (newTrack: Track) => void;
   currentUser: UserProfile | null;
   isAdmin: boolean;
@@ -79,6 +81,7 @@ const saveCoverLibraryCache = (covers: CoverLibraryItem[]) => {
 export const UploadModal: React.FC<UploadModalProps> = ({
   isOpen,
   onClose,
+  onDirtyChange,
   onSuccess,
   presentation = 'overlay',
   currentUser,
@@ -859,7 +862,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form id="track-upload-form" onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 text-xs">
+        <form id="track-upload-form" onSubmit={handleSubmit} onChangeCapture={()=>onDirtyChange?.(true)} className="p-4 sm:p-5 space-y-4 text-xs">
           {errorMessage && (
             <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
