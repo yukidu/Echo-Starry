@@ -96,7 +96,6 @@
     }
 
 @media(max-width:767px){
-    @media (max-width: 767px) {
       #track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility="true"] {
         grid-column: 1 !important;
         grid-row: 5 !important;
