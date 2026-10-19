@@ -57,11 +57,11 @@ test('two answers still invalid do not publish, rather than charging user for po
  assert.ok(result.qualityIssues.includes('backend_jargon'));
 });
 test('dedicated subtab, no duplicate settings in transcript, preview and audit restore are admin-only',()=>{
- const page=read('src/v161AudioManagementNavigation.tsx');
+ const page=read('src/components/AudioWorkspacePage.tsx');
  const transcript=read('src/components/TranscriptQaAdmin.tsx');
  const qa=read('src/components/AiQuestionSettingsAdmin.tsx');
  const route=read('worker/aiSpeakerQaRouter.ts');
- assert.match(page,/mode === 'ai-question'/);
+ assert.match(page,/active==='ai-question'/);
  assert.match(page,/<AiQuestionSettingsAdmin \/>/);
  assert.doesNotMatch(transcript,/演講者問答設定/);
  assert.match(qa,/第一層｜演講者角色與說話視角/);
