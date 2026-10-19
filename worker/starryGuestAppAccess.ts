@@ -37,7 +37,7 @@ const reject=(message:string,status=400)=>respond({error:message},status);
 export async function ensureGuestPolicySchema(db:any):Promise<void>{
   let task=ready.get(db as object);
   if(!task){
-    task=db.batch([
+    const pending:Promise<void>=db.batch([
       db.prepare(`CREATE TABLE IF NOT EXISTS starry_guest_app_policies(
         appId TEXT PRIMARY KEY,allowed INTEGER NOT NULL CHECK(allowed IN (0,1)),
         updatedAt INTEGER NOT NULL,updatedBy TEXT NOT NULL)`),
@@ -51,7 +51,8 @@ export async function ensureGuestPolicySchema(db:any):Promise<void>{
         beforeAllowed INTEGER NOT NULL,afterAllowed INTEGER NOT NULL,
         createdAt INTEGER NOT NULL,sourceOperationId TEXT,undoneBy TEXT)`)
     ]).then(()=>{}).catch((error:unknown)=>{ready.delete(db as object);throw error;});
-    ready.set(db as object,task);
+    ready.set(db as object,pending);
+    task=pending;
   }
   await task;
 }
