@@ -49,14 +49,14 @@ function dbMock(){
       id=v[0];
       if(!records.has(id!)){
         stamp=v[8];actor=v[9];
-        records.set(id!,row({...modelId:id!,name:v[1],provider:v[2],version:v[3],capabilities:JSON.parse(v[4]),tasks:JSON.parse(v[5]),routeKind:v[6],registryStatus:v[7],updatedAt:stamp}));
+        records.set(id!,row({modelId:id!,name:v[1],provider:v[2],version:v[3],capabilities:JSON.parse(v[4]),tasks:JSON.parse(v[5]),routeKind:v[6],registryStatus:v[7],updatedAt:stamp}));
         changes=1;done=true;
       }
     }else if(s.includes('UPDATE starry_ai_models SET')){
       id=v[9];const old=records.get(id!);
       if(old&&old.updated_at===v[10]){
         stamp=v[7];actor=v[8];
-        records.set(id!,row({...modelId:id!,name:v[0],provider:v[1],version:v[2],capabilities:JSON.parse(v[3]),tasks:JSON.parse(v[4]),routeKind:v[5],registryStatus:v[6],updatedAt:stamp}));
+        records.set(id!,row({modelId:id!,name:v[0],provider:v[1],version:v[2],capabilities:JSON.parse(v[3]),tasks:JSON.parse(v[4]),routeKind:v[5],registryStatus:v[6],updatedAt:stamp}));
         changes=1;done=true;
       }
     }else if(s.includes('INSERT INTO starry_ai_model_secret_refs')){
@@ -132,7 +132,7 @@ test('A02/A05: central route is superadmin-only, POST same-origin, cannot call p
  assert.match(page,/免費格式預檢/);
  assert.match(page,/確認還原所選版本/);
  assert.match(page,/金鑰來源/);
- assert.match(page,//api/ai-model-admin/dry-run/);
+ assert.ok(page.includes('/api/ai-model-admin/dry-run'));
 });
 
 test('A05: migration is additive, baseline snapshots do not include secrets',()=>{
