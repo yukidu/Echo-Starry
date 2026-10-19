@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS starry_ai_b07_calls (
   status TEXT NOT NULL DEFAULT 'reserved'
     CHECK(status IN ('reserved','settled','uncertain','void')),
   max_units INTEGER NOT NULL CHECK(max_units BETWEEN 1 AND 1000000000),
+  unit_micro_twd INTEGER NOT NULL CHECK(unit_micro_twd BETWEEN 0 AND 1000000000000),
   held_micro_twd INTEGER NOT NULL CHECK(held_micro_twd BETWEEN 0 AND 100000000000000),
   actual_units INTEGER NOT NULL DEFAULT 0 CHECK(actual_units>=0),
   actual_micro_twd INTEGER NOT NULL DEFAULT 0 CHECK(actual_micro_twd>=0),
@@ -146,6 +147,7 @@ BEGIN
   WHERE m.model_id=NEW.model_id AND m.registry_status='verified'
     AND p.billing_class=NEW.billing_class
     AND p.valid_until>NEW.created_at
+    AND NEW.unit_micro_twd=p.micro_twd_per_unit
     AND NEW.held_micro_twd=NEW.max_units*p.micro_twd_per_unit
     AND (NEW.billing_class='priced' AND m.free_eligibility='not_eligible'
          OR NEW.billing_class='free_verified' AND m.free_eligibility='eligible')
