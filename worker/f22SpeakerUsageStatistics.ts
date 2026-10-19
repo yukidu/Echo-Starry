@@ -6,7 +6,7 @@
 import { actor } from './aiSpeakerQaRouter';
 
 type Env = {
-  DB?: any; STARRY_ID_DB?: any; STARRY_ID_SUPER_ADMIN_EMAILS?: string;
+  DB?: any; STARRY_ID_DB?: any;
 };
 const DAY=86_400_000;
 const timeZoneOffset=8*3_600_000;
@@ -38,19 +38,49 @@ export async function f22CentralSuperAdmin(req:Request,env:Env){
   const local=await actor(req,env as any).catch(()=>null);
   if(!local?.id||!local.email)return false;
   const db=env.STARRY_ID_DB;
+  // The Echo login is independently verified by actor(). Require a known
+  // central ID mapping (or the original identical ID) and exact central email.
+  // No Email allowlist, App-local super-admin role or built-in fallback grants access.
+  const link:any=await db.prepare(
+    "SELECT userId FROM legacy_links WHERE sourceApp='echostars' AND sourceUserId=? LIMIT 1"
+  ).bind(local.id).first();
+  const centralId=safeString(link?.userId||local.id);
+  if(!centralId)return false;
   const row:any=await db.prepare(
-    "SELECT u.id,u.primaryEmail,u.status,central.status AS centralStatus,"+
-    "central.role AS centralRole "+
+    "SELECT u.id,u.status,central.status AS centralStatus,central.role AS centralRole "+
     "FROM users u "+
     "JOIN app_memberships central ON central.userId=u.id AND central.appId='starry-id' "+
-    "WHERE (u.id IN (SELECT userId FROM legacy_links WHERE sourceApp='echostars' AND sourceUserId=?) "+
-    "OR lower(u.primaryEmail)=lower(?)) LIMIT 1"
-  ).bind(local.id,local.email).first();
-  if(!row||row.status!=='active'||row.centralStatus!=='active')return false;
-  if(safeString(row.primaryEmail).toLowerCase()!==safeString(local.email).toLowerCase())return false;
-  const configured=safeString(env.STARRY_ID_SUPER_ADMIN_EMAILS)||'yukidu@gmail.com';
-  const allow=new Set(configured.split(',').map(s=>s.trim().toLowerCase()).filter(Boolean));
-  return row.centralRole==='super-admin'||allow.has(safeString(row.primaryEmail).toLowerCase());
+    "WHERE u.id=? AND lower(trim(u.primaryEmail))=lower(trim(?)) LIMIT 1"
+  ).bind(centralId,local.email).first();
+  return row?.status==='active'&&row?.centralStatus==='active'&&
+    row?.centralRole==='super-admin';
+}
+
+export const F22_MAX_CLAIMS=6000;
+export const F22_MAX_D1_ROWS_READ=30000;
+/** Fail closed: a bounded indexed preflight prevents full historical scans.
+ * Returning a partial "all time" ranking would be misleading; require a
+ * future daily roll-up when the source exceeds this limit. */
+export class F22CapacityError extends Error{
+  constructor(public code:'statistics_requires_rollup'|'statistics_read_budget_exceeded'){
+    super(code);
+  }
+}
+export function f22CountSql(){
+  return "SELECT COUNT(*) AS n FROM ("+
+    "SELECT 1 FROM qa_claims INDEXED BY qa_claims_day "+
+    "WHERE day>=? AND day<=? AND createdAt>=? AND createdAt<? LIMIT ?)";
+}
+export async function f22Preflight(db:any,w:ReturnType<typeof f22Window>){
+  const res=await db.prepare(f22CountSql()).bind(
+    w.startDay,w.endDay,w.start,w.end,F22_MAX_CLAIMS+1).all();
+  const count=Number(res?.results?.[0]?.n);
+  if(!Number.isSafeInteger(count)||count<0||count>F22_MAX_CLAIMS)
+    throw new F22CapacityError('statistics_requires_rollup');
+  const rowsRead=Number(res?.meta?.rows_read);
+  if(Number.isFinite(rowsRead)&&rowsRead>F22_MAX_D1_ROWS_READ)
+    throw new F22CapacityError('statistics_read_budget_exceeded');
+  return {count,rowsRead:Number.isFinite(rowsRead)?rowsRead:null};
 }
 
 const base=(
@@ -83,21 +113,23 @@ function makeSummarySql(){
 }
 function makeTrendSql(){
   return base+"SELECT strftime('%Y-%m-%d',createdAt/1000,'unixepoch','+8 hours') AS day,"+
-    "COUNT(*) AS calls FROM measured GROUP BY day ORDER BY day DESC LIMIT 366";
+    "COUNT(*) AS calls FROM measured GROUP BY day ORDER BY day DESC LIMIT 6000";
 }
 function makeRankingSql(group:F22Grouping,sort:F22Sort){
   if(group==='track'){
     return base+"SELECT m.trackId AS id,COALESCE(t.title,'已刪除音檔') AS title,"+
       "COALESCE(t.speaker,'') AS speaker,COALESCE(t.uploadDate,'') AS uploadDate,"+
-      "COALESCE(sm.speakers,'') AS linkedSpeakers,"+
+      "COALESCE((SELECT GROUP_CONCAT(ts.speakerName,'、') FROM track_speakers ts "+
+        "WHERE ts.trackId=m.trackId),'') AS linkedSpeakers,"+
       measures+" FROM measured m LEFT JOIN tracks t ON t.id=m.trackId "+
-      "LEFT JOIN (SELECT trackId,GROUP_CONCAT(speakerName,'、') AS speakers FROM track_speakers GROUP BY trackId) sm ON sm.trackId=m.trackId "+
+      ""+
       "GROUP BY m.trackId ORDER BY "+orderBy[sort]+",m.trackId LIMIT 60";
   }
   // Join at most one canonical attribution per track BEFORE grouping claims.
   // An unresolved multi-speaker session must never be credited to individuals.
   return base+", speaker_count AS ("+
-    "SELECT trackId,COUNT(*) AS n,MIN(speakerName) AS onlySpeaker FROM track_speakers GROUP BY trackId"+
+    "SELECT trackId,COUNT(*) AS n,MIN(speakerName) AS onlySpeaker FROM track_speakers "+
+    "WHERE trackId IN (SELECT DISTINCT trackId FROM scoped) GROUP BY trackId"+
   "), owned AS ("+
     "SELECT m.*,"+
       "CASE WHEN sc.n=1 THEN sc.onlySpeaker "+
@@ -122,8 +154,9 @@ export async function f22Statistics(env:Env,period:F22Period,group:F22Grouping,s
   now=Date.now()){
   if(!env.DB)throw new Error('f22_echo_database_missing');
   const w=f22Window(period,now);
+  const preflight=await f22Preflight(env.DB,w);
   const bind=(sql:string)=>env.DB.prepare(sql).bind(w.startDay,w.endDay,w.start,w.end);
-  // Three bounded read-only indexed queries. No R2 reads, KV writes or new schema.
+  // Guarded at <=6,000 real events, then three read-only indexed queries.
   const [summary,rankings,trend]=await Promise.all([
     bind(makeSummarySql()).first(),
     bind(makeRankingSql(group,sort)).all(),
@@ -147,7 +180,8 @@ export async function f22Statistics(env:Env,period:F22Period,group:F22Grouping,s
     },
     recordingDisclosure:'多人演講無明確對象記錄時歸類「多人演講（未歸屬）」，不重複分給個別講者',
     historyDisclosure:'過去未保存的 Token、速度、備援與實際費用不能補算',
-    limit:60
+    limit:60,queryBudget:{maxClaims:F22_MAX_CLAIMS,matchedClaims:preflight.count,
+      preflightRowsRead:preflight.rowsRead},
   };
 }
 export async function handleF22SpeakerUsage(req:Request,env:Env):Promise<Response|null>{
@@ -164,7 +198,11 @@ export async function handleF22SpeakerUsage(req:Request,env:Env):Promise<Respons
        !['calls','members','repeat','cost'].includes(s))
       return json({error:'invalid_statistics_filter'},400);
     return json(await f22Statistics(env,p as F22Period,g as F22Grouping,s as F22Sort));
-  }catch{
+  }catch(e){
+    if(e instanceof F22CapacityError)return json({
+      error:e.code,message:'資料筆數超出安全查詢上限，需建立每日彙總後才能準確顯示；目前沒有返回不完整的排行',
+      maxClaims:F22_MAX_CLAIMS
+    },422);
     // Never expose SQL, member data, provider internals or error stack.
     return json({error:'statistics_temporarily_unavailable'},503);
   }
