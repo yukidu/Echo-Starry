@@ -107,7 +107,9 @@ async function main() {
       };
     })();`});
     await send('Page.reload',{ignoreCache:true});
-    await waitFor("!!document.querySelector('[data-main-menu=\\\"hamburger\\\"]')", 'logged-in navbar');
+    // Wait for the *new* React document, not the still-existing DOM from before reload.
+    await delay(1250);
+    await waitFor("document.readyState==='complete'&&!!document.querySelector('[data-main-menu=\\\"hamburger\\\"]')", 'logged-in navbar');
     await evaluate("document.querySelector('[data-main-menu=\\\"hamburger\\\"]').click()");
     await waitFor("!!document.querySelector('.mobile-menu-panel')", 'hamburger menu');
     const navLabel = await evaluate("Array.from(document.querySelectorAll('.mobile-menu-panel button')).find(b=>b.textContent?.includes('音檔管理'))?.textContent?.trim()||''");
