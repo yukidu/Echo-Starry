@@ -17,7 +17,6 @@ const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,
   'X-Content-Type-Options':'nosniff'
 }});
 const safeString=(v:unknown)=>String(v??'').trim();
-const isMember=(v:unknown)=>safeString(v).startsWith('member:');
 export type F22Period='today'|'7d'|'30d'|'all';
 export type F22Grouping='track'|'speaker';
 export type F22Sort='calls'|'members'|'repeat'|'cost';
@@ -84,15 +83,15 @@ function makeSummarySql(){
 }
 function makeTrendSql(){
   return base+"SELECT strftime('%Y-%m-%d',createdAt/1000,'unixepoch','+8 hours') AS day,"+
-    "COUNT(*) AS calls FROM measured GROUP BY day ORDER BY day ASC LIMIT 366";
+    "COUNT(*) AS calls FROM measured GROUP BY day ORDER BY day DESC LIMIT 366";
 }
 function makeRankingSql(group:F22Grouping,sort:F22Sort){
   if(group==='track'){
     return base+"SELECT m.trackId AS id,COALESCE(t.title,'已刪除音檔') AS title,"+
       "COALESCE(t.speaker,'') AS speaker,COALESCE(t.uploadDate,'') AS uploadDate,"+
-      "COALESCE(GROUP_CONCAT(DISTINCT ts.speakerName),'') AS linkedSpeakers,"+
+      "COALESCE(sm.speakers,'') AS linkedSpeakers,"+
       measures+" FROM measured m LEFT JOIN tracks t ON t.id=m.trackId "+
-      "LEFT JOIN track_speakers ts ON ts.trackId=m.trackId "+
+      "LEFT JOIN (SELECT trackId,GROUP_CONCAT(speakerName,'、') AS speakers FROM track_speakers GROUP BY trackId) sm ON sm.trackId=m.trackId "+
       "GROUP BY m.trackId ORDER BY "+orderBy[sort]+",m.trackId LIMIT 60";
   }
   // Join at most one canonical attribution per track BEFORE grouping claims.
@@ -136,11 +135,11 @@ export async function f22Statistics(env:Env,period:F22Period,group:F22Grouping,s
       id:safeString(r.id),title:safeString(r.title),
       ...(group==='track'?{speaker:safeString(r.speaker),
         uploadDate:safeString(r.uploadDate),
-        linkedSpeakers:safeString(r.linkedSpeakers).split(',').filter(Boolean)}:
+        linkedSpeakers:safeString(r.linkedSpeakers).split('、').filter(Boolean)}:
         {trackCount:Number(r.trackCount||0)}),
       ...normalizedF22Metrics(r)
     })),
-    trend:(trend?.results||[]).map((r:any)=>({day:safeString(r.day),calls:Number(r.calls||0)})),
+    trend:(trend?.results||[]).map((r:any)=>({day:safeString(r.day),calls:Number(r.calls||0)})).reverse(),
     costDisclosure:{
       actual:'無可靠的逐筆實際費用紀錄',
       estimate:'尚無可驗證的逐筆估算',
