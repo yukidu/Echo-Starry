@@ -20,13 +20,13 @@ test('Q1 R2 uses original audio and safely queues one admin-requested track', ()
 });
 
 test('Q2 H1 adds per-track relisten button to the real management list', () => {
-  const list = read('src/v161AudioManagementNavigation.tsx');
+  const list = read('src/components/AudioTrackList.tsx');
   assert.ok(list.includes('aria-label="音檔管理"'));
   assert.ok(list.includes('重聽逐字稿'));
   assert.ok(list.includes('relistenBusy'));
   assert.ok(list.includes('disabled={relistenBusy}'));
   assert.ok(list.includes('transcriptProgressPresentation'));
-  assert.ok(list.includes('管理音檔'));
+  assert.ok(read('src/components/AudioWorkspacePage.tsx').includes('管理音檔'));
 });
 
 test('Keeps member correction and battery history but avoids old correction overlays', () => {

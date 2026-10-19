@@ -18,9 +18,11 @@ test('mobile visibility checkboxes keep a fixed compact size', () => {
   assert.match(layoutFix, /flex: 0 0 1\.25rem !important/);
 });
 
-test('permission layout fix loads after upload presentation policy', () => {
-  const baseIndex = index.indexOf('/src/uploadModalPresentationPolicy.ts');
-  const fixIndex = index.indexOf('/src/v189MobilePermissionLayoutFix.ts');
-  assert.ok(baseIndex >= 0);
-  assert.ok(fixIndex > baseIndex);
+test('React-owned upload form mounts its presentation while permission CSS remains available',()=>{
+ const upload=readFileSync(new URL('../src/components/UploadModal.tsx',import.meta.url),'utf8');
+ const policy=readFileSync(new URL('../src/uploadModalPresentationPolicy.ts',import.meta.url),'utf8');
+ assert.match(upload,/prepareAudioFormPresentation\(formElementRef\.current\)/);
+ assert.match(policy,/export function prepareAudioFormPresentation/);
+ assert.ok(index.includes('/src/v189MobilePermissionLayoutFix.ts'));
+ assert.doesNotMatch(index,/script type="module" src="\/src\/uploadModalPresentationPolicy\.ts"/);
 });

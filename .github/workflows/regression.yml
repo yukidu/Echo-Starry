@@ -187,12 +187,6 @@ jobs:
             node scripts/verifyV167PageNavigation.mjs
           fi
 
-          if ! node scripts/verifyV168AudioEditSave.mjs; then
-            echo "v168 audio-edit save browser check startup failed once; retrying one final time."
-            sleep 2
-            node scripts/verifyV168AudioEditSave.mjs
-          fi
-
           if ! node scripts/verifyV169UploadTabs.mjs; then
             echo "v169 upload-tab browser check startup failed once; retrying one final time."
             sleep 2

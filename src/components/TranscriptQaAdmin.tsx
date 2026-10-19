@@ -30,7 +30,7 @@ export const TranscriptQaAdmin:React.FC=()=>{
   const [message,setMessage]=useState('');
   const load=async()=>{
     setBusy(true);
-    try{setData(await api('/api/qa/admin'));setMessage('');}
+    try{const result=await api('/api/qa/admin');if(!Array.isArray(result?.items))throw new Error('逐字稿資料載入異常');setData(result);setMessage('');}
     catch(e){setMessage(e instanceof Error?e.message:'讀取失敗');}
     finally{setBusy(false);}
   };

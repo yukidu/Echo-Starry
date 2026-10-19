@@ -1,0 +1,108 @@
+/* One React owner controls the audio workspace, no injected overlay or hidden duplicate navigation. */
+.audio-workspace { width:100%; max-width:72rem; margin:0 auto; min-width:0; }
+.audio-workspace-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.35rem; padding:.55rem; border-bottom:1px solid #475569; }
+.audio-workspace-tabs::-webkit-scrollbar { display:none; }
+.audio-workspace-tab { display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.25rem;min-width:0; border:1px solid #94a3b8; border-radius:.8rem; padding:.6rem .8rem; font-size:.85rem; font-weight:800; white-space:nowrap; min-height:2.8rem; color:inherit; background:transparent; }
+.audio-workspace-tab[aria-selected="true"] { color:white; border-color:var(--color-primary,#c06c84); background:var(--color-primary,#c06c84); }
+.audio-workspace-tab:focus-visible { outline:3px solid var(--color-primary,#c06c84); outline-offset:2px; }
+.audio-workspace-panel { min-width:0; padding:1rem .6rem; }
+.audio-workspace-track-list { display:grid; gap:.6rem; }
+.v161-manage-toolbar { margin-bottom:.8rem; }
+    .v161-search-row { display:grid; grid-template-columns:minmax(0,1fr); gap:.4rem; }
+    .v161-search { display:flex; align-items:center; gap:.4rem; min-height:2.45rem; padding:.38rem .62rem; border:1px solid rgb(203 213 225); border-radius:.75rem; background:white; }
+    .dark .v161-search { border-color:rgb(71 85 105); background:rgb(15 23 42); }
+    .v161-search input { min-width:0; width:100%; border:0; outline:0; background:transparent; color:rgb(30 41 59); font-size:.78rem; }
+    .dark .v161-search input { color:rgb(241 245 249); }
+    .v161-track-list { display:grid; gap:.34rem; max-height:31rem; overflow-y:auto; padding-right:.15rem; }
+    .v161-track-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.5rem; align-items:center; padding:.48rem .58rem; border:1px solid rgb(226 232 240); border-radius:.72rem; background:white; }
+    .dark .v161-track-row { border-color:rgb(51 65 85); background:rgb(30 41 59); }
+    .v161-track-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.8rem; line-height:1.15rem; font-weight:900; color:rgb(30 41 59); }
+    .dark .v161-track-title { color:rgb(241 245 249); }
+    .v161-track-meta { margin-top:.06rem; font-size:.68rem; line-height:1.05rem; color:rgb(100 116 139); }
+    .dark .v161-track-meta { color:rgb(148 163 184); }
+    .v161-transcript-status { display:inline-flex; align-items:center; margin-top:.22rem; border-radius:999px; padding:.18rem .48rem; font-size:.66rem; line-height:1rem; font-weight:900; }
+    .v161-transcript-status.is-processing { background:rgb(254 243 199); color:rgb(146 64 14); }
+    .v161-transcript-status.is-ready { background:rgb(209 250 229); color:rgb(4 120 87); }
+    .v161-transcript-status.is-failed { background:rgb(254 226 226); color:rgb(190 24 93); }
+    .v161-transcript-status.is-queued { background:rgb(219 234 254); color:rgb(29 78 216); }
+    .dark .v161-transcript-status.is-processing { background:rgb(120 53 15 / .45); color:rgb(253 230 138); }
+    .dark .v161-transcript-status.is-ready { background:rgb(6 78 59 / .5); color:rgb(167 243 208); }
+    .dark .v161-transcript-status.is-failed { background:rgb(127 29 29 / .5); color:rgb(254 202 202); }
+    .dark .v161-transcript-status.is-queued { background:rgb(30 58 138 / .5); color:rgb(191 219 254); }
+    .v161-actions { display:flex; gap:.28rem; align-items:center; }
+    .v161-action { display:inline-flex; align-items:center; justify-content:center; gap:.2rem; min-height:1.9rem; padding:.3rem .48rem; border-radius:.6rem; font-size:.7rem; font-weight:850; white-space:nowrap; }
+    .v161-edit { background:color-mix(in srgb,var(--color-primary,#c06c84) 12%,white); color:var(--color-primary,#c06c84); }
+    .v161-relisten { background:rgb(219 234 254); color:rgb(29 78 216); }
+    .v161-relisten:disabled { opacity:.5; cursor:not-allowed; }
+    .dark .v161-relisten { background:rgb(30 58 138 / .5); color:rgb(191 219 254); }
+    .v161-delete { background:rgb(254 226 226); color:rgb(190 24 93); }
+    .dark .v161-edit { background:rgb(51 65 85); }
+    .dark .v161-delete { background:rgb(76 29 49); color:rgb(253 164 175); }
+@media(min-width:640px){ .v161-search-row.has-member-search {grid-template-columns:minmax(0,1fr) minmax(0,1fr);} }
+@media(max-width:767px){
+ .audio-workspace-panel {padding:.7rem .4rem;}
+ .v161-track-row {grid-template-columns:minmax(0,1fr);gap:.3rem;}
+ .v161-actions {justify-content:flex-end;flex-wrap:wrap;}
+}
+
+/* Keep the existing upload form presentation without legacy DOM injection. */
+    /* Upload page sits at z-index 160. Raise only the navbar while this page is active
+       so the hamburger drawer is never trapped underneath the upload content. */
+    body[data-main-tab="upload"] > #root header,
+    body[data-main-tab="upload"] header.sticky {
+      z-index: 240 !important;
+    }
+    body[data-main-tab="upload"] .mobile-menu-shell {
+      z-index: 260 !important;
+    }
+
+    /* The old cover presentation split the label and selected-cover area across two
+       grid rows while the parent still had a 1rem row gap. Bridge that gap so the
+       card reads as one continuous box. */
+    #track-upload-form[data-upload-presentation="1"] [data-upload-cover-label="1"] {
+      margin-bottom: -0.5rem !important;
+      padding-bottom: 0.75rem !important;
+      position: relative;
+      z-index: 2;
+    }
+    #track-upload-form[data-upload-presentation="1"] [data-upload-cover-selected="1"] {
+      margin-top: -0.5rem !important;
+      padding-top: 0.75rem !important;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Keep guest visibility visually inside the permission card without moving a
+       React-owned node in the DOM. */
+    #track-upload-form[data-upload-presentation="1"] [data-upload-permission="1"] {
+      padding-bottom: 3.35rem !important;
+    }
+    #track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility="true"] {
+      grid-column: 5 / 7 !important;
+      grid-row: 3 !important;
+      align-self: end !important;
+      z-index: 4 !important;
+      margin: 0 !important;
+      padding: 0 0.75rem 0.65rem !important;
+      background: transparent !important;
+      border: 0 !important;
+    }
+    #track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility="true"] > p {
+      display: none !important;
+    }
+    #track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility="true"] label {
+      font-size: 0.75rem !important;
+      line-height: 1.15rem !important;
+    }
+
+@media(max-width:767px){
+      #track-upload-form[data-upload-presentation="1"] [data-upload-guest-visibility="true"] {
+        grid-column: 1 !important;
+        grid-row: 5 !important;
+      }
+      #track-upload-form[data-upload-presentation="1"] [data-upload-permission="1"] {
+        padding-bottom: 3.35rem !important;
+      }
+}
+@media(min-width:900px){.audio-workspace-tabs{grid-template-columns:repeat(6,minmax(0,1fr))}}
+#track-upload-form [data-upload-guest-visibility="true"] input[type="checkbox"] {width:2rem;height:2rem;accent-color:var(--color-primary,#c06c84)}

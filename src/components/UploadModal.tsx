@@ -1,5 +1,6 @@
 import { ThemedSelect } from './ThemedSelect';
 import React, { useState, useRef } from 'react';
+import {prepareAudioFormPresentation} from '../uploadModalPresentationPolicy';
 import {
   UploadCloud,
   FileAudio,
@@ -37,6 +38,8 @@ interface UploadModalProps {
   /** The main upload/management workspace is an actual page, while editor dialogs stay overlays. */
   presentation?: 'page' | 'overlay';
   onClose: () => void;
+  /** Inform the single owning workspace about user edits for back/leave protection. */
+  onDirtyChange?: (dirty:boolean) => void;
   onSuccess: (newTrack: Track) => void;
   currentUser: UserProfile | null;
   isAdmin: boolean;
@@ -79,6 +82,7 @@ const saveCoverLibraryCache = (covers: CoverLibraryItem[]) => {
 export const UploadModal: React.FC<UploadModalProps> = ({
   isOpen,
   onClose,
+  onDirtyChange,
   onSuccess,
   presentation = 'overlay',
   currentUser,
@@ -429,10 +433,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setSelectedCategories(['事業']);
       setKeywords([]);
       setSeries('');
-      setSpeechDate(new Date().toISOString().split('T')[0].replace(/-/g, '/'));
-      setSeriesOrder('第 1 集');
+      setSpeechDate('');
+      setSeriesOrder('');
       setRequiredRank('無');
-      setGuestVisible(false);
+      // New public recordings remain guest-visible, matching the previous rule.
+      setGuestVisible(true);
       setAuthorizedOnlyVisible(false);
       setStickerUnlockCost(0);
       setCommentStickerReward(0);
@@ -450,6 +455,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setAudioDurationSeconds(null);
     }
   }, [trackToEdit, isOpen]);
+
+  // Presentation is scoped to this React-owned form; never watch document.body.
+  const formElementRef=useRef<HTMLFormElement>(null);
+  React.useEffect(()=>{
+    if(!isOpen)return;
+    const frame=window.requestAnimationFrame(()=>{
+      if(formElementRef.current)prepareAudioFormPresentation(formElementRef.current);
+    });
+    return ()=>window.cancelAnimationFrame(frame);
+  },[isOpen,trackToEdit?.id,categoryList,coverLibrary.length,keywords.length]);
 
   // The language is only a recognition hint; the AI always preserves real mixed-language speech.
   React.useEffect(() => {
@@ -821,9 +836,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           if (!hintResponse.ok) console.warn('逐字稿語言提示未儲存，將使用自動辨識');
         } catch { console.warn('逐字稿語言提示未儲存，將使用自動辨識'); }
       }
+      onDirtyChange?.(false);
       onSuccess(normalizedTrack);
       window.dispatchEvent(new CustomEvent('echostars:sticker-changed'));
-      onClose();
+      // Document pages are navigated by AudioWorkspacePage; only true dialogs close themselves.
+      if(presentation==='overlay')onClose();
     } catch (err: any) {
       setErrorMessage(err.message || '上傳失敗，請檢查網路連線');
     } finally {
@@ -832,7 +849,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   return (
-    <div className={`upload-modal-overlay upload-page ${presentation === 'page' ? 'upload-standalone-page' : ''}`} data-upload-page-presentation={presentation}>
+    <div className={presentation === 'page' ? 'audio-form-document upload-page' : 'upload-modal-overlay upload-page'} data-upload-page-presentation={presentation}>
       <div className="w-full bg-white dark:bg-slate-900">
         {/* Header - Requirement 20: 統一底色與麥克風相同色 */}
         <div
@@ -859,7 +876,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form id="track-upload-form" onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 text-xs">
+        <form id="track-upload-form" ref={formElementRef} onSubmit={handleSubmit} onChangeCapture={()=>onDirtyChange?.(true)} className="p-4 sm:p-5 space-y-4 text-xs">
           {errorMessage && (
             <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -1378,7 +1395,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               </label>
               <ThemedSelect
                 value={requiredRank}
-                onChange={e => setRequiredRank(e.target.value as AmwayRank)}
+                onChange={e => {const next=e.target.value as AmwayRank;setRequiredRank(next);setGuestVisible(next==='無'||next==='公開');}}
                 className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-hidden focus:border-rose-400"
               >
                 {!['無', '3%', '9%', '15%', '銀章', '白金', '翡翠', '鑽石級以上'].includes(requiredRank) && <option value={requiredRank}>{requiredRank}</option>}
@@ -1454,17 +1471,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               )}
             </div>
 
-            <div>
-              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                今天上傳日期 (系統自動產生，不可修改)
-              </label>
-              <input
-                type="text"
-                value={todayUploadDate}
-                disabled
-                className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-slate-400 cursor-not-allowed"
-              />
-            </div>
           </div>
 
           {/* 社群連結（可多個） */}
@@ -1605,10 +1611,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             />
           </div>
 
-          <div className="flex justify-end gap-3 pb-6">
-            <button type="button" onClick={onClose} disabled={isUploading} className="px-4 py-3">取消</button>
-            <button type="submit" disabled={isUploading} className="rounded-xl px-5 py-3 text-white" style={{backgroundColor:'var(--color-primary,#c06c84)'}}>{isUploading ? '儲存中…' : '儲存音檔'}</button>
-          </div>
         </form>
       </div>
     </div>

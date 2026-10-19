@@ -7,7 +7,9 @@ function installUploadCategoryPolicyStyle() {
   style.id = CATEGORY_POLICY_STYLE_ID;
   style.textContent = `
     .upload-modal-overlay button[title="修改標籤名稱"],
-    .upload-modal-overlay button[title="刪除此標籤"] {
+    .upload-modal-overlay button[title="刪除此標籤"],
+    .audio-form-document button[title="修改標籤名稱"],
+    .audio-form-document button[title="刪除此標籤"] {
       display: none !important;
     }
   `;
@@ -16,13 +18,13 @@ function installUploadCategoryPolicyStyle() {
 
 function enforceUploadCategorySelectionOnly(root: ParentNode = document) {
   root.querySelectorAll<HTMLInputElement>(
-    '.upload-modal-overlay input[placeholder^="輸入新標籤名稱"]'
+    '.upload-modal-overlay input[placeholder^="輸入新標籤名稱"], .audio-form-document input[placeholder^="輸入新標籤名稱"]'
   ).forEach(input => {
     const row = input.parentElement;
     if (row) row.style.setProperty('display', 'none', 'important');
   });
 
-  root.querySelectorAll<HTMLElement>('.upload-modal-overlay span').forEach(span => {
+  root.querySelectorAll<HTMLElement>('.upload-modal-overlay span, .audio-form-document span').forEach(span => {
     const text = span.textContent?.trim() || '';
     if (text.includes('右側按鈕可編輯或刪除標籤')) {
       span.textContent = '僅可選取既有分類；新增、修改、刪除請至後台管理中心 › 分類標籤';
@@ -72,7 +74,7 @@ function installAdminCategoryDeleteGuard() {
     if (!(target instanceof Element)) return;
 
     const button = target.closest<HTMLButtonElement>('button[title="刪除標籤"], button[title="再次點擊確認刪除"]');
-    if (!button || button.closest('.upload-modal-overlay')) return;
+    if (!button || button.closest('.upload-modal-overlay,.audio-form-document')) return;
 
     const until = Number(button.dataset.categoryDeleteConfirmUntil || 0);
     if (until > Date.now()) {

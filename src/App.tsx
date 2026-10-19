@@ -56,7 +56,7 @@ import { Navbar, NavTab } from './components/Navbar';
 import { AudioCard } from './components/AudioCard';
 import { MiniPlayer } from './components/MiniPlayer';
 import { DetailView } from './components/DetailView';
-const UploadModal = lazy(() => import('./components/UploadModal').then(module => ({ default: module.UploadModal })));
+const AudioWorkspacePage = lazy(() => import('./components/AudioWorkspacePage').then(module => ({ default: module.AudioWorkspacePage })));
 const SpeakerProfilePage = lazy(() => import('./components/SpeakerProfilePage').then(m => ({default:m.SpeakerProfilePage})));
 const AdminModal = lazy(() => import('./components/AdminModal').then(module => ({ default: module.AdminModal })));
 const ProfileModal = lazy(() => import('./components/ProfileModal').then(module => ({ default: module.ProfileModal })));
@@ -3266,42 +3266,34 @@ export default function App() {
         }}
       />
 
-      {/* Upload & management document page (the nested editor remains a separate modal) */}
+      {/* Audio management is a real document with one React tab owner. */}
       {isUploadOpen && <main data-echo-page="audio-management" className="flex-1 w-full max-w-6xl mx-auto px-0 sm:px-6 py-0 sm:py-5 pb-28">
       <Suspense fallback={<div role="status" className="py-14 text-center text-slate-500">載入音檔管理中…</div>}>
-      <UploadModal
-        presentation="page"
-        isOpen={isUploadOpen}
-        onClose={() => {
-          // Native browser Back should return to the previous page rather than
-          // keeping a stale upload entry that re-opens the workspace.
-          if (window.history.state?.echostars && window.history.state?.tab === 'upload') {
-            window.history.back();
-          } else {
-            setIsUploadOpen(false);
-            setTrackToEdit(null);
-            if (currentTab === 'upload') setCurrentTab('home');
-          }
-        }}
-        currentUser={currentUser}
-        isAdmin={isAdmin}
-        trackToEdit={trackToEdit}
-        tracks={tracks}
-        onCategoriesUpdated={fetchCategories}
-        onSuccess={rawTrack => {
-          const trackData: any = (rawTrack as any)?.track || rawTrack;
-          const normalizedTrack = trackData as Track;
-
-          if (trackToEdit) {
-            updateTrackCopies(normalizedTrack.id, track => ({ ...track, ...normalizedTrack }));
-            setTrackToEdit(null);
-          } else {
-            locallyChangedTrackIds.current.add(normalizedTrack.id);
-            setTracks(prev => [normalizedTrack, ...prev]);
-            handlePlayTrack(normalizedTrack, savedPreferredMode);
-          }
-        }}
-      />
+        <AudioWorkspacePage
+          currentUser={currentUser}
+          isAdmin={isAdmin}
+          tracks={tracks}
+          initialEditTrack={trackToEdit}
+          onEditCancelled={()=>setTrackToEdit(null)}
+          onCategoriesUpdated={fetchCategories}
+          onDeleted={id=>setTracks(previous=>previous.filter(item=>item.id!==id))}
+          onClose={()=>{
+            if (window.history.state?.echostars && window.history.state?.tab === 'upload') window.history.back();
+            else {setIsUploadOpen(false);setTrackToEdit(null);if(currentTab==='upload')setCurrentTab('home');}
+          }}
+          onSaved={(rawTrack,wasEditing)=>{
+            const trackData:any=(rawTrack as any)?.track||rawTrack;
+            const normalizedTrack=trackData as Track;
+            if(wasEditing){
+              updateTrackCopies(normalizedTrack.id,track=>({...track,...normalizedTrack}));
+              setTrackToEdit(null);
+            }else{
+              locallyChangedTrackIds.current.add(normalizedTrack.id);
+              setTracks(previous=>[normalizedTrack,...previous]);
+              handlePlayTrack(normalizedTrack,savedPreferredMode);
+            }
+          }}
+        />
       </Suspense>
       </main>}
 

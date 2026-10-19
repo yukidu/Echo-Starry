@@ -128,7 +128,9 @@ export const DetailView: React.FC<DetailViewProps> = ({
       const element = document.getElementById(navigation.target)
         || document.getElementById(navigation.target.startsWith('comment-') ? 'comments-section' : 'audio-timeline');
       if (element) {
-        element.scrollIntoView({ behavior: 'instant', block: 'start' });
+        // Return to the top of the audio page without a global scrollIntoView monkeypatch.
+        if(element.id==='audio-timeline')window.scrollTo({top:0,behavior:'instant'});
+        else element.scrollIntoView({behavior:'instant',block:'start'});
         completedNavigation.current = key;
       }
     });

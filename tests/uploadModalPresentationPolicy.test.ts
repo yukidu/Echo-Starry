@@ -47,11 +47,13 @@ test('keyword presentation keeps plain words without check, hash and plus prefix
   assert.match(policy, /replace\(\/\^\[✓\+\]\\s\*#/);
 });
 
-test('new uploads clear speech date and series order defaults without affecting edits', () => {
-  assert.match(policy, /heading !== '上傳音檔'/);
-  assert.match(policy, /label\.startsWith\('演講日期'\) \|\| label\.startsWith\('系列順序'\)/);
-  assert.match(policy, /setReactInputValue\(input, ''\)/);
-  assert.match(policy, /uploadDefaultsCleared/);
+test('React owns the new upload speech-date and series defaults without altering edit records', () => {
+  const form = readFileSync(new URL('../src/components/UploadModal.tsx',import.meta.url),'utf8');
+  assert.match(form,/setSpeechDate\(''\)/);
+  assert.match(form,/setSeriesOrder\(''\)/);
+  assert.match(form,/setSpeechDate\(trackToEdit\.speechDate/);
+  assert.match(form,/setSeriesOrder\(trackToEdit\.seriesOrder/);
+  assert.doesNotMatch(policy,/setReactInputValue|clearNewUploadDefaults/);
 });
 
 test('non VIP explanatory notes are hidden while VIP copy is exempt', () => {
@@ -62,10 +64,10 @@ test('non VIP explanatory notes are hidden while VIP copy is exempt', () => {
   assert.match(policy, /每首音檔最多 20 組關鍵字/);
 });
 
-test('presentation policy is loaded before the React bootstrap', () => {
-  const policyIndex = indexHtml.indexOf('/src/uploadModalPresentationPolicy.ts');
-  const bootstrapIndex = indexHtml.indexOf('/src/categoryIntegrityBootstrap.ts');
-  assert.ok(policyIndex >= 0);
-  assert.ok(bootstrapIndex >= 0);
-  assert.ok(policyIndex < bootstrapIndex);
+test('presentation policy is owned by the React form rather than a document-wide watcher',()=>{
+  const form=readFileSync(new URL('../src/components/UploadModal.tsx',import.meta.url),'utf8');
+  assert.match(form,/prepareAudioFormPresentation\(formElementRef\.current\)/);
+  assert.match(policy,/export function prepareAudioFormPresentation/);
+  assert.doesNotMatch(indexHtml,/script type="module" src="\/src\/uploadModalPresentationPolicy\.ts"/);
+  assert.doesNotMatch(policy,/new MutationObserver/);
 });
