@@ -124,7 +124,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
           <button type="button" class="btn" id="memberClearSelection">清除勾選</button>
         </div>
         <div class="access-toolbar">
-          <label class="member-select-label"><input id="memberSelectAll" type="checkbox">全選目前篩選結果</label>
+          <label class="member-select-label"><input id="memberSelectAll" type="checkbox">全選目前篩選的真正會員（不含訪客）</label>
           <span id="accessSelectedCount">已選 0 位</span>
           <button type="button" class="btn primary" id="bulkAccessButton">批次設定 App 權限</button>
         </div>
@@ -133,7 +133,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         <button type="button" id="guestAccessEntry" class="guest-entry"
           aria-label="訪客使用權限管理">
           <span aria-hidden="true">👥</span><span>
-          <strong>訪客</strong><small>未登入使用者｜不計入會員人數</small>
+          <strong>訪客</strong><small>獨立 App 權限｜不參與全選、不計入會員人數</small>
           </span>
         </button>
         <div class="members" id="members"></div>
@@ -143,7 +143,11 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         <h2>👥 訪客｜App 使用權限</h2>
         <p class="guest-policy-help">「訪客」不是會員，不會建立會員資料或加入批次勾選。預設全部禁止；僅已完成安全整合的 App 能開放已註明的公開功能。</p>
         <p class="guest-policy-help">繁星下載：開放後僅限公開首頁非會員互動；下載、收藏、紀錄及私人資料仍需會員登入並取得授權。</p>
-        <div class="guest-policy-list" id="guestAppPolicies" aria-live="polite">正在載入訪客權限…</div>
+        <div class="guest-policy-list" id="guestAppPolicies" aria-live="polite" aria-busy="false"></div>
+        <div id="guestAccessLoadError" class="access-load-error hidden" role="alert" aria-live="assertive">
+          <div id="guestAccessLoadErrorText">訪客權限讀取失敗</div>
+          <button type="button" class="btn" id="guestAccessRetryBtn">重新讀取</button>
+        </div>
         <section class="access-preview hidden" id="guestAccessPreview" aria-label="訪客權限變更確認">
           <strong>請確認訪客權限變更</strong>
           <div id="guestAccessPreviewText"></div>
@@ -225,7 +229,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
   <script>
   (() => {
     const CLIENT_ID = ${safeClientId};
-    const state = { session:null, user:null, isSuperAdmin:false, targetUserId:null, adminOpen:false, members:[], visibility:null, selectedIds:new Set(), currentFilterIds:null, currentFilterKey:'', selectionBusy:false, selectionGeneration:0, memberOffset:0, memberTotal:0, memberHasMore:false, memberLoading:false, memberLoadToken:0, memberRanksLoaded:false, activeSearch:'', activeRank:'', memberFilterPending:false, accessApps:[], accessUserIds:[], accessBulkSelection:null, accessPreview:null, accessLoadToken:0, accessLastRequest:null, bulkRunning:false };
+    const state = { session:null, user:null, isSuperAdmin:false, targetUserId:null, adminOpen:false, members:[], visibility:null, selectedIds:new Set(), guestOpen:false, guestReadGeneration:0, guestLoadController:null, currentFilterIds:null, currentFilterKey:'', selectionBusy:false, selectionGeneration:0, memberOffset:0, memberTotal:0, memberHasMore:false, memberLoading:false, memberLoadToken:0, memberRanksLoaded:false, activeSearch:'', activeRank:'', memberFilterPending:false, accessApps:[], accessUserIds:[], accessBulkSelection:null, accessPreview:null, accessLoadToken:0, accessLastRequest:null, bulkRunning:false };
     const $ = (id) => document.getElementById(id);
     const editable = [
       ['name','姓名',false],['amwayId','會員編號 / Amway ID',false],['phone','電話',false],['residence','居住地',false],
@@ -310,12 +314,12 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
         root.appendChild(card);
       }
     }
-    function renderProfile(user){ state.guestOpen=false; $('guestAccessCard').classList.add('hidden'); $('profileCard').classList.remove('hidden'); $('guestAccessEntry').classList.remove('active'); state.user=user; state.targetUserId=user.id; renderAvatar(user); $('displayName').textContent=user.name||'尚未填寫姓名'; $('displayEmail').textContent=user.email||''; renderBadges(user); renderFields(user); renderMemberActive(); $('memberIdentity').classList.toggle('access-mode',state.isSuperAdmin); if(state.isSuperAdmin)void showAppAccess([user.id],user.name||user.email||'會員',false); }
+    function renderProfile(user){ state.guestOpen=false; ++state.guestReadGeneration; state.guestLoadController?.abort(); $('guestAccessCard').classList.add('hidden'); $('profileCard').classList.remove('hidden'); $('guestAccessEntry').classList.remove('active'); state.user=user; state.targetUserId=user.id; renderAvatar(user); $('displayName').textContent=user.name||'尚未填寫姓名'; $('displayEmail').textContent=user.email||''; renderBadges(user); renderFields(user); renderMemberActive(); $('memberIdentity').classList.toggle('access-mode',state.isSuperAdmin); if(state.isSuperAdmin)void showAppAccess([user.id],user.name||user.email||'會員',false); }
     async function saveField(field,value,card){ card.classList.add('saving'); try{ const path=state.isSuperAdmin && state.targetUserId!==state.session.user.id ? '/api/admin/members/'+encodeURIComponent(state.targetUserId) : '/api/profile'; const data=await api(path,{method:'PUT',body:JSON.stringify({[field]:value})}); renderProfile(data.user); toast('已儲存 '+editable.find(x=>x[0]===field)?.[1]); }catch(e){ card.classList.remove('saving'); renderFields(state.user); toast(e.message||'儲存失敗',true); } }
     function beginEdit(card,field,label,wide){ if(card.querySelector('.field-editor')) return; const value=state.user[field]===null||state.user[field]===undefined?'':String(state.user[field]); const display=card.querySelector('.field-value'); const edit=card.querySelector('.edit'); if(edit) edit.classList.add('hidden'); const input=wide?document.createElement('textarea'):document.createElement('input'); input.className='field-editor'; if(wide) input.rows=3; if(isNumeric(field)) input.inputMode='numeric'; input.value=value; display.replaceWith(input); let done=false; const cancel=()=>{ if(done)return; done=true; renderFields(state.user); }; const commit=()=>{ if(done)return; done=true; const next=input.value.trim(); if(next===value){renderFields(state.user);return;} saveField(field,next,card); }; input.addEventListener('keydown',(event)=>{ if(event.key==='Escape'){event.preventDefault();cancel();return;} if(event.key==='Enter' && (!wide || event.ctrlKey || event.metaKey)){event.preventDefault();commit();} }); input.addEventListener('blur',()=>{ if(!done) commit(); }); input.focus(); input.select(); }
     function renderMemberActive(){ document.querySelectorAll('.member-item').forEach(el=>el.classList.toggle('active',el.dataset.id===state.targetUserId)); }
     function showLoggedIn(){ $('loginView').classList.add('hidden'); $('memberView').classList.remove('hidden'); $('topActions').hidden=false; $('adminBtn').classList.toggle('hidden',!state.isSuperAdmin); }
-    function showLoggedOut(){ resetMemberSelection(); state.guestOpen=false; $('guestAccessCard').classList.add('hidden'); $('profileCard').classList.remove('hidden'); state.session=null; state.user=null; state.targetUserId=null; state.visibility=null; $('topActions').hidden=true; $('memberView').classList.add('hidden'); $('loginView').classList.remove('hidden'); initGoogle(); }
+    function showLoggedOut(){ resetMemberSelection(); state.guestOpen=false; ++state.guestReadGeneration; state.guestLoadController?.abort(); $('guestAccessCard').classList.add('hidden'); $('profileCard').classList.remove('hidden'); state.session=null; state.user=null; state.targetUserId=null; state.visibility=null; $('topActions').hidden=true; $('memberView').classList.add('hidden'); $('loginView').classList.remove('hidden'); initGoogle(); }
     async function loadSession(){ try{ const data=await api('/api/session'); state.session=data; state.isSuperAdmin=Boolean(data.isSuperAdmin); state.targetUserId=data.user.id; await loadOwnVisibility(); showLoggedIn(); renderProfile(data.user); }catch{ showLoggedOut(); } }
     async function handleCredential(response){ $('loginStatus').textContent='正在登入…'; try{ await api('/api/google-sync',{method:'POST',body:JSON.stringify({credential:response.credential,appId:'starry-id'})}); $('loginStatus').textContent='登入成功'; await loadSession(); }catch(e){ $('loginStatus').textContent=e.message||'登入失敗'; toast(e.message||'登入失敗',true); } }
     function initGoogle(){ const start=Date.now(); const tick=()=>{ if(window.google?.accounts?.id){ try{ google.accounts.id.initialize({client_id:CLIENT_ID,callback:handleCredential,auto_select:false,cancel_on_tap_outside:true}); $('googleButton').replaceChildren(); google.accounts.id.renderButton($('googleButton'),{theme:'outline',size:'large',shape:'pill',text:'signin_with',locale:'zh_TW',width:280}); $('loginStatus').textContent=''; }catch(e){ $('loginStatus').textContent='Google 登入載入失敗，請重新整理。'; } return; } if(Date.now()-start<8000) setTimeout(tick,120); else $('loginStatus').textContent='Google 登入載入較慢，請重新整理再試。'; }; tick(); }
@@ -359,7 +363,15 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
       state.selectedIds.clear();
       refreshVisibleMemberChecks();
     }
+    // Guest is a separate policy principal, NEVER a central member. A
+    // malformed or future API response must not mix it into member batches.
+    const GUEST_PRINCIPAL_ID='starry:guest';
+    function isRealMemberSelectionId(id){
+      return typeof id==='string' && id.length>0 && id!==GUEST_PRINCIPAL_ID;
+    }
     function mergeMemberSelection(ids,shouldSelect){
+      if(!Array.isArray(ids)||!ids.every(isRealMemberSelectionId))
+        throw new Error('全選資料包含非會員身分，已停止操作');
       const next=new Set(state.selectedIds);
       for(const id of ids){
         if(shouldSelect)next.add(id);
@@ -383,7 +395,7 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
           ids=response.ids;
           if(!Array.isArray(ids)||ids.length!==response.count||
              ids.length>MAX_SELECTED_MEMBERS||new Set(ids).size!==ids.length||
-             !ids.every(id=>typeof id==='string'&&id.length>0))
+             !ids.every(isRealMemberSelectionId))
             throw new Error('中央會員選取資料不完整，請重新操作');
         }
         if(generation!==state.selectionGeneration)return; // Explicit clear/logout wins.
@@ -519,6 +531,10 @@ export function renderStarryIdMemberCenterPage(clientId: string) {
       // before asking for the separate final confirmation.
       state.accessBulkSelection={scope:'manual',userIds:[...state.selectedIds]};
       const selected=selectedMemberCount();
+      // Defense in depth: even a future guest entry must never enter bulk.
+      if([...state.selectedIds].some(id=>!isRealMemberSelectionId(id))){
+        toast('訪客不能加入會員批次權限設定',true);return;
+      }
       const first=state.members.find(m=>selectedMember(m.id))?.id||state.selectedIds.values().next().value;
       if(!first){toast('沒有選取會員',true);return;}
       void showAppAccess([first],'跨篩選累積已選 '+selected+' 位會員',true);
