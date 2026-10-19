@@ -20,11 +20,11 @@ test('mobile menu hugs its content and keeps only counts in the palette primary 
 
 test('upload audio is document-flow content without the shared modal height cap', () => {
   const upload = readFileSync(new URL('../src/components/UploadModal.tsx', import.meta.url), 'utf8');
-  assert.match(upload, /presentation === 'page' \? 'upload-standalone-page'/);
+  assert.match(upload, /presentation === 'page' \? 'audio-form-document upload-page'/);
   assert.doesNotMatch(upload, /className="app-modal-overlay upload-modal-overlay/);
   assert.doesNotMatch(upload, /max-h-\[75vh\]/);
   assert.match(css, /\.upload-page > div \{ max-height: none/);
   const mainStyles = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
-  assert.match(mainStyles, /position: static !important/);
-  assert.match(mainStyles, /overflow: visible !important/);
+  assert.match(mainStyles, /\.audio-form-document\s*\{[\s\S]*position:static;/);
+  assert.match(mainStyles, /main\[data-echo-page="audio-management"\] \.v161-track-list\s*\{[\s\S]*overflow:visible;/);
 });
