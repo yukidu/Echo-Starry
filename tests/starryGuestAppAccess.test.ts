@@ -100,7 +100,7 @@ test('Guest is a fixed policy principal before paged members, never a users-tabl
   assert.ok(page.indexOf('id="guestAccessEntry"')<page.indexOf('id="members"'));
   assert.match(page,/function memberCard\(member\)/);
   assert.match(page,/state\.members\.push\(\.\.\.batch\)/);
-  assert.match(page,/state\.selectedIds:new Set/);
+  assert.match(page,/selectedIds:new Set/);
   assert.doesNotMatch(page,/state\.members\.unshift\([^)]*guest/i);
   assert.doesNotMatch(page,/mergeMemberSelection\(\['guest'\]/i);
   assert.match(bulk,/WHERE.+?user|requireExistingMembers|json_each/);
