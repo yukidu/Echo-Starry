@@ -171,10 +171,10 @@ export async function b07Reserve(env:B07Env,input:B07Quote){
  try {
   const r=await db.prepare(`INSERT OR IGNORE INTO starry_ai_b07_calls
     (id,request_key,fingerprint,day,app_id,task_id,member_key,model_id,
-     billing_class,status,max_units,held_micro_twd,created_at,updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,'reserved',?,?,?,?)`)
+     billing_class,status,max_units,unit_micro_twd,held_micro_twd,created_at,updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,'reserved',?,?,?,?,?)`)
     .bind(id,q.requestKey,q.fingerprint,day,q.appId,q.taskId,q.memberKey,q.modelId,
-      tariff.billing_class,q.maxUnits,hold,now,now).run();
+      tariff.billing_class,q.maxUnits,Number(tariff.micro_twd_per_unit),hold,now,now).run();
   if(Number(r?.meta?.changes||0)!==1){
    const repeat=await db.prepare('SELECT * FROM starry_ai_b07_calls WHERE request_key=?')
     .bind(q.requestKey).first();
@@ -209,11 +209,8 @@ export async function b07Complete(env:B07Env,id:string,kind:'settled'|'uncertain
  }
  if(kind!=='settled')requireSafe(actualUnits===0,'invalid_actual_units');
  else requireSafe(isInt(actualUnits,0,old.max_units),'actual_units_above_hold');
- const tariff=kind==='settled'?await db.prepare(
-   'SELECT micro_twd_per_unit FROM starry_ai_b07_tariffs WHERE model_id=?')
-  .bind(old.model_id).first():null;
- requireSafe(kind!=='settled'||tariff,'tariff_missing_on_settlement',503);
- const actual=kind==='settled'?actualUnits*Number(tariff.micro_twd_per_unit):0;
+ // Use the immutable price quoted at reservation; a later rate edit must not reprice a member.
+ const actual=kind==='settled'?actualUnits*Number(old.unit_micro_twd):0;
  requireSafe(isInt(actual,0,old.held_micro_twd),'actual_cost_above_hold',409);
  const result=await db.prepare(`UPDATE starry_ai_b07_calls
     SET status=?,actual_units=?,actual_micro_twd=?,updated_at=?
