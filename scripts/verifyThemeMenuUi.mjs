@@ -29,21 +29,6 @@ function resolveChromeBinary() {
   throw new Error(`Chrome/Chromium not found. Checked: ${candidates.join(', ')}`);
 }
 
-async function waitForJson(url, attempts = 60) {
-  let lastError;
-  for (let i = 0; i < attempts; i += 1) {
-    try {
-      const response = await fetch(url);
-      if (response.ok) return await response.json();
-      lastError = new Error(`${response.status} ${response.statusText}`);
-    } catch (error) {
-      lastError = error;
-    }
-    await delay(250);
-  }
-  throw lastError || new Error(`Timed out waiting for ${url}`);
-}
-
 async function allocateDebugPort() {
   if (CONFIGURED_DEBUG_PORT > 0) return CONFIGURED_DEBUG_PORT;
   return new Promise((resolve, reject) => {
