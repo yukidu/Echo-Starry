@@ -114,7 +114,7 @@ test('v296 battery ledger backend still exposes all three transcript game rules'
 });
 
 test('audio management keeps the four user-facing transcript states', () => {
-  const manager = read('src/v161AudioManagementNavigation.tsx');
+  const manager = read('src/components/AudioTrackList.tsx');
   assert.match(manager, /正在撰寫逐字稿/);
   assert.match(manager, /已完成逐字稿/);
   assert.match(manager, /逐字稿異常/);
