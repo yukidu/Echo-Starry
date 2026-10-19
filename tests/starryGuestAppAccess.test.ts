@@ -18,6 +18,13 @@ function memoryDb(){
   const statements:string[]=[];
   const prepare=(sql:string)=>({
     run:async()=>({meta:{changes:0}}), // DDL statements are unbound
+    all:async()=>{
+      if(sql.includes('FROM starry_guest_app_policies'))
+        return {results:[...policies].map(([appId,value])=>({appId,...value}))};
+      if(sql.includes('FROM starry_guest_app_operations'))
+        return {results:[...operations.values()].sort((a,b)=>b.createdAt-a.createdAt)};
+      throw Error('Unhandled unbound .all SQL '+sql);
+    },
     bind(...params:any[]){
       return {
         async first(){
