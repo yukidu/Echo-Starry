@@ -8,6 +8,8 @@ import { memberDirectoryFilter } from './starryMemberDirectoryFilter';
 import { renderStarryAiManagementPage } from './starryAiManagementPage';
 import { renderStarryAiModelRegistryPage } from './starryAiModelRegistryPage';
 import { readCentralAiModels } from './starryAiModelRegistry';
+import { renderStarryAiModelAdminPage } from './starryAiModelAdminPage';
+import { modelAdminHistory, modelAdminSecretStatus, dryRunModelDraft, applyModelAdminAction, AdminInputError } from './starryAiModelAdmin';
 import { loadAiPriorities, saveAiPriorities, collectAiCatalog, recentAiChanges, DEFAULT_AI_ORDER } from './starryAiManagement';
 
 type StarryEnv = Env & {
@@ -688,6 +690,42 @@ async function handleApi(request: Request, env: StarryEnv, path: string) {
     return handleStarryAppAccessAdminRequest(request,env,session.member.id);
   }
 
+  if (path === '/api/ai-model-admin' || path === '/api/ai-model-admin/dry-run') {
+    // Central manager-only, same-origin JSON API. Does not invoke model providers.
+    if (origin && origin !== 'https://id.starry.phd')
+      return json(request, { error: '請從 Starry ID 官網操作' }, 403);
+    const session = await sessionUser(request, env);
+    if (!session) return json(request, { error: '請先登入 Starry ID' }, 401);
+    if (!session.isSuperAdmin) return json(request, { error: '只有中央超級管理員可以管理模型' }, 403);
+    const url = new URL(request.url);
+    if (method === 'GET' && path === '/api/ai-model-admin') {
+      try {
+        if (url.searchParams.has('secretFor'))
+          return json(request, await modelAdminSecretStatus(env, url.searchParams.get('secretFor') || ''));
+        return json(request, await modelAdminHistory(env, url.searchParams.get('modelId')));
+      } catch (e) {
+        if (e instanceof AdminInputError) return json(request, { error: e.code }, e.status);
+        return json(request, { error: '管理紀錄暫時無法讀取' }, 503);
+      }
+    }
+    if (method !== 'POST') return json(request, { error: 'Method not allowed' }, 405);
+    // Browser mutations need same-origin Origin and JSON to prevent CSRF.
+    if (origin !== 'https://id.starry.phd' ||
+        !(request.headers.get('Content-Type') || '').toLowerCase().startsWith('application/json'))
+      return json(request, { error: '請從中央管理頁重新操作' }, 403);
+    try {
+      const raw = await request.text();
+      if (raw.length > 8192) return json(request, { error: '資料過大' }, 413);
+      let body: any;
+      try { body = JSON.parse(raw); } catch { return json(request, { error: 'JSON 格式不正確' }, 400); }
+      if (path === '/api/ai-model-admin/dry-run') return json(request, dryRunModelDraft(body));
+      return json(request, await applyModelAdminAction(env, session.member.id, body));
+    } catch (e) {
+      if (e instanceof AdminInputError) return json(request, { error: e.code }, e.status);
+      return json(request, { error: '模型儲存失敗，請重新整理後再試' }, 503);
+    }
+  }
+
   if (path === '/api/ai-models') {
     // Private Starry ID inventory: never expose model pricing or route status to sibling Apps.
     if (origin && origin !== 'https://id.starry.phd')
@@ -904,6 +942,12 @@ export async function handleStarryIdCentral(request: Request, env: StarryEnv): P
 
   if (url.pathname === '/' && request.method.toUpperCase() === 'GET') return servicePage(env);
   if (url.pathname === '/ai-management' && request.method.toUpperCase() === 'GET') return renderStarryAiManagementPage();
+  if (url.pathname === '/ai-model-setup' && request.method.toUpperCase() === 'GET') {
+    const session = await sessionUser(request, env);
+    if (!session) return new Response('請先登入 Starry ID', { status: 401, headers: { 'Cache-Control':'no-store' } });
+    if (!session.isSuperAdmin) return new Response('只有中央超級管理員可查看', { status: 403, headers: { 'Cache-Control':'no-store' } });
+    return renderStarryAiModelAdminPage();
+  }
   if (url.pathname === '/ai-models' && request.method.toUpperCase() === 'GET') {
     const session = await sessionUser(request, env);
     if (!session) return new Response('請先登入 Starry ID', { status: 401, headers: { 'Cache-Control':'no-store' } });
