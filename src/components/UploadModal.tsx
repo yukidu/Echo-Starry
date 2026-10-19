@@ -435,7 +435,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setSpeechDate(new Date().toISOString().split('T')[0].replace(/-/g, '/'));
       setSeriesOrder('第 1 集');
       setRequiredRank('無');
-      setGuestVisible(false);
+      // New public recordings remain guest-visible, matching the previous rule.
+      setGuestVisible(true);
       setAuthorizedOnlyVisible(false);
       setStickerUnlockCost(0);
       setCommentStickerReward(0);
@@ -1383,7 +1384,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               </label>
               <ThemedSelect
                 value={requiredRank}
-                onChange={e => setRequiredRank(e.target.value as AmwayRank)}
+                onChange={e => {const next=e.target.value as AmwayRank;setRequiredRank(next);setGuestVisible(next==='無'||next==='公開');}}
                 className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 outline-hidden focus:border-rose-400"
               >
                 {!['無', '3%', '9%', '15%', '銀章', '白金', '翡翠', '鑽石級以上'].includes(requiredRank) && <option value={requiredRank}>{requiredRank}</option>}
@@ -1459,17 +1460,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               )}
             </div>
 
-            <div>
-              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                今天上傳日期 (系統自動產生，不可修改)
-              </label>
-              <input
-                type="text"
-                value={todayUploadDate}
-                disabled
-                className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-slate-400 cursor-not-allowed"
-              />
-            </div>
           </div>
 
           {/* 社群連結（可多個） */}
@@ -1610,10 +1600,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             />
           </div>
 
-          <div className="flex justify-end gap-3 pb-6">
-            <button type="button" onClick={onClose} disabled={isUploading} className="px-4 py-3">取消</button>
-            <button type="submit" disabled={isUploading} className="rounded-xl px-5 py-3 text-white" style={{backgroundColor:'var(--color-primary,#c06c84)'}}>{isUploading ? '儲存中…' : '儲存音檔'}</button>
-          </div>
         </form>
       </div>
     </div>
