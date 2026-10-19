@@ -7,7 +7,7 @@ const router = readFileSync(new URL('../worker/aiSpeakerQaRouter.ts', import.met
 const main = readFileSync(new URL('../worker/starryMainInlineLoginRouter.ts',import.meta.url),'utf8');
 const comments = readFileSync(new URL('../src/components/CommentsSection.tsx',import.meta.url),'utf8');
 const app = readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
-const admin = readFileSync(new URL('../src/components/TranscriptQaAdmin.tsx',import.meta.url),'utf8');
+const admin = readFileSync(new URL('../src/components/AiQuestionSettingsAdmin.tsx',import.meta.url),'utf8');
 const page = readFileSync(new URL('../src/v161AudioManagementNavigation.tsx',import.meta.url),'utf8');
 
 test('the five member tiers do not accidentally treat visitors as registered members',()=>{
@@ -56,9 +56,10 @@ test('main comments keeps a single line speaker name with shared icon and inline
 test('audio management has an actual dedicated transcript tab, full text, keyword search, and admin pricing',()=>{
   assert.match(page,/mode === 'qa'/);
   assert.match(page,/<TranscriptQaAdmin \/>/);
+  assert.match(page,/<AiQuestionSettingsAdmin \/>/);
   assert.match(router,/path==='\/api\/qa\/search'/);
   assert.ok(router.includes('const match=path.match('));
   assert.match(router,/chineseCount/);
-  assert.match(admin,/全文搜尋/);
-  assert.match(admin,/每天上限/);
+  assert.match(readFileSync(new URL('../src/components/TranscriptQaAdmin.tsx',import.meta.url),'utf8'),/全文搜尋/);
+  assert.match(admin,/每日上限/);
 });
