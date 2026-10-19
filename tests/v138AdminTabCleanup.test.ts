@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
+const read=(p:string)=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const cleanup=read('src/v138AdminTabCleanup.ts'),html=read('index.html'),app=read('src/App.tsx');
 test('separate central admin keeps moved audio tab hidden and inaccessible',()=>{
  assert.match(cleanup,/while \(candidate\)/);
