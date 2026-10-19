@@ -110,7 +110,11 @@ async function main() {
     // Wait for the *new* React document, not the still-existing DOM from before reload.
     await delay(1250);
     await waitFor("document.readyState==='complete'&&!!document.querySelector('[data-main-menu=\\\"hamburger\\\"]')", 'logged-in navbar');
+    const beforeMenu=await evaluate("({u:JSON.parse(localStorage.getItem('sq_current_user_v1')||'null')?.role,aria:document.querySelector('[data-main-menu=\\\"hamburger\\\"]')?.getAttribute('aria-expanded'),count:document.querySelectorAll('.mobile-menu-panel').length})");
     await evaluate("document.querySelector('[data-main-menu=\\\"hamburger\\\"]').click()");
+    await delay(200);
+    const afterMenu=await evaluate("({aria:document.querySelector('[data-main-menu=\\\"hamburger\\\"]')?.getAttribute('aria-expanded'),count:document.querySelectorAll('.mobile-menu-panel').length,role:document.querySelector('.navbar-menu-identity-role')?.textContent,nav:document.querySelector('nav')?.textContent?.slice(0,120)})");
+    console.log('Audio workspace menu diagnostic:',JSON.stringify({beforeMenu,afterMenu}));
     await waitFor("!!document.querySelector('.mobile-menu-panel')", 'hamburger menu');
     const navLabel = await evaluate("Array.from(document.querySelectorAll('.mobile-menu-panel button')).find(b=>b.textContent?.includes('音檔管理'))?.textContent?.trim()||''");
     if(!navLabel)throw Error('音檔管理 entry missing from main navbar');
