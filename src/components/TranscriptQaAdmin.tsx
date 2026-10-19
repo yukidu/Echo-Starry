@@ -1,13 +1,11 @@
 import { SpeakerNameLink } from './SpeakerNameLink';
 import React, { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Download, Save, Search } from 'lucide-react';
+import { RefreshCw, Download, Search } from 'lucide-react';
 import { AiBadge } from './AiBadge';
 import { TranscriptCleanupAdmin } from './TranscriptCleanupAdmin';
 
 type Item = { id:string;title:string;speaker:string;speakerRank:string;status:string;error?:string;wordCount?:number;segmentCount?:number;durationSeconds?:number };
-type Model = {id:string;label:string;strength:string};
-type Tier = {tier:number;label:string;daily:number;free:number;cost:number};
-type Data = {items:Item[];models:Model[];policies:Tier[];model:string;openAiConfigured:boolean;enabled:boolean;globalDaily:number;globalUsed:number;replyDirections:string;history?:{commentId:string;createdAt:number;mode:string;status:string;error?:string;title?:string;authorName?:string}[]};
+type Data = {items:Item[]};
 type Transcript = {text:string;originalText?:string;segments:{start:number;end:number;text:string}[];originalSegments?:{start:number;end:number;text:string}[];chineseCount:number;totalChars:number};
 const statuses:Record<string,string>={pending:'排隊中逐字稿',queued:'排隊中逐字稿',processing:'正在撰寫逐字稿',ready:'已完成逐字稿',failed:'逐字稿異常'};
 const field:React.CSSProperties={border:'1px solid #94a3b8',borderRadius:10,padding:'7px',background:'transparent',color:'inherit',width:'100%'};
@@ -69,13 +67,6 @@ export const TranscriptQaAdmin:React.FC=()=>{
     catch(e){setMessage(e instanceof Error?e.message:'重試失敗');}
     finally{setBusy(false);}
   };
-  const save=async()=>{
-    if(!data)return;
-    setBusy(true);setMessage('');
-    try{await api('/api/qa/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:data.enabled,model:data.model,policies:data.policies,globalDaily:data.globalDaily,replyDirections:data.replyDirections||''})});setMessage('設定已儲存');}
-    catch(e){setMessage(e instanceof Error?e.message:'儲存失敗');}finally{setBusy(false);}
-  };
-  const update=(i:number,key:'daily'|'free'|'cost',n:number)=>setData(d=>d?{...d,policies:d.policies.map((p,j)=>i===j?{...p,[key]:n}:p)}:d);
   return <section className="space-y-4 border border-slate-200 dark:border-slate-700 rounded-2xl p-3 sm:p-5" aria-label="逐字稿管理">
     <div className="flex justify-between items-center gap-2"><h2 className="flex items-center gap-1 text-xl font-black"><AiBadge/> 逐字稿管理</h2><button type="button" onClick={()=>void load()} disabled={busy} className="flex items-center gap-1 border rounded-lg p-2"><RefreshCw size={16}/>重新整理</button></div>
     {message&&<p role="status" className="text-rose-600 font-bold text-xs">{message}</p>}
@@ -91,24 +82,6 @@ export const TranscriptQaAdmin:React.FC=()=>{
     </div>
     <div className="max-h-[340px] overflow-y-auto space-y-2">{items.map(i=><div key={i.id} className="flex justify-between gap-2 border border-slate-200 dark:border-slate-700 rounded-xl p-3"><div className="min-w-0 text-xs"><b className="block text-sm break-words">{i.title}</b><span>{i.speaker} · {i.speakerRank}</span><span className="block opacity-70">{statuses[i.status]||i.status} · {i.wordCount||0} 字元 · {i.segmentCount||0} 段</span>{i.error&&<span className="block text-rose-600">{i.error}</span>}</div><div className="flex flex-col gap-1 shrink-0"><button type="button" onClick={()=>void open(i)} disabled={busy||i.status!=='ready'} className="border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1 text-xs disabled:opacity-30">全文</button>{i.status==='failed'&&<button type="button" className="text-xs underline text-rose-600" disabled={busy} onClick={()=>void retry(i)}>重試</button>}</div></div>)}{!items.length&&<p className="text-center text-sm opacity-60 p-3">沒有符合條件的逐字稿</p>}</div>
     {opened&&<div className="space-y-2 border-2 rounded-xl p-3"><div className="flex justify-between gap-2"><b>{opened.item.title}</b><button onClick={()=>setOpened(null)}>返回</button></div><p className="text-xs">中文字數：{opened.file.chineseCount}｜總字元：{opened.file.totalChars}｜段落：{opened.file.segments.length}</p><label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={showOriginal} onChange={e=>setShowOriginal(e.target.checked)}/>查看與匯出未淨化原始稿</label><div className="flex gap-2">{(['txt','srt','vtt'] as const).map(f=><button type="button" key={f} onClick={()=>download(f)} className="border rounded-lg p-2 flex gap-1 items-center text-xs"><Download size={13}/>{f.toUpperCase()}</button>)}</div><pre className="max-h-[380px] overflow-auto whitespace-pre-wrap break-words text-sm leading-relaxed p-3 bg-slate-50 dark:bg-slate-900">{showOriginal?(opened.file.originalText||opened.file.text):opened.file.text}</pre></div>}
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 space-y-2"><h3 className="text-lg font-black">最近 50 筆問答紀錄</h3><div className="max-h-52 overflow-auto space-y-1">{(data?.history||[]).map(h=><p key={h.commentId} className="text-xs rounded-lg p-2 bg-slate-100 dark:bg-slate-800">{h.authorName||'訪客'} · {h.title||'未知音檔'} · {h.mode==='all'?'所有演講':'本場演講'} · {h.status==='done'?'完成':h.status==='failed'?'失敗':'回覆中'}{h.error?'（'+h.error+'）':''}</p>)}{!data?.history?.length&&<p className="text-xs text-slate-500">目前尚無問答紀錄</p>}</div></div>
-    <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-3"><h3 className="text-lg font-black flex items-center gap-2"><AiBadge/> 演講者問答設定</h3><label className="flex gap-2 items-center text-sm"><input type="checkbox" checked={!!data?.enabled} onChange={e=>setData(d=>d?{...d,enabled:e.target.checked}:d)}/>啟用演講者問答（預設關閉）</label><div className="rounded-xl bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-200 p-3 text-xs space-y-2">
-      <strong className="block">注意：這是兩種不同的上限！</strong>
-      <p>全站今日已使用 {data?.globalUsed??0}／{data?.globalDaily??12} 次。只修改下方的五級會員額度，無法提高全站上限。</p>
-      <p>超級管理員不受網站設定的每日次數、全站上限及電池限制；Cloudflare 供應商免費額度仍可能用完。</p>
-      <label className="block font-bold mt-2">全站一般會員每日回答上限（保護免費額度）
-        <input type="number" style={field} min="1" max="100" value={data?.globalDaily??12} onChange={e=>setData(d=>d?{...d,globalDaily:Number(e.target.value)}:d)}/>
-      </label>
-    </div>
-    <div className="overflow-x-auto"><table className="w-full min-w-[440px] text-xs"><thead><tr><th className="text-left p-2">會員等級</th><th>每天上限</th><th>免費次數</th><th>每次電池</th></tr></thead><tbody>{data?.policies.map((p,i)=><tr key={p.tier} className="border-t dark:border-slate-700"><td className="font-bold p-2">{p.tier}. {p.label}</td>{(['daily','free','cost'] as const).map(k=><td key={k} className="p-1"><input type="number" style={{...field,width:'78px'}} min="0" step={k==='cost'?'0.1':'1'} aria-label={p.label+k} value={p[k]} onChange={e=>update(i,k,Number(e.target.value))}/></td>)}</tr>)}</tbody></table></div>
-    <div className="space-y-2">
-      <h4 className="font-bold">演講者回答文字格式</h4>
-      <p className="text-xs text-slate-500">系統固定：不顯示來源、參考資料或音檔引用清單，留言最後自動附上「{'<本留言由ai回覆，僅供參考，非本人回覆！>'}」。以下可自訂其他語氣、長度與回答方式。</p>
-      <textarea aria-label="AI 回答格式自訂指令" rows={5} maxLength={2000} value={data?.replyDirections||''} onChange={e=>setData(d=>d?{...d,replyDirections:e.target.value}:d)}
-        placeholder="例如：以親切、生活化的繁體中文回答；先給出簡短結論，再分享兩點啟發。不必列舉逐字稿片段。"
-        className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-transparent p-3 text-sm"/>
-      <p className="text-xs text-slate-500">這個設定會套用到之後的新回答，不會改寫舊留言。</p>
-    </div>
-    <h4 className="font-bold flex items-center gap-1"><AiBadge/> 回答模型（僅後台顯示）</h4><p className="text-xs text-slate-500">依照下方順序顯示模型。切換後需按「儲存設定」，原先的選擇不會自行改變。ChatGPT API 按使用量由 OpenAI 收費。</p>{data&&!data.openAiConfigured&&<p role="status" className="text-xs text-amber-700">目前未設定 OpenAI API 金鑰，請先完成 Cloudflare 安全金鑰設定。</p>}<table className="w-full text-xs"><thead><tr><th className="text-left p-2">模型</th><th className="text-left">優點</th><th>選擇</th></tr></thead><tbody>{data?.models.map(m=><tr key={m.id} className="border-t dark:border-slate-700"><td className="p-2 font-bold">{m.label}</td><td>{m.strength}</td><td className="text-center"><input type="radio" name="qa-model" checked={data.model===m.id} onChange={()=>setData(d=>d?{...d,model:m.id}:d)}/></td></tr>)}</tbody></table><button type="button" disabled={busy||!data} onClick={()=>void save()} className="w-full rounded-xl p-3 flex items-center gap-2 justify-center bg-rose-600 text-white font-bold disabled:opacity-50"><Save size={18}/>儲存設定</button></div>
+    <p className="rounded-xl border p-3 text-sm text-slate-500">演講者的 AI 模型、回答規則、測試回答與電池額度，已集中移到「AI問問題」子分頁。</p>
   </section>;
 };

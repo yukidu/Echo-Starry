@@ -5,7 +5,7 @@ import {quota,reserve,isSuper,formatQaAnswer} from '../worker/aiSpeakerQaRouter'
 
 const get=(p:string)=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const router=get('worker/aiSpeakerQaRouter.ts');
-const admin=get('src/components/TranscriptQaAdmin.tsx');
+const admin=get('src/components/AiQuestionSettingsAdmin.tsx');
 const comments=get('src/components/CommentsSection.tsx');
 const profile=get('src/components/SpeakerProfilePage.tsx');
 const app=get('src/App.tsx');
@@ -39,7 +39,7 @@ test('regular members still keep their per-tier and site-wide limits',()=>{
   assert.match(router,/if\(q\.unlimited\)/);
   assert.match(router,/if\(q\.unlimited\|\|!q\.costUnits\)return true/);
   assert.match(router,/globalUsed:Number\(used\?\.used\|\|0\)/);
-  assert.match(admin,/全站今日已使用/);
+  assert.match(admin,/全站今日已回答/);
   assert.match(comments,/超級管理員：網站內召喚不限次數、不扣電池/);
 });
 test('AI answer is readable and ends with trusted recording source titles only',()=>{
@@ -50,8 +50,8 @@ test('AI answer is readable and ends with trusted recording source titles only',
   assert.doesNotMatch(out,/12:35/);
   assert.doesNotMatch(out,/第4段/);
   assert.match(router,/replyDirections/);
-  assert.match(admin,/AI 回答格式自訂指令/);
-  assert.match(router,/max_tokens:i===0\?1800:1200/);
+  assert.match(admin,/第一層｜演講者角色與說話視角/);
+  assert.match(router,/runQaModelOnce\(env,chosen,messages,i===0\?1800:1200\)/);
 });
 test('speaker recordings require confirmation and play through existing bubble, preserving view',()=>{
   assert.match(profile,/role="alertdialog"/);
