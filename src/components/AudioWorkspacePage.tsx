@@ -37,7 +37,8 @@ export const AudioWorkspacePage:React.FC<Props>=({currentUser,isAdmin,tracks,ini
  editRef.current=editing;dirtyRef.current=dirty;
  const tabs=useMemo(()=>AUDIO_WORKSPACE_TABS.filter(t=>!('superOnly' in t&&t.superOnly)||superAdmin),[superAdmin]);
  const switchTab=(tab:AudioWorkspaceTab)=>{
-   if(editRef.current)return;
+   if(editRef.current || !discard())return;
+   setDirty(false);dirtyRef.current=false;
    if(tab==='community'||tab==='transcript'||tab==='ai-question'||tab==='speaker'){if(!superAdmin)return;}
    setActive(tab);
    window.requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'auto'}));
