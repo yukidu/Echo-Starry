@@ -1,5 +1,6 @@
 import { ThemedSelect } from './ThemedSelect';
 import React, { useState, useRef } from 'react';
+import {prepareAudioFormPresentation} from '../uploadModalPresentationPolicy';
 import {
   UploadCloud,
   FileAudio,
@@ -432,8 +433,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setSelectedCategories(['事業']);
       setKeywords([]);
       setSeries('');
-      setSpeechDate(new Date().toISOString().split('T')[0].replace(/-/g, '/'));
-      setSeriesOrder('第 1 集');
+      setSpeechDate('');
+      setSeriesOrder('');
       setRequiredRank('無');
       // New public recordings remain guest-visible, matching the previous rule.
       setGuestVisible(true);
@@ -454,6 +455,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setAudioDurationSeconds(null);
     }
   }, [trackToEdit, isOpen]);
+
+  // Presentation is scoped to this React-owned form; never watch document.body.
+  const formElementRef=useRef<HTMLFormElement>(null);
+  React.useEffect(()=>{
+    if(!isOpen)return;
+    const frame=window.requestAnimationFrame(()=>{
+      if(formElementRef.current)prepareAudioFormPresentation(formElementRef.current);
+    });
+    return ()=>window.cancelAnimationFrame(frame);
+  },[isOpen,trackToEdit?.id,categoryList,coverLibrary.length,keywords.length]);
 
   // The language is only a recognition hint; the AI always preserves real mixed-language speech.
   React.useEffect(() => {
@@ -865,7 +876,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form id="track-upload-form" onSubmit={handleSubmit} onChangeCapture={()=>onDirtyChange?.(true)} className="p-4 sm:p-5 space-y-4 text-xs">
+        <form id="track-upload-form" ref={formElementRef} onSubmit={handleSubmit} onChangeCapture={()=>onDirtyChange?.(true)} className="p-4 sm:p-5 space-y-4 text-xs">
           {errorMessage && (
             <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
