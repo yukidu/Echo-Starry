@@ -39,12 +39,13 @@ test('F22 API strictly denies without central membership even if Echo user exist
  assert.match(res?.headers.get('cache-control')||'',/no-store/);
  assert.equal(await res?.text(),'{"error":"central_super_admin_required"}');
 });
-test('F22 never exposes member questions or transcripts, uses three bounded read-only SQL queries',async()=>{
+test('F22 never exposes member questions or transcripts, uses four guarded read-only SQL queries',async()=>{
  const prepared:string[]=[];const calls:{kind:string;params:unknown[]}[]=[];
  const db={prepare:(sql:string)=>{prepared.push(sql);return{
   bind:(...params:unknown[])=>({
     first:async()=>{calls.push({kind:'first',params});return {calls:3,members:2,successes:2,failures:1,repeat30:1};},
     all:async()=>{calls.push({kind:'all',params});
+      if(sql.includes('SELECT COUNT(*) AS n FROM ('))return {results:[{n:3}],meta:{rows_read:3}};
       if(sql.includes('AS title'))return {results:[{id:'audio-1',title:'音檔測試',speaker:'甲&乙',
         linkedSpeakers:'甲、乙',calls:3,members:2,successes:2,failures:1,repeat30:1}]};
       return {results:[{day:'2026-10-20',calls:3}]};
@@ -52,7 +53,7 @@ test('F22 never exposes member questions or transcripts, uses three bounded read
   })
  }}};
  const data=await f22Statistics({DB:db},'7d','track','members',Date.parse('2026-10-20T02:00:00Z'));
- assert.equal(calls.length,3);
+ assert.equal(calls.length,4);
  assert.equal(data.rows[0].calls,3);
  assert.deepEqual(data.rows[0].linkedSpeakers,['甲','乙']);
  assert.equal(data.totals.members,2);
@@ -62,15 +63,16 @@ test('F22 never exposes member questions or transcripts, uses three bounded read
  assert.ok(prepared.every(sql=>sql.includes('createdAt>=?')&&sql.includes('createdAt<?')));
  assert.ok(prepared.every(sql=>!/\b(insert|update|delete|alter|create)\b/i.test(sql)));
  assert.ok(prepared.every(sql=>!/\b(content|question|prompt|api_key)\b/i.test(sql)));
- assert.match(prepared.find(x=>x.includes('AS title'))||'',/LEFT JOIN \(SELECT trackId,GROUP_CONCAT/);
+ assert.match(prepared.find(x=>x.includes('AS title'))||'',/SELECT GROUP_CONCAT\(ts\.speakerName/);
  assert.ok(prepared.some(x=>x.includes('LIMIT 60')));
- assert.ok(prepared.some(x=>x.includes('LIMIT 366')));
+ assert.ok(prepared.some(x=>x.includes('LIMIT 6000')));
+ assert.ok(prepared.some(x=>x.includes('LIMIT ?')));
 });
 test('F22 multi speaker cannot double-count or invent individual QA attribution',async()=>{
  const sql:string[]=[];
  const db={prepare:(text:string)=>{sql.push(text);return {bind:()=>({
   first:async()=>({calls:2,members:1}),
-  all:async()=>({results:[]})
+  all:async()=>text.includes('SELECT COUNT(*) AS n FROM (')?{results:[{n:2}],meta:{rows_read:2}}:{results:[]}
  })}}};
  await f22Statistics({DB:db},'today','speaker','calls');
  const owned=sql.find(x=>x.includes('speaker_count'));
