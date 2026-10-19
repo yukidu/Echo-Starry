@@ -6,7 +6,7 @@ import {readFileSync} from 'node:fs';
 async function guestScript(){
   const response=renderStarryIdMemberCenterPage('test-client.apps.googleusercontent.com');
   const html=await response.text();
-  const script=html.match(/<script>([\\s\\S]*?)<\\/script>/)?.[1];
+  const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
   assert.ok(script,'Member UI should include a runnable manager script');
   assert.doesNotThrow(()=>new Function(script),'Generated browser script must be valid JS');
   return {html,script};
