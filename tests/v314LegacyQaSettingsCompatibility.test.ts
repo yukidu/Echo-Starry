@@ -14,7 +14,7 @@ test('older mobile/PWA version may save five tier settings without replyDirectio
   assert.equal(parseReplyDirectionsUpdate(legacy),undefined);
   assert.equal(parseReplyDirectionsUpdate({...legacy,replyDirections:undefined}),undefined);
   assert.match(router,/if\(replyDirections!==undefined\) updatedSettings\.replyDirections=replyDirections/);
-  assert.match(router,/Object\.entries\(updatedSettings\)/);
+  assert.match(router,/writeQaSettings\(env,updatedSettings/);
 });
 test('new client can save, clear, and safely validate response instructions',()=>{
   assert.equal(parseReplyDirectionsUpdate({replyDirections:'溫暖精簡地回答'}),'溫暖精簡地回答');
