@@ -103,7 +103,7 @@ test('A04 saves separate app/task records with 0–3 ordered backup models and a
  assert.equal(separate.revision,1);assert.equal(db.policies.size,2);
  const panel=await readAiRoutingControl(env,'echostars','echo.qa');
  assert.equal(panel.history.length,2);assert.equal(panel.policies.length,2);
- assert.equal(panel.policies.find(x=>x.taskId==='echo.qa')?.selection.backups[0],'@cf/test/qa-a');
+ assert.equal(panel.policies.find((x:any)=>x.taskId==='echo.qa')?.selection.backups[0],'@cf/test/qa-a');
  assert.equal(panel.enabledForRuntime,false);
  assert.equal(db.audits.size,3);
 });
