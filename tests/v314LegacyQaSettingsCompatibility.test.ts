@@ -5,7 +5,7 @@ import {parseReplyDirectionsUpdate} from '../worker/aiSpeakerQaRouter';
 
 const read=(p:string)=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const router=read('worker/aiSpeakerQaRouter.ts');
-const admin=read('src/components/TranscriptQaAdmin.tsx');
+const admin=read('src/components/AiQuestionSettingsAdmin.tsx');
 const badge=read('src/components/AiBadge.css');
 const serviceWorker=read('public/sw.js');
 
@@ -22,9 +22,9 @@ test('new client can save, clear, and safely validate response instructions',()=
   assert.equal(parseReplyDirectionsUpdate({replyDirections:'答'.repeat(2000)})?.length,2000);
   assert.throws(()=>parseReplyDirectionsUpdate({replyDirections:'答'.repeat(2001)}),/不得超過2000字/);
   assert.throws(()=>parseReplyDirectionsUpdate({replyDirections:null}),/不得超過2000字/);
-  assert.match(admin,/value=\{data\?\.replyDirections\|\|''\}/);
-  assert.match(admin,/maxLength=\{2000\}/);
-  assert.match(admin,/replyDirections:data\.replyDirections\|\|''/);
+  assert.match(admin,/qaRules/);
+  assert.match(admin,/maxLength=\{2400\}/);
+  assert.match(admin,/replyDirections:data\.qaRules\.styleDirections\.slice\(0,2000\)/);
 });
 test('new service worker shell updates existing mobile tabs once after release',()=>{
   assert.match(serviceWorker,/const CACHE_NAME = 'echostars-shell-v\d+'/);
