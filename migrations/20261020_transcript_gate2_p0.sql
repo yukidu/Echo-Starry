@@ -12,6 +12,7 @@ CREATE TABLE transcript_runs (
   leaseUntil INTEGER NOT NULL DEFAULT 0,
   sourceAudioKey TEXT NOT NULL,
   sourceAudioUrl TEXT NOT NULL,
+  sourceAudioEtag TEXT NOT NULL,
   expectedActiveR2Key TEXT,
   candidateVersionId TEXT,
   approvedBy TEXT,
@@ -35,6 +36,7 @@ CREATE TABLE transcript_versions (
   manifestKey TEXT NOT NULL,
   checksum TEXT NOT NULL,
   sourceAudioKey TEXT NOT NULL,
+  sourceAudioEtag TEXT NOT NULL,
   createdAt INTEGER NOT NULL
 );
 CREATE INDEX transcript_versions_by_track ON transcript_versions(trackId,createdAt);
