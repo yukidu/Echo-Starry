@@ -11,7 +11,8 @@ export type MockConsoleDependencies = {
  checkFakeAdmin(request:Request):Promise<FakeAdmin|null>;
  readFakeCloud():Promise<readonly Observation[]>;
  readFakeEvents():Promise<readonly SyntheticInput[]>;
- readFakePositiveChecks():Promise<readonly MockPositiveCheck[]>;
+ /** Legacy injected fixture. Explicitly ignored: no trusted proof source is wired. */
+ readFakePositiveChecks?():Promise<readonly MockPositiveCheck[]>;
  // Inject limiter in tests; no shared global network state or KV writes.
  mayRead(subject:string,now:number):boolean;
 };
@@ -25,7 +26,6 @@ function respond(body:object,status=200):Response {
 export function createN1aOfflineReadOnlyHandler(deps:MockConsoleDependencies) {
  const cloud=createMockSnapshotReader(deps.readFakeCloud);
  const events=createMockSnapshotReader(deps.readFakeEvents);
- const positive=createMockSnapshotReader(deps.readFakePositiveChecks);
  return async (request:Request):Promise<Response>=>{
   const url=new URL(request.url);
   if(url.pathname!=='/admin/ops/n1a-s1-offline')return respond({error:'not_found'},404);
@@ -37,16 +37,17 @@ export function createN1aOfflineReadOnlyHandler(deps:MockConsoleDependencies) {
   if(!actor?.subject||!actor.centralSuperAdmin||!actor.starryIdCheckedInFixture||
      !Number.isFinite(actor.expiresAt)||actor.expiresAt<=now)return respond({error:'access_denied'},403);
   if(!deps.mayRead(actor.subject,now))return respond({error:'refresh_too_frequent'},429);
-  const [cloudResult,eventResult,positiveResult]=await Promise.allSettled([cloud(now),events(now),positive(now)]);
+  // No trusted approval adapter: never fetch/cache a caller's positive security claims.
+  const [cloudResult,eventResult]=await Promise.allSettled([cloud(now),events(now)]);
   const payload=buildN1aMockDashboard(
    cloudResult.status==='fulfilled'?cloudResult.value:[],
    eventResult.status==='fulfilled'?eventResult.value:[],
    now,
-   positiveResult.status==='fulfilled'?positiveResult.value:[],
+   [],
    {
     cloudSourceAvailable:cloudResult.status==='fulfilled',
     eventSourceAvailable:eventResult.status==='fulfilled',
-    positiveSourceAvailable:positiveResult.status==='fulfilled',
+    positiveSourceAvailable:true, // empty positives: allow isolated warning/fault, never green
    },
   );
   return respond(payload);
