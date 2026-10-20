@@ -80,11 +80,14 @@ const rows=(value:any):any[]=>Array.isArray(value?.results)?value.results:[];
 export async function replaceQaSearchGeneration(db:any,options:{
   trackId:string;sourceKey:string;sourceUpdatedAt:number;generation:string;speaker:string;
   subtitles:QaSubtitle[];cleaned?:{id?:string;text?:string}[];
+  expectedChangeRevision?:number;
 }):Promise<number>{
   const {trackId,sourceKey,sourceUpdatedAt,generation,speaker,subtitles,cleaned}=options;
   if(!trackId||!sourceKey||!generation||!Number.isFinite(sourceUpdatedAt))throw Error('逐字稿索引來源版本無效');
   const prior:any=await db.prepare('SELECT changeRevision FROM qa_search_state WHERE trackId=?').bind(trackId).first();
-  const expectedRevision=Number(prior?.changeRevision||0);
+  const expectedRevision=options.expectedChangeRevision??Number(prior?.changeRevision||0);
+  if(options.expectedChangeRevision!==undefined && expectedRevision!==Number(prior?.changeRevision||0))
+    throw Error('索引來源在重建前已改變，稍後重新排程');
   const paragraphs=buildQaSearchParagraphs(trackId,generation,speaker,subtitles,cleaned||[]);
   if(!paragraphs.length)throw Error('逐字稿沒有可索引的內容');
   // Guard expensive unbounded index jobs; long recordings can be handled in a later batch.
@@ -155,7 +158,7 @@ export async function findQaIndexedPassages(db:any,question:string,trackIds:stri
  */
 export async function rebuildQaSearchAfterMutation(env:{
   DB:any;R2_BUCKET:any;QA_CHINESE_SEARCH_WRITE_ENABLED?:string
-},trackId:string):Promise<{indexed:boolean;reason?:string;count?:number}>{
+},trackId:string,expectedChangeRevision?:number):Promise<{indexed:boolean;reason?:string;count?:number}>{
   if(env.QA_CHINESE_SEARCH_WRITE_ENABLED!=='true')return {indexed:false,reason:'disabled'};
   const indexed:any=await env.DB.prepare(
     "SELECT r2Key,updatedAt,status FROM transcript_index WHERE trackId=? LIMIT 1"
@@ -181,9 +184,18 @@ export async function rebuildQaSearchAfterMutation(env:{
   const cleaned=[...overrides].map(([id,text])=>({id,text}));
   // New unique generation per real rebuild, but immutable original segments.
   const generation='qa-'+crypto.randomUUID();
-  const count=await replaceQaSearchGeneration(env.DB,{
-    trackId,sourceKey:String(indexed.r2Key),sourceUpdatedAt:Number(indexed.updatedAt),
-    generation,speaker:String(track.speaker||''),subtitles:source.segments,cleaned
-  });
-  return {indexed:true,count};
+  try{
+    const count=await replaceQaSearchGeneration(env.DB,{
+      trackId,sourceKey:String(indexed.r2Key),sourceUpdatedAt:Number(indexed.updatedAt),
+      generation,speaker:String(track.speaker||''),subtitles:source.segments,cleaned,
+      expectedChangeRevision
+    });
+    return {indexed:true,count};
+  }catch(error){
+    // Failed jobs never publish their paragraphs. Remove this generation to
+    // avoid accumulating dead FTS documents during retries and lease recovery.
+    await env.DB.prepare('DELETE FROM qa_search_segments WHERE trackId=? AND generation=?')
+      .bind(trackId,generation).run().catch(()=>null);
+    throw error;
+  }
 }
