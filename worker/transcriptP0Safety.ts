@@ -4,31 +4,49 @@
 export type SafeIntent = 'first'|'relisten';
 export type SafeRun = {
   runId:string;trackId:string;intent:SafeIntent;requestKey:string;state:string;
-  generation:number;sourceAudioKey:string;sourceAudioUrl:string;expectedActiveR2Key:string|null;
+  generation:number;sourceAudioKey:string;sourceAudioUrl:string;sourceAudioEtag:string;expectedActiveR2Key:string|null;
   approvedBy:string|null;approvedAt:number|null;approvedMaxSeconds:number;
   candidateVersionId:string|null;
 };
-type Db = { prepare(sql:string):any };
-export type SafeEnv = { DB:Db;R2_BUCKET:any };
+type Db = { prepare(sql:string):any; batch?(statements:any[]):Promise<any[]> };
+export type SafeEnv = { DB:Db; R2_BUCKET:any; P0_AUTHORITY?:{
+  verifyPublication(input:{
+    trackId:string;runId:string;actorId:string|null;sourceAudioEtag:string;
+    intendedActiveKey:string|null
+  }):Promise<{allowed:boolean;epoch:string;permissionRevision:string;correctionRevision:string}>
+} };
 const OPEN_STATES = "('pending','queued','processing','awaiting_review')";
 export const gate2Enabled=(env:any)=>String(env?.TRANSCRIPT_P0_ENABLED||'')==='1';
 
 function fail(message:string):never {throw new Error('Gate2 safe transcript: '+message);}
+export async function sourceRevision(r2:any,key:string):Promise<string>{
+  if(!r2 || typeof r2.head!=='function')fail('R2 source revision verifier unavailable');
+  const obj=await r2.head(key);
+  const etag=String(obj?.etag||'').trim();
+  if(!etag || !Number.isFinite(Number(obj?.size)) || Number(obj.size)<1)
+    fail('source missing, empty or unversioned');
+  return etag+':'+String(obj.size);
+}
+export async function assertSourceRevision(env:SafeEnv,run:SafeRun){
+  const current=await sourceRevision(env.R2_BUCKET,run.sourceAudioKey);
+  if(current!==run.sourceAudioEtag)fail('audio content revision changed; candidate rejected');
+}
 export async function requestSafeRun(db:Db,input:{
-  trackId:string;intent:SafeIntent;requestKey:string;sourceAudioKey:string;sourceAudioUrl:string;
+  trackId:string;intent:SafeIntent;requestKey:string;sourceAudioKey:string;sourceAudioUrl:string;sourceAudioEtag:string;
   approvedBy?:string;approvedMaxSeconds?:number
 }):Promise<SafeRun|null>{
+  if(!input.sourceAudioEtag || !input.requestKey || !input.sourceAudioUrl) fail('unversioned candidate request');
   const now=Date.now(),id=crypto.randomUUID();
   const row=await db.prepare(
     "INSERT INTO transcript_runs(runId,trackId,intent,requestKey,state,generation,leaseUntil,"+
-    "sourceAudioKey,sourceAudioUrl,expectedActiveR2Key,approvedBy,approvedAt,approvedMaxSeconds,createdAt,updatedAt) "+
-    "SELECT ?,i.trackId,?,?,'pending',0,0,?,?,i.r2Key,?,?,?, ?,? "+
+    "sourceAudioKey,sourceAudioUrl,sourceAudioEtag,expectedActiveR2Key,approvedBy,approvedAt,approvedMaxSeconds,createdAt,updatedAt) "+
+    "SELECT ?,i.trackId,?,?,'pending',0,0,?,?,?,i.r2Key,?,?,?, ?,? "+
     "FROM transcript_index i WHERE i.trackId=? "+
     "AND ((?='first' AND i.status='pending' AND i.r2Key IS NULL) "+
     "OR (?='relisten' AND i.status='ready' AND i.r2Key IS NOT NULL AND ? IS NOT NULL)) "+
     "AND NOT EXISTS(SELECT 1 FROM transcript_runs r WHERE r.trackId=i.trackId AND r.state IN "+OPEN_STATES+") "+
     "ON CONFLICT DO NOTHING RETURNING *")
-    .bind(id,input.intent,input.requestKey,input.sourceAudioKey,input.sourceAudioUrl,
+    .bind(id,input.intent,input.requestKey,input.sourceAudioKey,input.sourceAudioUrl,input.sourceAudioEtag,
       input.approvedBy||null,input.approvedBy?now:null,
       Number(input.approvedMaxSeconds||0),now,now,
       input.trackId,input.intent,input.intent,input.approvedBy||null).first();
@@ -36,7 +54,13 @@ export async function requestSafeRun(db:Db,input:{
   // A repeated, previously approved request must never create a second paid run.
   const existing=await db.prepare('SELECT * FROM transcript_runs WHERE requestKey=? LIMIT 1')
     .bind(input.requestKey).first();
-  return (existing as SafeRun)||null;
+  if(!existing)return null;
+  const prev=existing as SafeRun;
+  // One HTTP approval nonce represents exactly one actor, audio version and track.
+  if(prev.trackId!==input.trackId || prev.intent!==input.intent ||
+     prev.sourceAudioEtag!==input.sourceAudioEtag ||
+     String(prev.approvedBy||'')!==String(input.approvedBy||''))fail('request key reused across approvals');
+  return prev;
 }
 export async function claimSafeRun(db:Db,runId:string,trackId:string):Promise<SafeRun>{
   const now=Date.now();
