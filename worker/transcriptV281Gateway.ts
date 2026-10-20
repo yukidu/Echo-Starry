@@ -2,7 +2,7 @@ import type { Env } from './index';
 import transcriptWorker from './transcriptMemberNotificationsRouter';
 import { queueAllPendingTranscripts, transcriptBulkStatus } from './transcriptBulkScheduler';
 import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
-import { gate2Enabled, requestSafeRun } from './transcriptP0Safety';
+import { gate2Enabled, requestSafeRun, sourceRevision } from './transcriptP0Safety';
 import { handleCleanupAdmin } from './transcriptCleanupService';
 import { batteriesToUnits, unitsToBatteries } from '../shared/battery';
 
@@ -366,16 +366,22 @@ export default {
         const pos=audio.indexOf(marker);
         if(pos<0)return json({error:'找不到 R2 原音檔來源'},400);
         const key=decodeURIComponent(audio.slice(pos+marker.length));
+        const sourceAudioEtag=await sourceRevision((env as any).R2_BUCKET,key)
+          .catch(()=>null);
+        if(!sourceAudioEtag)return json({error:'原音檔無法安全確認版本，已拒絕重聽'},409);
+        const approvalNonce=text(body.approvalNonce);
+        if(!/^[0-9a-fA-F-]{36}$/.test(approvalNonce))return json({error:'請重新確認本次重聽申請'},400);
         const current:any=await db.prepare(
           "SELECT status,r2Key FROM transcript_index WHERE trackId=? LIMIT 1").bind(trackId).first();
         if(current?.status!=='ready'||!current?.r2Key)
           return json({error:'尚未有可安全保留的已完成原稿'},409);
         const run=await requestSafeRun(db,{
-          trackId,intent:'relisten',sourceAudioKey:key,sourceAudioUrl:audio,
-          requestKey:'relisten:'+trackId+':'+current.r2Key,
+          trackId,intent:'relisten',sourceAudioKey:key,sourceAudioUrl:audio,sourceAudioEtag,
+          requestKey:'relisten:'+trackId+':'+text(actor.id)+':'+approvalNonce,
           approvedBy:text(actor.id),approvedMaxSeconds:seconds
         });
-        if(!run)return json({error:'已存在候選工作或狀態已變更'},409);
+        if(!run || !['pending','queued','processing','awaiting_review'].includes(run.state))
+          return json({error:'本次任務已結束或已有其他候選；請重新確認後再申請'},409);
         ctx.waitUntil(queueNextTranscriptV293(env as any,{includeFailed:false}).catch(()=>null));
         return json({success:true,trackId,status:'ready',activePreserved:true,
           candidateStatus:run.state,message:'已申請新版本，舊逐字稿保持可用'},202);
