@@ -4,7 +4,7 @@ import type { WorkflowEvent, WorkflowStep } from 'cloudflare:workers';
 import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
 import { markSpeakerBiosDirty } from './aiSpeakerProfileRouter';
 import { cleanTranscriptSegmentsOnce, loadCleanupSettings } from './transcriptCleanupService';
-import { gate2Enabled, claimSafeRun, assertLiveRun, stageSafeVersion, publishSafeVersion, failSafeRun } from './transcriptP0Safety';
+import { gate2Enabled, claimSafeRun, assertLiveRun, stageSafeVersion, publishSafeVersion, failSafeRun, failUnclaimedRun, assertSourceRevision, assertUnfundedWhisperBlocked } from './transcriptP0Safety';
 import type { SafeRun } from './transcriptP0Safety';
 
 const MODEL = '@cf/openai/whisper-large-v3-turbo';
@@ -283,7 +283,10 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
       const segments: Segment[] = [];
 
       await step.do('prepare-audio-container', { retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' } }, async () => {
-        if (gate2 && safeRun) await assertLiveRun(this.env.DB, safeRun);
+        if (gate2 && safeRun) {
+          await assertLiveRun(this.env.DB,safeRun);
+          await assertSourceRevision(this.env,safeRun);
+        }
         await loadAudio(this.env, trackId, info.key, info.ext);
         return { ok: true, bytes: info.size };
       });
@@ -298,6 +301,7 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
             if (gate2 && safeRun) await assertLiveRun(this.env.DB, safeRun);
             const buffer = await getAudioSegment(this.env, trackId, info.key, info.ext, start, seconds);
             if (gate2 && safeRun) await assertLiveRun(this.env.DB, safeRun);
+            if (gate2 && safeRun) await assertUnfundedWhisperBlocked(this.env,safeRun);
             const audio = Buffer.from(buffer).toString('base64');
             return this.env.AI.run(MODEL, {
               audio,
@@ -366,12 +370,13 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
       const txtKey = `${base}/transcript.txt`;
       const vttKey = `${base}/transcript.vtt`;
 
+      let publishedKeys: {jsonKey:string;txtKey:string;vttKey:string}|null=null;
       await step.do('store-transcript-formats', async () => {
         if (gate2 && safeRun) {
-          await stageSafeVersion(this.env, safeRun, {
+          publishedKeys=await stageSafeVersion(this.env, safeRun, {
             json:JSON.stringify(file),txt:fullText,vtt:toVtt(segments),raw:rawWhisper,language:storedLanguage
           });
-          if (safeRun.intent==='first') await publishSafeVersion(this.env.DB,safeRun.runId,null);
+          if (safeRun.intent==='first') await publishSafeVersion(this.env,safeRun.runId,null);
           return;
         }
         await Promise.all([
@@ -396,11 +401,13 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
       if (!gate2 || safeRun?.intent==='first') await markSpeakerBiosDirty(this.env, trackId).catch(() => null);
       await cleanupAudio(this.env, trackId, info.ext);
       const next = await queueFollowingTranscript(this.env, step, 'queue-next-transcript');
-      return { trackId, chunks, segments: segments.length, language: storedLanguage, jsonKey, txtKey, vttKey, next };
+      const resultKeys=publishedKeys||{jsonKey,txtKey,vttKey};
+      return {trackId,chunks,segments:segments.length,language:storedLanguage,...resultKeys,next};
     } catch (error) {
       if (info?.ext) await cleanupAudio(this.env, trackId, info.ext);
       if (gate2) {
-        await failSafeRun(this.env.DB,safeRun,error).catch(() => null);
+        if(safeRun)await failSafeRun(this.env.DB,safeRun,error).catch(() => null);
+        else if(runId)await failUnclaimedRun(this.env.DB,runId,trackId,error).catch(() => null);
       } else {
         await this.env.DB.prepare("UPDATE transcript_index SET status='failed',error=?,updatedAt=? WHERE trackId=?")
           .bind(error instanceof Error ? error.message.slice(0,1000) : String(error).slice(0,1000), Date.now(), trackId).run().catch(() => null);
