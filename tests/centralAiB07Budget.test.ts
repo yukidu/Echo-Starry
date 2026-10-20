@@ -124,6 +124,8 @@ test('B07 free local HTTP rehearsal: 2000 fake identities, <=96 loopback sockets
  assert.equal(run.error,undefined,String(run.error||''));
  assert.equal(run.status,0,'stdout:\n'+run.stdout+'\nstderr:\n'+run.stderr);
  assert.match(run.stdout,/B07_OFFLINE_HTTP_FAKE_USERS_OK/);
+ // Print only anonymized localhost metrics for AI2 audit; no account or member data.
+ console.log(run.stdout.trim());
  assert.match(run.stdout,/"trueCloudflareUsersMeasured":0/);
  assert.match(run.stdout,/"paidProviderCalls":0/);
 });
