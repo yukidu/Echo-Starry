@@ -19,7 +19,9 @@ const PY = [
 '  out=[]',
 '  for i,stmt in enumerate(payload["batch"]):',
 '   if i==1 and payload.get("failSecond"): raise RuntimeError("injected second statement failure")',
-'   cur=conn.execute(stmt["sql"],stmt.get("args",[]))',
+'   sql=stmt["sql"]',
+'   if i==payload.get("zeroRowAt",-1): sql+=" AND 0"',
+'   cur=conn.execute(sql,stmt.get("args",[]))',
 '   out.append({"meta":{"changes":cur.rowcount}})',
 ' elif payload.get("script"): conn.executescript(payload["sql"]); out={}',
 ' else:',
@@ -35,10 +37,11 @@ const PY = [
 ].join('\n');
 class FakeD1 {
   failSecond=false;
+  zeroRowAt=-1;
   constructor(public path:string){}
   async batch(statements:any[]){
     const subprocess=spawnSync('python3',['-c',PY,this.path,JSON.stringify({
-      batch:statements.map(item=>({sql:item.sql,args:item.args})),failSecond:this.failSecond
+      batch:statements.map(item=>({sql:item.sql,args:item.args})),failSecond:this.failSecond,zeroRowAt:this.zeroRowAt
     })],{encoding:'utf8'});
     if(subprocess.status!==0)throw Error('fake batch rolled back: '+(subprocess.stdout||subprocess.stderr||''));
     return JSON.parse(subprocess.stdout||'{}').result;
@@ -114,7 +117,7 @@ test('SAFE-01/02 original ready cannot enter first-run and duplicate claim is re
       requestKey:'relisten:synthetic-a:legacy',sourceAudioKey:'audio/demo.mp3',sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123',
       approvedBy:'fake-admin',approvedMaxSeconds:80});
     assert.equal(duplicate?.runId,relisten?.runId);
-    await db.prepare("UPDATE transcript_runs SET state='queued' WHERE runId=?").bind(relisten!.runId).run();
+    await db.prepare("UPDATE transcript_runs SET state='queued',leaseUntil=CAST(strftime('%s','now') AS INTEGER)*1000+1800000 WHERE runId=?").bind(relisten!.runId).run();
     const owned=await claimSafeRun(db,relisten!.runId,'synthetic-a');
     assert.equal(owned.state,'processing');
     await assert.rejects(()=>claimSafeRun(db,relisten!.runId,'synthetic-a'),/not queued/);
@@ -130,7 +133,7 @@ test('SAFE-03 partial R2 candidate writes never change active published transcri
     const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'relisten',
       requestKey:'relisten:failed',sourceAudioKey:'audio/demo.mp3',sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123',
       approvedBy:'fake-admin',approvedMaxSeconds:80}))!;
-    await db.prepare("UPDATE transcript_runs SET state='queued' WHERE runId=?").bind(run.runId).run();
+    await db.prepare("UPDATE transcript_runs SET state='queued',leaseUntil=CAST(strftime('%s','now') AS INTEGER)*1000+1800000 WHERE runId=?").bind(run.runId).run();
     const claimed=await claimSafeRun(db,run.runId,'synthetic-a');
     r2.failAt=2;
     await assert.rejects(()=>stageSafeVersion({DB:db,R2_BUCKET:r2},claimed,content),/injected/);
@@ -146,7 +149,7 @@ test('SAFE-04/05 new first-run only publishes once and stale callbacks cannot re
   try{
     const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'first',
       requestKey:'first:synthetic-a:audio/demo.mp3',sourceAudioKey:'audio/demo.mp3',sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123'}))!;
-    await db.prepare("UPDATE transcript_runs SET state='queued' WHERE runId=?").bind(run.runId).run();
+    await db.prepare("UPDATE transcript_runs SET state='queued',leaseUntil=CAST(strftime('%s','now') AS INTEGER)*1000+1800000 WHERE runId=?").bind(run.runId).run();
     await db.prepare("UPDATE transcript_index SET status='queued' WHERE trackId='synthetic-a'").run();
     const claimed=await claimSafeRun(db,run.runId,'synthetic-a');
     await stageSafeVersion({DB:db,R2_BUCKET:r2},claimed,content);
@@ -169,7 +172,7 @@ test('member correction requires a separate review and keeps the prior ready poi
     const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'relisten',
       requestKey:'relisten:review',sourceAudioKey:'audio/demo.mp3',sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123',
       approvedBy:'fake-admin',approvedMaxSeconds:80}))!;
-    await db.prepare("UPDATE transcript_runs SET state='queued' WHERE runId=?").bind(run.runId).run();
+    await db.prepare("UPDATE transcript_runs SET state='queued',leaseUntil=CAST(strftime('%s','now') AS INTEGER)*1000+1800000 WHERE runId=?").bind(run.runId).run();
     const claimed=await claimSafeRun(db,run.runId,'synthetic-a');
     await stageSafeVersion({DB:db,R2_BUCKET:r2},claimed,content);
     await db.prepare("INSERT INTO transcript_corrections(id,trackId) VALUES('fake-c1','synthetic-a')").run();
@@ -186,7 +189,7 @@ test('RST-01 atomic publish rolls back pointer AND job when the second D1 statem
   try{
     const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'first',
       requestKey:'first:atomic',sourceAudioKey:'audio/demo.mp3',sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123'}))!;
-    await db.prepare("UPDATE transcript_runs SET state='queued' WHERE runId=?").bind(run.runId).run();
+    await db.prepare("UPDATE transcript_runs SET state='queued',leaseUntil=CAST(strftime('%s','now') AS INTEGER)*1000+1800000 WHERE runId=?").bind(run.runId).run();
     await db.prepare("UPDATE transcript_index SET status='queued' WHERE trackId='synthetic-a'").run();
     const claimed=await claimSafeRun(db,run.runId,'synthetic-a');
     await stageSafeVersion(env,claimed,content);
@@ -205,7 +208,7 @@ test('RST-03 corrupted or missing manifest and R2 artifact blocks publication',a
   try{
     const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'first',
       requestKey:'first:integrity',sourceAudioKey:'audio/demo.mp3',sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123'}))!;
-    await db.prepare("UPDATE transcript_runs SET state='queued' WHERE runId=?").bind(run.runId).run();
+    await db.prepare("UPDATE transcript_runs SET state='queued',leaseUntil=CAST(strftime('%s','now') AS INTEGER)*1000+1800000 WHERE runId=?").bind(run.runId).run();
     await db.prepare("UPDATE transcript_index SET status='queued' WHERE trackId='synthetic-a'").run();
     const claimed=await claimSafeRun(db,run.runId,'synthetic-a');
     const result=await stageSafeVersion(env,claimed,content);
@@ -224,7 +227,7 @@ test('RST-02 unchanged audio URL with modified object revision blocks publicatio
   try{
     const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'first',
       requestKey:'first:audio-revision',sourceAudioKey:'audio/demo.mp3',sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123'}))!;
-    await db.prepare("UPDATE transcript_runs SET state='queued' WHERE runId=?").bind(run.runId).run();
+    await db.prepare("UPDATE transcript_runs SET state='queued',leaseUntil=CAST(strftime('%s','now') AS INTEGER)*1000+1800000 WHERE runId=?").bind(run.runId).run();
     await db.prepare("UPDATE transcript_index SET status='queued' WHERE trackId='synthetic-a'").run();
     const claimed=await claimSafeRun(db,run.runId,'synthetic-a');
     await stageSafeVersion(env,claimed,content);
@@ -238,7 +241,7 @@ test('RST-02 external revocation/unavailable authority fails closed',async()=>{
   try{
     const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'first',
       requestKey:'first:revoke',sourceAudioKey:'audio/demo.mp3',sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123'}))!;
-    await db.prepare("UPDATE transcript_runs SET state='queued' WHERE runId=?").bind(run.runId).run();
+    await db.prepare("UPDATE transcript_runs SET state='queued',leaseUntil=CAST(strftime('%s','now') AS INTEGER)*1000+1800000 WHERE runId=?").bind(run.runId).run();
     await db.prepare("UPDATE transcript_index SET status='queued' WHERE trackId='synthetic-a'").run();
     const claimed=await claimSafeRun(db,run.runId,'synthetic-a');
     await stageSafeVersion(env,claimed,content);
@@ -268,7 +271,7 @@ test('RST-03 output format mismatch and duplicate staging do not publish or over
     const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'relisten',
       requestKey:'relisten:format',sourceAudioKey:'audio/demo.mp3',sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123',
       approvedBy:'fake-admin',approvedMaxSeconds:80}))!;
-    await db.prepare("UPDATE transcript_runs SET state='queued' WHERE runId=?").bind(run.runId).run();
+    await db.prepare("UPDATE transcript_runs SET state='queued',leaseUntil=CAST(strftime('%s','now') AS INTEGER)*1000+1800000 WHERE runId=?").bind(run.runId).run();
     const claimed=await claimSafeRun(db,run.runId,'synthetic-a');
     await assert.rejects(()=>stageSafeVersion(env,claimed,{...content,txt:'與字幕不一致'}),/mismatch/);
     const version=await stageSafeVersion(env,claimed,content);
@@ -339,5 +342,108 @@ test('claim failure before paid attempt quarantines queued reservation',async()=
     const active=await db.prepare("SELECT status,r2Key FROM transcript_index WHERE trackId='synthetic-a'").first();
     assert.equal(active.status,'ready');
     assert.equal(active.r2Key,'transcripts/synthetic-a/legacy.json');
+  }finally{cleanup();}
+});
+
+
+test('R1 SQL guard rejects zero-row first or second UPDATE on initial queue',async()=>{
+  const {db,cleanup}=await fixture(false);
+  try{
+    const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'first',
+      requestKey:'first:zero-queue',sourceAudioKey:'audio/demo.mp3',
+      sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123'}))!;
+    for(const position of [0,2]){
+      db.zeroRowAt=position;
+      await assert.rejects(()=>queueSafeRun(db,run.runId,1),/rolled back/);
+      assert.equal((await db.prepare("SELECT state FROM transcript_runs WHERE runId=?").bind(run.runId).first()).state,'pending');
+      assert.equal((await db.prepare("SELECT status FROM transcript_index WHERE trackId='synthetic-a'").first()).status,'pending');
+    }
+    db.zeroRowAt=-1;
+    await queueSafeRun(db,run.runId,1);
+    for(const position of [0,2]){
+      db.zeroRowAt=position;
+      await assert.rejects(()=>claimSafeRun(db,run.runId,'synthetic-a'),/rolled back/);
+      assert.equal((await db.prepare("SELECT state FROM transcript_runs WHERE runId=?").bind(run.runId).first()).state,'queued');
+      assert.equal((await db.prepare("SELECT status FROM transcript_index WHERE trackId='synthetic-a'").first()).status,'queued');
+    }
+    db.zeroRowAt=-1;
+    assert.equal((await claimSafeRun(db,run.runId,'synthetic-a')).state,'processing');
+  }finally{cleanup();}
+});
+
+test('R1 zero-row publication cannot leave an orphan ready pointer or published run',async()=>{
+  const {db,r2,env,cleanup}=await fixture(false);
+  try{
+    const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'first',
+      requestKey:'first:zero-publish',sourceAudioKey:'audio/demo.mp3',
+      sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123'}))!;
+    await queueSafeRun(db,run.runId,1);
+    const claimed=await claimSafeRun(db,run.runId,'synthetic-a');
+    await stageSafeVersion(env,claimed,content);
+    for(const position of [0,2]){
+      db.zeroRowAt=position;
+      await assert.rejects(()=>publishSafeVersion(env,run.runId,null),/rolled back/);
+      const index=await db.prepare("SELECT status,r2Key FROM transcript_index WHERE trackId='synthetic-a'").first();
+      assert.equal(index.status,'processing');
+      assert.equal(index.r2Key,null);
+      assert.equal((await db.prepare("SELECT state FROM transcript_runs WHERE runId=?").bind(run.runId).first()).state,'awaiting_review');
+    }
+    db.zeroRowAt=-1;
+    assert.equal((await publishSafeVersion(env,run.runId,null)).published,true);
+  }finally{cleanup();}
+});
+
+test('R1 uncertain dispatch expires to manual review without requeue or AI call',async()=>{
+  const {db,cleanup}=await fixture(false);
+  try{
+    const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'first',
+      requestKey:'first:lost-dispatch',sourceAudioKey:'audio/demo.mp3',
+      sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123'}))!;
+    await queueSafeRun(db,run.runId,1);
+    await db.prepare("UPDATE transcript_runs SET leaseUntil=1 WHERE runId=?").bind(run.runId).run();
+    assert.equal(await quarantineExpiredRuns(db),1);
+    const stored=await db.prepare("SELECT state,error FROM transcript_runs WHERE runId=?").bind(run.runId).first();
+    assert.equal(stored.state,'failed');
+    assert.equal(stored.error,'dispatch_uncertain_manual_review');
+    assert.equal((await db.prepare("SELECT status FROM transcript_index WHERE trackId='synthetic-a'").first()).status,'failed');
+    assert.equal(await queueSafeRun(db,run.runId,1),null);
+    await assert.rejects(()=>claimSafeRun(db,run.runId,'synthetic-a'),/not queued/);
+  }finally{cleanup();}
+});
+
+test('R1 failed dispatch and stale lease roll back on zero index rows',async()=>{
+  const {db,cleanup}=await fixture(false);
+  try{
+    const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'first',
+      requestKey:'first:zero-failure',sourceAudioKey:'audio/demo.mp3',
+      sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123'}))!;
+    const queued=(await queueSafeRun(db,run.runId,1))!;
+    db.zeroRowAt=2;
+    await assert.rejects(()=>failSafeRun(db,queued,Error('simulated dispatch fault')),/rolled back/);
+    assert.equal((await db.prepare("SELECT state FROM transcript_runs WHERE runId=?").bind(run.runId).first()).state,'queued');
+    assert.equal((await db.prepare("SELECT status FROM transcript_index WHERE trackId='synthetic-a'").first()).status,'queued');
+    db.zeroRowAt=-1;
+    await db.prepare("UPDATE transcript_runs SET leaseUntil=1 WHERE runId=?").bind(run.runId).run();
+    db.zeroRowAt=2;
+    await assert.rejects(()=>quarantineExpiredRuns(db),/rolled back/);
+    assert.equal((await db.prepare("SELECT state FROM transcript_runs WHERE runId=?").bind(run.runId).first()).state,'queued');
+    db.zeroRowAt=-1;
+    assert.equal(await quarantineExpiredRuns(db),1);
+  }finally{cleanup();}
+});
+
+test('R1 two admins race for one queue/claim ownership',async()=>{
+  const {db,cleanup}=await fixture(false);
+  try{
+    const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'first',
+      requestKey:'first:parallel',sourceAudioKey:'audio/demo.mp3',
+      sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123'}))!;
+    const queued=await Promise.allSettled([queueSafeRun(db,run.runId,1),queueSafeRun(db,run.runId,1)]);
+    assert.equal(queued.filter(x=>x.status==='fulfilled'&&x.value?.state==='queued').length,1);
+    assert.equal((await db.prepare("SELECT status FROM transcript_index WHERE trackId='synthetic-a'").first()).status,'queued');
+    const claimed=await Promise.allSettled([claimSafeRun(db,run.runId,'synthetic-a'),claimSafeRun(db,run.runId,'synthetic-a')]);
+    assert.equal(claimed.filter(x=>x.status==='fulfilled').length,1);
+    assert.equal((await db.prepare("SELECT status FROM transcript_index WHERE trackId='synthetic-a'").first()).status,'processing');
+    assert.equal((await db.prepare("SELECT state FROM transcript_runs WHERE runId=?").bind(run.runId).first()).state,'processing');
   }finally{cleanup();}
 });
