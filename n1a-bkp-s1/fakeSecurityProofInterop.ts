@@ -61,15 +61,16 @@ export type FakeInteropDecision = Readonly<{
 }>;
 const ID=/^[A-Za-z0-9_.:-]{1,160}$/;
 const SHA=/^[0-9a-f]{64}$/;
+const safeId=(v:unknown):v is string=>typeof v==='string' && ID.test(v);
 function check(snapshot:FakeInteropEvidence,x:FakeInteropRequest,why:Set<string>,stage:'precheck'|'before_commit') {
   const p=snapshot.proof;
   if(!p||p.schemaVersion!=='N1A-S1-FAKE-v1'||p.issuer!=='fake-star-id-plus-witness'||
      p.audience!=='n1a-offline-only'||p.appId!==x.appId||
      p.action!=='backup.preflight'&&p.action!=='backup.commit'||
      p.requestId!==x.requestId||p.resourceId!==x.backupId||
-     p.subjectId!==x.reviewerSubjectId||!ID.test(p.nonce)||
-     !ID.test(p.subjectId)||!ID.test(p.resourceId)||!ID.test(p.requestId)||
-     !ID.test(p.appId)||!p.fakeAttestation)
+     p.subjectId!==x.reviewerSubjectId||!safeId(p.nonce)||
+     !safeId(p.subjectId)||!safeId(p.resourceId)||!safeId(p.requestId)||
+     !safeId(p.appId)||!p.fakeAttestation)
     why.add('PROOF_SCOPE_OR_SCHEMA_INVALID');
   for(const v of [p.membershipRevision,p.permissionRevision,p.correctionRevision,
      p.securitySeq,p.restoreEpoch,p.revocationWatermark,p.deletionWatermark,
@@ -77,7 +78,7 @@ function check(snapshot:FakeInteropEvidence,x:FakeInteropRequest,why:Set<string>
     if(!isCanonicalBkpVersion(v))why.add('PROOF_VERSION_INVALID');
   // Source revision is an OPAQUE string (content ETag/digest); it is not
   // AI5's numeric statistics event version or a witness sequence.
-  if(!ID.test(p.sourceRevision))why.add('SOURCE_REVISION_OPAQUE_INVALID');
+  if(!safeId(p.sourceRevision))why.add('SOURCE_REVISION_OPAQUE_INVALID');
   if(!Number.isSafeInteger(x.nowMs)||!Number.isSafeInteger(p.issuedAtMs)||
      !Number.isSafeInteger(p.expiresAtMs)||p.issuedAtMs>x.nowMs||
      p.expiresAtMs<=x.nowMs||p.expiresAtMs<=p.issuedAtMs||
