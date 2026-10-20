@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {FakeStarryIdSource,newFakeDatabase,applyFakeEvent,fakeStats,
+import {FakeStarryIdSource,newFakeDatabase,applyFakeEvent,fakeStatsFixtureOnly,
   reportWindow,setupFakeAccount,reserveFakeBatch,markFakeUncertain,
   fakeBudgetTotals,TEST_ONLY,productionAuthorized,F22_N1A_S1_GATE_ENABLED} from '../f22-n1a-s1/offlineModel.ts';
 
@@ -28,7 +28,7 @@ test('N1A-S1: mock is disabled in production, registered distinct vs visitor and
   const guest=s.firstAccept({logicalSourceId:'guest-1',app:'echo',subject:null,acceptedAtUtcMs:NOW-1000,track:'talk-1',state:'done'});
   const unknown=s.firstAccept({logicalSourceId:'unknown-1',app:'echo',subject:'unverified-person',acceptedAtUtcMs:NOW-1000,track:'talk-1',state:'failed'});
   for(const e of [a,b,guest,unknown])assert.equal(applyFakeEvent(db,s,e),'APPLIED');
-  const stats=fakeStats(db,'all',NOW);
+  const stats=fakeStatsFixtureOnly(db,'all',NOW);
   assert.deepEqual({calls:stats.calls,members:stats.registeredMembers,guests:stats.guestCalls,unknown:stats.unknownCalls},
    {calls:4,members:1,guests:1,unknown:1});
   assert.equal(stats.actualTwd,null);
@@ -37,7 +37,7 @@ test('N1A-S1: mock is disabled in production, registered distinct vs visitor and
    if(hidden)assert.ok(!out.includes(hidden));
   s.register('unverified-person');
   assert.equal(applyFakeEvent(db,s,unknown),'DUPLICATE_NOOP');
-  assert.equal(fakeStats(db,'all',NOW).registeredMembers,1,'old unknown event must not silently upgrade');
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW).registeredMembers,1,'old unknown event must not silently upgrade');
  }finally{db.close();}
 });
 test('N1A-S1: original eventID stable across devices, state corrections and cancellation without double counting',()=>{
@@ -50,14 +50,14 @@ test('N1A-S1: original eventID stable across devices, state corrections and canc
   assert.equal(applyFakeEvent(db,s,desktop),'DUPLICATE_NOOP');
   const v2=s.revise('echo','accepted-on-server',{state:'done',track:'t2'});
   assert.equal(applyFakeEvent(db,s,v2),'APPLIED');
-  assert.equal(fakeStats(db,'all',NOW,'t1').calls,0);
-  assert.equal(fakeStats(db,'all',NOW,'t2').registeredMembers,1);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW,'t1').calls,0);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW,'t2').registeredMembers,1);
   assert.equal(applyFakeEvent(db,s,a),'STALE_IGNORED');
   assert.throws(()=>applyFakeEvent(db,s,{...v2,state:'failed'}),/UNTRUSTED_FAKE_SOURCE/);
   assert.throws(()=>applyFakeEvent(db,s,{...v2,acceptedAtUtcMs:v2.acceptedAtUtcMs+1000}),/UNTRUSTED_FAKE_SOURCE/);
   const v3=s.revise('echo','accepted-on-server',{active:false});
   assert.equal(applyFakeEvent(db,s,v3),'APPLIED');
-  assert.equal(fakeStats(db,'all',NOW).calls,0);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW).calls,0);
   assert.equal(applyFakeEvent(db,s,v2),'STALE_IGNORED');
  }finally{db.close();}
 });
@@ -69,11 +69,11 @@ test('N1A-S1: Taipei date cutoffs vs precise historic asOf instant; no after-cut
   const a=s.firstAccept({logicalSourceId:'a',app:'echo',subject:'m',acceptedAtUtcMs:before,track:'talk',state:'done'});
   const b=s.firstAccept({logicalSourceId:'b',app:'echo',subject:'m',acceptedAtUtcMs:after,track:'talk',state:'done'});
   applyFakeEvent(db,s,a);applyFakeEvent(db,s,b);
-  assert.equal(fakeStats(db,'today',Date.parse('2026-10-20T00:00:00Z')).calls,1);
-  assert.equal(fakeStats(db,'7d',Date.parse('2026-10-20T00:00:00Z')).calls,2);
-  assert.equal(fakeStats(db,'all',Date.parse('2026-10-19T15:59:59.999Z')).calls,0);
-  assert.equal(fakeStats(db,'all',Date.parse('2026-10-19T16:00:00Z')).calls,1);
-  assert.equal(fakeStats(db,'all',NOW).registeredMembers,1);
+  assert.equal(fakeStatsFixtureOnly(db,'today',Date.parse('2026-10-20T00:00:00Z')).calls,1);
+  assert.equal(fakeStatsFixtureOnly(db,'7d',Date.parse('2026-10-20T00:00:00Z')).calls,2);
+  assert.equal(fakeStatsFixtureOnly(db,'all',Date.parse('2026-10-19T15:59:59.999Z')).calls,0);
+  assert.equal(fakeStatsFixtureOnly(db,'all',Date.parse('2026-10-19T16:00:00Z')).calls,1);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW).registeredMembers,1);
   assert.equal(reportWindow('today',Date.parse('2026-10-20T02:00:00Z')).startMs,Date.parse('2026-10-19T16:00:00Z'));
  }finally{db.close();}
 });
@@ -87,7 +87,7 @@ test('N1A-S1: fake >60080 events / 2000 verified members, cross-day true DISTINC
    const outcome=applyFakeEvent(db,s,e);
    assert.equal(outcome,'APPLIED');
   }
-  const all=fakeStats(db,'all',NOW),short=fakeStats(db,'7d',NOW);
+  const all=fakeStatsFixtureOnly(db,'all',NOW),short=fakeStatsFixtureOnly(db,'7d',NOW);
   assert.equal(all.calls,60080);assert.equal(all.registeredMembers,2000);
   assert.ok(short.calls<all.calls);
   const check=db.prepare("SELECT COUNT(DISTINCT member_handle) n FROM fake_f22_events WHERE active=1 AND accepted_ms>=? AND accepted_ms<? AND identity_kind='registered'")
