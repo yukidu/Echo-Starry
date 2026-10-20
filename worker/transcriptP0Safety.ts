@@ -128,77 +128,183 @@ export async function sha256(value:string):Promise<string>{
   const digest=await crypto.subtle.digest('SHA-256',bytes);
   return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
 }
+// P0 output must be internally coherent. Independent file hashes alone are insufficient.
+function canonicalSegments(json:string,txt:string,vtt:string){
+  const file:any=JSON.parse(json);
+  const segments:any[]=file?.segments;
+  if(!Array.isArray(segments)||segments.length===0)fail('missing recognized segments');
+  const ids=new Set<string>();
+  for(const segment of segments){
+    if(typeof segment?.id!=='string' || !segment.id || ids.has(segment.id) ||
+       typeof segment.text!=='string' ||
+       !Number.isFinite(Number(segment.start)) || !Number.isFinite(Number(segment.end)) ||
+       Number(segment.start)<0 || Number(segment.end)<=Number(segment.start))
+      fail('invalid segment metadata or duplicate segment ID');
+    ids.add(segment.id);
+  }
+  const lines=segments.map(s=>s.text);
+  if(txt!==lines.join('\n') || (typeof file.text==='string'&&file.text!==txt))
+    fail('JSON/TXT recognized text mismatch');
+  const cues=vtt.replace(/\r/g,'').split(/\n\s*\n/).slice(1);
+  if(!vtt.startsWith('WEBVTT')||cues.length!==segments.length)fail('VTT cue count mismatch');
+  const time=(n:number)=>{
+    const ms=Math.max(0,Math.round(n*1000));
+    const h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),
+      sec=Math.floor(ms%60000/1000),rest=ms%1000;
+    return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+
+      String(sec).padStart(2,'0')+'.'+String(rest).padStart(3,'0');
+  };
+  for(let i=0;i<cues.length;i++){
+    const expected=time(Number(segments[i].start))+' --> '+time(Number(segments[i].end));
+    const parts=cues[i].trim().split('\n');
+    if(parts[0]!==expected || parts.slice(1).join('\n').trim()!==lines[i].trim())
+      fail('JSON/VTT timecodes or recognized text mismatch');
+  }
+  return {segmentCount:segments.length,timecodeChecksum:JSON.stringify(
+    segments.map(s=>[s.id,s.start,s.end]))};
+}
+async function verifyCandidateObjects(env:SafeEnv,version:any,run:SafeRun){
+  if(version.trackId!==run.trackId || version.runId!==run.runId ||
+     version.sourceAudioEtag!==run.sourceAudioEtag)fail('candidate version/source mismatch');
+  const manifestObj=await env.R2_BUCKET.get(version.manifestKey);
+  if(!manifestObj)fail('candidate manifest missing');
+  const manifestRaw=await manifestObj.text();
+  if(await sha256(manifestRaw)!==version.checksum)fail('candidate manifest checksum mismatch');
+  const manifest=JSON.parse(manifestRaw);
+  if(manifest?.version!==2 || manifest.versionId!==version.versionId ||
+     manifest.trackId!==run.trackId || manifest.runId!==run.runId ||
+     manifest.sourceAudioEtag!==run.sourceAudioEtag ||
+     !Array.isArray(manifest.checks) || manifest.checks.length!==4)
+    fail('candidate manifest identity mismatch');
+  const data:Record<string,string>={};
+  const expectedKeys:Record<string,string>={
+    json:version.jsonKey,txt:version.txtKey,vtt:version.vttKey,raw:version.rawKey
+  };
+  for(const check of manifest.checks){
+    if(typeof check?.name!=='string' || check.key!==expectedKeys[check.name] ||
+       check.sha256!==String(check.sha256||'') || Object.hasOwn(data,check.name))
+      fail('candidate manifest object mismatch');
+    const obj=await env.R2_BUCKET.get(check.key);
+    if(!obj)fail('candidate artifact missing');
+    const content=await obj.text();
+    if(await sha256(content)!==check.sha256)fail('candidate artifact corrupted');
+    data[check.name]=content;
+  }
+  if(Object.keys(data).length!==4)fail('candidate incomplete');
+  canonicalSegments(data.json,data.txt,data.vtt);
+  const raw=JSON.parse(data.raw);
+  if(!Array.isArray(raw?.segments))fail('missing Whisper raw segments');
+}
 export async function stageSafeVersion(env:SafeEnv,run:SafeRun,items:{
   json:string;txt:string;vtt:string;raw:string;language:string
 }){
   await assertLiveRun(env.DB,run);
-  const base='transcripts/'+encodeURIComponent(run.trackId)+'/versions/'+encodeURIComponent(run.runId);
+  await assertSourceRevision(env,run);
+  const parsed=canonicalSegments(items.json,items.txt,items.vtt);
+  const raw=JSON.parse(items.raw);
+  if(!Array.isArray(raw?.segments))fail('invalid raw transcription');
+  // Each *attempt* gets its own cryptographically unique location. Retry can
+  // never PUT into an already published candidate's key, even on a stale job.
+  const versionId=crypto.randomUUID();
+  const base='transcripts/'+encodeURIComponent(run.trackId)+'/versions/'+versionId;
   const objects=[
-    {type:'json',key:base+'/transcript.json',value:items.json},
-    {type:'txt',key:base+'/transcript.txt',value:items.txt},
-    {type:'vtt',key:base+'/transcript.vtt',value:items.vtt},
-    {type:'raw',key:base+'/raw-whisper.json',value:items.raw}
+    {name:'json',key:base+'/transcript.json',value:items.json},
+    {name:'txt',key:base+'/transcript.txt',value:items.txt},
+    {name:'vtt',key:base+'/transcript.vtt',value:items.vtt},
+    {name:'raw',key:base+'/raw-whisper.json',value:items.raw}
   ];
   const checks=[];
-  for(const obj of objects)checks.push({name:obj.type,key:obj.key,sha256:await sha256(obj.value)});
-  const manifest=JSON.stringify({version:1,trackId:run.trackId,runId:run.runId,
-    sourceAudioKey:run.sourceAudioKey,language:items.language,checks});
-  const manifestKey=base+'/manifest.json';
-  // No old/active R2 key is ever written. A failed candidate is not published.
-  for(const obj of objects){
+  for(const obj of objects)checks.push({name:obj.name,key:obj.key,sha256:await sha256(obj.value)});
+  const manifest=JSON.stringify({
+    version:2,versionId,trackId:run.trackId,runId:run.runId,
+    sourceAudioKey:run.sourceAudioKey,sourceAudioEtag:run.sourceAudioEtag,
+    language:items.language,segmentCount:parsed.segmentCount,
+    timecodeHash:await sha256(parsed.timecodeChecksum),checks
+  });
+  const manifestKey=base+'/manifest.json',checksum=await sha256(manifest);
+  for(const obj of [...objects,{name:'manifest',key:manifestKey,value:manifest}]){
     await assertLiveRun(env.DB,run);
+    if(await env.R2_BUCKET.get(obj.key))fail('immutable candidate key already occupied');
     await env.R2_BUCKET.put(obj.key,obj.value);
   }
-  await env.R2_BUCKET.put(manifestKey,manifest);
-  // Verify every artifact, not just the manifest metadata.
-  for(const obj of objects){
-    const stored=await env.R2_BUCKET.get(obj.key);
-    if(!stored || await sha256(await stored.text())!==await sha256(obj.value))
-      fail('candidate R2 checksum mismatch');
-  }
-  const checksum=await sha256(manifest);
+  const version={
+    versionId,trackId:run.trackId,runId:run.runId,
+    jsonKey:objects[0].key,txtKey:objects[1].key,vttKey:objects[2].key,
+    rawKey:objects[3].key,manifestKey,checksum,
+    sourceAudioKey:run.sourceAudioKey,sourceAudioEtag:run.sourceAudioEtag
+  };
+  await verifyCandidateObjects(env,version,run);
+  await assertSourceRevision(env,run);
   await env.DB.prepare(
-    'INSERT INTO transcript_versions(versionId,trackId,runId,jsonKey,txtKey,vttKey,rawKey,manifestKey,checksum,sourceAudioKey,createdAt) '+
-    'VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING')
-    .bind(run.runId,run.trackId,run.runId,objects[0].key,objects[1].key,
-      objects[2].key,objects[3].key,manifestKey,checksum,run.sourceAudioKey,Date.now()).run();
+    'INSERT INTO transcript_versions(versionId,trackId,runId,jsonKey,txtKey,vttKey,rawKey,manifestKey,checksum,sourceAudioKey,sourceAudioEtag,createdAt) '+
+    'VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(versionId,run.trackId,run.runId,version.jsonKey,version.txtKey,
+      version.vttKey,version.rawKey,manifestKey,checksum,
+      run.sourceAudioKey,run.sourceAudioEtag,Date.now()).run();
   const changed=await env.DB.prepare(
     "UPDATE transcript_runs SET state='awaiting_review',candidateVersionId=?,updatedAt=? "+
-    "WHERE runId=? AND generation=? AND state='processing' RETURNING runId")
-    .bind(run.runId,Date.now(),run.runId,run.generation).first();
+    "WHERE runId=? AND generation=? AND state='processing' AND leaseUntil>? RETURNING runId")
+    .bind(versionId,Date.now(),run.runId,run.generation,Date.now()).first();
   if(!changed)fail('candidate lost ownership before review');
-  return {jsonKey:objects[0].key,txtKey:objects[1].key,vttKey:objects[2].key,manifestKey,checksum};
+  return {versionId,...version};
 }
-export async function publishSafeVersion(db:Db,runId:string,approvedBy:string|null){
+export async function publishSafeVersion(env:SafeEnv,runId:string,approvedBy:string|null){
+  const db=env.DB;
+  if(!db.batch)fail('D1 atomic batch unavailable');
   const run=await db.prepare("SELECT * FROM transcript_runs WHERE runId=? AND state='awaiting_review' LIMIT 1")
     .bind(runId).first() as SafeRun|null;
-  if(!run)fail('candidate not awaiting review');
+  if(!run || !run.candidateVersionId)fail('candidate not awaiting review');
+  const version=await db.prepare('SELECT * FROM transcript_versions WHERE versionId=? AND runId=?')
+    .bind(run.candidateVersionId,runId).first() as any;
+  if(!version)fail('candidate version not found');
   if(run.intent==='relisten'){
-    if(!approvedBy)fail('manual second approval required');
-    // Cross-version corrections require explicit segment-by-segment review.
-    const legacy=await db.prepare('SELECT id FROM transcript_corrections WHERE trackId=? LIMIT 1')
+    if(!approvedBy || approvedBy!==run.approvedBy)fail('candidate requires verified human approval');
+    // Mapping/approval of historical corrections is NOT yet implemented.
+    // Fail closed until an independently reviewed mapping service is integrated.
+    const corrections=await db.prepare('SELECT id FROM transcript_corrections WHERE trackId=? LIMIT 1')
       .bind(run.trackId).first();
-    const moderated=await db.prepare('SELECT id FROM transcript_correction_events WHERE trackId=? LIMIT 1')
+    const events=await db.prepare('SELECT id FROM transcript_correction_events WHERE trackId=? LIMIT 1')
       .bind(run.trackId).first();
-    if(legacy||moderated)fail('manual correction version mapping not yet approved');
+    if(corrections||events)fail('manual correction version mapping not yet approved');
   }
-  const version=await db.prepare('SELECT * FROM transcript_versions WHERE runId=? LIMIT 1')
-    .bind(runId).first() as any;
-  if(!version||!version.jsonKey||!version.checksum)fail('missing verified candidate');
+  // Never rely on a snapshot restored from Echo D1 for a current revocation.
+  // Production currently has no configured independent authority, so NO new
+  // active version can be published merely by enabling the feature flag.
+  if(!env.P0_AUTHORITY)fail('independent current authority unavailable');
+  const proof=await env.P0_AUTHORITY.verifyPublication({
+    trackId:run.trackId,runId,actorId:approvedBy,
+    sourceAudioEtag:run.sourceAudioEtag,intendedActiveKey:run.expectedActiveR2Key
+  });
+  if(!proof?.allowed || !proof.epoch || !proof.permissionRevision || !proof.correctionRevision)
+    fail('current revoke/delete/correction authority did not approve');
+  await assertSourceRevision(env,run);
+  await verifyCandidateObjects(env,version,run);
   const now=Date.now();
-  // Sole public pointer. The AND checks enforce compare-and-swap.
-  const query=run.intent==='first'
+  // Cloudflare D1 batch is transactional. Both updates share the SAME database
+  // transaction; any SQLite error rolls back the entire publication attempt.
+  const valid =
+    " AND EXISTS(SELECT 1 FROM transcript_runs r JOIN tracks t ON t.id=r.trackId "+
+    "WHERE r.runId=? AND r.trackId=transcript_index.trackId "+
+    "AND r.state='awaiting_review' AND r.candidateVersionId=? "+
+    "AND t.audioUrl=r.sourceAudioUrl)";
+  const indexSql=run.intent==='first'
     ? "UPDATE transcript_index SET status='ready',r2Key=?,activeVersionId=?,workingRunId=NULL,error=NULL,updatedAt=? "+
-      "WHERE trackId=? AND status='processing' AND workingRunId=? AND r2Key IS NULL "+
-      "AND EXISTS(SELECT 1 FROM transcript_runs r JOIN tracks t ON t.id=r.trackId WHERE r.runId=? AND r.state='awaiting_review' AND t.audioUrl=r.sourceAudioUrl) RETURNING trackId"
+      "WHERE trackId=? AND status='processing' AND workingRunId=? AND r2Key IS NULL"+valid
     : "UPDATE transcript_index SET status='ready',r2Key=?,activeVersionId=?,error=NULL,updatedAt=? "+
-      "WHERE trackId=? AND status='ready' AND r2Key=? "+
-      "AND EXISTS(SELECT 1 FROM transcript_runs r JOIN tracks t ON t.id=r.trackId WHERE r.runId=? AND r.state='awaiting_review' AND t.audioUrl=r.sourceAudioUrl) RETURNING trackId";
-  const swapped=await db.prepare(query)
-    .bind(version.jsonKey,run.runId,now,run.trackId,
-      run.intent==='first'?runId:run.expectedActiveR2Key,runId).first();
-  if(!swapped)fail('active pointer changed; preserving prior transcript');
-  await db.prepare("UPDATE transcript_runs SET state='published',updatedAt=? "+
-    "WHERE runId=? AND state='awaiting_review'").bind(now,runId).run();
-  return {published:true,r2Key:version.jsonKey};
+      "WHERE trackId=? AND status='ready' AND r2Key=?"+valid;
+  const indexStmt=db.prepare(indexSql)
+    .bind(version.jsonKey,version.versionId,now,run.trackId,
+      run.intent==='first'?runId:run.expectedActiveR2Key,runId,version.versionId);
+  const runStmt=db.prepare(
+    "UPDATE transcript_runs SET state='published',publishedEpoch=?,publishedPermissionRevision=?,"+
+    "publishedCorrectionRevision=?,updatedAt=? WHERE runId=? AND state='awaiting_review' "+
+    "AND candidateVersionId=? AND EXISTS(SELECT 1 FROM transcript_index "+
+    "WHERE trackId=transcript_runs.trackId AND status='ready' AND activeVersionId=?)")
+    .bind(proof.epoch,proof.permissionRevision,proof.correctionRevision,now,
+      runId,version.versionId,version.versionId);
+  const results=await db.batch([indexStmt,runStmt]);
+  if(results?.length!==2 || Number(results[0]?.meta?.changes)!==1 ||
+     Number(results[1]?.meta?.changes)!==1)
+    fail('atomic publication refused or inconsistent; manual investigation required');
+  return {published:true,r2Key:version.jsonKey,versionId:version.versionId};
 }
