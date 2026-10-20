@@ -163,7 +163,9 @@ export async function bkpS1Preflight(r:RestoreRequest):Promise<PreflightResult>{
       // a later delta must never allow its earlier physical objects to disappear.
       if(previous && JSON.stringify(previous)!==JSON.stringify(v))
         add('version_immutability_conflict');
-      else versions.set(v.id,v);
+      // Later leaf metadata is still what pointer checks must inspect, but
+      // the conflict above blocks using the resulting mixed restore point.
+      versions.set(v.id,v);
     }
     for(const [track,versionId] of Object.entries(snap.activeByTrack)){
       const v=versions.get(versionId);
