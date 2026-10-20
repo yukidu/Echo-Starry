@@ -115,3 +115,15 @@ test('B07 SQLite 2000 submissions (max 12 worker threads) enforce budgets; not 2
  assert.equal(run.status,0,'stdout:\n'+run.stdout+'\nstderr:\n'+run.stderr);
  assert.match(run.stdout,/B07_SQLITE_SAFETY_OK/);
 });
+
+
+test('B07 free local HTTP rehearsal: 2000 fake identities, <=96 loopback sockets, no provider or Cloudflare',()=>{
+ const run=spawnSync('node',['tests/b07-offline-http-fake-users.mjs'],{
+  encoding:'utf8',timeout:150000,maxBuffer:4*1024*1024
+ });
+ assert.equal(run.error,undefined,String(run.error||''));
+ assert.equal(run.status,0,'stdout:\n'+run.stdout+'\nstderr:\n'+run.stderr);
+ assert.match(run.stdout,/B07_OFFLINE_HTTP_FAKE_USERS_OK/);
+ assert.match(run.stdout,/"trueCloudflareUsersMeasured":0/);
+ assert.match(run.stdout,/"paidProviderCalls":0/);
+});
