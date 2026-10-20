@@ -257,16 +257,18 @@ class FakeCostLedger:
             c.execute('COMMIT')
         return 'settled'
     def cancel_never_sent(self,g):
-        # Missing/unknown Echo dispatch state is NOT evidence of non-dispatch.
-        # Only an irrevocable Fake Echo-side never-queued fence can justify void.
-        if not self.echo.is_cancel_fenced(g.run_key):
-            return 'denied_dispatch_not_proven'
+        # The central ticket is checked FIRST, preserving its more precise
+        # "possibly sent" rejection reason. A zero-ticket run still needs
+        # irrevocable Echo-side proof before releasing a central hold.
         with opened(self.path) as c:
             c.execute('BEGIN IMMEDIATE')
             run=c.execute('SELECT day,held,state FROM runs WHERE key=?',(g.run_key,)).fetchone()
             seen=c.execute('SELECT 1 FROM tickets WHERE run_key=? LIMIT 1',(g.run_key,)).fetchone()
             if not run or run[2]!='reserved' or seen:
                 c.execute('ROLLBACK');return 'denied_possible_send'
+            # Missing/unknown Echo dispatch state is never "not dispatched".
+            if not self.echo.is_cancel_fenced(g.run_key):
+                c.execute('ROLLBACK');return 'denied_dispatch_not_proven'
             c.execute("UPDATE runs SET state='void' WHERE key=?",(g.run_key,))
             c.execute('UPDATE usage SET held=held-?,calls=calls-1 WHERE day=?',(run[1],run[0]))
             c.execute('COMMIT')
