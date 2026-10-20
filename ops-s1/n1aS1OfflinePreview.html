@@ -51,6 +51,9 @@ footer{margin:18px 0 0;color:#a5b7d1;font-size:.83rem;line-height:1.6}
 <button type="button" data-scenario="warning" aria-pressed="false">跨組警示</button>
 <button type="button" data-scenario="fault" aria-pressed="false">已確認故障</button>
 <button type="button" data-scenario="isolated" aria-pressed="false">平台正常／App 備份異常</button>
+<button type="button" data-scenario="proofUnknown" aria-pressed="false">安全證明未知</button>
+<button type="button" data-scenario="proofRevoked" aria-pressed="false">假撤權／刪除命中</button>
+<button type="button" data-scenario="proofRollback" aria-pressed="false">錨點版本不符</button>
 </div>
 <div class="grid">
 <section class="panel" aria-labelledby="cloud-heading">
@@ -62,6 +65,7 @@ footer{margin:18px 0 0;color:#a5b7d1;font-size:.83rem;line-height:1.6}
  <div class="panel-head"><div><h2 id="app-heading">B. 會員／逐字稿安全</h2><p class="hint">中央 Starry ID 身份、撤權、排隊與內容引用</p></div><span class="pill unknown" id="app-status">未知</span></div>
  <div class="data-line"><div><strong>中央管理權限</strong><small>正式權限不由這個示範頁授權</small></div><span class="lock">🔒 待核</span></div>
  <div class="data-line"><div><strong>逐字稿工作</strong><small id="app-reason">來源與時間未核實</small></div><span class="pill unknown" id="app-detail">未知</span></div>
+ <div class="data-line"><div><strong>AI2 安全證明交接（假資料）</strong><small id="proof-description">尚無證明；不顯示身份資料</small></div><span class="pill unknown" id="proof-state">未知</span></div>
  <p class="domain-details">不自動重跑 Whisper，不覆寫已完成稿。</p>
 </section>
 <section class="panel" aria-labelledby="billing-heading">
@@ -72,7 +76,7 @@ footer{margin:18px 0 0;color:#a5b7d1;font-size:.83rem;line-height:1.6}
 </section>
 <section class="panel" aria-labelledby="backup-heading">
  <div class="panel-head"><div><h2 id="backup-heading">D. 備份還原／雙人批准</h2><p class="hint">備份完整性問題不能當作 R2 平台故障</p></div><span class="pill unknown" id="backup-status">未知</span></div>
- <div class="data-line"><div><strong>N1A 外部安全版本</strong><small>見證保存服務尚未正式建立</small></div><span class="pill unknown">未知</span></div>
+ <div class="data-line"><div><strong>N1A 外部安全版本</strong><small id="witness-description">見證保存服務尚未正式建立</small></div><span class="pill unknown" id="witness-state">未知</span></div>
  <div class="data-line"><div><strong>兩位獨立中央超管</strong><small>必須同版本、當下仍有權限</small></div><span class="lock">🔒 待驗 0/2</span></div>
  <div class="data-line"><div><strong>備份／還原</strong><small id="backup-reason">任何安全證據不明都禁止還原</small></div><span class="lock">🔒 已鎖定</span></div>
 </section>
@@ -95,7 +99,18 @@ const scenarios={
  reason:['模擬：逐字稿確證失敗','模擬：額度不明／費用 Hold','模擬：備份檔案驗證失敗']},
  isolated:{cloud:'normal',app:'warning',billing:'warning',backup:'fault',events:[
  ['app_security','APP_QUEUE_UNCONFIRMED','警示'],['ai_billing','BILLING_UNCERTAIN_HOLD','警示'],['backup_restore','BACKUP_INTEGRITY_FAILED','故障']],
- reason:['模擬：逐字稿 queue 需確認','模擬：帳務不明持續 Hold','模擬：單一備份損毀；不等於 R2 故障']}
+ reason:['模擬：逐字稿 queue 需確認','模擬：帳務不明持續 Hold','模擬：單一備份損毀；不等於 R2 故障']},
+ proofUnknown:{cloud:'normal',app:'unknown',billing:'normal',backup:'unknown',events:[],
+ reason:['SecurityProof 無法驗證；不允許敏感操作','模擬：無帳務異常，但付費仍鎖定','安全版本來源未確立，禁止還原'],
+ proof:['unknown','沒有可信 AI2 判定：未知，仍鎖定','unknown','外部見證待查']},
+ proofRevoked:{cloud:'normal',app:'warning',billing:'normal',backup:'normal',events:[
+ ['app_security','FAKE_WITNESS_DENIAL_RECORD','警示']],
+ reason:['假見證命中撤權或刪除記錄；拒絕操作','模擬：帳務可正常，但新付費仍禁止','假備份觀測正常，但不會解除還原鎖'],
+ proof:['warning','僅假撤權/刪除命中，沒有真實會員資訊','normal','備份假觀測正常；還原仍鎖定']},
+ proofRollback:{cloud:'normal',app:'unknown',billing:'warning',backup:'unknown',events:[
+ ['app_security','WITNESS_VERSION_MISMATCH_UNVERIFIED','警示'],['ai_billing','BILLING_UNCERTAIN_HOLD','警示']],
+ reason:['外部見證版本不一致／可能回捲；不得宣稱已確證回捲','模擬：未知帳單獨立鎖定','外部安全版本未核實；禁止還原'],
+ proof:['unknown','AI2 回覆：版本不一致或可能回捲，沒有確認真實回捲','unknown','外部錨點版本不符，保持鎖定']}
 };
 function badge(value){const e=document.createElement('span');e.className='pill '+value;e.textContent=words[value];return e;}
 function status(id,value){const n=document.getElementById(id);n.replaceWith(Object.assign(badge(value),{id}));}
@@ -110,6 +125,10 @@ function show(which){
  document.getElementById('app-reason').textContent=s.reason[0];
  document.getElementById('billing-reason').textContent=s.reason[1];
  document.getElementById('backup-reason').textContent=s.reason[2];
+ const proof=s.proof||['unknown','沒有可信 AI2 SecurityProof；保持鎖定','unknown','外部見證尚未正式建立'];
+ status('proof-state',proof[0]);status('witness-state',proof[2]);
+ document.getElementById('proof-description').textContent=proof[1];
+ document.getElementById('witness-description').textContent=proof[3];
  const list=document.getElementById('events-list');list.replaceChildren();
  if(!s.events.length){const p=document.createElement('p');p.className='sub';p.textContent='本假資料場景無異常事件；這不代表真實系統無事件。';list.appendChild(p);}
  for(const item of s.events){const line=document.createElement('div');line.className='event';const tag=document.createElement('strong');
