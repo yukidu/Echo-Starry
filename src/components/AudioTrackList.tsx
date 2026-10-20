@@ -108,6 +108,7 @@ export function AudioTrackList({mode,currentUser,onEditTrack,onDeleted}:{
   const [relisteningId, setRelisteningId] = useState<string | null>(null);
   const [transcriptStatuses, setTranscriptStatuses] = useState<Record<string, TranscriptProgressItem>>({});
   const [transcriptStatusesReady, setTranscriptStatusesReady] = useState(false);
+  const [safeTranscriptMode, setSafeTranscriptMode] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -150,6 +151,7 @@ export function AudioTrackList({mode,currentUser,onEditTrack,onDeleted}:{
         }
         if (!cancelled) {
           setTranscriptStatuses(next);
+          setSafeTranscriptMode(data?.gate2SafeMode === true);
           setTranscriptStatusesReady(true);
         }
       } catch {}
@@ -225,20 +227,28 @@ export function AudioTrackList({mode,currentUser,onEditTrack,onDeleted}:{
   const relistenTrack = async (track: Track) => {
     if (!superAdmin || relisteningId || ['pending','queued','processing'].includes(transcriptStatuses[track.id]?.status)) return;
     const seconds=Number(track.durationSeconds||0);
-    if(!Number.isFinite(seconds)||seconds<=0){
-      setError('無法確認音檔長度與 AI 使用量，請先補充音檔長度');
-      return;
+    if(safeTranscriptMode){
+      if(!Number.isFinite(seconds)||seconds<=0){
+        setError('無法確認音檔長度與 AI 使用量，請先補充音檔長度');
+        return;
+      }
+      if(!window.confirm('將為「'+(track.title||'此音檔')+'」建立新逐字稿候選，舊稿與會員訂正保留。這可能消耗 AI 額度，確定繼續？'))return;
+      if(!window.confirm('最後確認：只重新辨識這一份約 '+Math.ceil(seconds/60)+' 分鐘的音檔。候選須審核才會取代舊稿。確定送出？'))return;
+    }else{
+      // Existing v281 backend resets a ready item to pending; do not
+      // misrepresent the legacy behavior as the safe candidate flow.
+      if(!window.confirm('目前使用舊版逐字稿流程，重新辨識期間原稿可能暫時無法顯示。確定繼續？'))return;
     }
-    if(!window.confirm('將為「'+(track.title||'此音檔')+'」建立新逐字稿候選，舊稿與會員訂正保留。這可能消耗 AI 額度，確定繼續？'))return;
-    if(!window.confirm('最後確認：只重新辨識這一份約 '+Math.ceil(seconds/60)+' 分鐘的音檔。候選須審核才會取代舊稿。確定送出？'))return;
     setError('');
     setRelisteningId(track.id);
     try {
       const response = await fetch('/api/v281/transcript-management/relisten/'+encodeURIComponent(track.id),{
         method:'POST',
         credentials:'same-origin',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({confirm:true,approvedMaxSeconds:seconds,approvalNonce:crypto.randomUUID()})
+        ...(safeTranscriptMode?{
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({confirm:true,approvedMaxSeconds:seconds,approvalNonce:crypto.randomUUID()})
+        }:{})
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.error || '重聽逐字稿失敗');
