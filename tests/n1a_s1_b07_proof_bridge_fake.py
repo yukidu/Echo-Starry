@@ -123,7 +123,22 @@ class FakeB07SecurityBridge:
         self.read_count["anchor"]+=1
         if self.witness.down:
             return deny("external_witness_missing")
-        if proof["securitySeq"]!=wire_uint64(self.witness.seq) or            proof["restoreEpoch"]!=wire_uint64(self.witness.epoch) or            proof["revocationWatermark"]!=wire_uint64(self.revocation_watermark) or            proof["deletionWatermark"]!=wire_uint64(self.deletion_watermark) or            grant.id in self.witness.revoked or grant.user in self.blocked_subjects or            grant.track in self.deleted_resources or grant.track in self.revoked_resources:
+        # A corrupt or overflowed witness is UNKNOWN and cannot authorize.
+        try:
+            witness_seq=wire_uint64(self.witness.seq)
+            witness_epoch=wire_uint64(self.witness.epoch)
+            witness_rev=wire_uint64(self.revocation_watermark)
+            witness_deleted=wire_uint64(self.deletion_watermark)
+        except ValueError:
+            return deny("external_witness_invalid_version")
+        if (proof["securitySeq"]!=witness_seq or
+            proof["restoreEpoch"]!=witness_epoch or
+            proof["revocationWatermark"]!=witness_rev or
+            proof["deletionWatermark"]!=witness_deleted or
+            grant.id in self.witness.revoked or
+            grant.user in self.blocked_subjects or
+            grant.track in self.deleted_resources or
+            grant.track in self.revoked_resources):
             return deny("external_witness_changed_or_rolled_back")
         self.read_count["resource"]+=1
         if self.ledger.sources.get((grant.app,grant.track))!=grant.source or            proof["sourceRevision"]!=grant.source or            proof["permissionRevision"]!=self.permission_revision.get(grant.track,"8") or            proof["correctionRevision"]!=self.correction_revision.get(grant.track,"3"):
