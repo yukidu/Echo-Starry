@@ -6,7 +6,7 @@ fixtures only. There is NO external account, SDK, network or provider request.
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import hashlib, json, sqlite3, threading, time, uuid
+import hashlib, json, re, sqlite3, threading, time, uuid
 
 def digest(*fields):
     return hashlib.sha256(json.dumps(fields,separators=(',',':'),ensure_ascii=False).encode()).hexdigest()
@@ -61,17 +61,71 @@ class FakeIndependentWitness:
     def rollback_epoch(self):
         with self.lock:self.seq+=1;self.epoch+=1
 
+class FakeInvoiceAuthority:
+    """Disposable MOCK provider-invoice-line registry. Never a real supplier proof.
+
+    Only the fake supplier test fixture should call attest_fake_invoice_line;
+    a caller's 64-character string is NOT evidence of actual billing.
+    """
+    def __init__(self):
+        self._lines={}
+        self._lock=threading.Lock()
+    def attest_fake_invoice_line(self,invoice_line,grant,units):
+        if not isinstance(invoice_line,str) or not re.fullmatch(r"[a-f0-9]{64}",invoice_line) or \
+           type(units) is not int or units<0:
+            return False
+        expected=(grant.run_key,units)
+        with self._lock:
+            old=self._lines.get(invoice_line)
+            if old is not None:return old==expected
+            self._lines[invoice_line]=expected
+            return True
+    def verified(self,invoice_line,grant,units):
+        with self._lock:
+            return self._lines.get(invoice_line)==(grant.run_key,units)
+
+
 class FakeEchoQueue:
     def __init__(self,path):
         self.path=path
         with opened(path) as c:
-            c.execute('CREATE TABLE fake_echo_queue (id TEXT PRIMARY KEY, run_key TEXT, state TEXT)')
+            c.executescript("""
+                CREATE TABLE fake_echo_queue(
+                    id TEXT PRIMARY KEY,run_key TEXT,state TEXT);
+                CREATE TABLE fake_echo_cancel_fences(
+                    run_key TEXT PRIMARY KEY,state TEXT NOT NULL CHECK(state='never_queued'));
+            """)
     def enqueue(self,run_id,g,failed=False,lost_ack=False):
         if failed:return 'failed'
         with opened(self.path) as c:
+            # The queue and fence serialize in ONE fake Echo SQLite writer lock.
+            c.execute('BEGIN IMMEDIATE')
+            if c.execute('SELECT 1 FROM fake_echo_cancel_fences WHERE run_key=?',
+                         (g.run_key,)).fetchone():
+                c.execute('ROLLBACK');return 'cancelled'
             c.execute('INSERT OR IGNORE INTO fake_echo_queue VALUES (?,?,?)',
                       (run_id,g.run_key,'dispatch_unknown' if lost_ack else 'queued'))
+            c.execute('COMMIT')
         return 'unknown' if lost_ack else 'success'
+    def certify_never_queued(self,run_key):
+        """Irreversible Fake Echo dispatch fence, not a cross-D1 transaction."""
+        with opened(self.path) as c:
+            c.execute('BEGIN IMMEDIATE')
+            if c.execute('SELECT 1 FROM fake_echo_queue WHERE run_key=? LIMIT 1',
+                         (run_key,)).fetchone():
+                c.execute('ROLLBACK');return 'denied_queued'
+            c.execute('INSERT OR IGNORE INTO fake_echo_cancel_fences VALUES(?,?)',
+                      (run_key,'never_queued'))
+            c.execute('COMMIT')
+        return 'fenced'
+    def is_cancel_fenced(self,run_key):
+        try:
+            with opened(self.path) as c:
+                return bool(c.execute(
+                    'SELECT 1 FROM fake_echo_cancel_fences WHERE run_key=?',
+                    (run_key,)).fetchone())
+        except sqlite3.Error:
+            return False
     def confirmed(self,run_id,g):
         with opened(self.path) as c:
             return c.execute('SELECT state,run_key FROM fake_echo_queue WHERE id=?',
@@ -81,6 +135,9 @@ class FakeCostLedger:
     def __init__(self,path,ids,witness,echo,max_calls=40,max_cost=100000):
         self.path=path;self.ids=ids;self.witness=witness;self.echo=echo
         self.max_calls=max_calls;self.max_cost=max_cost;self.sources={}
+        self.invoices=FakeInvoiceAuthority()
+        # Internal fake server clock, never an HTTP date from the caller.
+        self._trusted_utc_day=lambda: datetime.now(timezone.utc).date().isoformat()
         self.fake_sends=0;self.send_lock=threading.Lock()
         self.official_free_known=False
         with opened(path) as c:c.executescript("""
@@ -93,19 +150,24 @@ class FakeCostLedger:
             state TEXT NOT NULL,sent INTEGER NOT NULL DEFAULT 0 CHECK(sent IN(0,1)),
             units INTEGER NOT NULL DEFAULT 0, receipt TEXT NOT NULL DEFAULT '',
             UNIQUE(run_key,segment));
-          CREATE TABLE reconciliations(run_key TEXT PRIMARY KEY,invoice TEXT NOT NULL,
+          CREATE TABLE reconciliations(run_key TEXT PRIMARY KEY,invoice TEXT NOT NULL UNIQUE,
             human1 TEXT NOT NULL,human2 TEXT NOT NULL,units INTEGER,amount INTEGER);
         """)
     def trusted(self,g):
         return self.ids.can(g.user,g.app) and self.witness.valid(g) and \
                self.sources.get((g.app,g.track))==g.source
     def reserve(self,g,http_key='any',run='run',day=None,ack_lost=False):
+        # Compatibility argument is deliberately REJECTED, not used for accounting.
+        # Day rollover tests must advance the internal trusted mock clock.
+        if day is not None:return 'denied_untrusted_day'
         if not self.trusted(g):return 'denied_identity'
         if g.model=='@cf/fake/free' and not self.official_free_known:return 'denied_free_unknown'
         if g.model not in ('@cf/fake/free','@cf/fake/whisper'):return 'denied_tariff'
         if g.price and self.max_cost==0:return 'denied_zero_budget'
         if not 1<=g.segments<=100 or g.held>1_000_000_000:return 'denied_plan'
-        day=day or datetime.now(timezone.utc).date().isoformat()
+        day=self._trusted_utc_day()
+        if not isinstance(day,str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}",day):
+            return 'denied_untrusted_clock'
         with opened(self.path) as c:
             c.execute('BEGIN IMMEDIATE')
             if c.execute('SELECT 1 FROM runs WHERE key=?',(g.run_key,)).fetchone():
@@ -195,6 +257,10 @@ class FakeCostLedger:
             c.execute('COMMIT')
         return 'settled'
     def cancel_never_sent(self,g):
+        # Missing/unknown Echo dispatch state is NOT evidence of non-dispatch.
+        # Only an irrevocable Fake Echo-side never-queued fence can justify void.
+        if not self.echo.is_cancel_fenced(g.run_key):
+            return 'denied_dispatch_not_proven'
         with opened(self.path) as c:
             c.execute('BEGIN IMMEDIATE')
             run=c.execute('SELECT day,held,state FROM runs WHERE key=?',(g.run_key,)).fetchone()
@@ -208,7 +274,8 @@ class FakeCostLedger:
     def reconcile(self,g,invoice,units,a,b):
         human1=self.ids.reviewer(a);human2=self.ids.reviewer(b)
         if not human1 or not human2 or human1==human2 or \
-           len(invoice)!=64 or not isinstance(units,int) or units<0:return 'denied_review'
+           not isinstance(invoice,str) or not re.fullmatch(r"[a-f0-9]{64}",invoice) or \
+           type(units) is not int or units<0:return 'denied_review'
         with opened(self.path) as c:
             c.execute('BEGIN IMMEDIATE')
             row=c.execute('SELECT day,held,unitprice,state FROM runs WHERE key=?',
@@ -219,6 +286,13 @@ class FakeCostLedger:
             if existing:
                 c.execute('ROLLBACK')
                 return 'already_reconciled' if existing==(invoice,units) else 'denied_conflict'
+            # A supplier CHARGE LINE (not the whole batch invoice) is one-use
+            # across ALL runs, including different UTC accounting dates.
+            if c.execute('SELECT 1 FROM reconciliations WHERE invoice=?',
+                         (invoice,)).fetchone():
+                c.execute('ROLLBACK');return 'denied_invoice_reused'
+            if not self.invoices.verified(invoice,g,units):
+                c.execute('ROLLBACK');return 'denied_invoice_unverified'
             actual=units*row[2]
             if actual>row[1]:c.execute('ROLLBACK');return 'denied_over_hold'
             c.execute('INSERT INTO reconciliations VALUES(?,?,?,?,?,?)',
