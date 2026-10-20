@@ -4,6 +4,7 @@ import type { WorkflowEvent, WorkflowStep } from 'cloudflare:workers';
 import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
 import { markSpeakerBiosDirty } from './aiSpeakerProfileRouter';
 import { cleanTranscriptSegmentsOnce, loadCleanupSettings } from './transcriptCleanupService';
+import { replaceQaSearchGeneration } from './qaTranscriptSearchIndex';
 
 const MODEL = '@cf/openai/whisper-large-v3-turbo';
 const TRADITIONAL_MODEL = '@cf/openai/gpt-oss-20b';
@@ -15,6 +16,7 @@ type Env = {
   AI: any;
   AUDIO_SEGMENTER: any;
   TRANSCRIPT_WORKFLOW: any;
+  QA_CHINESE_SEARCH_WRITE_ENABLED?: string;
 };
 
 type Segment = { id: string; start: number; end: number; text: string };
@@ -346,6 +348,7 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
       const txtKey = `${base}/transcript.txt`;
       const vttKey = `${base}/transcript.vtt`;
 
+      const qaTranscriptUpdatedAt = Date.now();
       await step.do('store-transcript-formats', async () => {
         await Promise.all([
           this.env.R2_BUCKET.put(jsonKey, JSON.stringify(file), {
@@ -362,8 +365,33 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
           })
         ]);
         await this.env.DB.prepare(`UPDATE transcript_index SET status='ready',r2Key=?,model=?,chunkCount=?,segmentCount=?,wordCount=?,durationSeconds=?,error=NULL,updatedAt=? WHERE trackId=?`)
-          .bind(jsonKey, MODEL, chunks, segments.length, fullText.length, duration, Date.now(), trackId).run();
+          .bind(jsonKey, MODEL, chunks, segments.length, fullText.length, duration, qaTranscriptUpdatedAt, trackId).run();
       });
+
+      // Only after explicit migration/approval: index NEW recordings without
+      // changing the original R2 transcript, subtitle timestamps or audio.
+      // This is intentionally OFF until a separate production authorization.
+      if(this.env.QA_CHINESE_SEARCH_WRITE_ENABLED==='true'){
+        await step.do('c09-index-current-transcript', async () => {
+          try {
+            const index:any=await this.env.DB.prepare(
+              "SELECT r2Key,updatedAt,status FROM transcript_index WHERE trackId=? LIMIT 1"
+            ).bind(trackId).first();
+            if(index?.status!=='ready'||index.r2Key!==jsonKey||Number(index.updatedAt)!==qaTranscriptUpdatedAt)
+              return {indexed:false,reason:'source_version_changed'};
+            const count=await replaceQaSearchGeneration(this.env.DB,{
+              trackId,sourceKey:jsonKey,sourceUpdatedAt:qaTranscriptUpdatedAt,
+              generation:String(file.createdAt)+':'+String(cleanupSnapshot.version),
+              speaker:String(info.track.speaker||''),subtitles:segments,cleaned:cleanedSegments
+            });
+            return {indexed:true,paragraphs:count};
+          }catch(e){
+            // Index errors must not mark a successful Whisper job as failed.
+            console.warn('C09 transcript search indexing deferred',e instanceof Error?e.name:'unknown');
+            return {indexed:false,reason:'index_unavailable'};
+          }
+        });
+      }
 
       // Successful new transcripts queue a speaker biography refresh without making the recording fail on bio errors.
       await markSpeakerBiosDirty(this.env, trackId).catch(() => null);

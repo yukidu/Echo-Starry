@@ -1,4 +1,5 @@
 import transcriptWorker, { TranscriptWorkflow } from './transcriptRouter';
+import { drainQaSearchRebuildQueue } from './qaTranscriptSearchRebuildQueue';
 
 export { TranscriptWorkflow };
 
@@ -242,6 +243,18 @@ async function correctedTranscriptResponse(request: Request, env: Env, ctx: Exec
   return json({ ...data, segments, text: segments.map(segment => segment.text).join('\n') }, inner.status, inner.headers);
 }
 
+function syncQaSearchAfterCorrection(env:Env,ctx:ExecutionContext,trackId:string){
+  // Mutation-time D1 triggers immediately mark all existing indexed paragraphs
+  // invalid. Background rebuild is optional and never blocks correction/rewards.
+  if((env as any).QA_CHINESE_SEARCH_WRITE_ENABLED!=='true')return;
+  // D1 mutation triggers already recorded a durable rebuild job. Attempt
+  // once promptly, then let the existing 5-minute cron retry after failures.
+  if(ctx && typeof ctx.waitUntil==='function'){
+    ctx.waitUntil(drainQaSearchRebuildQueue(env as any,1).catch(error=>{
+      console.warn('C09 correction index rebuild deferred',error instanceof Error?error.name:'unknown');
+    }));
+  }
+}
 async function createCorrection(request: Request, env: Env, ctx: ExecutionContext, trackId: string, segmentId: string) {
   await ensureSchema(env);
   const actor = await verifiedActor(request, env);
@@ -291,6 +304,7 @@ async function createCorrection(request: Request, env: Env, ctx: ExecutionContex
         .bind(rewardUnits, transactionId || null, Date.now(), eventId).run();
     }
   }
+  syncQaSearchAfterCorrection(env,ctx,trackId);
   return json({
     success: true,
     id: eventId,
@@ -402,6 +416,7 @@ async function reviewCorrection(request: Request, env: Env, ctx: ExecutionContex
     }
   }
 
+  syncQaSearchAfterCorrection(env,ctx,row.trackId);
   const current = await currentSegmentState(env, row.trackId, row.segmentId);
   const fresh: any = await env.DB.prepare('SELECT * FROM transcript_correction_events WHERE id=? LIMIT 1').bind(correctionId).first();
   return json({

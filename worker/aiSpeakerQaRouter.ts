@@ -1,4 +1,6 @@
 import { recordAiActivity } from './starryAiManagement';
+import { findQaIndexedPassages, qaSearchEvidenceGuard, qaSearchEvidenceIsCurrent, type QaSearchEvidence } from './qaTranscriptSearchIndex';
+import { qaSearchRebuildStatus, retryFailedQaSearchRebuild } from './qaTranscriptSearchRebuildQueue';
 /**
  * Echo Starry transcript QA.  Server-side-only permissions, pricing and model.
  * No new app/database: transcripts in R2, indexes/comments in Echo D1, batteries in Starry ID D1.
@@ -216,7 +218,43 @@ export async function excerpts(env:Env,track:any,u:any,mode:string,question:stri
     .bind(...candidates.map((x:any)=>x.id)).all():{results:[]};
   const pilotMap=new Map((approvals.results||[]).map((x:any)=>[x.trackId,x]));
   const selectedSpeaker=selectQaSpeaker(question,track.speaker);
-  const found:{score:number;part:string;title:string}[]=[];
+  const found:{score:number;part:string;title:string;evidence?:QaSearchEvidence}[]=[];
+  // C09/C10 opt-in: never query an index before the explicit D1 migration and
+  // reviewed backfill. The current member/rank/sticker and pilot gates are reused.
+  let indexed:Awaited<ReturnType<typeof findQaIndexedPassages>>|null=null;
+  if(env.QA_CHINESE_SEARCH_ENABLED==='true' && candidates.length){
+    const eligible:string[]=[];
+    for(const row of candidates){
+      if(pilotMap.has(row.id))continue; // approved speaker stories use their existing, reviewed facts
+      if(mode==='all'&&splitSpeakerNames(row.speaker).length>1)continue;
+      if(await mayUseTranscript(env,u,row))eligible.push(row.id);
+    }
+    if(eligible.length){
+      try {
+        indexed=await findQaIndexedPassages(env.DB,question,eligible);
+        const allowed=new Map(candidates.filter((r:any)=>eligible.includes(r.id)).map((r:any)=>[r.id,r]));
+        for(const hit of indexed.hits){
+          const source:any=allowed.get(hit.trackId);
+          if(!source)continue;
+          found.push({
+            score:hit.score,
+            part:'【'+txt(source.title)+'｜'+txt(source.speaker)+'】'+hit.content,
+            title:txt(source.title),
+            evidence:{trackId:hit.trackId,generation:hit.generation,
+              changeRevision:hit.changeRevision,sourceKey:hit.sourceKey,
+              sourceUpdatedAt:hit.sourceUpdatedAt}
+          });
+        }
+      }catch(error){
+        // A broken index cannot bypass access checks or prevent the old reader.
+        console.warn('C09 search index unavailable',error instanceof Error?error.name:'unknown');
+        // Corrected or revoked content must NEVER silently fall back to the
+        // original R2 text if the index fails after explicit activation.
+        return {prompt:'',sources:[],evidence:[]};
+      }
+    }
+  }
+  let fallbackReads=0;
   for(const row of candidates){
     if(!await mayUseTranscript(env,u,row))continue;
     const pilot:any=pilotMap.get(row.id);
@@ -233,6 +271,16 @@ export async function excerpts(env:Env,track:any,u:any,mode:string,question:stri
     }
     // All-talk search must not reintroduce unreviewed multi-speaker recordings.
     if(mode==='all'&&splitSpeakerNames(row.speaker).length>1)continue;
+    if(indexed?.blocked.has(row.id))continue; // mutated source: no stale R2 fallback
+    if(indexed?.covered.has(row.id))continue; // search directly from D1; no R2 read
+    // Safety gate: an unindexed R2 original has no revision evidence that can
+    // be checked atomically at AI publication. While opt-in indexed QA is ON,
+    // fail closed rather than cite an older original after a concurrent edit.
+    // When the flag is OFF the original QA path stays exactly unchanged.
+    if(env.QA_CHINESE_SEARCH_ENABLED==='true')continue;
+    // Legacy, flag-OFF only: retain the existing bounded R2 reader.
+    if(indexed?.covered.size && fallbackReads>=2)continue;
+    fallbackReads++;
     const idx:any=await env.DB.prepare("SELECT r2Key FROM transcript_index WHERE trackId=? AND status='ready' LIMIT 1").bind(row.id).first();
     if(!idx?.r2Key)continue;
     const object=await env.R2_BUCKET?.get(idx.r2Key);
@@ -247,7 +295,11 @@ export async function excerpts(env:Env,track:any,u:any,mode:string,question:stri
     }
   }
   const ranked=found.sort((a,b)=>b.score-a.score).slice(0,mode==='all'?9:7);
-  return {prompt:ranked.map(x=>x.part).join('\n').slice(0,9000),sources:[...new Set(ranked.map(x=>x.title))].filter(Boolean).slice(0,3)};
+  const evidence=[...new Map(ranked.filter(x=>x.evidence).map(x=>[x.evidence!.trackId,x.evidence!])).values()];
+  if(evidence.length && !(await qaSearchEvidenceIsCurrent(env.DB,evidence)))
+    return {prompt:'',sources:[],evidence:[]};
+  return {prompt:ranked.map(x=>x.part).join('\n').slice(0,9000),
+    sources:[...new Set(ranked.map(x=>x.title))].filter(Boolean).slice(0,3),evidence};
 }
 /** Reply body and model metadata stay separate: show no references but keep
  * internal track evidence and permission checks unchanged.
@@ -343,13 +395,25 @@ export async function generateQaWithQuality(env:Env,model:string,messages:any[],
   }catch(e){console.warn('QA quality repair unavailable',e instanceof Error?e.name:'unknown');}
   return {...initial,reply:'',qualityIssues:issues,repaired:true};
 }
-async function insertReply(env:Env,comment:any,track:any,reply:string,selectedSpeaker=''){
+export async function insertReply(env:Env,comment:any,track:any,reply:string,selectedSpeaker='',evidence:QaSearchEvidence[]=[]){
   const createdAt=Date.now(),id='qa-'+crypto.randomUUID(),name=selectedSpeaker||txt(track.speaker)||'演講者';
-  await env.DB.batch([
-    env.DB.prepare("INSERT INTO comments(id,trackId,authorName,authorAvatar,authorBadge,authorEmail,deviceId,content,timestamp,createdAt,replyToId,replyToAuthor,isAdmin,likes,likedBy) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,0,'[]')")
-      .bind(id,track.id,name,txt(track.speakerAvatar),'AI_SPEAKER','','',reply,formatCommentTimestamp({createdAt}),createdAt,comment.id,txt(comment.authorName)),
+  const guard=qaSearchEvidenceGuard(evidence);
+  // When indexed evidence is used, the decisive version verification AND the
+  // comment write occur in the same atomic D1 INSERT statement. A transcript
+  // changed while the AI model was generating makes the INSERT write 0 rows.
+  const insert=env.DB.prepare(
+    "INSERT INTO comments(id,trackId,authorName,authorAvatar,authorBadge,authorEmail,deviceId,content,timestamp,createdAt,replyToId,replyToAuthor,isAdmin,likes,likedBy) "+
+    (evidence.length?
+      "SELECT ?,?,?,?,?,?,?,?,?,?,?,?,0,0,'[]' WHERE "+guard.where:
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,0,'[]')")
+  ).bind(id,track.id,name,txt(track.speakerAvatar),'AI_SPEAKER','','',reply,
+    formatCommentTimestamp({createdAt}),createdAt,comment.id,txt(comment.authorName),...guard.params);
+  const results=await env.DB.batch([
+    insert,
     env.DB.prepare('UPDATE tracks SET commentsCount = (SELECT COUNT(*) FROM comments WHERE trackId=?) WHERE id=?').bind(track.id,track.id)
   ]);
+  if(evidence.length && !Number(results?.[0]?.meta?.changes))
+    throw Error('搜尋來源在 AI 回答期間變更，拒絕發布舊資料');
 }
 async function charge(env:Env,u:any,q:any,commentId:string){
   if(q.unlimited||!q.costUnits)return true;
@@ -404,6 +468,9 @@ export async function processQaAfterComment(req:Request,env:Env,ctx:any,comment:
       if(!await reserve(env,q,cfg,comment.id,track.id,mode))return;
       const source=await excerpts(env,track,u,mode,comment.content);
       if(!source.prompt){await fail(env,q,comment.id,'尚未有可引用的逐字稿');return;}
+      if(source.evidence?.length && !(await qaSearchEvidenceIsCurrent(env.DB,source.evidence))){
+        await fail(env,q,comment.id,'搜尋來源更新中，請重新提問');return;
+      }
       await recordAiActivity(env as any,'echo.qa');
       const messages=[
         {role:'system',content:buildQaSystemInstructions(cfg.qaRules)},
@@ -414,7 +481,7 @@ export async function processQaAfterComment(req:Request,env:Env,ctx:any,comment:
       if(!reply){await fail(env,q,comment.id,'AI 無法產生符合規則的回答，本次不扣電池');return;}
       if(!await charge(env,u,q,comment.id)){await fail(env,q,comment.id,'電池不足，未扣款');return;}
       charged=q.costUnits>0;
-      await insertReply(env,comment,track,formatQaAnswer(reply,source.sources),selectedSpeaker);
+      await insertReply(env,comment,track,formatQaAnswer(reply,source.sources),selectedSpeaker,source.evidence||[]);
       replyInserted=true;
       await env.DB.prepare("UPDATE qa_claims SET status='done',error=NULL WHERE commentId=?").bind(comment.id).run().catch(()=>null);
     }catch(e){
@@ -463,6 +530,19 @@ export async function handleQaRequest(req:Request,env:Env):Promise<Response|null
       return json({enabled:(cfg.enabled||q.unlimited)&&!q.reason,reason:q.reason,tier:q.tier,label:q.label,daily:q.daily,free:q.free,freeLeft:q.freeLeft,left:q.left,cost:q.cost,unlimited:!!q.unlimited});
     }
     if(!admin)return json({error:'只有超級管理員可以管理逐字稿與問答設定'},403);
+    if(path==='/api/qa/index-rebuild/status'&&method==='GET'){
+      if(env.QA_CHINESE_SEARCH_WRITE_ENABLED!=='true')return json({enabled:false,waiting:0,processing:0,retrying:0,failed:0});
+      return json({enabled:true,...await qaSearchRebuildStatus(env.DB)});
+    }
+    if(path==='/api/qa/index-rebuild/retry'&&method==='POST'){
+      if(env.QA_CHINESE_SEARCH_WRITE_ENABLED!=='true')return json({error:'索引功能尚未授權啟用'},409);
+      const body:any=await req.json().catch(()=>({}));
+      const trackId=txt(body.trackId);
+      if(!trackId||trackId.length>128)return json({error:'請指定正確音檔'},400);
+      const queued=await retryFailedQaSearchRebuild(env.DB,trackId);
+      return json({queued,message:queued?'已重新排入安全佇列':'沒有可重試的失敗索引'});
+    }
+
     if(path==='/api/qa/search'&&method==='GET'){
       // Admin-triggered search only: NEVER scan cloud files on each keystroke.
       const term=txt(url.searchParams.get('q')).slice(0,80);
