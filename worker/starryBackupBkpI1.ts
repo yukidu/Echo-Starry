@@ -130,7 +130,11 @@ export async function bkpI1SimulateRestore(input:BkpI1Input):Promise<BkpI1Decisi
     if(!Object.hasOwn(input.memberIdsByTrack,trackId))fail('member_mapping_missing');
     else{
       const mapped=input.memberIdsByTrack[trackId];
-      if(!Array.isArray(mapped)||!unique(mapped)||mapped.some(id=>!id))
+      // A present key with [] means the relationship is UNKNOWN, not public.
+      // Only a separate, authenticated public/no-member evidence type could
+      // ever authorize an unassociated track in a future design.
+      if(!Array.isArray(mapped)||mapped.length===0||!unique(mapped)||
+         mapped.some(id=>typeof id!=='string'||!id.trim()))
         fail('member_mapping_invalid');
       else if(mapped.some(id=>deniedMembers.has(id)))fail('member_rights_revoked');
     }
