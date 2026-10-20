@@ -107,7 +107,7 @@ test('B07 protected admin page distinguishes real ledger from demos and guards e
  assert.match(page,/模擬/);assert.match(page,/member:default/);
  assert.match(page,/ai-budget\/simulate/);
 });
-test('B07 real SQLite schema enforces 2000-request concurrent cost ceilings and free quota',()=>{
+test('B07 SQLite 2000 submissions (max 12 worker threads) enforce budgets; not 2000 live users',()=>{
  const run=spawnSync('python3',['tests/b07-budget-sqlite-safety.py'],{
   encoding:'utf8',timeout:180000,maxBuffer:4*1024*1024
  });
