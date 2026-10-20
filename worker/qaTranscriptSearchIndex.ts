@@ -114,7 +114,10 @@ export async function replaceQaSearchGeneration(db:any,options:{
     trackId,sourceKey,sourceUpdatedAt).first();
   if(!published?.trackId)throw Error('索引期間來源已變更，取消舊版本發布');
   // Obsolete generations are never used, even if cleanup fails.
-  await db.prepare('DELETE FROM qa_search_segments WHERE trackId=? AND generation<>?').bind(trackId,generation).run().catch(()=>null);
+  await db.prepare(
+    'DELETE FROM qa_search_segments WHERE trackId=? AND generation<>? '+
+    'AND EXISTS (SELECT 1 FROM qa_search_state WHERE trackId=? AND activeGeneration=? AND invalidated=0)'
+  ).bind(trackId,generation,trackId,generation).run().catch(()=>null);
   return paragraphs.length;
 }
 export async function findQaIndexedPassages(db:any,question:string,trackIds:string[]):Promise<{
