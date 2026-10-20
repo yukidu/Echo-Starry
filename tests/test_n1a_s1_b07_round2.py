@@ -189,10 +189,11 @@ class FakeS1R2SecurityProof(unittest.TestCase):
     def test_15_different_utc_date_same_grant_no_second_run(self):
         g=self.grant();p=self.proof(g)
         today=date.today();tomorrow=today+timedelta(days=1)
-        self.assertEqual(self.bridge.fake_reserve(p,g,"req-one",day=str(today),now_ms=self.now),
+        self.assertEqual(self.bridge.fake_reserve(p,g,"req-one",now_ms=self.now),
                          "reserved")
+        self.ledger._trusted_utc_day=lambda: str(tomorrow)
         p2=self.proof(g,"req-later")
-        self.assertEqual(self.bridge.fake_reserve(p2,g,"req-later",day=str(tomorrow),now_ms=self.now),
+        self.assertEqual(self.bridge.fake_reserve(p2,g,"req-later",now_ms=self.now),
                          "denied_duplicate")
         self.assertEqual(self.ledger.count("runs"),1)
 
