@@ -27,7 +27,7 @@ const other:FakeSource = {trackId:'fake-track-23',version:'v1',
   sourceRevision:'etag.def',permissionRevision:'7',correctionRevision:'4',
   text:'第二筆虛構私人逐字稿'};
 function setup(){
-  const auth=new MutableFakeAuthority([one,other]);
+  const auth=new MutableFakeAuthority([one,other],[one.trackId,other.trackId]);
   const run=(hooks?:FakeHooks,sources:readonly FakeSource[]=[one])=>
     simulateProtectedQA({subjectId:auth.subjectId,requestId:'request-22',
       authority:auth,candidates:sources.map(({text:_neverT0,...ref})=>ref),nowMs:()=>auth.clock,hooks});
