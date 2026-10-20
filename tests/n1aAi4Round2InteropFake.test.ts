@@ -178,7 +178,7 @@ test('R2-09 fakeAttestation/verified boolean alone never allows production',asyn
 for(const stage of ['T0','T1','T2','SEND'] as const){
   test('R2-member-permission at '+stage+' fails closed',async()=>{
     const {auth,run}=setup();
-    const mutate=()=>auth.resources.set(one.trackId,{...one,permissionRevision:'8'});
+    const mutate=():void=>{auth.resources.set(one.trackId,{...one,permissionRevision:'8'});};
     if(stage==='T0') mutate();
     const hooks:FakeHooks=stage==='T1'?{afterT0:mutate}:stage==='T2'?{afterT1:mutate}:
       stage==='SEND'?{beforeSend:mutate}:{};
