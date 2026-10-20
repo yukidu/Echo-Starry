@@ -6,13 +6,14 @@ import {
  findQaIndexedPassages,replaceQaSearchGeneration,qaSearchEvidenceIsCurrent,
  type QaSearchEvidence
 } from '../worker/qaTranscriptSearchIndex';
-import {insertReply} from '../worker/aiSpeakerQaRouter';
+import {insertReply,excerpts} from '../worker/aiSpeakerQaRouter';
 
 const schema=readFileSync(new URL('../migrations/20261020_c09_qa_chinese_search.sql',import.meta.url),'utf8');
 function setup(){
  const db=new DatabaseSync(':memory:');
  db.exec('CREATE TABLE tracks(id TEXT PRIMARY KEY,title TEXT,speaker TEXT,audioUrl TEXT,uploadDate INTEGER,requiredRank TEXT,authorizedOnlyVisible INTEGER DEFAULT 0,isPrivateVip INTEGER DEFAULT 0,stickerUnlockCost INTEGER DEFAULT 0,commentsCount INTEGER DEFAULT 0)');
  db.exec('CREATE TABLE transcript_index(trackId TEXT PRIMARY KEY,r2Key TEXT,status TEXT,updatedAt INTEGER)');
+ db.exec('CREATE TABLE ai_story_pilots(trackId TEXT PRIMARY KEY,status TEXT,revision INTEGER)');
  db.exec('CREATE TABLE transcript_corrections(id TEXT PRIMARY KEY,trackId TEXT,segmentId TEXT,newText TEXT,createdAt INTEGER)');
  db.exec('CREATE TABLE transcript_correction_events(id TEXT PRIMARY KEY,trackId TEXT,segmentId TEXT,newText TEXT,adminText TEXT,createdAt INTEGER,status TEXT)');
  db.exec("CREATE TABLE comments(id TEXT PRIMARY KEY,trackId TEXT,authorName TEXT,authorAvatar TEXT,authorBadge TEXT,authorEmail TEXT,deviceId TEXT,content TEXT,timestamp TEXT,createdAt INTEGER,replyToId TEXT,replyToAuthor TEXT,isAdmin INTEGER,likes INTEGER,likedBy TEXT)");
@@ -158,4 +159,23 @@ test('race guards remain explicit in the final FTS SQL and the atomic publish SQ
  assert.match(router,/INSERT INTO comments/);
  assert.match(router,/WHERE "\+guard.where/);
  assert.match(router,/qaSearchEvidenceIsCurrent/);
+});
+
+test('unindexed R2 originals cannot bypass evidence validation when opt-in search is enabled',async()=>{
+ const f=setup();let reads=0;
+ try{
+  f.db.prepare("INSERT INTO tracks(id,title,speaker,audioUrl,uploadDate,requiredRank) VALUES('old','未索引音檔','講者甲','audio',1,'公開')").run();
+  f.db.prepare("INSERT INTO transcript_index(trackId,r2Key,status,updatedAt) VALUES('old','transcripts/old/transcript.json','ready',1)").run();
+  const track=f.db.prepare("SELECT * FROM tracks WHERE id='old'").get();
+  const env:any={DB:f.d1,QA_CHINESE_SEARCH_ENABLED:'true',R2_BUCKET:{async get(){
+    reads++;return {async text(){return JSON.stringify({segments:[{id:'s1',text:'感恩帶來進步'}]});}};
+  }}};
+  const safe=await excerpts(env,track,null,'current','感恩');
+  assert.equal(safe.prompt,'');
+  assert.equal(reads,0,'new indexed mode must never quote unverifiable R2');
+  env.QA_CHINESE_SEARCH_ENABLED=undefined;
+  const legacy=await excerpts(env,track,null,'current','感恩');
+  assert.match(legacy.prompt,/感恩帶來進步/);
+  assert.equal(reads,1,'legacy flag-off QA behaviour remains available');
+ }finally{f.close();}
 });
