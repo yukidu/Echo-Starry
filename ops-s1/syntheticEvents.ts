@@ -96,10 +96,17 @@ export function composeSyntheticOps(
   const groups = new Map<string, { rule: Rule; origin: SyntheticOrigin; count: number; status: HealthStatus; observedAt: string | null }>();
   const overflow = fakeEvents.length > MAX_ENTRIES;
   const entries = fakeEvents.slice(0, MAX_ENTRIES);
+  let invalidRecord = false;
   for (const event of entries) {
-    if (!event || !Object.prototype.hasOwnProperty.call(RULES, event.kind)) continue;
+    if (!event || !Object.prototype.hasOwnProperty.call(RULES, event.kind)) {
+      invalidRecord = true;
+      continue;
+    }
     const rule = RULES[event.kind];
-    if (rule.origin !== event.origin) continue;
+    if (rule.origin !== event.origin) {
+      invalidRecord = true;
+      continue;
+    }
     const stamp = safeDate(event.observedAt);
     const fresh = Number.isFinite(nowMs) && Number.isFinite(stamp) && stamp <= nowMs && nowMs - stamp <= MAX_AGE_MS;
     const trusted = event.verified === true && fresh;
@@ -123,6 +130,16 @@ export function composeSyntheticOps(
     } else groups.set(key, {
       rule, origin: rule.origin, status, count: 1,
       observedAt: Number.isFinite(stamp) ? new Date(stamp).toISOString() : null,
+    });
+  }
+  if (invalidRecord) {
+    // Unknown schema or source must not be silently discarded into a misleading healthy dashboard.
+    for (const service of ['workflows','workers_ai','r2','d1'] as const)
+      outputObservations.push({ service, source: 'fixture', access: 'unknown', verified: false, windowMinutes: 15 });
+    groups.set('SYNTHETIC_SOURCE_UNVERIFIED', {
+      rule: { origin: 'ai2', service: 'workflows', impact: 'warning',
+        code: 'SYNTHETIC_SOURCE_UNVERIFIED', message: '收到未驗證的跨組事件格式；需人工核對來源' },
+      origin: 'ai2', status: 'unknown', count: 1, observedAt: null,
     });
   }
   if (overflow) {
