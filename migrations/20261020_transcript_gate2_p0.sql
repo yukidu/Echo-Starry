@@ -11,6 +11,7 @@ CREATE TABLE transcript_runs (
   generation INTEGER NOT NULL DEFAULT 0,
   leaseUntil INTEGER NOT NULL DEFAULT 0,
   sourceAudioKey TEXT NOT NULL,
+  sourceAudioUrl TEXT NOT NULL,
   expectedActiveR2Key TEXT,
   candidateVersionId TEXT,
   approvedBy TEXT,
