@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Starry OPS-S1｜離線假資料健康中心預覽</title>
+<style>
+:root { color-scheme: dark; font-family: system-ui,-apple-system,"Noto Sans TC",sans-serif; background:#111827;color:#e9eef9 }
+*{box-sizing:border-box}body{margin:0} main{max-width:1050px;margin:auto;padding:22px}
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}h1{font-size:clamp(1.35rem,4vw,1.9rem);margin:0}h2{font-size:1.05rem;margin:0 0 12px}.muted{color:#a5b4ce;font-size:.86rem;line-height:1.5}
+.note{border:1px solid #eabf72;background:#3c3020;border-radius:10px;padding:12px;font-size:.9rem;margin:18px 0}.badge{font-size:.79rem;border-radius:99px;padding:5px 9px;background:#26364d;white-space:nowrap}.panel{border:1px solid #344256;background:#192335;border-radius:14px;padding:16px;margin:14px 0}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.service{background:#222f43;border:1px solid #374760;border-radius:12px;padding:14px}.service strong{display:block;margin-bottom:7px}.status{display:inline-block;border-radius:9px;padding:4px 8px;background:#3d4659;color:#e8efff;font-size:.82rem;font-weight:600}.status.normal{background:#145335;color:#d9ffe9}.status.warning{background:#6d4b0d;color:#ffebb9}.status.fault{background:#702d3b;color:#ffe1e7}.status.unknown{background:#414858;color:#e1e6ef}.row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.controls{display:flex;flex-wrap:wrap;gap:8px}button{background:#354a6c;color:#fff;border:1px solid #6381ae;padding:10px 12px;border-radius:9px;cursor:pointer}button:focus-visible{outline:2px solid #ffdc85}button[aria-pressed=true]{background:#456aa0;border-color:#d3e5ff}ul{margin:8px 0;padding-left:20px;line-height:1.7} .history{display:grid;grid-template-columns:1fr auto;gap:8px;padding:9px 0;border-bottom:1px solid #30405a}
+@media(max-width:720px){main{padding:12px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.service{padding:12px}header{display:block}header .badge{margin-top:10px;display:inline-block}}
+@media(max-width:380px){.grid{grid-template-columns:1fr 1fr;font-size:.85rem}.controls button{font-size:.85rem}}
+</style></head>
+<body><main>
+<header><div><h1>繁星雲端健康中心</h1><p class="muted">OPS-S1 · 安全隔離預覽 · 手機／桌機自適應</p></div><span class="badge">僅限假資料｜無正式管理員驗證</span></header>
+<div class="note">此頁完全離線，不呼叫 Cloudflare、資料庫、AI、Workflow，也沒有重試或取消操作。所有顏色都是示範情境，<strong>不是目前正式服務的健康狀況</strong>。</div>
+<section class="panel"><div class="row"><div><h2>健康總覽</h2><span id="overall" class="status unknown">未知</span><p id="observation" class="muted">資料來源：未授權／當前無即時觀測</p></div><div class="controls" aria-label="假資料情境"><button type="button" data-mode="unknown" aria-pressed="true">缺資料</button><button type="button" data-mode="normal" aria-pressed="false">正常示範</button><button type="button" data-mode="warning" aria-pressed="false">警示示範</button><button type="button" data-mode="fault" aria-pressed="false">故障示範</button></div></div></section>
+<section class="panel"><h2>六大 Cloudflare 服務</h2><div class="grid" id="services" aria-live="polite"></div></section>
+<section class="panel"><h2>異常事件（歷史案例，不是今天）</h2><div class="history"><span>繁中 JSON 格式錯誤</span><strong>歷史 37 次</strong></div><div class="history"><span>請求深度 10034</span><strong>歷史 4 次</strong></div><div class="history"><span>Workflow 終止</span><strong>歷史 3 次</strong></div><p class="muted">歷史事件不能直接判定今日服務故障，也不能自動重新 Whisper。</p></section>
+<section class="panel"><h2>值班建議（完全唯讀）</h2><ul id="advice"><li>來源不足：先查證資料時間與權限。</li><li>不要取消、重試或重新辨識已完成逐字稿。</li><li>不存取會員個資、原文或密鑰。</li></ul><p class="muted">本頁沒有部署入口、推播、定時輪詢或付費功能。</p></section>
+</main><script>
+'use strict';
+// Synthetic user-triggered scenarios only; ZERO fetch/WebSocket/timers.
+const labels=['Workers','Workflows','D1','R2','KV','Workers AI'];
+const el=document.getElementById('services');
+const overall=document.getElementById('overall');
+const observation=document.getElementById('observation');
+const advice=document.getElementById('advice');
+function render(mode){
+  const values=labels.map((name,index)=>({name,status:mode==='normal'?'normal':mode==='warning'&&index===1?'warning':mode==='fault'&&index===1?'fault':'unknown'}));
+  if(mode==='warning' || mode==='fault'){values[0].status='normal';values[2].status='unknown';}
+  const status=mode==='normal'?'正常':mode==='warning'?'警示':mode==='fault'?'故障':'未知';
+  overall.textContent=status; overall.className='status '+mode;
+  observation.textContent='模式：離線假資料｜所有時間與統計均非 Cloudflare 即時讀值';
+  // All labels and statuses are fixed trusted literals, no user content is inserted.
+  el.replaceChildren(...values.map(({name,status})=>{const div=document.createElement('div');div.className='service';const title=document.createElement('strong');title.textContent=name;const badge=document.createElement('span');badge.className='status '+status;badge.textContent=({normal:'正常',warning:'警示',fault:'故障',unknown:'未知'})[status];const hint=document.createElement('p');hint.className='muted';hint.textContent='假資料／無正式監控';div.append(title,badge,hint);return div;}));
+  advice.replaceChildren(); const lines=mode==='fault'?['故障示範：先確認影響範圍並交由中央AI 2。','禁止自動取消／重新辨識／操作正式資料。']:mode==='warning'?['警示示範：核對工作排隊時間與已完成稿。','不能從歷史錯誤推定目前故障。']:['先檢查資料來源、觀測時間、是否有中央超管權限。','若為未知，不能把服務顯示為綠色。'];
+  lines.push('原有 ready 稿不覆寫，無真實 Cloudflare 或 AI 呼叫。');for(const s of lines){const li=document.createElement('li');li.textContent=s;advice.appendChild(li);}
+  for(const b of document.querySelectorAll('[data-mode]')) b.setAttribute('aria-pressed',String(b.dataset.mode===mode));
+}
+for(const b of document.querySelectorAll('[data-mode]'))b.addEventListener('click',()=>render(b.dataset.mode));
+render('unknown');
+</script></body></html>
