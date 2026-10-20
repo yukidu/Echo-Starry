@@ -222,3 +222,20 @@ test('N1A6-P2-23 2000 fake rejected handoffs are bounded, never authorize paid w
   locked(out);
  }
 });
+
+test('N1A6-R3-01 self-claimed consistent fake proof must NEVER preserve a green App card',()=>{
+ const result=showFakeProofHandoff(base(),decision('fake_evidence_consistent',true));
+ assert.equal(result.domains.app_security.status,'unknown');
+ assert.equal(result.proofHandoff.proofState,'not_verified');
+ assert.equal(result.proofHandoff.witnessState,'unknown');
+ assert.match(result.proofHandoff.displayText,/未經可信後端驗證/);
+ assert.equal(result.domains.backup_restore.status,'unknown');
+ unchangedPlatform(result);locked(result);
+});
+test('N1A6-R3-02 self-claimed fake witness denial is not an authenticated security warning',()=>{
+ const result=showFakeProofHandoff(base(),decision('witness_records_revocation_or_deletion'));
+ assert.equal(result.domains.app_security.status,'unknown');
+ assert.equal(result.proofHandoff.status,'unknown');
+ assert.equal(result.domains.backup_restore.status,'unknown');
+ locked(result);
+});
