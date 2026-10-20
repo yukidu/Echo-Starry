@@ -11,10 +11,16 @@ import type {
 
 const NOW=Date.UTC(2026,9,20,18,0);
 const DAY=86400000;
+type FakePersistedFloor={
+  sourceId:string; headSeq:string; headHash:string;
+  restoreEpoch:string; observedAtMs:number;
+};
 type F={
   input:SimulatedRestoreInput; files:Map<string,string>;
   beforeW:MockWitness|null; afterW:MockWitness|null;
   beforeH:MockIndependentHead|null;afterH:MockIndependentHead|null;
+  floorBefore:FakePersistedFloor|null;floorAfter:FakePersistedFloor|null;
+  consumedReviews:Set<string>;
   beforeId:MockStarryId|null;afterId:MockStarryId|null;
 };
 async function event(seq:string,kind:MockEvent['kind'],target:string,prevHash:string):Promise<MockEvent>{
@@ -58,13 +64,26 @@ async function fixture():Promise<F>{
     headHash:e2.hash,restoreEpoch:'9',reviewerIdRevision:'12',
     decision:'approve',approvedAtMs:NOW-500
   });
+  const floor:FakePersistedFloor={sourceId:'offline-third-domain-high-water',
+    headSeq:'2',headHash:e2.hash,restoreEpoch:'9',observedAtMs:NOW-1000};
   const f:F={
-    files,beforeW:w,afterW:w,beforeH:h,afterH:h,beforeId:id,afterId:id,
-    input:undefined as unknown as SimulatedRestoreInput
+    files,beforeW:w,afterW:w,beforeH:h,afterH:h,
+    floorBefore:floor,floorAfter:floor,consumedReviews:new Set<string>(),
+    beforeId:id,afterId:id,input:undefined as unknown as SimulatedRestoreInput
   };
-  const env:MockEnvironment={
+  // These are independent FAKE readers. The original unpatched gate ignores
+  // them, so the new red regressions first demonstrate the missing controls.
+  const env:MockEnvironment & {
+    readTrustedFloor(phase:'before'|'after'):Promise<FakePersistedFloor|null>;
+    claimFakeReviewOnce(key:string):Promise<boolean>;
+  }={
     readWitness:async phase=>phase==='before'?f.beforeW:f.afterW,
     readIndependentHead:async phase=>phase==='before'?f.beforeH:f.afterH,
+    readTrustedFloor:async phase=>phase==='before'?f.floorBefore:f.floorAfter,
+    claimFakeReviewOnce:async key=>{
+      if(f.consumedReviews.has(key))return false;
+      f.consumedReviews.add(key);return true;
+    },
     readStarryId:async phase=>phase==='before'?f.beforeId:f.afterId,
     readFakeR2:async key=>f.files.get(key)??null
   };
@@ -93,6 +112,8 @@ async function addEvent(f:F,kind:MockEvent['kind'],target:string){
   f.beforeW={...f.beforeW,headSeq:seq,headHash:next.hash,events:[...f.beforeW.events,next]};
   f.afterW=f.beforeW;
   f.beforeH={...f.beforeH,headSeq:seq,headHash:next.hash};f.afterH=f.beforeH;
+  if(f.floorBefore)f.floorBefore={...f.floorBefore,headSeq:seq,headHash:next.hash};
+  f.floorAfter=f.floorBefore;
   f.input={...f.input,approvals:f.input.approvals.map(a=>({...a,headHash:next.hash}))};
 }
 test('runtime is always OFF; happy Fake returns no production restore capability',async()=>{
@@ -261,3 +282,39 @@ test('unverified unrelated old backup never becomes an expiry-delete candidate',
     createdAtMs:NOW-120*DAY,securitySeq:'1',state:'failed',files:[]};
   f.input={...f.input,backups:[...f.input.backups,stale]};
 }));
+
+
+test('R3 RED: reviewer with pending revocation tombstone must not approve',async()=>{
+  await denied('REVIEWER_REVOKED_AT_WITNESS',async f=>{
+    // Starry ID's cached active=true must not outweigh a newer pending tombstone.
+    await addEvent(f,'member_revoke_pending','admin-one');
+  });
+});
+test('R3 RED: a matching two-person approval and backup must not be replayable',async()=>{
+  const f=await fixture();
+  const first=await simulateN1aBackupGate(f.input);
+  assert.equal(first.simulatedEligible,true,JSON.stringify(first.reasons));
+  const second=await simulateN1aBackupGate(f.input);
+  assert.equal(second.simulatedEligible,false,'second identical review replay must fail');
+  assert.ok(second.reasons.includes('REVIEW_ALREADY_CONSUMED'),JSON.stringify(second.reasons));
+  assert.deepEqual(second.retentionCandidates,[]);
+  assert.equal(second.productionAuthorized,false);
+});
+test('R3 RED: two witnesses can agree on an OLD valid hash chain, but third floor vetoes rollback',async()=>{
+  await denied('TRUST_FLOOR_MISMATCH',f=>{
+    const originalFloor=f.floorBefore;
+    const old=f.beforeW!.events[0];
+    f.beforeW={...f.beforeW!,events:[old],headSeq:'1',headHash:old.hash};
+    f.afterW=f.beforeW;
+    f.beforeH={...f.beforeH!,headSeq:'1',headHash:old.hash};f.afterH=f.beforeH;
+    // Both PR witnesses and both admin signatures reverted to the old head.
+    // The FAKE independently retained floor still remembers seq=2.
+    f.input={...f.input,approvals:f.input.approvals.map(a=>({...a,headHash:old.hash}))};
+    f.floorBefore=originalFloor;f.floorAfter=originalFloor;
+  });
+});
+test('R3: third high-water proof unavailable always blocks cleanup and approval',async()=>{
+  await denied('TRUST_FLOOR_MISSING',f=>{
+    f.floorBefore=null;f.floorAfter=null;
+  });
+});
