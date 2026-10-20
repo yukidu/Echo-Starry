@@ -187,6 +187,11 @@ export async function assertLiveRun(db:Db,run:SafeRun):Promise<void>{
 }
 export async function failSafeRun(db:Db,run:SafeRun|null,error:unknown){
   if(!run || !['queued','processing'].includes(run.state))return;
+  // A delayed error callback after successful publication is a harmless stale
+  // signal, not grounds to rewrite (or even flag) the active ready version.
+  const current=await db.prepare("SELECT state,generation FROM transcript_runs WHERE runId=?")
+    .bind(run.runId).first();
+  if(!current || current.state!==run.state || Number(current.generation)!==run.generation)return;
   const message=error instanceof Error?error.message:String(error);
   const now=Date.now(),safeMessage=message.slice(0,300);
   const runStmt=db.prepare(
