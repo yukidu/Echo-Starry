@@ -1,0 +1,36 @@
+name: AI5 N1A S3A offline integration
+on:
+  push:
+    branches:
+      - safety/ai5-n1a-s3a-f22-shared-gate-20261020
+  pull_request:
+    paths:
+      - 'f22-n1a-s3a/**'
+      - 'f22-n1a-s1/offlineModel.ts'
+      - 'tests/f22N1AS3aSharedIntegration.test.ts'
+      - 'tests/f22N1AS1Fake.test.ts'
+      - 'tests/f22N1AS1R3Security.test.ts'
+      - '.github/workflows/ai5-n1a-s3a-fake-only.yml'
+permissions:
+  contents: read
+jobs:
+  ai5-fake-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout safe branch (no cloud credentials)
+        uses: actions/checkout@v4
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test dependencies only
+        run: npm install --ignore-scripts --no-package-lock --no-audit --no-fund
+      - name: Execute shared verifier and AI5 offline model in one process
+        run: node --import tsx --test tests/f22N1AS3aSharedIntegration.test.ts
+      - name: Rerun original AI5 synthetic 60080 events and R3 security
+        run: node --import tsx --test tests/f22N1AS1Fake.test.ts tests/f22N1AS1R3Security.test.ts
+      - name: Confirm baseline shared S3A envelope scenarios
+        run: node --import tsx --test tests/n1aS3aSharedEnvelope.test.ts
+      - name: TypeScript check without output
+        run: npm run lint
