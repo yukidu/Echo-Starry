@@ -1,4 +1,4 @@
-import { requestSafeRun, failSafeRun, sourceRevision } from './transcriptP0Safety';
+import { requestSafeRun, failSafeRun, sourceRevision, queueSafeRun, quarantineExpiredRuns } from './transcriptP0Safety';
 import { transcriptTargetConcurrency } from './starryAiManagement';
 
 type Env={DB:any;TRANSCRIPT_WORKFLOW:any;[key:string]:any};
@@ -13,7 +13,7 @@ const getKey=(url:string)=>{
  * The run reservation is atomic inside D1. NEVER requeue an unknown live run.
  */
 export async function queueNextTranscriptGate2P0(env:Env){
-  const now=Date.now(),target=Math.max(0,Math.min(5,Number(await transcriptTargetConcurrency(env))));
+  const target=Math.max(0,Math.min(5,Number(await transcriptTargetConcurrency(env))));
   // Populate at most five first-run intents per tick. No original ready row is touched.
   const unstarted:any=await env.DB.prepare(
     "SELECT i.trackId,t.audioUrl FROM transcript_index i JOIN tracks t ON t.id=i.trackId "+
@@ -30,12 +30,14 @@ export async function queueNextTranscriptGate2P0(env:Env){
         requestKey:'first:'+String(item.trackId)+':'+key+':'+etag});
     }
   }
-  const all:any=await env.DB.prepare(
-    "UPDATE transcript_runs SET state='queued',updatedAt=? "+
-    "WHERE runId IN(SELECT runId FROM transcript_runs WHERE state='pending' ORDER BY createdAt "+
-    "LIMIT(SELECT MAX(0, ?-COUNT(*)) FROM transcript_runs WHERE state IN ('queued','processing'))) "+
-    "RETURNING runId,trackId,intent,sourceAudioKey,generation").bind(now,target).all();
-  const claimed:any[]=all?.results||[],started:any[]=[],failures:any[]=[];
+  await quarantineExpiredRuns(env.DB);
+  // Each first-run queue transition is transactional with transcript_index.
+  const waiting:any=await env.DB.prepare("SELECT runId FROM transcript_runs WHERE state='pending' ORDER BY createdAt LIMIT 5").all();
+  const claimed:any[]=[],started:any[]=[],failures:any[]=[];
+  for(const entry of waiting?.results||[]){
+    const queued=await queueSafeRun(env.DB,String(entry.runId),target);
+    if(queued)claimed.push(queued);
+  }
   for(let i=0;i<claimed.length;i++){
     const run=claimed[i],trackId=String(run.trackId),runId=String(run.runId);
     if(run.intent==='first'){
