@@ -62,34 +62,96 @@ export async function requestSafeRun(db:Db,input:{
      String(prev.approvedBy||'')!==String(input.approvedBy||''))fail('request key reused across approvals');
   return prev;
 }
-export async function claimSafeRun(db:Db,runId:string,trackId:string):Promise<SafeRun>{
+export async function queueSafeRun(db:Db,runId:string,concurrency:number):Promise<SafeRun|null>{
+  const run=await db.prepare("SELECT * FROM transcript_runs WHERE runId=? AND state='pending' LIMIT 1")
+    .bind(runId).first() as SafeRun|null;
+  if(!run)return null;
+  const target=Math.max(0,Math.min(5,Math.floor(concurrency)));
+  if(target===0)return null;
   const now=Date.now();
-  const row=await db.prepare(
-    "UPDATE transcript_runs SET state='processing',generation=generation+1,leaseUntil=?,updatedAt=? "+
-    "WHERE runId=? AND trackId=? AND state='queued' AND EXISTS("+
-    "SELECT 1 FROM transcript_index i JOIN tracks t ON t.id=i.trackId "+
-    "WHERE i.trackId=transcript_runs.trackId "+
-    "AND t.audioUrl=transcript_runs.sourceAudioUrl "+
-    "AND ((transcript_runs.intent='first' AND i.status='queued' AND i.r2Key IS NULL) "+
+  const cap="(SELECT COUNT(*) FROM transcript_runs WHERE state IN ('queued','processing'))<?";
+  const sql="UPDATE transcript_runs SET state='queued',updatedAt=? "+
+    "WHERE runId=? AND state='pending' AND "+cap+
+    " AND EXISTS(SELECT 1 FROM transcript_index i JOIN tracks t ON t.id=i.trackId "+
+    "WHERE i.trackId=transcript_runs.trackId AND t.audioUrl=transcript_runs.sourceAudioUrl "+
+    "AND ((transcript_runs.intent='first' AND i.status='pending' AND i.r2Key IS NULL) "+
     "OR (transcript_runs.intent='relisten' AND i.status='ready' "+
-    "AND i.r2Key=transcript_runs.expectedActiveR2Key))) RETURNING *")
-    .bind(now+15*60_000,now,runId,trackId).first();
-  if(!row)fail('run not queued, source changed, or already completed');
-  const run=row as SafeRun;
+    "AND i.r2Key=transcript_runs.expectedActiveR2Key)))";
   if(run.intent==='first'){
-    const owned=await db.prepare(
-      "UPDATE transcript_index SET status='processing',workingRunId=?,updatedAt=? "+
-      "WHERE trackId=? AND status='queued' AND r2Key IS NULL "+
-      "AND workingRunId IS NULL RETURNING trackId")
-      .bind(runId,now,trackId).first();
-    if(!owned){
-      await db.prepare("UPDATE transcript_runs SET state='failed',error='claim_lost',updatedAt=? "+
-        "WHERE runId=? AND generation=? AND state='processing'")
-        .bind(Date.now(),runId,run.generation).run();
-      fail('initial transcript ownership lost');
+    if(!db.batch)fail('D1 atomic queue unavailable');
+    const stmts=[
+      db.prepare(sql).bind(now,runId,target),
+      db.prepare("UPDATE transcript_index SET status='queued',updatedAt=? "+
+        "WHERE trackId=? AND status='pending' AND r2Key IS NULL "+
+        "AND EXISTS(SELECT 1 FROM transcript_runs r WHERE r.trackId=transcript_index.trackId "+
+        "AND r.runId=? AND r.state='queued')").bind(now,run.trackId,runId)
+    ];
+    const results=await db.batch(stmts);
+    if(Number(results?.[0]?.meta?.changes)!==1 || Number(results?.[1]?.meta?.changes)!==1){
+      // Both statements have the same predicate on the pre-queue state;
+      // a partial result indicates an invariant failure; never start Whisper.
+      return null;
     }
+  }else{
+    const queued=await db.prepare(sql+" RETURNING runId").bind(now,runId,target).first();
+    if(!queued)return null;
   }
-  return run;
+  return await db.prepare("SELECT * FROM transcript_runs WHERE runId=? AND state='queued'")
+    .bind(runId).first() as SafeRun|null;
+}
+export async function claimSafeRun(db:Db,runId:string,trackId:string):Promise<SafeRun>{
+  const candidate=await db.prepare(
+    "SELECT * FROM transcript_runs WHERE runId=? AND trackId=? AND state='queued' LIMIT 1")
+    .bind(runId,trackId).first() as SafeRun|null;
+  if(!candidate)fail('run not queued or already completed');
+  const now=Date.now();
+  const condition=" AND EXISTS(SELECT 1 FROM transcript_index i JOIN tracks t ON t.id=i.trackId "+
+    "WHERE i.trackId=transcript_runs.trackId AND t.audioUrl=transcript_runs.sourceAudioUrl "+
+    "AND ((transcript_runs.intent='first' AND i.status='queued' AND i.r2Key IS NULL "+
+    "AND i.workingRunId IS NULL) OR (transcript_runs.intent='relisten' "+
+    "AND i.status='ready' AND i.r2Key=transcript_runs.expectedActiveR2Key)))";
+  const claimSql="UPDATE transcript_runs SET state='processing',generation=generation+1,"+
+    "leaseUntil=?,updatedAt=? WHERE runId=? AND trackId=? AND state='queued'"+condition;
+  if(candidate.intent==='first'){
+    if(!db.batch)fail('D1 atomic claim unavailable');
+    const results=await db.batch([
+      db.prepare(claimSql).bind(now+15*60_000,now,runId,trackId),
+      db.prepare("UPDATE transcript_index SET status='processing',workingRunId=?,updatedAt=? "+
+        "WHERE trackId=? AND status='queued' AND r2Key IS NULL AND workingRunId IS NULL "+
+        "AND EXISTS(SELECT 1 FROM transcript_runs r WHERE r.runId=? AND r.trackId=transcript_index.trackId "+
+        "AND r.state='processing')").bind(runId,now,trackId,runId)
+    ]);
+    if(Number(results?.[0]?.meta?.changes)!==1 || Number(results?.[1]?.meta?.changes)!==1)
+      fail('initial transcript atomic claim refused');
+  }else{
+    const claimed=await db.prepare(claimSql+" RETURNING runId")
+      .bind(now+15*60_000,now,runId,trackId).first();
+    if(!claimed)fail('relisten already claimed or source changed');
+  }
+  return await db.prepare("SELECT * FROM transcript_runs WHERE runId=? AND state='processing'")
+    .bind(runId).first() as SafeRun;
+}
+export async function quarantineExpiredRuns(db:Db):Promise<number>{
+  // Expired work is NEVER automatically resumed: a lost Whisper completion
+  // may still incur a bill, so the operator must authorize any new attempt.
+  const now=Date.now();
+  const expired=await db.prepare("SELECT runId,trackId,intent FROM transcript_runs "+
+    "WHERE state='processing' AND leaseUntil>0 AND leaseUntil<? LIMIT 10")
+    .bind(now).all();
+  let total=0;
+  for(const row of expired?.results||[]){
+    const mark=await db.prepare(
+      "UPDATE transcript_runs SET state='failed',error='lease_expired_manual_review',updatedAt=? "+
+      "WHERE runId=? AND state='processing' AND leaseUntil>0 AND leaseUntil<? RETURNING runId")
+      .bind(now,row.runId,now).first();
+    if(!mark)continue;
+    total++;
+    if(row.intent==='first')await db.prepare("UPDATE transcript_index SET status='failed',workingRunId=NULL,"+
+      "error='lease_expired_manual_review',updatedAt=? "+
+      "WHERE trackId=? AND workingRunId=? AND status='processing' AND r2Key IS NULL")
+      .bind(now,row.trackId,row.runId).run();
+  }
+  return total;
 }
 export async function assertLiveRun(db:Db,run:SafeRun):Promise<void>{
   const live=await db.prepare(
