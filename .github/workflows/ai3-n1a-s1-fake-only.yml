@@ -10,6 +10,7 @@ on:
       - tests/n1a_s1_b07_fake.py
       - tests/test_n1a_s1_b07.py
       - tests/test_n1a_s1_b07_round2.py
+      - tests/test_n1a_s1_b07_round3.py
       - tests/n1a_s1_b07_proof_bridge_fake.py
       - docs/STARRY_AI3_N1A_S1_FAKE_COST_CONTRACT.md
       - .github/workflows/ai3-n1a-s1-fake-only.yml
