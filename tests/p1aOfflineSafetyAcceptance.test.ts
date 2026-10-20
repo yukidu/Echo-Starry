@@ -67,7 +67,7 @@ test('tab navigation supports keyboard movement and selected-state sync', () => 
 test('mobile layout preserves horizontally scrollable tabs and one-column cards', () => {
   assert.match(style, /\.tabs\{[^}]*overflow-x:auto/);
   assert.match(style, /\.tabs button\{[^}]*min-height:44px/);
-  assert.match(style, /@media\(max-width:650px\)\{[^}]*\.grid\{grid-template-columns:1fr\}/);
+  assert.match(style, /@media\(max-width:650px\)\{[\s\S]*?\.grid\{grid-template-columns:1fr\}/);
   assert.match(style, /table\{display:block;overflow-x:auto/);
   assert.match(style, /prefers-reduced-motion:reduce/);
 });
