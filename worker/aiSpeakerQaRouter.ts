@@ -1,5 +1,6 @@
 import { recordAiActivity } from './starryAiManagement';
 import { findQaIndexedPassages } from './qaTranscriptSearchIndex';
+import { qaSearchRebuildStatus, retryFailedQaSearchRebuild } from './qaTranscriptSearchRebuildQueue';
 /**
  * Echo Starry transcript QA.  Server-side-only permissions, pricing and model.
  * No new app/database: transcripts in R2, indexes/comments in Echo D1, batteries in Starry ID D1.
@@ -503,6 +504,19 @@ export async function handleQaRequest(req:Request,env:Env):Promise<Response|null
       return json({enabled:(cfg.enabled||q.unlimited)&&!q.reason,reason:q.reason,tier:q.tier,label:q.label,daily:q.daily,free:q.free,freeLeft:q.freeLeft,left:q.left,cost:q.cost,unlimited:!!q.unlimited});
     }
     if(!admin)return json({error:'只有超級管理員可以管理逐字稿與問答設定'},403);
+    if(path==='/api/qa/index-rebuild/status'&&method==='GET'){
+      if(env.QA_CHINESE_SEARCH_WRITE_ENABLED!=='true')return json({enabled:false,waiting:0,processing:0,retrying:0,failed:0});
+      return json({enabled:true,...await qaSearchRebuildStatus(env.DB)});
+    }
+    if(path==='/api/qa/index-rebuild/retry'&&method==='POST'){
+      if(env.QA_CHINESE_SEARCH_WRITE_ENABLED!=='true')return json({error:'索引功能尚未授權啟用'},409);
+      const body:any=await req.json().catch(()=>({}));
+      const trackId=txt(body.trackId);
+      if(!trackId||trackId.length>128)return json({error:'請指定正確音檔'},400);
+      const queued=await retryFailedQaSearchRebuild(env.DB,trackId);
+      return json({queued,message:queued?'已重新排入安全佇列':'沒有可重試的失敗索引'});
+    }
+
     if(path==='/api/qa/search'&&method==='GET'){
       // Admin-triggered search only: NEVER scan cloud files on each keystroke.
       const term=txt(url.searchParams.get('q')).slice(0,80);
