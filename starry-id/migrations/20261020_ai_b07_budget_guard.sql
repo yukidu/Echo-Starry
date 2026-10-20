@@ -211,6 +211,26 @@ BEGIN
     CASE WHEN NEW.status='settled' THEN 'settle' WHEN NEW.status='void' THEN 'void'
     ELSE 'uncertain' END,OLD.held_micro_twd,NEW.actual_micro_twd,NEW.updated_at);
 END;
+-- Prevent an accidental future caller from changing reserved amounts, model,
+-- member, fingerprint, request key or dates outside a valid state transition.
+-- Otherwise counters and idempotency could silently diverge.
+CREATE TRIGGER IF NOT EXISTS starry_ai_b07_immutable_call
+BEFORE UPDATE ON starry_ai_b07_calls
+WHEN NEW.id<>OLD.id OR NEW.request_key<>OLD.request_key
+ OR NEW.fingerprint<>OLD.fingerprint OR NEW.day<>OLD.day
+ OR NEW.app_id<>OLD.app_id OR NEW.task_id<>OLD.task_id
+ OR NEW.member_key<>OLD.member_key OR NEW.model_id<>OLD.model_id
+ OR NEW.billing_class<>OLD.billing_class OR NEW.max_units<>OLD.max_units
+ OR NEW.unit_micro_twd<>OLD.unit_micro_twd OR NEW.held_micro_twd<>OLD.held_micro_twd
+ OR NEW.created_at<>OLD.created_at
+ OR (NEW.status='settled' AND NEW.actual_micro_twd<>NEW.actual_units*OLD.unit_micro_twd)
+ OR (NEW.status IN ('void','uncertain') AND (NEW.actual_units<>0 OR NEW.actual_micro_twd<>0))
+BEGIN SELECT RAISE(ABORT,'b07_immutable_charge_data'); END;
+-- Never delete a request ID: deleting it would make replay chargeable again.
+CREATE TRIGGER IF NOT EXISTS starry_ai_b07_no_call_delete
+BEFORE DELETE ON starry_ai_b07_calls
+BEGIN SELECT RAISE(ABORT,'b07_request_history_cannot_be_deleted'); END;
+
 -- All terminals and UNKNOWN outcomes are final; unknowns require manual reconciliation.
 CREATE TRIGGER IF NOT EXISTS starry_ai_b07_terminal
 BEFORE UPDATE OF status ON starry_ai_b07_calls
