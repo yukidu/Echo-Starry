@@ -69,7 +69,7 @@ export async function drainQaSearchRebuildQueue(env:Env,limit=MAX_PER_TICK):Prom
   let claimed=0;
   // Sequential processing to avoid concurrent R2/FTS bursts and keep free-tier usage low.
   for(const item of candidates){
-    const job=await claim(env,String(item.trackId),Number(item.requestedRevision),Date.now());
+    const job=await claim(env.DB,String(item.trackId),Number(item.requestedRevision),Date.now());
     if(!job)continue;
     claimed++;
     await runJob(env,job,Date.now());
