@@ -130,8 +130,17 @@ export async function bkpS1Preflight(r:RestoreRequest):Promise<PreflightResult>{
   const auth=r.authority;
   if(!auth||!auth.available||!auth.independentlyStored||!auth.active)add('authority_unavailable');
   if(leaf&&auth){
-    if(!isInt(auth.epoch)||auth.epoch<=leaf.restoreEpoch)add('restore_epoch_not_advanced');
-    if(auth.deletionWatermark>leaf.deletionWatermark||auth.revocationWatermark>leaf.revocationWatermark)
+    if(!isInt(auth.epoch)||!isInt(leaf.restoreEpoch)||auth.epoch<=leaf.restoreEpoch)
+      add('restore_epoch_not_advanced');
+    // BOTH directions are unsafe: an older authority may miss a deletion,
+    // while a newer authority proves the backup is obsolete. No stale reads.
+    if(!isInt(auth.deletionWatermark)||!isInt(auth.revocationWatermark))
+      add('authority_watermark_invalid');
+    else if(auth.deletionWatermark<leaf.deletionWatermark||
+            auth.revocationWatermark<leaf.revocationWatermark)
+      add('authority_watermark_older');
+    else if(auth.deletionWatermark>leaf.deletionWatermark||
+            auth.revocationWatermark>leaf.revocationWatermark)
       add('snapshot_outdated_authority');
   }
   const snap=r.snapshot;
@@ -145,9 +154,16 @@ export async function bkpS1Preflight(r:RestoreRequest):Promise<PreflightResult>{
     if(snap.deletionWatermark!==leaf.deletionWatermark||snap.revocationWatermark!==leaf.revocationWatermark||
       snap.correctionWatermark!==leaf.correctionWatermark||snap.entitlementWatermark!==leaf.entitlementWatermark)
       add('watermark_mismatch');
+    // A delta may only contain newly changed files; approved history can
+    // physically reside in the full base or an intermediate delta.
     const versions=new Map<string,TranscriptVersion>();
-    for(const v of leaf.versions){
-      if(versions.has(v.id))add('duplicate_version'); versions.set(v.id,v);
+    for(const manifest of chain)for(const v of manifest.versions){
+      const previous=versions.get(v.id);
+      // Version identifiers are immutable. Re-signing a conflicting version in
+      // a later delta must never allow its earlier physical objects to disappear.
+      if(previous && JSON.stringify(previous)!==JSON.stringify(v))
+        add('version_immutability_conflict');
+      else versions.set(v.id,v);
     }
     for(const [track,versionId] of Object.entries(snap.activeByTrack)){
       const v=versions.get(versionId);
@@ -161,10 +177,20 @@ export async function bkpS1Preflight(r:RestoreRequest):Promise<PreflightResult>{
       if(!v || (snap.publishedVersionIds.includes(versionId) && v.status!=='published') ||
         (snap.approvedHistoryIds.includes(versionId) && v.status!=='approved-history')) add('approved_version_missing');
     }
+    // Only the selected leaf may define CURRENT active pointers. Older
+    // manifests may describe an earlier active revision that is now historical.
     for(const v of leaf.versions){
       if(v.active && snap.activeByTrack[v.trackId]!==v.id)add('active_version_conflict');
       if(v.active && v.status!=='published')add('candidate_cannot_be_active');
-      if(v.status==='awaiting_review'||v.status==='failed')continue; // excluded from public restore
+    }
+    // But ALL approved/published artifacts across the full + every delta must
+    // exist and be validated, not merely leaf. A signed parent JSON document
+    // is not proof that the R2 object it references still exists.
+    const verifiedVersions=new Set<string>();
+    for(const manifest of chain)for(const v of manifest.versions){
+      if(v.status==='awaiting_review'||v.status==='failed')continue; // never publish candidates
+      if(verifiedVersions.has(v.id))continue;
+      verifiedVersions.add(v.id);
       if(v.rawOrigin==='legacy-unavailable' && v.legacyMissingRaw)legacyIds.push(v.id);
       if(!v.sourceAudioKey||!v.sourceAudioRevision||!isInt(v.segmentCount)||!validSha(v.timecodeHash))
         add('invalid_version_metadata');
@@ -210,9 +236,35 @@ export type RetentionPlan = Readonly<{ keepIds: readonly string[]; candidates:re
 export function bkpS1PlanRetention(input:{manifests:readonly BackupManifest[];lastGoodId:string|null;
   retentionDays:7|30|90;now:number}):RetentionPlan{
   const keep=new Set<string>();let blocked=false;
+  const ids=input.manifests.map(m=>m.id);
+  // Check the ENTIRE graph, including expired manifests outside lastGood.
+  // A duplicate, orphan, or cycle is untrustworthy even if that node is old.
+  if(!unique(ids)||ids.some(id=>!id))blocked=true;
   const lookup=new Map(input.manifests.map(m=>[m.id,m]));
   if(!isInt(input.now)||![7,30,90].includes(input.retentionDays))blocked=true;
   if(!input.lastGoodId||!lookup.has(input.lastGoodId))blocked=true;
+  for(const m of input.manifests){
+    if(!m.baseId||!['full','delta'].includes(m.mode))blocked=true;
+    if(m.mode==='full'&&(m.parentId!==null||m.baseId!==m.id))blocked=true;
+    if(m.mode==='delta'&&(!m.parentId||!lookup.has(m.parentId)))blocked=true;
+    const seen=new Set<string>();
+    let cursor:BackupManifest|undefined=m;
+    // Traverse every candidate (not just retained nodes), detecting missing
+    // parents, cycles, incorrect base roots, and timestamp inversions.
+    while(cursor){
+      if(seen.has(cursor.id)){blocked=true;break}
+      seen.add(cursor.id);
+      if(cursor.parentId===null){
+        if(cursor.mode!=='full'||m.baseId!==cursor.id)blocked=true;
+        break;
+      }
+      const parent:BackupManifest|undefined=lookup.get(cursor.parentId);
+      if(!parent||cursor.mode!=='delta'){blocked=true;break}
+      if(!isInt(cursor.createdAt)||!isInt(parent.createdAt)||parent.createdAt>cursor.createdAt)
+        blocked=true;
+      cursor=parent;
+    }
+  }
   for(const m of input.manifests){
     if(m.state!=='verified-success'||!isInt(m.createdAt)||m.createdAt>input.now) {keep.add(m.id);blocked=true}
     else if(input.now-m.createdAt<=input.retentionDays*86400000)keep.add(m.id);
