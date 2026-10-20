@@ -135,7 +135,10 @@ test('R15 duplicate reward key REJECT',rejected('duplicate_entitlement',(f)=>{
 test('R16 currently revoked track REJECT',rejected('active_track_deleted_or_revoked',(f)=>{
   f.authority={...f.authority,currentRevokedTrackIds:['synthetic-track']};
 }));
-test('R17 approved historical version missing REJECT',rejected('approved_version_missing',(f)=>{
+test('R17 approved historical version absent from ENTIRE chain REJECT',rejected('approved_version_missing',(f)=>{
+  // Delta leaf may legitimately inherit a base-only approved version;
+  // removing it solely from the leaf is not data loss.
+  f.base={...f.base,versions:f.base.versions.filter(x=>x.id!=='legacy')};
   f.manifest={...f.manifest,versions:f.manifest.versions.filter(x=>x.id!=='legacy')};
 }));
 test('R18 referenced R2 object absent REJECT',rejected('object_not_found',(f)=>{
