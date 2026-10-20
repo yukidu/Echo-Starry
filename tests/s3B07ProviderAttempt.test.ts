@@ -194,3 +194,11 @@ test('S3-14 legacy localhost HTTP only: 2000 fake identities, <=96 connections; 
  assert.match(r.stdout,/B07_OFFLINE_HTTP_FAKE_USERS_OK/);
  assert.match(r.stdout,/"paidProviderCalls":0/);
 });
+
+test('S3-15 80 genuinely concurrent SQLite writers produce one ticket and one invoice adjustment',()=>{
+ const r=spawnSync('python3',['tests/b07-s3-concurrent-claims.py'],{
+  encoding:'utf8',timeout:150000,maxBuffer:1024*1024
+ });
+ assert.equal(r.status,0,'offline concurrency: '+r.stderr.slice(0,700));
+ assert.match(r.stdout,/S3_SQLITE_CONCURRENT_OK/);
+});
