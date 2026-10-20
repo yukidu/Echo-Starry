@@ -11,7 +11,7 @@ const docs:FakeSource[]=[
   correctionRevision:'1',permissionRevision:'2',text:'第二份完全虛構的受保護內容'}
 ];
 function setup(){
- const auth=new MutableFakeAuthority(docs);
+ const auth=new MutableFakeAuthority(docs,docs.map(s=>s.trackId));
  const run=(hooks?:Parameters<typeof simulateProtectedQA>[0]['hooks'],
    candidates:readonly FakeSource[]=[docs[0]],subjectId=auth.subjectId,requestId='request-123')=>
    simulateProtectedQA({authority:auth,candidates:candidates.map(({text:_neverT0,...ref})=>ref),subjectId,requestId,nowMs:()=>auth.clock,hooks});
