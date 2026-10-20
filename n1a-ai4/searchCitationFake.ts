@@ -3,6 +3,8 @@
  * DO NOT import into production routers. The final SEND fence is only an
  * in-memory model, NOT a cross-service atomicity guarantee.
  */
+import { createHash } from 'node:crypto';
+
 export const N1A_AI4_FAKE_ONLY = true as const;
 export const N1A_AI4_PRODUCTION_ENABLED = false as const;
 
@@ -10,6 +12,11 @@ export type FakeSource = Readonly<{
   trackId: string; version: string; sourceRevision: string;
   correctionRevision: string; permissionRevision: string; text: string;
 }>;
+/** Request-visible descriptor: private transcript bytes must never be handed to T0. */
+export type FakeSourceRef = Readonly<Omit<FakeSource, 'text'>>;
+const bodyDigest = (text:string):string =>
+  createHash('sha256').update(text,'utf8').digest('hex');
+
 export type FakeProof = Readonly<{
   subjectId: string; appId: 'echo'; requestId: string;
   action: 'transcript.searchEvidence'; memberRevision: string;
@@ -20,6 +27,7 @@ export type FakeProof = Readonly<{
     trackId: string; version: string; sourceRevision: string;
     correctionRevision: string; permissionRevision: string;
     deleted: boolean; revoked: boolean; revocationPending: boolean;
+    entitled: boolean; contentDigest: string;
   }>>;
   fakeIssuer: 'offline-starry-id-plus-witness';
 }>;
@@ -29,7 +37,11 @@ export type FakeDecision = Readonly<{
 }>;
 export type FakeAuthority = Readonly<{
   read(subjectId: string, requestId: string, ids: readonly string[]): Promise<FakeProof | null>;
-  sendIfCurrent(proof: FakeProof, sources: readonly FakeSource[], nowMs: number): readonly string[] | null;
+  /** May fetch private fake bytes only after T0/T1 checks, never from a request. */
+  readTextIfCurrent(proof: FakeProof, sources: readonly FakeSourceRef[],
+    nowMs: number): readonly string[] | null;
+  sendIfCurrent(proof: FakeProof, sources: readonly FakeSourceRef[],
+    buffered: readonly string[], nowMs: number): readonly string[] | null;
 }>;
 export type FakeHooks = Readonly<{
   afterT0?(): void | Promise<void>; afterSQL?(): void | Promise<void>;
@@ -49,11 +61,12 @@ const same = (a: FakeProof, b: FakeProof): boolean =>
     return w?.trackId === v.trackId && w.version === v.version &&
       w.sourceRevision === v.sourceRevision && w.correctionRevision === v.correctionRevision &&
       w.permissionRevision === v.permissionRevision && w.deleted === v.deleted &&
-      w.revoked === v.revoked && w.revocationPending === v.revocationPending;
+      w.revoked === v.revoked && w.revocationPending === v.revocationPending &&
+      w.entitled === v.entitled && w.contentDigest === v.contentDigest;
   });
 
 export function validateFakeProof(p: FakeProof | null, expected: Readonly<{
-  subjectId: string; requestId: string; sources: readonly FakeSource[];
+  subjectId: string; requestId: string; sources: readonly FakeSourceRef[];
 }>, nowMs: number): boolean {
   if (!p || p.fakeIssuer !== 'offline-starry-id-plus-witness' || p.appId !== 'echo' ||
       p.action !== 'transcript.searchEvidence' || p.subjectId !== expected.subjectId ||
@@ -72,7 +85,9 @@ export function validateFakeProof(p: FakeProof | null, expected: Readonly<{
     const q = p.source[i];
     return q?.trackId === source.trackId && q.version === source.version &&
       q.sourceRevision === source.sourceRevision && q.correctionRevision === source.correctionRevision &&
-      q.permissionRevision === source.permissionRevision && !q.deleted && !q.revoked &&
+      q.permissionRevision === source.permissionRevision && q.entitled === true &&
+      typeof q.contentDigest === 'string' && /^[0-9a-f]{64}$/.test(q.contentDigest) &&
+      !q.deleted && !q.revoked &&
       !q.revocationPending && !!q.trackId && !!q.version && !!q.sourceRevision;
   });
 }
@@ -83,10 +98,11 @@ export function validateFakeProof(p: FakeProof | null, expected: Readonly<{
  */
 export async function simulateProtectedQA(input: Readonly<{
   subjectId: string; requestId: string; authority: FakeAuthority;
-  candidates: readonly FakeSource[]; nowMs(): number; hooks?: FakeHooks;
+  candidates: readonly FakeSourceRef[]; nowMs(): number; hooks?: FakeHooks;
 }>): Promise<FakeDecision> {
   const { subjectId, requestId, authority, candidates, hooks } = input;
-  if (!subjectId || !requestId || !candidates.length || candidates.length > 5)
+  if (!subjectId || !requestId || !candidates.length || candidates.length > 5 ||
+      candidates.some(c=>!c || typeof c!=='object' || 'text' in c))
     return dec('T0','invalid_scope');
   const tracks = candidates.map(s => s.trackId);
   try {
@@ -99,13 +115,18 @@ export async function simulateProtectedQA(input: Readonly<{
     const t1 = await authority.read(subjectId,requestId,tracks);
     if (!validateFakeProof(t1,{subjectId,requestId,sources:candidates},input.nowMs()) || !same(t0!,t1!))
       return dec('T1','source_or_access_changed');
+    // Private mock bytes are acquired only AFTER T0 and T1 are both valid.
+    // This helper must compare authority/version/content digest once more.
+    const buffered=authority.readTextIfCurrent(t1!,candidates,input.nowMs());
+    if (buffered===null || buffered.length!==candidates.length)
+      return dec('T1','protected_source_unavailable');
     await hooks?.afterT1?.();
     // A potential AI answer is buffered privately, not sent or persisted.
     const t2 = await authority.read(subjectId,requestId,tracks);
     if (!validateFakeProof(t2,{subjectId,requestId,sources:candidates},input.nowMs()) || !same(t1!,t2!))
       return dec('T2','publication_authority_changed');
     await hooks?.beforeSend?.();
-    const output = authority.sendIfCurrent(t2!,candidates,input.nowMs());
+    const output = authority.sendIfCurrent(t2!,candidates,buffered,input.nowMs());
     return output === null ? dec('SEND','revoked_before_send') : dec('SEND','fake_admitted',output);
   } catch {
     return dec('SEND','fake_authority_unavailable');
@@ -117,13 +138,33 @@ export class MutableFakeAuthority implements FakeAuthority {
   readonly subjectId = 'member-fake';
   readonly appId = 'echo' as const;
   readonly resources = new Map<string,FakeSource>();
+  /** Explicit fake grant map: a live member is NOT entitled to every track. */
+  readonly entitlements = new Map<string,boolean>();
   active = true; memberRevision = '7'; witnessSeq = '20'; checkpointSeq = '20';
   epoch = '6'; revokeSeq = '2'; deleteSeq = '3';
   pending = new Set<string>(); revoked = new Set<string>(); deleted = new Set<string>();
-  offline = false; readCount = 0; sentCount = 0; clock = 1_000_000;
-  constructor(sources: readonly FakeSource[]) { for (const s of sources) this.resources.set(s.trackId,s); }
+  offline = false; readCount = 0; bodyReadCount = 0; sentCount = 0; clock = 1_000_000;
+  constructor(sources: readonly FakeSource[]) {
+    // Test fixture authors explicitly place these source records on the
+    // member's synthetic initial grant list. Production has no such default.
+    for (const source of sources) {
+      this.resources.set(source.trackId,source);
+      this.entitlements.set(source.trackId,true);
+    }
+  }
   private bump(): void { this.witnessSeq = String(BigInt(this.witnessSeq)+1n); }
-  block(trackId: string): void { this.pending.add(trackId); this.revokeSeq = String(BigInt(this.revokeSeq)+1n); this.bump(); }
+  setEntitlement(trackId:string, allowed:boolean):void {
+    const previous=this.resources.get(trackId);
+    if (!previous || typeof allowed!=='boolean')throw new Error('invalid_fake_resource');
+    if (this.entitlements.get(trackId)===allowed)return;
+    this.entitlements.set(trackId,allowed);
+    this.resources.set(trackId,{...previous,
+      permissionRevision:String(BigInt(previous.permissionRevision)+1n)});
+    this.bump();
+  }
+  block(trackId: string): void {
+    this.pending.add(trackId); this.revokeSeq = String(BigInt(this.revokeSeq)+1n); this.bump();
+  }
   revoke(trackId: string): void { this.block(trackId); this.revoked.add(trackId); }
   remove(trackId: string): void { this.deleted.add(trackId); this.deleteSeq = String(BigInt(this.deleteSeq)+1n); this.bump(); }
   correct(trackId: string): void {
@@ -137,42 +178,64 @@ export class MutableFakeAuthority implements FakeAuthority {
   suspendMember(): void {
     this.active = false; this.memberRevision = String(BigInt(this.memberRevision)+1n); this.bump();
   }
+  private evidence(trackId:string):FakeProof['source'][number]|null {
+    const live=this.resources.get(trackId);
+    if (!live)return null;
+    return {trackId,version:live.version,sourceRevision:live.sourceRevision,
+      correctionRevision:live.correctionRevision,permissionRevision:live.permissionRevision,
+      deleted:this.deleted.has(trackId),revoked:this.revoked.has(trackId),
+      revocationPending:this.pending.has(trackId),
+      entitled:this.entitlements.get(trackId)===true,
+      contentDigest:bodyDigest(live.text)};
+  }
   async read(subjectId: string, requestId: string, trackIds: readonly string[]): Promise<FakeProof|null> {
     this.readCount++;
-    if (this.offline || !this.active || subjectId !== this.subjectId || !requestId) return null;
-    const rows = trackIds.map(id => this.resources.get(id));
-    if (rows.some(s => !s)) return null;
+    if (this.offline || !this.active || subjectId !== this.subjectId || !requestId)return null;
+    const source=trackIds.map(id=>this.evidence(id));
+    if (source.some(item=>item===null))return null;
     return {
       subjectId,appId:this.appId,requestId,action:'transcript.searchEvidence',
       memberRevision:this.memberRevision,witnessSeq:this.witnessSeq,checkpointSeq:this.checkpointSeq,
       restoreEpoch:this.epoch,revocationWatermark:this.revokeSeq,deletionWatermark:this.deleteSeq,
-      issuedAtMs:this.clock-1,expiresAtMs:this.clock+5_000,fakeIssuer:'offline-starry-id-plus-witness',
-      source:rows.map(s => ({
-        trackId:s!.trackId,version:s!.version,sourceRevision:s!.sourceRevision,
-        correctionRevision:s!.correctionRevision,permissionRevision:s!.permissionRevision,
-        deleted:this.deleted.has(s!.trackId),revoked:this.revoked.has(s!.trackId),
-        revocationPending:this.pending.has(s!.trackId),
-      })),
+      issuedAtMs:this.clock-1,expiresAtMs:this.clock+5_000,
+      fakeIssuer:'offline-starry-id-plus-witness',
+      source:source as FakeProof['source']
     };
   }
-  sendIfCurrent(p: FakeProof, candidates: readonly FakeSource[], nowMs: number): readonly string[] | null {
-    if (this.offline || !this.active || Math.abs(this.clock-nowMs)>30_000) return null;
-    // Synchronous fake admission only; DO NOT mistake for distributed send lock.
-    const current: FakeProof = {...p,
-      witnessSeq:this.witnessSeq,checkpointSeq:this.checkpointSeq,restoreEpoch:this.epoch,
-      memberRevision:this.memberRevision,revocationWatermark:this.revokeSeq,
+  private currentProof(p:FakeProof,candidates:readonly FakeSourceRef[],nowMs:number):FakeProof|null {
+    if (this.offline || !this.active || p.subjectId!==this.subjectId ||
+        !p.requestId || !Number.isSafeInteger(nowMs) || nowMs!==this.clock)return null;
+    const currentSources=candidates.map(s=>this.evidence(s.trackId));
+    if(currentSources.some(v=>v===null))return null;
+    return {...p,
+      memberRevision:this.memberRevision,
+      witnessSeq:this.witnessSeq,checkpointSeq:this.checkpointSeq,
+      restoreEpoch:this.epoch,revocationWatermark:this.revokeSeq,
       deletionWatermark:this.deleteSeq,
-      source:candidates.map(s => {
-        const live = this.resources.get(s.trackId);
-        return {trackId:s.trackId,version:live?.version||'',sourceRevision:live?.sourceRevision||'',
-          permissionRevision:live?.permissionRevision||'',correctionRevision:live?.correctionRevision||'',
-          deleted:this.deleted.has(s.trackId),revoked:this.revoked.has(s.trackId),
-          revocationPending:this.pending.has(s.trackId)};
-      }),
-    };
-    if (!same(p,current) || !validateFakeProof(current,{subjectId:p.subjectId,requestId:p.requestId,sources:candidates},nowMs))
-      return null;
+      source:currentSources as FakeProof['source']};
+  }
+  private checkCurrent(p:FakeProof,candidates:readonly FakeSourceRef[],nowMs:number):boolean {
+    const current=this.currentProof(p,candidates,nowMs);
+    return current!==null && same(p,current) &&
+      validateFakeProof(current,{subjectId:p.subjectId,requestId:p.requestId,sources:candidates},nowMs);
+  }
+  readTextIfCurrent(p:FakeProof,candidates:readonly FakeSourceRef[],nowMs:number):readonly string[]|null {
+    // No protected bytes are read for unauthorized T0 or T1 requests.
+    if(!this.checkCurrent(p,candidates,nowMs))return null;
+    this.bodyReadCount++;
+    return candidates.map(c=>this.resources.get(c.trackId)!.text);
+  }
+  sendIfCurrent(p:FakeProof,candidates:readonly FakeSourceRef[],
+    buffered:readonly string[],nowMs:number):readonly string[]|null {
+    // Single-process FAKE "send fence": not a distributed safety guarantee.
+    if (!this.checkCurrent(p,candidates,nowMs) ||
+        buffered.length!==candidates.length ||
+        !candidates.every((ref,i)=>{
+          const current=this.resources.get(ref.trackId);
+          return current!==undefined && buffered[i]===current.text &&
+            bodyDigest(buffered[i])===p.source[i]?.contentDigest;
+        }))return null;
     this.sentCount++;
-    return candidates.map(s => s.text);
+    return buffered;
   }
 }
