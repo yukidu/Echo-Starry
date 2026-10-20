@@ -227,5 +227,35 @@ class FakeS1R2SecurityProof(unittest.TestCase):
         self.assertEqual(self.bridge.assess(p,g,"req-one",now_ms=self.now)[1],
                          "proof_rebound_to_other_action")
 
+    def test_19_overflowed_fake_witness_never_grants_ticket(self):
+        g=self.grant();p=self.proof(g)
+        self.witness.seq=UINT64_MAX+1
+        self.assertEqual(self.bridge.assess(p,g,"req-one",now_ms=self.now)[1],
+                         "external_witness_invalid_version")
+        self.assertEqual(self.bridge.fake_claim(p,g,"req-one","run-one",0,now_ms=self.now),
+                         "proof_denied:external_witness_invalid_version")
+        self.assertEqual(self.ledger.count("tickets"),0)
+
+    def test_20_partial_success_unknown_segment_cannot_rekey_or_settle(self):
+        g=self.witness.issue("fake-member",track="partial-track",source="b"*64,segments=2)
+        self.ledger.sources[(g.app,g.track)]=g.source
+        p=self.proof(g)
+        self.assertEqual(self.bridge.fake_reserve(p,g,"req-one",now_ms=self.now),"reserved")
+        self.echo.enqueue("run-one",g)
+        self.assertEqual(self.bridge.fake_claim(p,g,"req-one","run-one",0,now_ms=self.now),"one_ticket")
+        self.assertEqual(self.ledger.fake_provider(g,0),"confirmed")
+        self.assertEqual(self.ledger.settle(g),"denied_partial")
+        self.assertEqual(self.bridge.fake_claim(p,g,"req-one","run-one",1,now_ms=self.now),"one_ticket")
+        self.assertEqual(self.ledger.fake_provider(g,1,"timeout"),"unknown")
+        replay=self.proof(g,"req-again")
+        self.assertEqual(self.bridge.fake_reserve(replay,g,"req-again",now_ms=self.now),
+                         "denied_duplicate")
+        self.assertEqual(self.bridge.fake_claim(replay,g,"req-again","run-one",1,now_ms=self.now),
+                         "denied_hold")
+        self.assertEqual(self.ledger.settle(g),"denied_unknown")
+        self.assertEqual(self.ledger.totals()[1],g.held)
+        self.assertEqual(self.ledger.fake_sends,2)
+
+
 if __name__=="__main__":
     unittest.main(verbosity=2)
