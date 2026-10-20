@@ -16,13 +16,13 @@ export type FakeProofDecisionLike = Readonly<{
   sideEffects: 0;
 }>;
 export type ProofHandoffState =
-  'unknown'|'mock_consistent'|'revocation_or_unavailable'|
+  'unknown'|'revocation_or_unavailable'|
   'revocation_or_deletion_record'|'witness_mismatch'|'not_verified';
 export type FakeProofHandoff = Readonly<{
   domain:'app_security';
   proofState:ProofHandoffState;
   status: HealthStatus;
-  witnessState:'unknown'|'mock_consistent'|'mismatch_or_possible_rollback';
+  witnessState:'unknown'|'mismatch_or_possible_rollback';
   reasonCode:string;
   displayText:string;
   stage:'precheck'|'before_commit'|'unknown';
@@ -76,18 +76,19 @@ export function showFakeProofHandoff(
   let reasonCode='PROOF_NOT_VERIFIED';
   let displayText='安全證明尚未核實：保持鎖定';
   if(d?.reason==='fake_evidence_consistent'){
-    proofState='mock_consistent';witnessState='mock_consistent';
-    reasonCode='FAKE_PROOF_CONSISTENT_NOT_AUTHORIZED';
-    displayText='假證據一致；仍非正式授權';
+    // An arbitrary caller can forge this shape. There is no server-trusted verifier in S1.
+    proofState='not_verified';
+    reasonCode='SELF_REPORTED_CONSISTENCY_UNVERIFIED';
+    displayText='聲稱假資料一致，但未經可信後端驗證；保持未知與鎖定';
   } else if(d?.reason==='membership_revoked_or_unavailable'||
             d?.reason==='membership_revision_changed'){
     proofState='revocation_or_unavailable';
     reasonCode='MEMBERSHIP_UNAVAILABLE_OR_CHANGED';
     displayText='會員資格已變更或無法核實（不能直接認定已撤權）';
   } else if(d?.reason==='witness_records_revocation_or_deletion'){
-    proofState='revocation_or_deletion_record';status='warning';
-    reasonCode='FAKE_WITNESS_DENIAL_RECORD';
-    displayText='假見證含撤權或刪除記錄：拒絕操作';
+    proofState='revocation_or_deletion_record';
+    reasonCode='UNVERIFIED_FAKE_WITNESS_DENIAL';
+    displayText='收到假見證撤權或刪除記錄的自報，未經可信後端驗證；拒絕操作';
   } else if(d?.reason==='external_witness_changed_or_rolled_back'||
             d?.reason==='external_witness_invalid_version'){
     proofState='witness_mismatch';witnessState='mismatch_or_possible_rollback';
@@ -102,12 +103,11 @@ export function showFakeProofHandoff(
   }
   const affectsWitness = witnessState==='mismatch_or_possible_rollback'||
     d?.reason==='external_witness_missing' || d?.reason==='trusted_source_unavailable';
-  const app = d?.reason==='fake_evidence_consistent'
-    ? base.domains.app_security
-    : downgrade(base.domains.app_security,status,reasonCode);
-  const backup = affectsWitness
-    ? downgrade(base.domains.backup_restore,'unknown','WITNESS_VERSION_UNVERIFIED')
-    : base.domains.backup_restore;
+  // Even a matching fake decision is untrusted input; it cannot inherit old green App/backup cards.
+  // Retain genuine already-modelled faults as red while denying positive claims.
+  const app = downgrade(base.domains.app_security,status,reasonCode);
+  const backup = downgrade(base.domains.backup_restore,'unknown',
+    affectsWitness?'WITNESS_VERSION_UNVERIFIED':'WITNESS_NOT_SERVER_VERIFIED');
   const domains:{
     app_security:DomainCard;ai_billing:DomainCard;backup_restore:DomainCard
   }={app_security:app,ai_billing:base.domains.ai_billing,backup_restore:backup};
