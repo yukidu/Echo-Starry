@@ -98,7 +98,9 @@ export async function evaluateS3aForMockConsole(
  const base=buildN1aMockDashboard(platform,incidents,nowMs,[],{
    cloudSourceAvailable:sourceState.cloudAvailable!==false,
    eventSourceAvailable:sourceState.incidentsAvailable!==false,
-   positiveSourceAvailable:false,
+   // No positive check is supplied. This preserves independently observed
+   // AI3 Hold/App/backup warnings while never creating a "normal" card.
+   positiveSourceAvailable:true,
  });
  const proof=outcome(decision);
  const domains={
