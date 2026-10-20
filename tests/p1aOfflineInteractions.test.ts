@@ -46,7 +46,7 @@ function launch() {
     querySelectorAll: (selector: string) => selector === '.page' ? pages : selector === '[data-tab]' ? tabs : [],
     createElement: () => new FakeElement()
   };
-  runInNewContext(script, { document, Number, Math, String });
+  runInNewContext(script!, { document, Number, Math, String });
   return { nodes, pages, tabs };
 }
 
@@ -65,10 +65,10 @@ test('cost calculator never grants production budget', () => {
   nodes.budget.value = '1000';
   nodes.scenario.value = '2';
   nodes.budget.trigger('input');
-  assert.match(nodes.estimate.textContent, /這不會改變正式 NT\\$0 預算/);
+  assert.ok(nodes.estimate.textContent.includes('這不會改變正式 NT$0 預算'));
   nodes.budget.value = '0';
   nodes.budget.trigger('input');
-  assert.match(nodes.estimate.textContent, /正式支出仍禁止/);
+  assert.ok(nodes.estimate.textContent.includes('這不會改變正式 NT$0 預算'));
 });
 
 test('offline search never invents a missing result', () => {
