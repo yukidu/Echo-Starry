@@ -236,9 +236,11 @@ with tempfile.TemporaryDirectory(prefix="b07-i1-FULLY-OFFLINE-") as root:
     verified(not rerun["allow"],"runId rewrite without new approval cannot re-send")
     # Restore original run for remaining segment.
     f.put_run("safe-run-01","track-alpha",audio,grant,segments=2)
+    # #464 deliberately blocks another segment while a previous provider
+    # attempt is still "may_have_sent"; first confirm it before segment 2.
+    f.complete(a["request_id"],0,"confirmed")
     second=f.request("safe-run-01","track-alpha",audio,grant,1,"new-key-other-segment")
     verified(second["allow"] and second["request_id"]==a["request_id"] and f.sends==2,"segments share ONE run hold")
-    f.complete(a["request_id"],0,"confirmed")
     verified(not f.finalize(a["request_id"]),"one of two segments cannot settle whole run")
     before=f.usage()
     verified(before[1]==12 and before[2]==0,"partial success retains full hold")
