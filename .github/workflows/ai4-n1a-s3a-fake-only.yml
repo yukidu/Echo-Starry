@@ -27,3 +27,24 @@ jobs:
         run: node --import tsx --test tests/n1aS3aSharedEnvelope.test.ts tests/n1aAi4S3aIntegrationFake.test.ts
       - name: Static TypeScript checks
         run: npm run lint
+      - name: Recheck every existing test file in isolation (no cloud)
+        shell: bash
+        run: |
+          set +e
+          failed=0
+          total=0
+          passed=0
+          for f in tests/*.test.ts; do
+            total=$((total + 1))
+            node --import tsx --test "$f" > /tmp/ai4-s3a-test.txt 2>&1
+            status=$?
+            if [ "$status" -eq 0 ]; then
+              passed=$((passed + 1))
+            else
+              failed=1
+              echo "FAILED $f (exit $status)"
+              tail -n 70 /tmp/ai4-s3a-test.txt
+            fi
+          done
+          echo "AI4 S3A regression files passed: $passed/$total"
+          exit "$failed"
