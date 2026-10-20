@@ -33,14 +33,14 @@ test('R3-P0-01 active ordinary member cannot cite a higher entitlement resource'
  const a=new MutableFakeAuthority([ordinary,elite]);
  (a as unknown as {setEntitlement(trackId:string,allowed:boolean):void})
  .setEntitlement(elite.trackId,false);
- const r=await call(a,[metadata(elite)]);
- deny(r);assert.equal(r.stage,'T0');
+ const r=await call(a,[metadata(a.resources.get(elite.trackId)!)]);
+ deny(r);assert.equal(r.stage,'T0');assert.equal(a.bodyReadCount,0);
 });
 test('R3-P0-02 one forbidden resource blocks whole two-source result',async()=>{
  const a=new MutableFakeAuthority([ordinary,elite]);
  (a as unknown as {setEntitlement(trackId:string,allowed:boolean):void})
  .setEntitlement(elite.trackId,false);
- const r=await call(a,[metadata(ordinary),metadata(elite)]);
+ const r=await call(a,[metadata(ordinary),metadata(a.resources.get(elite.trackId)!)]);
  deny(r);assert.equal(r.stage,'T0');
 });
 test('R3-P1-03 normal allowed output fetches private bytes only after T0 authorization',async()=>{
