@@ -289,7 +289,7 @@ test('S3A-7-15 source content silently changed without ETag bump is rejected',as
   });
 });
 test('S3A-7-16 tampering parent raw Fake R2 object is blocked by real S1 fake function',async()=>{
-  await blocked('BACKUP_OBJECT_TAMPERED',f=>f.files.set('fake/r2/old.txt','被竄改的歷史稿'));
+  await blocked('BACKUP_OBJECT_TAMPERED',f=>{f.files.set('fake/r2/old.txt','被竄改的歷史稿');});
 });
 test('S3A-7-17 parent full missing => no chance to ignore historic versions',async()=>{
   await blocked('BACKUP_PARENT_MISSING',f=>{
