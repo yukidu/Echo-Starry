@@ -92,3 +92,17 @@ export async function qaSearchRebuildStatus(db:any):Promise<{
     retrying:counts.get('retry')||0,failed:counts.get('failed')||0,
     lastError:String(last?.lastError||'').slice(0,100)};
 }
+
+/** Super-admin only caller: manually reset an exhausted job after fixing its cause.
+ * Does not rebuild immediately and cannot expand to a bulk operation.
+ */
+export async function retryFailedQaSearchRebuild(db:any,trackId:string):Promise<boolean>{
+  if(!trackId||trackId.length>128)return false;
+  const row:any=await db.prepare(
+    "UPDATE qa_search_rebuild_jobs SET status='pending',attempts=0,nextAttemptAt=0,leaseUntil=0,"+
+    "requestedRevision=(SELECT changeRevision FROM qa_search_state WHERE trackId=?),lastError=NULL,updatedAt=? "+
+    "WHERE trackId=? AND status='failed' AND EXISTS ("+
+    "SELECT 1 FROM qa_search_state s WHERE s.trackId=? AND s.invalidated=1) RETURNING trackId"
+  ).bind(trackId,Date.now(),trackId,trackId).first();
+  return Boolean(row?.trackId);
+}
