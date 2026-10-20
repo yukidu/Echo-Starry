@@ -120,6 +120,11 @@ with tempfile.TemporaryDirectory() as d:
     first=c.execute("SELECT id FROM starry_ai_b07_calls ORDER BY request_key LIMIT 1").fetchone()[0]
     c.execute("UPDATE starry_ai_b07_policies SET max_calls=0,max_micro_twd=0 WHERE scope_key='global'")
     c.execute("UPDATE starry_ai_b07_calls SET status='settled',actual_units=1,actual_micro_twd=1000,updated_at=? WHERE id=?",(NOW+10,first))
+    try:
+        c.execute("UPDATE starry_ai_b07_calls SET actual_micro_twd=0,actual_units=0 WHERE id=?",(first,))
+        raise AssertionError("must not reprice settled entry without changing status")
+    except sqlite3.IntegrityError:
+        pass
     global_scope=c.execute("SELECT held_micro_twd,settled_micro_twd FROM starry_ai_b07_usage WHERE scope_key='global'").fetchone()
     assert global_scope==(4000,1000),global_scope
     try:
