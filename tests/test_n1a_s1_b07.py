@@ -46,8 +46,10 @@ class B07N1AS1(unittest.TestCase):
     def test_02_run_id_and_utc_date_rewrite_no_extra_hold(self):
         g=self.grant()
         d=datetime.now(timezone.utc).date()
-        self.assertEqual(self.b.reserve(g,'first','old-run',str(d)),'reserved')
-        self.assertEqual(self.b.reserve(g,'different-key','new-run',str(d+timedelta(days=1))),'denied_duplicate')
+        self.assertEqual(self.b.reserve(g,'first','old-run'),'reserved')
+        # Only the trusted *server-side fake clock* may roll over UTC days.
+        self.b._trusted_utc_day=lambda: str(d+timedelta(days=1))
+        self.assertEqual(self.b.reserve(g,'different-key','new-run'),'denied_duplicate')
         self.assertEqual(self.b.count('runs'),1)
 
     def test_03_new_grant_when_prior_unresolved_cannot_bypass(self):
@@ -133,6 +135,7 @@ class B07N1AS1(unittest.TestCase):
         self.both(g)
         self.b.claim(g,'run',0)
         self.b.fake_provider(g,0,'timeout')
+        self.assertTrue(self.b.invoices.attest_fake_invoice_line('c'*64,g,1))
         self.assertEqual(self.b.reconcile(g,'c'*64,1,'a1','a2'),'reconciled')
         self.assertEqual(self.b.reconcile(g,'c'*64,1,'a1','a2'),'already_reconciled')
         self.assertEqual(self.b.reconcile(g,'d'*64,2,'a1','a2'),'denied_conflict')
@@ -176,8 +179,11 @@ class B07N1AS1(unittest.TestCase):
 
     def test_17_cancel_without_ticket_preserves_tombstone(self):
         g=self.grant()
-        self.both(g)
+        self.assertEqual(self.b.reserve(g),'reserved')
+        # Zero tickets alone is NOT safe; durable Echo fence must forbid dispatch.
+        self.assertEqual(self.echo.certify_never_queued(g.run_key),'fenced')
         self.assertEqual(self.b.cancel_never_sent(g),'void')
+        self.assertEqual(self.echo.enqueue('forbidden-late-run',g),'cancelled')
         self.assertEqual(self.b.reserve(g,'other-key'),'denied_duplicate')
         self.assertEqual(self.b.totals(),(0,0,0))
         self.assertEqual(self.b.count('runs'),1)
