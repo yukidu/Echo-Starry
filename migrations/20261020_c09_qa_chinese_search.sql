@@ -57,54 +57,54 @@ CREATE INDEX IF NOT EXISTS qa_search_rebuild_ready
 -- All triggers run in the SAME D1 transaction as the source mutation.
 -- Corrections never update original R2, they only invalidate derived search.
 CREATE TRIGGER IF NOT EXISTS qa_search_moderation_insert AFTER INSERT ON transcript_correction_events BEGIN
-  INSERT INTO qa_search_state(trackId,activeGeneration,sourceKey,sourceUpdatedAt,segmentCount,updatedAt,invalidated,changeRevision)
-    VALUES(NEW.trackId,'','',0,0,0,1,1)
-    ON CONFLICT(trackId) DO UPDATE SET invalidated=1,changeRevision=changeRevision+1;
+  -- Only previously indexed tracks are eligible. A correction to an old,
+  -- not-yet-indexed transcript must NOT initiate an implicit backfill.
+  UPDATE qa_search_state SET invalidated=1,changeRevision=changeRevision+1 WHERE trackId=NEW.trackId;
   INSERT INTO qa_search_rebuild_jobs(trackId,requestedRevision,status,attempts,nextAttemptAt,leaseUntil,updatedAt,lastError)
     SELECT NEW.trackId,s.changeRevision,'pending',0,0,0,0,NULL FROM qa_search_state s WHERE s.trackId=NEW.trackId
     ON CONFLICT(trackId) DO UPDATE SET requestedRevision=excluded.requestedRevision,status='pending',
       attempts=0,nextAttemptAt=0,leaseUntil=0,updatedAt=0,lastError=NULL;
 END;
 CREATE TRIGGER IF NOT EXISTS qa_search_moderation_update AFTER UPDATE ON transcript_correction_events BEGIN
-  INSERT INTO qa_search_state(trackId,activeGeneration,sourceKey,sourceUpdatedAt,segmentCount,updatedAt,invalidated,changeRevision)
-    VALUES(NEW.trackId,'','',0,0,0,1,1)
-    ON CONFLICT(trackId) DO UPDATE SET invalidated=1,changeRevision=changeRevision+1;
+  -- Only previously indexed tracks are eligible. A correction to an old,
+  -- not-yet-indexed transcript must NOT initiate an implicit backfill.
+  UPDATE qa_search_state SET invalidated=1,changeRevision=changeRevision+1 WHERE trackId=NEW.trackId;
   INSERT INTO qa_search_rebuild_jobs(trackId,requestedRevision,status,attempts,nextAttemptAt,leaseUntil,updatedAt,lastError)
     SELECT NEW.trackId,s.changeRevision,'pending',0,0,0,0,NULL FROM qa_search_state s WHERE s.trackId=NEW.trackId
     ON CONFLICT(trackId) DO UPDATE SET requestedRevision=excluded.requestedRevision,status='pending',
       attempts=0,nextAttemptAt=0,leaseUntil=0,updatedAt=0,lastError=NULL;
 END;
 CREATE TRIGGER IF NOT EXISTS qa_search_moderation_delete AFTER DELETE ON transcript_correction_events BEGIN
-  INSERT INTO qa_search_state(trackId,activeGeneration,sourceKey,sourceUpdatedAt,segmentCount,updatedAt,invalidated,changeRevision)
-    VALUES(OLD.trackId,'','',0,0,0,1,1)
-    ON CONFLICT(trackId) DO UPDATE SET invalidated=1,changeRevision=changeRevision+1;
+  -- Only previously indexed tracks are eligible. A correction to an old,
+  -- not-yet-indexed transcript must NOT initiate an implicit backfill.
+  UPDATE qa_search_state SET invalidated=1,changeRevision=changeRevision+1 WHERE trackId=OLD.trackId;
   INSERT INTO qa_search_rebuild_jobs(trackId,requestedRevision,status,attempts,nextAttemptAt,leaseUntil,updatedAt,lastError)
     SELECT OLD.trackId,s.changeRevision,'pending',0,0,0,0,NULL FROM qa_search_state s WHERE s.trackId=OLD.trackId
     ON CONFLICT(trackId) DO UPDATE SET requestedRevision=excluded.requestedRevision,status='pending',
       attempts=0,nextAttemptAt=0,leaseUntil=0,updatedAt=0,lastError=NULL;
 END;
 CREATE TRIGGER IF NOT EXISTS qa_search_legacy_insert AFTER INSERT ON transcript_corrections BEGIN
-  INSERT INTO qa_search_state(trackId,activeGeneration,sourceKey,sourceUpdatedAt,segmentCount,updatedAt,invalidated,changeRevision)
-    VALUES(NEW.trackId,'','',0,0,0,1,1)
-    ON CONFLICT(trackId) DO UPDATE SET invalidated=1,changeRevision=changeRevision+1;
+  -- Only previously indexed tracks are eligible. A correction to an old,
+  -- not-yet-indexed transcript must NOT initiate an implicit backfill.
+  UPDATE qa_search_state SET invalidated=1,changeRevision=changeRevision+1 WHERE trackId=NEW.trackId;
   INSERT INTO qa_search_rebuild_jobs(trackId,requestedRevision,status,attempts,nextAttemptAt,leaseUntil,updatedAt,lastError)
     SELECT NEW.trackId,s.changeRevision,'pending',0,0,0,0,NULL FROM qa_search_state s WHERE s.trackId=NEW.trackId
     ON CONFLICT(trackId) DO UPDATE SET requestedRevision=excluded.requestedRevision,status='pending',
       attempts=0,nextAttemptAt=0,leaseUntil=0,updatedAt=0,lastError=NULL;
 END;
 CREATE TRIGGER IF NOT EXISTS qa_search_legacy_update AFTER UPDATE ON transcript_corrections BEGIN
-  INSERT INTO qa_search_state(trackId,activeGeneration,sourceKey,sourceUpdatedAt,segmentCount,updatedAt,invalidated,changeRevision)
-    VALUES(NEW.trackId,'','',0,0,0,1,1)
-    ON CONFLICT(trackId) DO UPDATE SET invalidated=1,changeRevision=changeRevision+1;
+  -- Only previously indexed tracks are eligible. A correction to an old,
+  -- not-yet-indexed transcript must NOT initiate an implicit backfill.
+  UPDATE qa_search_state SET invalidated=1,changeRevision=changeRevision+1 WHERE trackId=NEW.trackId;
   INSERT INTO qa_search_rebuild_jobs(trackId,requestedRevision,status,attempts,nextAttemptAt,leaseUntil,updatedAt,lastError)
     SELECT NEW.trackId,s.changeRevision,'pending',0,0,0,0,NULL FROM qa_search_state s WHERE s.trackId=NEW.trackId
     ON CONFLICT(trackId) DO UPDATE SET requestedRevision=excluded.requestedRevision,status='pending',
       attempts=0,nextAttemptAt=0,leaseUntil=0,updatedAt=0,lastError=NULL;
 END;
 CREATE TRIGGER IF NOT EXISTS qa_search_legacy_delete AFTER DELETE ON transcript_corrections BEGIN
-  INSERT INTO qa_search_state(trackId,activeGeneration,sourceKey,sourceUpdatedAt,segmentCount,updatedAt,invalidated,changeRevision)
-    VALUES(OLD.trackId,'','',0,0,0,1,1)
-    ON CONFLICT(trackId) DO UPDATE SET invalidated=1,changeRevision=changeRevision+1;
+  -- Only previously indexed tracks are eligible. A correction to an old,
+  -- not-yet-indexed transcript must NOT initiate an implicit backfill.
+  UPDATE qa_search_state SET invalidated=1,changeRevision=changeRevision+1 WHERE trackId=OLD.trackId;
   INSERT INTO qa_search_rebuild_jobs(trackId,requestedRevision,status,attempts,nextAttemptAt,leaseUntil,updatedAt,lastError)
     SELECT OLD.trackId,s.changeRevision,'pending',0,0,0,0,NULL FROM qa_search_state s WHERE s.trackId=OLD.trackId
     ON CONFLICT(trackId) DO UPDATE SET requestedRevision=excluded.requestedRevision,status='pending',
