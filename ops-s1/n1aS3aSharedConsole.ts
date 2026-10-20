@@ -47,7 +47,9 @@ const VALID_PHASES:readonly string[]=['T0','T1','T2','SEND','before_commit'];
 function unknownCard(card:DomainCard, code:string):DomainCard {
  // An already confirmed in-domain fault remains red. Other status cannot be
  // promoted by a client-supplied proof or by the fake verifier's success.
- if(card.status==='fault')return {...card,conflict:true,locked:true,productionAuthorized:false};
+ if(card.status==='fault'||card.status==='warning')return {
+   ...card,locked:true,productionAuthorized:false
+  }; // Preserve independently established fake incidents; only downgrade green.
  return {...card,status:'unknown',evidence:'missing',reasonCode:code,
    conflict:card.conflict||card.status!=='unknown',locked:true,productionAuthorized:false};
 }
