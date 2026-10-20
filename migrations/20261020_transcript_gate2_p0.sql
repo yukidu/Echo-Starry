@@ -43,3 +43,11 @@ CREATE TABLE transcript_versions (
   createdAt INTEGER NOT NULL
 );
 CREATE INDEX transcript_versions_by_track ON transcript_versions(trackId,createdAt);
+
+-- A single-row transaction assertion table. D1.batch rolls back *all* statements
+-- when an assertion violates CHECK; changes() alone checked after the batch cannot.
+-- The row is bounded to one slot, never retains member data or candidate contents.
+CREATE TABLE transcript_gate2_tx_guard (
+  slot INTEGER PRIMARY KEY CHECK(slot=1),
+  exactOne INTEGER NOT NULL CHECK(exactOne=1)
+);
