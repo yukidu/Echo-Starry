@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {
   gate2Enabled,requestSafeRun,claimSafeRun,stageSafeVersion,failSafeRun,
-  assertLiveRun,publishSafeVersion
+  assertLiveRun,publishSafeVersion,queueSafeRun,quarantineExpiredRuns,
+  assertUnfundedWhisperBlocked,failUnclaimedRun
 } from '../worker/transcriptP0Safety';
 
 const PY = [
@@ -274,5 +275,69 @@ test('RST-03 output format mismatch and duplicate staging do not publish or over
     await assert.rejects(()=>stageSafeVersion(env,claimed,content),/lease lost/);
     assert.equal(r2.puts.filter(k=>k===version.jsonKey).length,1);
     assert.equal((await db.prepare("SELECT r2Key FROM transcript_index WHERE trackId='synthetic-a'").first()).r2Key,'transcripts/synthetic-a/legacy.json');
+  }finally{cleanup();}
+});
+
+
+test('RST-05 first-run queue and claim are atomic; second statement failure rolls back',async()=>{
+  const {db,cleanup}=await fixture(false);
+  try{
+    const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'first',
+      requestKey:'first:atomic-queue',sourceAudioKey:'audio/demo.mp3',
+      sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123'}))!;
+    db.failSecond=true;
+    await assert.rejects(()=>queueSafeRun(db,run.runId,1),/rolled back/);
+    assert.equal((await db.prepare("SELECT status FROM transcript_index WHERE trackId='synthetic-a'").first()).status,'pending');
+    assert.equal((await db.prepare("SELECT state FROM transcript_runs WHERE runId=?").bind(run.runId).first()).state,'pending');
+    db.failSecond=false;
+    assert.ok(await queueSafeRun(db,run.runId,1));
+    db.failSecond=true;
+    await assert.rejects(()=>claimSafeRun(db,run.runId,'synthetic-a'),/rolled back/);
+    assert.equal((await db.prepare("SELECT state FROM transcript_runs WHERE runId=?").bind(run.runId).first()).state,'queued');
+    assert.equal((await db.prepare("SELECT status FROM transcript_index WHERE trackId='synthetic-a'").first()).status,'queued');
+    db.failSecond=false;
+    assert.equal((await claimSafeRun(db,run.runId,'synthetic-a')).state,'processing');
+  }finally{cleanup();}
+});
+test('RST-05 lease expiry quarantines stale first-run without paid retry',async()=>{
+  const {db,cleanup}=await fixture(false);
+  try{
+    const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'first',
+      requestKey:'first:expire',sourceAudioKey:'audio/demo.mp3',
+      sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123'}))!;
+    await queueSafeRun(db,run.runId,1);
+    const claimed=await claimSafeRun(db,run.runId,'synthetic-a');
+    await db.prepare("UPDATE transcript_runs SET leaseUntil=1 WHERE runId=?").bind(run.runId).run();
+    assert.equal(await quarantineExpiredRuns(db),1);
+    assert.equal((await db.prepare("SELECT state FROM transcript_runs WHERE runId=?").bind(run.runId).first()).state,'failed');
+    assert.equal((await db.prepare("SELECT status,r2Key FROM transcript_index WHERE trackId='synthetic-a'").first()).status,'failed');
+    await assert.rejects(()=>assertLiveRun(db,claimed),/lease lost/);
+    assert.equal((await queueSafeRun(db,run.runId,1)),null);
+  }finally{cleanup();}
+});
+test('B07 hard cost guard refuses even the fake candidate without trusted reservation',async()=>{
+  const {db,cleanup}=await fixture(true);
+  try{
+    const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'relisten',
+      requestKey:'relisten:no-provider-spend',sourceAudioKey:'audio/demo.mp3',
+      sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123',
+      approvedBy:'fake-admin',approvedMaxSeconds:80}))!;
+    await assert.rejects(()=>assertUnfundedWhisperBlocked({AI:{run:()=>{throw Error('must not call');}}},run),
+      /B07 per-segment hard-budget authority is not integrated/);
+  }finally{cleanup();}
+});
+test('claim failure before paid attempt quarantines queued reservation',async()=>{
+  const {db,cleanup}=await fixture(true);
+  try{
+    const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'relisten',
+      requestKey:'relisten:unclaimed',sourceAudioKey:'audio/demo.mp3',
+      sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',sourceAudioEtag:'audio-v1:123',
+      approvedBy:'fake-admin',approvedMaxSeconds:80}))!;
+    await queueSafeRun(db,run.runId,1);
+    await failUnclaimedRun(db,run.runId,'synthetic-a',Error('simulated boot failure'));
+    assert.equal((await db.prepare("SELECT state FROM transcript_runs WHERE runId=?").bind(run.runId).first()).state,'failed');
+    const active=await db.prepare("SELECT status,r2Key FROM transcript_index WHERE trackId='synthetic-a'").first();
+    assert.equal(active.status,'ready');
+    assert.equal(active.r2Key,'transcripts/synthetic-a/legacy.json');
   }finally{cleanup();}
 });
