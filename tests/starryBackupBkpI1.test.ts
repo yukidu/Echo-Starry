@@ -234,6 +234,42 @@ test('member-track mapping unknown fails closed',async()=>{
     f.input={...f.input,memberIdsByTrack:{'current-track':['fake-member-1']}};
   });
 });
+test('P0 AI2: published active track with explicit [] mapping is not authorized',async()=>{
+  await denied('member_mapping_invalid',f=>{
+    f.input={...f.input,memberIdsByTrack:{
+      ...f.input.memberIdsByTrack,'current-track':[]
+    }};
+  });
+});
+test('P0 AI2: approved-history track only in full parent with [] mapping rejects',async()=>{
+  await denied('member_mapping_invalid',f=>{
+    f.input={...f.input,memberIdsByTrack:{
+      ...f.input.memberIdsByTrack,'old-track':[]
+    }};
+  });
+});
+test('P0 AI2: all tracks unmapped with [] must never certify a restore',async()=>{
+  await denied('member_mapping_invalid',f=>{
+    f.input={...f.input,memberIdsByTrack:{
+      'current-track':[],'old-track':[]
+    }};
+  });
+});
+test('P0 AI2: revoked historical member cannot be hidden with empty mapping',async()=>{
+  await denied('member_mapping_invalid',async f=>{
+    f.input={...f.input,memberIdsByTrack:{
+      ...f.input.memberIdsByTrack,'old-track':[]
+    }};
+    await withAuthority(f,{blockedMemberIds:['fake-member-legacy']});
+  });
+});
+test('P0 AI2: whitespace-only member ID also fails closed',async()=>{
+  await denied('member_mapping_invalid',f=>{
+    f.input={...f.input,memberIdsByTrack:{
+      ...f.input.memberIdsByTrack,'old-track':['   ']
+    }};
+  });
+});
 test('fake 2000 member records with one revoked account still reject',async()=>{
   await denied('member_rights_revoked',async f=>{
     const memberIds=Array.from({length:2000},(_,i)=>`fake-member-${i}`);
