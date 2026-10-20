@@ -64,3 +64,15 @@ node --import tsx --test tests/n1aS1Ops6.test.ts tests/n1aS1ProofHandoff6.test.t
 CI 驗收補充：第二輪只允許 GitHub 現有 Regression audit／CodeQL／建置／瀏覽器假資料檢查。若為觸發 main-based CI 暫時調整 PR base，工作流程結束後必須恢復 stacked Draft base=#462；CI 自動 Preview 非正式部署，不進行任何正式雲端資料驗證。
 
 R3 RED gate：先加入四項僅 Fake 的惡意輸入與撤權快取反例，於原 Draft PR 上執行故意預期失敗的 GitHub 回歸，再在自有隔離模組實施最小修正並重跑 CI。不得將 RED 或 CI Preview 誤報正式部署。
+
+
+## N1A-S1 R3 最終單次精準修補（2026-10-20）
+
+**先 RED、再修復，沒有改動正式系統。** 依 [AI2 派工 #6290549782](https://github.com/yukidu/Echo-Starry/issues/455#issuecomment-6290549782)，針對 AI4 交叉審 AI6 的 P1（[審查 #6290457124](https://github.com/yukidu/Echo-Starry/issues/455#issuecomment-6290457124)）新增四項假資料反例。修正前 GitHub Regression audit run 39421118251：`n1aS1ProofHandoff6.test.ts` 有兩項新反例失敗、`n1aS1Ops6.test.ts` 有一項新反例失敗；原有撤權後 403 反例通過，**231/233 測試檔 PASS，這是刻意保留的 RED 證據，不能對外聲稱驗收過關**。
+
+針對缺口的**最小修復**：
+1. `n1aS1ProofHandoff.ts` 收到任何未經可信後端驗證的 `FakeSecurityDecision`，即使自稱 `fake_evidence_consistent/simulatedAllowed:true`，也不能沿用既有 App 綠燈；App 一律 **UNKNOWN/LOCKED**，已有可信 Fake 事故仍保留原紅色且標衝突。收到自報「見證撤權/刪除」只能顯示未經核實，不能把自報誤稱經可信驗證。N1A 備份安全版本沒有真正 server-trusted witness，也維持 UNKNOWN/LOCKED；AI billing 與 Cloudflare 六服務仍互相隔離。
+2. `n1aS1ReadOnly.ts` 每一次 GET 都先重新檢查注入的假中央超管；已撤權立刻 403 + `no-store` 且**不讀**後續假監控/快取。原本未驗來源的 `readFakePositiveChecks` 一律不查、不用、不快取，避免舊「沒有事故」資料讓 App/費用/備份變綠；為維持既有測試注入介面相容，該屬性保留為 optional/deprecated（完全不執行）。後端依舊只用單 isolate 60 秒共用雲端/匿名事件**假資料**；不是跨區硬限額。
+3. `n1aS1OfflinePreview.html` 顯著提醒「未獲正式核實」，自報假撤權／刪除情境改 UNKNOWN，不再黃色表示已驗；匿名來源、不顯示會員/音檔/金鑰，不開 API 或輪詢。
+
+注意：六 Cloudflare 平台卡綠燈只表示**特定人工 Fake 場景**，不是生產指標或真人權限；真外部見證/簽章、真超管、真人2,000併發、全帳號限流與跨 PR 一次性原子證明都尚未存在。不可因通過 R3 Fake CI 而放行真付費、還原、Provider 或合併/部署。
