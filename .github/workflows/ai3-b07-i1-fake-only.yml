@@ -1,0 +1,73 @@
+name: AI3 B07-I1 isolated fake-only CI
+
+# This workflow exists ONLY on the AI3 feature branch for a Draft PR whose
+# base is #464's branch. Shared workflows run only for PRs against main.
+# No workflow_dispatch, production migration, deployment or remote probes.
+on:
+  push:
+    branches:
+      - safety/ai3-s2367a-b07-i1-fake-contract-20261020
+    paths:
+      - 'tests/s3B07Gate2I1.test.ts'
+      - 'tests/support/s3Gate2B07I1FakeAdapter.ts'
+      - 'tests/b07-i1-offline-integration.py'
+      - 'docs/STARRY_AI3_S2367A_B07_I1_FAKE_GATE2_CONTRACT.md'
+      - '.github/workflows/ai3-b07-i1-fake-only.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai3-b07-i1-fake-only
+  cancel-in-progress: true
+
+env:
+  CLOUDFLARE_API_TOKEN: ''
+  CLOUDFLARE_ACCOUNT_ID: ''
+  OPENAI_API_KEY: ''
+  ANTHROPIC_API_KEY: ''
+  GEMINI_API_KEY: ''
+
+jobs:
+  fake-gate2-b07:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install from public npm packages only (no cloud bindings)
+        run: npm install --prefer-offline --no-audit --no-fund
+      - name: Verify fake TS Gate2 to B07 and 2000 local submissions
+        run: node --import tsx --test tests/s3B07Gate2I1.test.ts
+      - name: Verify inherited S3 B07 fake budget and uncertain billing
+        run: node --import tsx --test tests/s3B07ProviderAttempt.test.ts
+
+  offline-typecheck-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies without Cloudflare credentials
+        run: npm install --prefer-offline --no-audit --no-fund
+      - name: TypeScript typecheck
+        run: npm run lint
+      - name: Local static build, not a Cloudflare deploy
+        run: npm run build
+
+  offline-codeql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@v3
