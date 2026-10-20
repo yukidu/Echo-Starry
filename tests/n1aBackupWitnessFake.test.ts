@@ -228,9 +228,9 @@ test('under 7/30/90 days old unrelated backup is only suggested, never deleted',
     const old:MockBackup={id:'independent-full',parentId:null,kind:'full',
       createdAtMs:NOW-45*DAY,state:'verified-success',securitySeq:'1',files:[]};
     const backups=[...f.input.backups,old];
-    f.input={...f.input,backups,retentionDays,
-      manifestHash:await sha256FakeText(JSON.stringify(backups)),
-      approvals:f.input.approvals.map(a=>({...a,manifestHash:await sha256FakeText(JSON.stringify(backups))}))};
+    const manifestHash=await sha256FakeText(JSON.stringify(backups));
+    f.input={...f.input,backups,retentionDays,manifestHash,
+      approvals:f.input.approvals.map(a=>({...a,manifestHash}))};
     const r=await simulateN1aBackupGate(f.input);
     assert.equal(r.simulatedEligible,true,JSON.stringify(r));
     assert.equal(r.retentionCandidates.includes('independent-full'),retentionDays!==90);
