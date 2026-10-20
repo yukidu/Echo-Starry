@@ -133,7 +133,7 @@ export async function runAi4S3aFakeCitation(h:Ai4S3aHarness):Promise<Ai4S3aResul
     resourceIds:h.resources.map(r=>r.trackId)};
   const readers=fakeReaders(h);
   const phases:SearchPhase[]=[];
-  let failure:{phase:SearchPhase;reason:string}|null=null;
+  const denied:{phase?:SearchPhase;reason?:string}={};
   const check=async (phase:SearchPhase):Promise<boolean>=>{
     phases.push(phase);
     const decision:S3aDecision=await evaluateS3aFakeEnvelope(
@@ -142,12 +142,12 @@ export async function runAi4S3aFakeCitation(h:Ai4S3aHarness):Promise<Ai4S3aResul
        decision.providerCalls!==0||decision.restoreWrites!==0||
        decision.irreversibleActionsAllowed!==false||
        !decision.simulatedAllowed){
-      failure={phase,reason:decision.reason};
+      denied.phase=phase;denied.reason=decision.reason;
       return false;
     }
     return true;
   };
-  if(!await check('T0'))return verdict('T0',failure?.reason??'T0_DENIED',phases);
+  if(!await check('T0'))return verdict('T0',denied.reason??'T0_DENIED',phases);
   const reject=async (phase:SearchPhase)=>{
     if(!await check(phase))throw new Error('FAKE_SHARED_GATE_REJECT');
   };
@@ -164,9 +164,8 @@ export async function runAi4S3aFakeCitation(h:Ai4S3aHarness):Promise<Ai4S3aResul
       beforeSend:async()=>{await h.hooks?.beforeSend?.();await reject('SEND');},
     },
   });
-  if(failure!==null) {
-    const error=failure as {phase:SearchPhase;reason:string};
-    return verdict(error.phase,error.reason,phases);
+  if(denied.phase!==undefined) {
+    return verdict(denied.phase,denied.reason??'FAKE_SHARED_GATE_DENIED',phases);
   }
   if(outcome.reason!=='fake_admitted'||outcome.stage!=='SEND'||
      outcome.productionAuthorized!==false||outcome.sideEffects!==0||
