@@ -93,10 +93,16 @@ test('R02 missing current VTT REJECT',rejected('object_not_found',(f)=>f.files.d
 test('R03 changed TXT without checksum update REJECT',rejected('object_hash_mismatch',(f)=>f.files.set('synthetic/v2/txt','惡意變更')));
 test('R04 false segment count REJECT',rejected('segment_count_mismatch',(f)=>{
   const versions=[...f.manifest.versions];versions[0]={...versions[0],segmentCount:99};
+  // This test targets the selected integrity rule, not an immutable-ID
+  // conflict: the same version must remain identical across full and delta.
+  f.base={...f.base,versions};
   f.manifest={...f.manifest,versions};
 }));
 test('R05 false timecode checksum REJECT',rejected('timecode_hash_mismatch',(f)=>{
   const versions=[...f.manifest.versions];versions[0]={...versions[0],timecodeHash:'f'.repeat(64)};
+  // This test targets the selected integrity rule, not an immutable-ID
+  // conflict: the same version must remain identical across full and delta.
+  f.base={...f.base,versions};
   f.manifest={...f.manifest,versions};
 }));
 test('R06 delta without full base REJECT',rejected('chain_missing_parent',(f,r)=>{
@@ -108,6 +114,9 @@ test('R07 legacy missing raw correctly marked remains ACCEPT',async()=>{
 });
 test('R08 current published raw missing REJECT',rejected('required_object_missing',(f)=>{
   const versions=[...f.manifest.versions];versions[0]={...versions[0],objects:versions[0].objects.filter(x=>x.format!=='raw')};
+  // This test targets the selected integrity rule, not an immutable-ID
+  // conflict: the same version must remain identical across full and delta.
+  f.base={...f.base,versions};
   f.manifest={...f.manifest,versions};
 }));
 test('R09 DB active/published inconsistency REJECT',rejected('d1_publication_inconsistent',(f)=>{
@@ -158,6 +167,9 @@ test('restore authority exists only as injected Fake; must be independently stor
 }));
 test('historical legacy missing raw exception cannot be falsely applied to active',rejected('invalid_legacy_raw_exception',(f)=>{
   const versions=[...f.manifest.versions];versions[0]={...versions[0],legacyMissingRaw:true,rawOrigin:'legacy-unavailable'};
+  // This test targets the selected integrity rule, not an immutable-ID
+  // conflict: the same version must remain identical across full and delta.
+  f.base={...f.base,versions};
   f.manifest={...f.manifest,versions};
 }));
 test('candidate waiting review does not qualify as published',rejected('active_pointer_not_published',(f)=>{
