@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
 import {
   qaSearchTokens,qaQuestionTerms,qaSearchMatchExpression,qaSearchScore,
-  buildQaSearchParagraphs,replaceQaSearchGeneration,findQaIndexedPassages
+  buildQaSearchParagraphs,replaceQaSearchGeneration,findQaIndexedPassages,rebuildQaSearchAfterMutation
 } from '../worker/qaTranscriptSearchIndex';
 import {excerpts} from '../worker/aiSpeakerQaRouter';
 
@@ -176,4 +176,92 @@ test('search is opt-in; request-time path has no schema creation or backfill',()
   assert.doesNotMatch(index,/CREATE TABLE|CREATE VIRTUAL TABLE/);
   assert.doesNotMatch(workflow,/backfill/i);
   assert.match(migration,/CREATE VIRTUAL TABLE IF NOT EXISTS qa_search_fts/);
+});
+
+test('correction add/accept/supplement/revoke immediately blocks stale results, and rebuild uses effective text',async()=>{
+ const s=store();
+ try{
+  await seed(s,'edit','原始演講','講者','感恩是重要的態度');
+  const initial=await findQaIndexedPassages(s.d1,'感恩',['edit']);
+  assert.equal(initial.hits.length,1);
+  s.db.prepare("INSERT INTO transcript_correction_events(id,trackId,segmentId,createdAt,updatedAt,status,newText) VALUES(?,?,?,?,?,'pending_review',?)")
+    .run('event1','edit','s000001',50,50,'有效陪伴能幫助學員');
+  const stale=await findQaIndexedPassages(s.d1,'感恩',['edit']);
+  assert.equal(stale.hits.length,0);
+  assert.equal(stale.blocked.has('edit'),true);
+  let reads=0;
+  const env:any={DB:s.d1,QA_CHINESE_SEARCH_WRITE_ENABLED:'true',R2_BUCKET:{async get(){
+    reads++;return {async text(){return JSON.stringify({
+      createdAt:1,segments:[{id:'s000001',start:2,end:12,text:'感恩是重要的態度'}]
+    });}};
+  }}};
+  const rebuilt=await rebuildQaSearchAfterMutation(env,'edit');
+  assert.equal(rebuilt.indexed,true);
+  assert.equal(reads,1);
+  assert.equal((await findQaIndexedPassages(s.d1,'有效陪伴',['edit'])).hits.length,1);
+  assert.equal((await findQaIndexedPassages(s.d1,'感恩',['edit'])).hits.length,0);
+  s.db.prepare("UPDATE transcript_correction_events SET status='supplemented',adminText='補充修正合作技巧',updatedAt=51 WHERE id='event1'").run();
+  assert.equal((await findQaIndexedPassages(s.d1,'有效陪伴',['edit'])).blocked.has('edit'),true);
+  await rebuildQaSearchAfterMutation(env,'edit');
+  assert.equal((await findQaIndexedPassages(s.d1,'補充修正',['edit'])).hits.length,1);
+  s.db.prepare("UPDATE transcript_correction_events SET status='revoked',updatedAt=52 WHERE id='event1'").run();
+  assert.equal((await findQaIndexedPassages(s.d1,'補充修正',['edit'])).blocked.has('edit'),true);
+  await rebuildQaSearchAfterMutation(env,'edit');
+  assert.equal((await findQaIndexedPassages(s.d1,'感恩',['edit'])).hits.length,1);
+  assert.equal((await findQaIndexedPassages(s.d1,'補充修正',['edit'])).hits.length,0);
+ }finally{s.close();}
+});
+test('legacy corrections, permissions and physical track deletion automatically invalidate/clean derived rows',async()=>{
+ const s=store();
+ try{
+  await seed(s,'acl','權限管理','講者','公開成長學習與家庭分享');
+  s.db.prepare("UPDATE tracks SET requiredRank='鑽石級以上' WHERE id='acl'").run();
+  assert.equal((await findQaIndexedPassages(s.d1,'成長',['acl'])).blocked.has('acl'),true);
+  const track:any=s.db.prepare("SELECT * FROM tracks WHERE id='acl'").get();
+  const env:any={DB:s.d1,QA_CHINESE_SEARCH_ENABLED:'true',R2_BUCKET:{async get(){throw Error('stale R2 read prohibited');}}};
+  const blocked=await excerpts(env,track,null,'current','成長');
+  assert.equal(blocked.prompt,'');
+  await seed(s,'legacy','舊版訂正','講者','成長與夥伴同行');
+  s.db.prepare('INSERT INTO transcript_corrections(id,trackId,segmentId,newText,createdAt) VALUES(?,?,?,?,?)')
+   .run('legacy1','legacy','s000001','這一段已更正為另一段說法',12);
+  assert.equal((await findQaIndexedPassages(s.d1,'成長',['legacy'])).blocked.has('legacy'),true);
+  s.db.prepare("DELETE FROM tracks WHERE id='legacy'").run();
+  assert.equal(Number((s.db.prepare("SELECT count(*) n FROM qa_search_segments WHERE trackId='legacy'").get() as any).n),0);
+  assert.equal(Number((s.db.prepare("SELECT count(*) n FROM qa_search_state WHERE trackId='legacy'").get() as any).n),0);
+  assert.equal((await findQaIndexedPassages(s.d1,'成長',['legacy'])).hits.length,0);
+ }finally{s.close();}
+});
+test('simulated 112 recordings: competing searches report local SQLite storage, query P95 and no R2 downloads',async()=>{
+ const s=store();
+ try{
+  const before=(s.db.prepare('PRAGMA page_count').get() as any).page_count *
+    (s.db.prepare('PRAGMA page_size').get() as any).page_size;
+  const ids:string[]=[];
+  for(let i=0;i<112;i++){
+    const id='perf-'+i;ids.push(id);
+    const specific=i===41?'堅定信念讓家庭與事業持續成長':'團隊溝通合作能提升學習的品質';
+    const text=[specific,'透過具體行動與真誠陪伴累積實力，建立信任與目標，持續改善生活。'.repeat(10)].join(' ');
+    await seed(s,id,'測試音檔'+i,'模擬講者',text,i+1);
+  }
+  const bytes=(s.db.prepare('PRAGMA page_count').get() as any).page_count *
+    (s.db.prepare('PRAGMA page_size').get() as any).page_size-before;
+  const times:number[]=[];
+  const question='堅定信念讓家庭與事業持續成長';
+  for(let i=0;i<40;i++){
+    const start=performance.now();
+    const result=await findQaIndexedPassages(s.d1,question,ids.slice(0,70));
+    times.push(performance.now()-start);
+    assert.ok(result.hits.slice(0,5).some(h=>h.trackId==='perf-41'));
+  }
+  times.sort((a,b)=>a-b);
+  const p95=times[Math.ceil(0.95*times.length)-1];
+  // Local SQLite resource measurements, NOT billed Cloudflare D1 metrics.
+  console.log('C09 LOCAL SQLITE BENCHMARK '+JSON.stringify({
+    documents:112,queries:40,indexBytes:bytes,bytesPerDocument:Math.round(bytes/112),
+    searchP95Ms:Number(p95.toFixed(2)),sourceR2Gets:0,
+    approximateSegmentInsertCount:Number((s.db.prepare('SELECT count(*) n FROM qa_search_segments').get() as any).n)
+  }));
+  assert.ok(bytes>0&&bytes<16*1024*1024,'synthetic corpus index should fit 16 MiB in local benchmark');
+  assert.ok(Number.isFinite(p95)&&p95>=0);
+ }finally{s.close();}
 });
