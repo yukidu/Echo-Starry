@@ -30,7 +30,7 @@ class FakeElement {
 }
 
 function launch() {
-  const ids = ['budget', 'scenario', 'estimate', 'find', 'query', 'results', 'period', 'statsview', 'state', 'stateview', 'backupid', 'backupview'];
+  const ids = ['budget', 'scenario', 'estimate', 'find', 'query', 'results', 'period', 'statsview', 'state', 'stateview', 'backupid', 'backupview', 'current-page'];
   const nodes = Object.fromEntries(ids.map(id => [id, new FakeElement(id)])) as Record<string, FakeElement>;
   nodes.budget.value = '0';
   nodes.scenario.value = '1';
@@ -38,7 +38,7 @@ function launch() {
   nodes.state.value = 'unknown';
   nodes.backupid.value = '42';
   const pages = ['home', 'cost', 'search', 'stats', 'safety', 'backup'].map(id => new FakeElement(id));
-  const tabs = pages.map(page => { const tab = new FakeElement('tab-' + page.id); tab.dataset.tab = page.id; return tab; });
+  const tabs = pages.map(page => { const tab = new FakeElement('tab-' + page.id); tab.dataset.tab = page.id; tab.textContent = ({home:'總覽',cost:'AI3 費用',search:'AI4 搜尋',stats:'AI5 統計',safety:'AI6 安全',backup:'AI7 備份'} as Record<string,string>)[page.id]; return tab; });
   const document = {
     getElementById: (id: string) => {
       assert.ok(nodes[id], 'unknown element ' + id);
@@ -52,12 +52,13 @@ function launch() {
 }
 
 test('offline navigation changes exactly one visible page', () => {
-  const { pages, tabs } = launch();
+  const { nodes, pages, tabs } = launch();
   for (const tab of tabs) {
     tab.trigger('click');
     assert.equal(pages.filter(page => page.attributes.get('class:hidden') === 'false').length, 1);
     assert.equal(pages.find(page => page.attributes.get('class:hidden') === 'false')?.id, tab.dataset.tab);
     assert.equal(tabs.filter(t => t.attributes.get('aria-selected') === 'true').length, 1);
+    assert.equal(nodes['current-page'].textContent, '目前頁面：' + tab.textContent);
   }
 });
 
