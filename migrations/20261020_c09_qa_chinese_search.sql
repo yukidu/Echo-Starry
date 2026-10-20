@@ -38,6 +38,21 @@ CREATE TRIGGER IF NOT EXISTS qa_search_segments_ad AFTER DELETE ON qa_search_seg
 END;
 -- Do not use REPLACE/update for segment rows; build a new generation then flip the state.
 
+-- Durable per-track index-rebuild intent. Corrections and rights updates
+-- are committed atomically with this work item; no unbounded cron scanning.
+CREATE TABLE IF NOT EXISTS qa_search_rebuild_jobs (
+  trackId TEXT PRIMARY KEY,
+  requestedRevision INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  attempts INTEGER NOT NULL DEFAULT 0,
+  nextAttemptAt INTEGER NOT NULL DEFAULT 0,
+  leaseUntil INTEGER NOT NULL DEFAULT 0,
+  updatedAt INTEGER NOT NULL DEFAULT 0,
+  lastError TEXT
+);
+CREATE INDEX IF NOT EXISTS qa_search_rebuild_ready
+  ON qa_search_rebuild_jobs(status,nextAttemptAt,updatedAt);
+
 -- These tables must already exist from Echo's existing transcript schema.
 -- All triggers run in the SAME D1 transaction as the source mutation.
 -- Corrections never update original R2, they only invalidate derived search.
@@ -45,41 +60,70 @@ CREATE TRIGGER IF NOT EXISTS qa_search_moderation_insert AFTER INSERT ON transcr
   INSERT INTO qa_search_state(trackId,activeGeneration,sourceKey,sourceUpdatedAt,segmentCount,updatedAt,invalidated,changeRevision)
     VALUES(NEW.trackId,'','',0,0,0,1,1)
     ON CONFLICT(trackId) DO UPDATE SET invalidated=1,changeRevision=changeRevision+1;
+  INSERT INTO qa_search_rebuild_jobs(trackId,requestedRevision,status,attempts,nextAttemptAt,leaseUntil,updatedAt,lastError)
+    SELECT NEW.trackId,s.changeRevision,'pending',0,0,0,0,NULL FROM qa_search_state s WHERE s.trackId=NEW.trackId
+    ON CONFLICT(trackId) DO UPDATE SET requestedRevision=excluded.requestedRevision,status='pending',
+      attempts=0,nextAttemptAt=0,leaseUntil=0,updatedAt=0,lastError=NULL;
 END;
 CREATE TRIGGER IF NOT EXISTS qa_search_moderation_update AFTER UPDATE ON transcript_correction_events BEGIN
   INSERT INTO qa_search_state(trackId,activeGeneration,sourceKey,sourceUpdatedAt,segmentCount,updatedAt,invalidated,changeRevision)
     VALUES(NEW.trackId,'','',0,0,0,1,1)
     ON CONFLICT(trackId) DO UPDATE SET invalidated=1,changeRevision=changeRevision+1;
+  INSERT INTO qa_search_rebuild_jobs(trackId,requestedRevision,status,attempts,nextAttemptAt,leaseUntil,updatedAt,lastError)
+    SELECT NEW.trackId,s.changeRevision,'pending',0,0,0,0,NULL FROM qa_search_state s WHERE s.trackId=NEW.trackId
+    ON CONFLICT(trackId) DO UPDATE SET requestedRevision=excluded.requestedRevision,status='pending',
+      attempts=0,nextAttemptAt=0,leaseUntil=0,updatedAt=0,lastError=NULL;
 END;
 CREATE TRIGGER IF NOT EXISTS qa_search_moderation_delete AFTER DELETE ON transcript_correction_events BEGIN
   INSERT INTO qa_search_state(trackId,activeGeneration,sourceKey,sourceUpdatedAt,segmentCount,updatedAt,invalidated,changeRevision)
     VALUES(OLD.trackId,'','',0,0,0,1,1)
     ON CONFLICT(trackId) DO UPDATE SET invalidated=1,changeRevision=changeRevision+1;
+  INSERT INTO qa_search_rebuild_jobs(trackId,requestedRevision,status,attempts,nextAttemptAt,leaseUntil,updatedAt,lastError)
+    SELECT OLD.trackId,s.changeRevision,'pending',0,0,0,0,NULL FROM qa_search_state s WHERE s.trackId=OLD.trackId
+    ON CONFLICT(trackId) DO UPDATE SET requestedRevision=excluded.requestedRevision,status='pending',
+      attempts=0,nextAttemptAt=0,leaseUntil=0,updatedAt=0,lastError=NULL;
 END;
 CREATE TRIGGER IF NOT EXISTS qa_search_legacy_insert AFTER INSERT ON transcript_corrections BEGIN
   INSERT INTO qa_search_state(trackId,activeGeneration,sourceKey,sourceUpdatedAt,segmentCount,updatedAt,invalidated,changeRevision)
     VALUES(NEW.trackId,'','',0,0,0,1,1)
     ON CONFLICT(trackId) DO UPDATE SET invalidated=1,changeRevision=changeRevision+1;
+  INSERT INTO qa_search_rebuild_jobs(trackId,requestedRevision,status,attempts,nextAttemptAt,leaseUntil,updatedAt,lastError)
+    SELECT NEW.trackId,s.changeRevision,'pending',0,0,0,0,NULL FROM qa_search_state s WHERE s.trackId=NEW.trackId
+    ON CONFLICT(trackId) DO UPDATE SET requestedRevision=excluded.requestedRevision,status='pending',
+      attempts=0,nextAttemptAt=0,leaseUntil=0,updatedAt=0,lastError=NULL;
 END;
 CREATE TRIGGER IF NOT EXISTS qa_search_legacy_update AFTER UPDATE ON transcript_corrections BEGIN
   INSERT INTO qa_search_state(trackId,activeGeneration,sourceKey,sourceUpdatedAt,segmentCount,updatedAt,invalidated,changeRevision)
     VALUES(NEW.trackId,'','',0,0,0,1,1)
     ON CONFLICT(trackId) DO UPDATE SET invalidated=1,changeRevision=changeRevision+1;
+  INSERT INTO qa_search_rebuild_jobs(trackId,requestedRevision,status,attempts,nextAttemptAt,leaseUntil,updatedAt,lastError)
+    SELECT NEW.trackId,s.changeRevision,'pending',0,0,0,0,NULL FROM qa_search_state s WHERE s.trackId=NEW.trackId
+    ON CONFLICT(trackId) DO UPDATE SET requestedRevision=excluded.requestedRevision,status='pending',
+      attempts=0,nextAttemptAt=0,leaseUntil=0,updatedAt=0,lastError=NULL;
 END;
 CREATE TRIGGER IF NOT EXISTS qa_search_legacy_delete AFTER DELETE ON transcript_corrections BEGIN
   INSERT INTO qa_search_state(trackId,activeGeneration,sourceKey,sourceUpdatedAt,segmentCount,updatedAt,invalidated,changeRevision)
     VALUES(OLD.trackId,'','',0,0,0,1,1)
     ON CONFLICT(trackId) DO UPDATE SET invalidated=1,changeRevision=changeRevision+1;
+  INSERT INTO qa_search_rebuild_jobs(trackId,requestedRevision,status,attempts,nextAttemptAt,leaseUntil,updatedAt,lastError)
+    SELECT OLD.trackId,s.changeRevision,'pending',0,0,0,0,NULL FROM qa_search_state s WHERE s.trackId=OLD.trackId
+    ON CONFLICT(trackId) DO UPDATE SET requestedRevision=excluded.requestedRevision,status='pending',
+      attempts=0,nextAttemptAt=0,leaseUntil=0,updatedAt=0,lastError=NULL;
 END;
 -- Metadata changes do not expose old passages. Member permissions also remain
 -- checked on every QA request, including when there is no search state row.
 CREATE TRIGGER IF NOT EXISTS qa_search_access_update AFTER UPDATE OF
   speaker,requiredRank,isPrivateVip,authorizedOnlyVisible,stickerUnlockCost ON tracks BEGIN
   UPDATE qa_search_state SET invalidated=1,changeRevision=changeRevision+1 WHERE trackId=NEW.id;
+  INSERT INTO qa_search_rebuild_jobs(trackId,requestedRevision,status,attempts,nextAttemptAt,leaseUntil,updatedAt,lastError)
+    SELECT NEW.id,s.changeRevision,'pending',0,0,0,0,NULL FROM qa_search_state s WHERE s.trackId=NEW.id
+    ON CONFLICT(trackId) DO UPDATE SET requestedRevision=excluded.requestedRevision,status='pending',
+      attempts=0,nextAttemptAt=0,leaseUntil=0,updatedAt=0,lastError=NULL;
 END;
 -- Deletes clean all derived rows atomically. Original media deletion is owned
 -- by the existing App workflow, never by this index.
 CREATE TRIGGER IF NOT EXISTS qa_search_track_delete AFTER DELETE ON tracks BEGIN
   DELETE FROM qa_search_segments WHERE trackId=OLD.id;
   DELETE FROM qa_search_state WHERE trackId=OLD.id;
+  DELETE FROM qa_search_rebuild_jobs WHERE trackId=OLD.id;
 END;
