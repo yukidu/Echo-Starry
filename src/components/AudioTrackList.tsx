@@ -222,19 +222,33 @@ export function AudioTrackList({mode,currentUser,onEditTrack,onDeleted}:{
 
   const relistenTrack = async (track: Track) => {
     if (!superAdmin || relisteningId || ['pending','queued','processing'].includes(transcriptStatuses[track.id]?.status)) return;
+    const seconds=Number(track.durationSeconds||0);
+    if(!Number.isFinite(seconds)||seconds<=0){
+      setError('無法確認音檔長度與 AI 使用量，請先補充音檔長度');
+      return;
+    }
+    if(!window.confirm('將為「'+(track.title||'此音檔')+'」建立新逐字稿候選，舊稿與會員訂正保留。這可能消耗 AI 額度，確定繼續？'))return;
+    if(!window.confirm('最後確認：只重新辨識這一份約 '+Math.ceil(seconds/60)+' 分鐘的音檔。候選須審核才會取代舊稿。確定送出？'))return;
     setError('');
     setRelisteningId(track.id);
     try {
-      const response = await fetch(`/api/v281/transcript-management/relisten/${encodeURIComponent(track.id)}`, {
-        method: 'POST',
-        credentials: 'same-origin'
+      const response = await fetch('/api/v281/transcript-management/relisten/'+encodeURIComponent(track.id),{
+        method:'POST',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({confirm:true,approvedMaxSeconds:seconds})
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.error || '重聽逐字稿失敗');
-      setTranscriptStatuses(previous => ({
-        ...previous,
-        [track.id]: { trackId: track.id, status: 'pending', error: null, updatedAt: Date.now() }
-      }));
+      // G31 candidate works separately from the existing ready transcript.
+      if (!data.activePreserved) {
+        setTranscriptStatuses(previous => ({
+          ...previous,
+          [track.id]: {trackId:track.id,status:'pending',error:null,updatedAt:Date.now()}
+        }));
+      } else {
+        setError('新版候選已申請，目前已完成的逐字稿仍可使用。');
+      }
       setTranscriptStatusesReady(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : '無法啟動逐字稿重聽');
