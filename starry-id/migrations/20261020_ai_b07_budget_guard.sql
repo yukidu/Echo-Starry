@@ -216,7 +216,7 @@ END;
 -- Otherwise counters and idempotency could silently diverge.
 CREATE TRIGGER IF NOT EXISTS starry_ai_b07_immutable_call
 BEFORE UPDATE ON starry_ai_b07_calls
-WHEN NEW.id<>OLD.id OR NEW.request_key<>OLD.request_key
+WHEN NEW.status=OLD.status OR NEW.id<>OLD.id OR NEW.request_key<>OLD.request_key
  OR NEW.fingerprint<>OLD.fingerprint OR NEW.day<>OLD.day
  OR NEW.app_id<>OLD.app_id OR NEW.task_id<>OLD.task_id
  OR NEW.member_key<>OLD.member_key OR NEW.model_id<>OLD.model_id
