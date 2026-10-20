@@ -14,7 +14,7 @@ function setup(){
  const auth=new MutableFakeAuthority(docs);
  const run=(hooks?:Parameters<typeof simulateProtectedQA>[0]['hooks'],
    candidates:readonly FakeSource[]=[docs[0]],subjectId=auth.subjectId,requestId='request-123')=>
-   simulateProtectedQA({authority:auth,candidates,subjectId,requestId,nowMs:()=>auth.clock,hooks});
+   simulateProtectedQA({authority:auth,candidates:candidates.map(({text:_neverT0,...ref})=>ref),subjectId,requestId,nowMs:()=>auth.clock,hooks});
  return {auth,run};
 }
 const blocked=(r:Awaited<ReturnType<typeof simulateProtectedQA>>)=>{
