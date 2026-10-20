@@ -54,3 +54,18 @@
 **額外安全測試：** 原本 20 項保留不動；第二輪新增 20 項，包含同 grant 新 requestId/runId/跨日不能重新預留/出第二票、`securitySeq` 與 `restoreEpoch` 超過 JavaScript 安全整數但在 uint64 內可精準比對、非法前導零/負數/浮點/超出 uint64 即拒發，審查後改權限/版本/音檔來源/撤權/見證失聯/證明逾時拒 claim，多段部分成功而另一段帳單 unknown 時不能因換 requestId 再發票或釋放預留額。測試是否 PASS 以 GitHub CI **最新 HEAD** 實際 log 為準。
 
 **S1 第二輪不得越界：** 只有 AI3 假 Python 測試和本文件、分支專用 GitHub CI；沒有變更 #469、#461、#464 的真 Worker/SQL/會員／Cloudflare。原先 #474 仍以 #467（依賴 #464）為 base，**不得獨立 merge**、不得啟動真 Provider 或付費。
+## R3 最終定向安全修補（總控 #455 #6290549782）
+
+**僅 AI3 原 Draft #474 自己的 Fake SQLite 程式/測試；不修改 #461、真 B07、會員、Cloudflare 或其餘 AI 模組。**
+
+本次先提交 `tests/test_n1a_s1_b07_round3.py`，GitHub CI [#39421075946](https://github.com/yukidu/Echo-Starry/actions/runs/39421075946) 的 46 項測試中，舊 40 項 PASS、新 6 項 **5 FAIL／1 ERROR**，重現來源日期越界、取消已排隊預留、同帳單重用與缺少供應商來源證明。**這個 RED 是修復前的證據，不代表已驗收通過。**
+
+三項狹義修補，僅供離線驗證：
+
+1. **計費日只能來自內部 Fake 伺服器時鐘。** `reserve(day=...)` 保留相容參數但任何外部提供日期立即回 `denied_untrusted_day`，不可藉不同日期重開帳號級 quota。合法跨 UTC 日界測試只控制 fixture 私有 `_trusted_utc_day`，不屬真用戶 HTTP 介面。原始 grant 身分不含 UTC 日期，因此同 grant 跨日仍不會生成第二筆 hold。
+2. **Echo 仍可能排隊就絕不自動退 hold。** `FakeEchoQueue.certify_never_queued` 使用 Echo **本機假 SQLite 原子寫入不可重用的 `fake_echo_cancel_fences`**；有任何 queued/unknown 紀錄就不能建立 fence，fence 成立後 `enqueue` 原子拒絕任何後續同 run 鍵排隊；`cancel_never_sent` 必須先驗 fence、且 B07 無 ticket 才可 void，否則保留 hold。**這不是 Echo D1＋中央 D1 的跨庫原子交易**，真系統仍需可信跨庫狀態協定及失聯審核。
+3. **供應商收費明細不能跨 run 重複使用。** `reconciliations.invoice` 增加中央單一 Fake SQLite 的 `UNIQUE`，同一 invoice *line*（非整張彙總發票）若已被另一 run 使用，`denied_invoice_reused`，原 unknown hold 不釋。首筆對帳須由 `FakeInvoiceAuthority` 的 **明確標示 Fake 的供應商憑證登記器**確認 `(invoiceLine,runIdentity,units)` 一致；任意傳 64 字元或只有兩位 Fake 管理員仍不足以算真帳單。所有結算於同一 Fake 中央 SQLite transaction，已完成的帳目僅追加事件不刪原 run 墓碑。**FakeInvoiceAuthority 是測試資料，不等於真 Provider 收據簽名／真雙人驗證。**
+
+原第 1/2 輪 40 項假驗收保留；R3 額外 6 項專門檢查不可信日期、已排隊/ACK unknown 取消、可證明未排隊時 fence+void、同 invoice 重送、未知來源帳單拒絕。完整 CI 驗收須以 **修復後最新 SHA** 為準；勿把 RED 的 CI 當 GREEN。
+
+仍屬 **BLOCKED**：正式 #464 的跨 requestKey grant/source UNIQUE、跨 Echo D1/B07 D1 的原子提交、真 Starry ID/獨立見證、真雙審、真模型價/官方免費額度/供應商真發票。本批不能接 Whisper，`#461 assertUnfundedWhisperBlocked` 必須保留；不可 merge main 或正式部署。
