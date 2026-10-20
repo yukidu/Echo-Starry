@@ -73,9 +73,9 @@ async function fixture():Promise<Fixture>{
     headHash:hash,restoreEpoch:'6',reviewerIdRevision:'9',
     decision:'approve' as const,approvedAtMs:NOW-1000
   }));
-  const members=new Map(['admin-one','admin-two'].map(subjectId=>
+  const members=new Map<string,S3aCurrentMembership>(['admin-one','admin-two'].map(subjectId=>
     [subjectId,{subjectId,active:true,appAllowed:true,centralSuperAdmin:true,
-      sessionRevision:'4',membershipRevision:'5'}]));
+      sessionRevision:'4',membershipRevision:'5'}] as const));
   const resources=new Map<string,S3aCurrentResource>([
     ['old-track',{resourceId:'old-track',sourceRevision:'etag-old',
       contentDigest:oldHash,activeTranscriptVersion:'v1',permissionRevision:'2',
@@ -191,7 +191,7 @@ test('S3A-7-01 imports and actually runs BOTH original functions in one Node pro
   assert.equal(f.sharedReads.checkpoint,4);
   assert.equal(f.sharedReads.resource,8,'two historical resources × two reviewers × two stages');
   assert.equal(d.backupDecision?.verifiedFileCount,2,'historical ancestor + current leaf');
-  assert.equal(f.s1Reads.witness,2,'two S1 readings plus pre-bind = at least two');
+  assert.equal(f.s1Reads.witness,3,'one pre-bind plus two S1 stage reads');
   assert.equal(f.claims.size,1);
   assert.equal(d.executableRestore,false);assert.equal(d.executableDelete,false);
   assert.equal(d.productionAuthorized,false);assert.equal(d.sideEffects,0);
@@ -328,7 +328,7 @@ test('S3A-7-20 different head/epoch proofs between reviewers reject',async()=>{
 test('S3A-7-21 approval grant for another fake reviewer cannot be reassigned',async()=>{
   await blocked('BACKUP_RESOURCE_OR_APPROVER_NOT_BOUND',f=>{
     f.input={...f.input,envelopes:f.input.envelopes.map((e,i)=>i===1?
-      {...e,subjectId:'admin-one'}:e)};
+      {...e,subjectId:'admin-three'}:e)};
   });
 });
 test('S3A-7-22 no independent side effects even if envelope and S1 gate both approve',async()=>{
