@@ -144,12 +144,13 @@ export class MutableFakeAuthority implements FakeAuthority {
   epoch = '6'; revokeSeq = '2'; deleteSeq = '3';
   pending = new Set<string>(); revoked = new Set<string>(); deleted = new Set<string>();
   offline = false; readCount = 0; bodyReadCount = 0; sentCount = 0; clock = 1_000_000;
-  constructor(sources: readonly FakeSource[]) {
-    // Test fixture authors explicitly place these source records on the
-    // member's synthetic initial grant list. Production has no such default.
+  constructor(sources: readonly FakeSource[], grantedTrackIds: readonly string[] = []) {
+    // Fail-closed fixture: merely having a live member and a source document
+    // NEVER grants access. Synthetic grants must be explicitly named.
+    const grants=new Set(grantedTrackIds);
     for (const source of sources) {
       this.resources.set(source.trackId,source);
-      this.entitlements.set(source.trackId,true);
+      this.entitlements.set(source.trackId,grants.has(source.trackId));
     }
   }
   private bump(): void { this.witnessSeq = String(BigInt(this.witnessSeq)+1n); }
