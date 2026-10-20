@@ -9,6 +9,7 @@ import { handleSpeakerProfileRequest } from './aiSpeakerProfileRouter';
 import { handleStoryAttributionRequest } from './aiSpeakerStoryRouter';
 import { generateNextSpeakerBiography } from './aiSpeakerBiographyScheduler';
 import { runNextStoryAttribution } from './aiSpeakerStoryAutoScheduler';
+import { drainQaSearchRebuildQueue } from './qaTranscriptSearchRebuildQueue';
 
 // Workflow / Container named handlers 必須由正式安全入口匯出，不改既有網站路由。
 export { TranscriptWorkflow } from './transcriptWorkflowV282';
@@ -143,6 +144,12 @@ async function serveFastHomeApi(request: Request, env: Env, ctx?: any): Promise<
 
   if (isStructuralTrackMutation(pathname, method) || isCategoryMutation(pathname, method)) {
     const response = await appWorker.fetch(request, env, ctx);
+    // A track permission/metadata update invalidates and enqueues its own
+    // derived index atomically in D1. Wake a single bounded queue worker.
+    if(response.ok && isStructuralTrackMutation(pathname,method) &&
+       (env as any).QA_CHINESE_SEARCH_WRITE_ENABLED==='true'){
+      runInBackground(ctx,drainQaSearchRebuildQueue(env as any,1));
+    }
     if (response.ok && env.KV) {
       runInBackground(ctx, rebuildHomeApiCache(request.url, '/api/tracks', env, ctx));
       if (isCategoryMutation(pathname, method)) {
@@ -351,6 +358,11 @@ export default {
     // Separate bounded five-track analysis from transcription / biography priority.
     if(controller.cron==='*/5 * * * *'){
       ctx.waitUntil(runNextStoryAttribution(env as any));
+      // Existing cron: at most 2 C09 jobs every 5 minutes, no new scheduler
+      // or paid service. Trigger-created queue survives request failures.
+      if((env as any).QA_CHINESE_SEARCH_WRITE_ENABLED==='true')
+        ctx.waitUntil(drainQaSearchRebuildQueue(env as any,2).catch(error=>
+          console.warn('C09 retry queue deferred',error instanceof Error?error.name:'unknown')));
       return;
     }
     ctx.waitUntil(queueNextTranscriptV293(env as any));
