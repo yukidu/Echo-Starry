@@ -189,3 +189,22 @@ test('rebuild queue disabled means no R2 reads, no cron work and no migrations a
   assert.equal(worker.includes('R2_BUCKET.put'),false);
  }finally{f.close();}
 });
+
+test('new corrections to older unindexed recordings do NOT enqueue historical backfill',()=>{
+ const f=fixture();
+ try{
+  f.db.prepare('INSERT INTO tracks(id,title,speaker,audioUrl,uploadDate,requiredRank) VALUES (?,?,?,?,?,?)')
+    .run('old','未索引舊音檔','講者乙','audio://old',1,'公開');
+  f.db.prepare("INSERT INTO transcript_correction_events(id,trackId,segmentId,createdAt,updatedAt,status,newText) VALUES('old-c','old','s1',2,2,'pending_review','修正內容')").run();
+  assert.equal(f.row("SELECT count(*) n FROM qa_search_state").n,0);
+  assert.equal(f.row("SELECT count(*) n FROM qa_search_rebuild_jobs").n,0);
+ }finally{f.close();}
+});
+test('admin-only API requires auth for rebuild status/retry, no customer queue actions',()=>{
+ const qa=read('worker/aiSpeakerQaRouter.ts');
+ const adminGate=qa.indexOf("if(!admin)return json({error:'只有超級管理員");
+ const statusGate=qa.indexOf("path==='/api/qa/index-rebuild/status'");
+ const retryGate=qa.indexOf("path==='/api/qa/index-rebuild/retry'");
+ assert.ok(adminGate>0&&statusGate>adminGate&&retryGate>adminGate);
+ assert.match(qa,/QA_CHINESE_SEARCH_WRITE_ENABLED!=='true'/);
+});
