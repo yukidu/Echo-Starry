@@ -3,12 +3,12 @@
 **結論：離線假資料核心基本正確，整合狀態「有阻擋」，不可合併／正式啟用。尚未部署。**
 
 ## 版本與邊界
-- GitHub：`yukidu/Echo-Starry`；main `60fc222f076dd0c9821a76df780414d78f0538aa`；Draft #466 `159f27840c339fe6d47e7ce5eaa914806aca6c9e`；舊 Draft #459 `79a06eabdce6a52f381b8070b9cb6da446088e1d`，全部未合併。
+- GitHub：`yukidu/Echo-Starry`；main `60fc222f076dd0c9821a76df780414d78f0538aa`；Draft #466（原開發基準 `159f27840c339fe6d47e7ce5eaa914806aca6c9e`；S2367A 測試與文件後以 PR 頁顯示最新 HEAD 為準）；舊 Draft #459 `79a06eabdce6a52f381b8070b9cb6da446088e1d`，全部未合併。
 - 主程式未變。使用 `git hash-object` 核對離線複本與 GitHub blob：`rollup.ts` = `97b3bb5f6dd0aeea9bd4c823fc1b7b128b0b423a`、`schema.sql` = `032a2b30cfb7bb6de768bc80bad11c8462b25315`。
 - 完全本機 Node v22.16.0 `node:sqlite` 記憶體資料庫和暫存資料庫，沒有 Cloudflare / 會員 / AI / 網路 API 呼叫。並非真 D1、真 2,000 人並行壓測或正式安全認證。
 
 ## 執行方式與結果
-`node --experimental-strip-types --test tests/f22S2367AIndependent.test.ts`：**14/14 斷言場景完成，0 JS 測試失敗；其中四項是成功重現缺口的負向驗證，不能算驗收放行。**
+本機完整獨立驗收：**14/14 場景執行完成、0 執行錯誤**，其中四項為成功重現缺口的負向證據，不代表驗收放行。GitHub 另新增精簡可重跑 `tests/f22S2367AIndependent.test.ts` **8 項核心回歸**（含四項缺口），請以最新 GitHub CI 為這 8 項的實際驗收依據。
 - 核心負載：獨立產生 60,080 筆事件、2,000 個虛構會員鍵、50 個日期、101 個音檔；以 `SELECT COUNT(DISTINCT member_key)` 與每個日期區間及各音檔的真 SQL 直接比較一致；以假額度日切換分批完成。
 - 跨時區日界、同一假會員多日、跨裝置同源事件重送去重：PASS（須保持相同 eventKey）。
 - 更新狀態、會員鍵、日期、音檔與撤銷；更舊版本不覆蓋新版：PASS。
