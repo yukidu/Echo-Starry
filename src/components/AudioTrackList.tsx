@@ -8,6 +8,7 @@ type TranscriptProgressItem = {
   trackId: string;
   status: string;
   error?: string | null;
+  candidateState?: string | null;
   updatedAt?: number;
 };
 
@@ -142,6 +143,7 @@ export function AudioTrackList({mode,currentUser,onEditTrack,onDeleted}:{
           next[trackId] = {
             trackId,
             status: normalize(item?.status) || 'pending',
+            candidateState:normalize(item?.candidateState) || null,
             error: normalize(item?.error) || null,
             updatedAt: Number(item?.updatedAt || 0)
           };
@@ -290,7 +292,8 @@ export function AudioTrackList({mode,currentUser,onEditTrack,onDeleted}:{
             const permission = !track.requiredRank || track.requiredRank === '無' ? '公開' : track.requiredRank;
             const speakerRank = normalize(track.speakerRank) && track.speakerRank !== '無' ? ` ${track.speakerRank}` : '';
             const transcriptItem = transcriptStatuses[track.id];
-            const relistenBusy = relisteningId === track.id || ['pending','queued','processing'].includes(transcriptItem?.status || '');
+            const relistenBusy = relisteningId === track.id || ['pending','queued','processing'].includes(transcriptItem?.status || '') ||
+              ['pending','queued','processing','awaiting_review'].includes(transcriptItem?.candidateState || '');
             const transcriptBadge = superAdmin && transcriptStatusesReady && normalize(track.audioUrl)
               ? transcriptProgressPresentation(transcriptItem)
               : null;
@@ -307,6 +310,7 @@ export function AudioTrackList({mode,currentUser,onEditTrack,onDeleted}:{
                       {transcriptBadge.label}
                     </div>
                   )}
+                  {transcriptItem?.candidateState && <div className="v161-track-meta" role="status">候選新版：{transcriptItem.candidateState==='awaiting_review'?'待管理員逐段審核（舊稿持續有效）':transcriptItem.candidateState==='failed'?'候選失敗（舊稿不受影響）':transcriptItem.candidateState==='processing'?'重新辨識中（舊稿持續有效）':'候選排隊中（舊稿持續有效）'}</div>}
                   {superAdmin && mode === 'community' && <div className="v161-track-meta inline-flex items-center gap-1"><UserRound className="h-3 w-3" />網友：{memberNameFor(track)}</div>}
                 </div>
                 <div className="v161-actions">
