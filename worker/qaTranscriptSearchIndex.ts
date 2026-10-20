@@ -120,8 +120,40 @@ export async function replaceQaSearchGeneration(db:any,options:{
   ).bind(trackId,generation,trackId,generation).run().catch(()=>null);
   return paragraphs.length;
 }
+export type QaSearchEvidence={
+  trackId:string;generation:string;changeRevision:number;sourceKey:string;sourceUpdatedAt:number
+};
+/** One SQL statement checks all evidence at one SQLite snapshot.
+ * Reused immediately before AI model use and inside the final comment INSERT.
+ */
+export function qaSearchEvidenceGuard(evidence:QaSearchEvidence[]):{where:string;params:(string|number)[]}{
+  const unique=[...new Map(evidence.map(e=>[e.trackId,e])).values()];
+  if(unique.length>9)throw Error('逐字稿引用來源超過安全限制');
+  if(!unique.length)return {where:'1=1',params:[]};
+  const conditions:string[]=[];const params:(string|number)[]=[];
+  for(const e of unique){
+    conditions.push(
+      'EXISTS (SELECT 1 FROM qa_search_state s '+
+      'JOIN transcript_index i ON i.trackId=s.trackId '+
+      'JOIN tracks t ON t.id=s.trackId '+
+      'WHERE s.trackId=? AND s.activeGeneration=? AND s.changeRevision=? '+
+      'AND s.sourceKey=? AND s.sourceUpdatedAt=? AND s.invalidated=0 '+
+      "AND i.status='ready' AND i.r2Key=s.sourceKey AND i.updatedAt=s.sourceUpdatedAt)"
+    );
+    params.push(e.trackId,e.generation,e.changeRevision,e.sourceKey,e.sourceUpdatedAt);
+  }
+  return {where:conditions.join(' AND '),params};
+}
+export async function qaSearchEvidenceIsCurrent(db:any,evidence:QaSearchEvidence[]):Promise<boolean>{
+  if(!evidence.length)return true;
+  const guard=qaSearchEvidenceGuard(evidence);
+  const row=await db.prepare('SELECT 1 AS ok WHERE '+guard.where).bind(...guard.params).first();
+  return Number(row?.ok)===1;
+}
 export async function findQaIndexedPassages(db:any,question:string,trackIds:string[]):Promise<{
-  covered:Set<string>;blocked:Set<string>;hits:{trackId:string;content:string;startMs:number;endMs:number;fromSegment:string;toSegment:string;score:number}[];
+  covered:Set<string>;blocked:Set<string>;hits:(QaSearchEvidence & {
+    content:string;startMs:number;endMs:number;fromSegment:string;toSegment:string;score:number
+  })[];
 }>{
   const covered=new Set<string>();
   const ids=[...new Set(trackIds)].filter(Boolean).slice(0,70);
@@ -147,14 +179,26 @@ export async function findQaIndexedPassages(db:any,question:string,trackIds:stri
   const accepted=[...covered];
   const places=accepted.map(()=>'?').join(',');
   const entries=rows(await db.prepare(
-    'SELECT p.trackId,p.content,p.startMs,p.endMs,p.fromSegment,p.toSegment '+
+    'SELECT p.trackId,p.content,p.startMs,p.endMs,p.fromSegment,p.toSegment,'+
+    's.activeGeneration AS generation,s.changeRevision,s.sourceKey,s.sourceUpdatedAt '+
     'FROM qa_search_fts JOIN qa_search_segments p ON p.id=qa_search_fts.rowid '+
     'JOIN qa_search_state s ON s.trackId=p.trackId AND s.activeGeneration=p.generation '+
-    'WHERE qa_search_fts MATCH ? AND p.trackId IN ('+places+') '+
+    'JOIN transcript_index i ON i.trackId=p.trackId '+
+    'JOIN tracks t ON t.id=p.trackId '+
+    "WHERE qa_search_fts MATCH ? AND s.invalidated=0 AND i.status='ready' "+
+    'AND i.r2Key=s.sourceKey AND i.updatedAt=s.sourceUpdatedAt '+
+    'AND p.trackId IN ('+places+') '+
     'ORDER BY bm25(qa_search_fts) LIMIT 180'
   ).bind(expression,...accepted).all());
-  const hits=entries.map(r=>({...r,score:qaSearchScore(question,String(r.content))}))
-    .filter(r=>r.score>0).sort((a,b)=>b.score-a.score).slice(0,40);
+  const hits=entries.map(r=>({
+    ...r,generation:String(r.generation),changeRevision:Number(r.changeRevision),
+    sourceKey:String(r.sourceKey),sourceUpdatedAt:Number(r.sourceUpdatedAt),
+    score:qaSearchScore(question,String(r.content))
+  })).filter(r=>r.score>0).sort((a,b)=>b.score-a.score).slice(0,40);
+  // The source may change AFTER the consistent final SELECT. Reject stale
+  // in-flight results; the comment INSERT checks these same stamps atomically.
+  const stamps=[...new Map(hits.map(h=>[h.trackId,h])).values()];
+  if(!(await qaSearchEvidenceIsCurrent(db,stamps)))return {covered,blocked:new Set([...blocked,...stamps.map(s=>s.trackId)]),hits:[]};
   return {covered,blocked,hits};
 }
 
