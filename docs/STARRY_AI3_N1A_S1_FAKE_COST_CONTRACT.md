@@ -31,3 +31,26 @@
 ## 仍待新授權
 
 正式 B07 仍缺跨 requestKey 的 sourceGrant 永久 UNIQUE，#464 部分狀態更新也尚未保證完整單筆原子轉移；真 Starry ID 權限、非回捲錨點、供應商收據及全帳號免費額度都未接。不得使用 Fake verified 作真憑證，不能解鎖 Whisper、修改正式 migrations、合併 main 或部署。
+
+## 第二輪 #469 SecurityProofV1 互通驗收（Fake-only）
+
+對照 **AI2 #469 head `629ba52462192645f93817c0bb1976a9cb025f18`** 的 `security-contract-v1/securityProof.ts`（**唯讀，不從 #469 複製、匯入或修改**）。本 PR 在自己的 `tests/n1a_s1_b07_proof_bridge_fake.py` 依欄位規格建一份 Python **測試轉接器**。跨分支未實際連成一個生產依賴；即使測試通過，也**不可當作真 SecurityProof API 互通完成**。
+
+| #469 SecurityProofV1 欄位 | 本 AI3 Mock 對照與安全規則 | 現在是否已真正互通 |
+|---|---|---|
+| `schemaVersion/issuer/audience/action` | 固定 `N1A-S1-FAKE-v1/fake-star-id-plus-witness/n1a-offline-only/ai.attempt`，其它值禁止 | **僅假轉接** |
+| `approvalGrantId` | 必須與 AI3 `Grant.id` 相同，為一次批准永續身份。新 HTTP `requestId` **不能**鑄造新 grant | **僅假轉接**；真 signer/批准權威尚無 |
+| `requestId/nonce` | 綁當次請求；`requestId` 可以改但只會讀**原 grant/run 一張票**。`nonce` 目前只檢字元合法，尚無真簽發/一次性登記 | **真 nonce 防重未定／BLOCKED** |
+| `resourceId/sourceRevision` | `Grant.track/Grant.source`（此 Fake 為 64-hex），付費前重新讀當前音檔來源 | **真 R2 ETag 格式待對齊**；#469 `sourceRevision` 的 `safeId` 不接受部分原始 ETag 字元，不能強制轉換 |
+| `membershipRevision/permissionRevision/correctionRevision` | 來自假會員/資源目前版本，與批准快照做**精確字串比較**，不等同 `securitySeq` | **假符合；真 Starry ID revision adapter 未建立** |
+| `securitySeq/restoreEpoch` | #469 為**canonical uint64 十進位字串**，#474 Fake Witness `seq/epoch` 是 Python 整數，必須 `0..2^64-1` 範圍內無浮點轉換；`9007199254740993` 等大於 JS 安全整數也必須精確 | **只在 Fake 驗證**；#469 需和 AI7 `headSeq` 證明是否同一語義，不是直接轉成 Number |
+| `revocationWatermark/deletionWatermark` | 正規化字串並與假獨立見證當前水位精確比對；新墓碑／見證不可用→deny | **Fake；真非回捲見證未建立** |
+| `issuedAtMs/expiresAtMs` | 期效最多 30 秒；超時／未來、失去校驗的 proof 立即 deny | **Fake；真時鐘/簽章待核** |
+| `fakeAttestation` | 僅本機測試註冊表中的假憑證能過；`verified:true`、瀏覽器傳值不可當權威 | **沒有真簽章，productionAuthorized 必定 false** |
+| 真 Provider 所需 `modelId/taskId/segmentPlan/priceProof/budget` | #469 proof **沒有**完整模型/價格/額度欄位：B07 必須另外由伺服器可信資料核對，否則無法授權花費 | **BLOCKED** |
+
+**驗證分成兩個階段：** `precheck`（費用預留前）與 `before_commit`（嘗試核票前），每次都重新讀假會員、假見證與假來源，避免預先通過後撤權仍重送。這是**契約模擬**；在真正分開的 Starry ID/Echo/中央 D1/R2 執行時，二次讀取與 D1 commit 中間仍有撤權競態，**本批沒有解決，也不許解除 #461 Whisper 阻擋**。
+
+**額外安全測試：** 原本 20 項保留不動；第二輪新增 20 項，包含同 grant 新 requestId/runId/跨日不能重新預留/出第二票、`securitySeq` 與 `restoreEpoch` 超過 JavaScript 安全整數但在 uint64 內可精準比對、非法前導零/負數/浮點/超出 uint64 即拒發，審查後改權限/版本/音檔來源/撤權/見證失聯/證明逾時拒 claim，多段部分成功而另一段帳單 unknown 時不能因換 requestId 再發票或釋放預留額。測試是否 PASS 以 GitHub CI **最新 HEAD** 實際 log 為準。
+
+**S1 第二輪不得越界：** 只有 AI3 假 Python 測試和本文件、分支專用 GitHub CI；沒有變更 #469、#461、#464 的真 Worker/SQL/會員／Cloudflare。原先 #474 仍以 #467（依賴 #464）為 base，**不得獨立 merge**、不得啟動真 Provider 或付費。
