@@ -266,3 +266,37 @@ test('N1A6-32 new adapter contains no real network, paid service or database cal
  const adapter=readFileSync(new URL('../ops-s1/n1aS1ReadOnly.ts',import.meta.url),'utf8');
  for(const text of [model,adapter])assert.doesNotMatch(text,/\bfetch\s*\(|\bAI\.run\s*\(|\.terminate\s*\(|\.retry\s*\(|\.createBatch\s*\(|\bsetInterval\s*\(|\bR2_BUCKET\.|\bD1\.prepare\s*\(/);
 });
+
+test('N1A6-R3-03 untrusted stale positive fixtures may NEVER turn an admin GET App/AI/backup green',async()=>{
+ let positiveReads=0;
+ const handler=createN1aOfflineReadOnlyHandler({
+  now:()=>NOW,checkFakeAdmin:async()=>identity(),
+  readFakeCloud:async()=>allPlatforms(),
+  readFakeEvents:async()=>[],
+  readFakePositiveChecks:async()=>{positiveReads++;return positives();},
+  mayRead:()=>true,
+ });
+ const first=await(await handler(req())).json();
+ assert.equal(first.mode,'offline_mock_only');
+ assert.ok(Object.values(first.domains).every((x:any)=>x.status==='unknown'));
+ assert.equal(positiveReads,0,'untrusted positive source should not even be queried');
+ assert.equal(first.cloud.overall,'normal','separate platform fake fixture unchanged');
+});
+test('N1A6-R3-04 revocation after green cached fake cloud must deny even with shared snapshot',async()=>{
+ let enabled=true,cloudReads=0,eventReads=0;
+ const handler=createN1aOfflineReadOnlyHandler({
+  now:()=>NOW,
+  checkFakeAdmin:async()=>enabled?identity():{...identity(),centralSuperAdmin:false},
+  readFakeCloud:async()=>{cloudReads++;return allPlatforms();},
+  readFakeEvents:async()=>{eventReads++;return[];},
+  readFakePositiveChecks:async()=>{throw Error('PRIVATE-OLD-PROOF');},
+  mayRead:()=>true,
+ });
+ const first=await handler(req());assert.equal(first.status,200);
+ assert.equal((await first.json()).cloud.overall,'normal');
+ enabled=false;
+ const rejected=await handler(req());assert.equal(rejected.status,403);
+ assert.deepEqual(await rejected.json(),{error:'access_denied'});
+ assert.deepEqual([cloudReads,eventReads],[1,1]);
+ assert.equal(rejected.headers.get('Cache-Control'),'no-store');
+});
