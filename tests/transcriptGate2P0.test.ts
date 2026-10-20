@@ -153,7 +153,9 @@ test('SAFE-04/05 new first-run only publishes once and stale callbacks cannot re
     assert.equal(result.published,true);
     const active=await db.prepare("SELECT * FROM transcript_index WHERE trackId='synthetic-a'").first();
     assert.equal(active.status,'ready');
-    assert.equal(active.activeVersionId,run.runId);
+    const candidate=await db.prepare("SELECT candidateVersionId FROM transcript_runs WHERE runId=?").bind(run.runId).first();
+    assert.equal(active.activeVersionId,candidate.candidateVersionId);
+    assert.notEqual(active.activeVersionId,run.runId);
     assert.ok(active.r2Key.includes('/versions/'));
     await assert.rejects(()=>claimSafeRun(db,run.runId,'synthetic-a'),/not queued/);
     await failSafeRun(db,claimed,Error('stale failure'));
