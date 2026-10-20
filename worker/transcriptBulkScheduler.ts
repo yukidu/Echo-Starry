@@ -1,4 +1,5 @@
 import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
+import { gate2Enabled } from './transcriptP0Safety';
 const TRANSCRIPT_MODEL = '@cf/openai/whisper-large-v3-turbo';
 const BATCH_LIMIT = 100;
 
@@ -37,11 +38,23 @@ export async function transcriptBulkStatus(env: SchedulerEnv) {
     LEFT JOIN transcript_index i ON i.trackId=t.id
     WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>''
     ORDER BY COALESCE(t.uploadDate,'') DESC,t.id`).all();
+  const candidateRows:any = gate2Enabled(env)
+    ? await env.DB.prepare("SELECT trackId,runId,state FROM transcript_runs WHERE intent='relisten' "+
+      "AND state IN ('pending','queued','processing','awaiting_review','failed') "+
+      "ORDER BY createdAt DESC LIMIT 200").all()
+    : {results:[]};
+  const candidateByTrack=new Map<string,{runId:string;state:string}>();
+  for(const row of candidateRows?.results||[]){
+    const id=text(row.trackId);
+    if(!candidateByTrack.has(id))candidateByTrack.set(id,{runId:text(row.runId),state:text(row.state)});
+  }
   const items = (itemRows?.results || []).map((item: any) => ({
     trackId: text(item.trackId),
     status: text(item.status) || 'pending',
     error: text(item.error) || null,
-    updatedAt: Number(item.updatedAt || 0)
+    updatedAt: Number(item.updatedAt || 0),
+    candidateState:candidateByTrack.get(text(item.trackId))?.state||null,
+    candidateRunId:candidateByTrack.get(text(item.trackId))?.runId||null
   }));
   return {
     audioTracks: Number(allTracks?.n || 0),
@@ -64,8 +77,11 @@ export async function queueAllPendingTranscripts(env: SchedulerEnv) {
       (trackId,status,r2Key,model,chunkCount,segmentCount,wordCount,durationSeconds,error,createdAt,updatedAt)
       SELECT t.id,'pending',NULL,?,0,0,0,COALESCE(t.durationSeconds,0),NULL,?,?
       FROM tracks t WHERE t.audioUrl IS NOT NULL AND TRIM(t.audioUrl)<>''`).bind(TRANSCRIPT_MODEL,now,now).run();
-  await env.DB.prepare("UPDATE transcript_index SET status='pending',error=NULL,updatedAt=? WHERE status='failed'")
-    .bind(now).run();
+  // Gate2 must never revive a failed/previously paid transcription in a bulk retry.
+  if(!gate2Enabled(env)){
+    await env.DB.prepare("UPDATE transcript_index SET status='pending',error=NULL,updatedAt=? WHERE status='failed'")
+      .bind(now).run();
+  }
   const scheduled=await queueNextTranscriptV293(env,{includeFailed:false});
   return {
     queued:scheduled.queued,errors:scheduled.failures,
