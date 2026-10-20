@@ -34,3 +34,29 @@ node --import tsx --test tests/opsS1.test.ts tests/opsI1.test.ts tests/n1aS1Ops6
 ## PR / CI 注意
 
 本批為 AI6 Draft #472，開發仍保持關閉。因既有 GitHub CI 僅對目標 main 的 PR 觸發，驗收時先在 PR 指向 main 的情況提交此文件修訂以啟動測試，**完成後應將 PR base 恢復至 AI6 #462 安全分支**，免得重複顯示前置 PR 原型變更。CI/Preview 綠燈不能替代 N1A 真安全權威核准。
+
+## 第二輪：AI2 SecurityProof 假交接（2026-10-20）
+
+依 [總指揮第2輪 #6289517050](https://github.com/yukidu/Echo-Starry/issues/455#issuecomment-6289517050) 的 AI6 限定任務，**僅新增自有檔案**：
+- `n1aS1ProofHandoff.ts`：只讀 AI2 [Draft #469](https://github.com/yukidu/Echo-Starry/pull/469) 的 `FakeSecurityDecision` 契約 **形狀**，從外部注入假判讀結果，不直接 import 另一分支的檔、也不接真 `SecurityProof` verifier；總表保持四域獨立。只能接受 `stage=precheck|before_commit`、`productionAuthorized=false`、`sideEffects=0`、`simulatedAllowed` 與 AI2 `reason` 相符的固定欄位；未知型別/碼或旗標矛盾一律 unknown + locked。
+- `n1aS1OfflinePreview.html`：增加安全證明未知、假撤權/刪除記錄命中、外部見證版本不符三組匿名情境，與四域既有卡片並列，無需刷新/網路。
+- `../tests/n1aS1ProofHandoff6.test.ts`：新增23個離線 Fake 情境，證據未知不會亮綠、已證故障仍紅、跨域 Cloudflare 不受污染、2,000 假交接操作全部鎖住、任意多餘個資/音檔/原文不進輸出。
+
+### AI2 #469 契約欄位對照（**非真權威**）
+
+| AI2 假資料契約 | AI6 顯示解讀 | 無法據此聲稱 |
+|---|---|---|
+| `FakeSecurityDecision.stage: precheck/before_commit`、`reason`、`simulatedAllowed`、`productionAuthorized:false`、`sideEffects:0` | 僅匿名原因碼、觀測狀態；所有高風險操作永久鎖定 | 真 Starry ID 身分或即時授權 |
+| `membership_revoked_or_unavailable` / `membership_revision_changed` | App 權限**未知／失效待查**，拒敏感操作 | **不可直接斷言已撤權**（也可能是假來源失聯） |
+| `witness_records_revocation_or_deletion` | **假見證**已記錄撤權/刪除拒絕 → App 黃色保護中 | 真實會員被撤權、真實刪除 |
+| `external_witness_changed_or_rolled_back` / `external_witness_invalid_version` | App 與備份版本**未知/鎖定**，注明「版本不一致，可能回捲」 | **不可斷言已經證實回捲** |
+| `external_witness_missing` / `trusted_source_unavailable` | App、備份灰色未知並鎖定 | 真錨點現況或雲端供應商故障 |
+| `fake_evidence_consistent`，`simulatedAllowed:true` | 只表示 AI2 的**模擬**一致；仍 `productionAuthorized=false` | 可發布、開付費 AI、備份還原 |
+| `sourceRevision:string`、`membershipRevision/securitySeq/restoreEpoch` canonical uint64 字串 | **不由 AI6 UI 轉數字/比較／存取原本值**；只吃 AI2 假判斷理由 | 與 AI5 統計 `sourceRevision:number` 同義、或 AI7 `headSeq` 等價 |
+
+```sh
+node --import tsx --test tests/n1aS1ProofHandoff6.test.ts
+node --import tsx --test tests/n1aS1Ops6.test.ts tests/n1aS1ProofHandoff6.test.ts
+```
+
+限制：此處的「撤權」、「回捲」僅**固定合成顯示狀態**，並未核對真會員/憑證或獨立防回捲高水位。絕對不可將 UI 可見字串、前端宣稱的 `simulatedAllowed:true` 接進真放行 API。AI2 的 `SecurityProofV1` 及其假 verifier 位於另個 Draft #469，未成為本 PR 的真程式相依，正式跨組共享**仍 BLOCKED**；這批新增測試僅檢查 AI6 的匿名 Fake 決策交接形狀，不是六組的跨分支整合執行。
