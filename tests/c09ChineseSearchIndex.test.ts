@@ -15,6 +15,8 @@ function store(){
   db.exec('CREATE TABLE transcript_index(trackId TEXT PRIMARY KEY,r2Key TEXT,status TEXT,updatedAt INTEGER)');
   db.exec('CREATE TABLE tracks(id TEXT PRIMARY KEY,title TEXT,speaker TEXT,audioUrl TEXT,uploadDate INTEGER,requiredRank TEXT,authorizedOnlyVisible INTEGER DEFAULT 0,isPrivateVip INTEGER DEFAULT 0,stickerUnlockCost INTEGER DEFAULT 0)');
   db.exec('CREATE TABLE ai_story_pilots(trackId TEXT PRIMARY KEY,status TEXT,revision INTEGER)');
+  db.exec('CREATE TABLE transcript_correction_events(id TEXT PRIMARY KEY,trackId TEXT,segmentId TEXT,createdAt INTEGER,updatedAt INTEGER,status TEXT,newText TEXT,adminText TEXT)');
+  db.exec('CREATE TABLE transcript_corrections(id TEXT PRIMARY KEY,trackId TEXT,segmentId TEXT,newText TEXT,createdAt INTEGER)');
   db.exec(migration);
   const prepare=(sql:string)=>{
     let bound:any[]=[];
@@ -87,18 +89,23 @@ test('30 representative Chinese questions (6 categories × 5) can retrieve the c
   const s=store();
   try{
     let n=0;
+    const questions:{kind:string;id:string;question:string}[]=[];
     for(const group of groups){
       for(const [question,body] of group.items){
         n++;const id='q'+n;
         await seed(s,id,group.kind,'講者A',body);
-        const out=await findQaIndexedPassages(s.d1,question,[id]);
-        await t.test(group.kind+' '+String(n).padStart(2,'0')+' '+question,()=>{
-          assert.equal(out.covered.has(id),true);
-          assert.ok(out.hits.some(h=>h.trackId===id && h.score>0),'should find relevant text');
-        });
+        questions.push({kind:group.kind,id,question});
       }
     }
     assert.equal(n,30);
+    const corpus=questions.map(q=>q.id);
+    for(const q of questions){
+      const out=await findQaIndexedPassages(s.d1,q.question,corpus);
+      await t.test(q.kind+' '+q.id+' '+q.question,()=>{
+        assert.equal(out.covered.size,30);
+        assert.ok(out.hits.slice(0,5).some(h=>h.trackId===q.id),'target should rank in top 5 among 30 competing recordings');
+      });
+    }
   }finally{s.close();}
 });
 test('two-character Chinese and full-width Latin words tokenize without AI calls',()=>{
