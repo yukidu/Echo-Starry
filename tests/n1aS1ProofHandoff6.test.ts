@@ -55,7 +55,7 @@ test('N1A6-P2-04 verified fake witness revocation OR deletion record gives local
  assert.equal(result.domains.app_security.status,'unknown');
  assert.equal(result.proofHandoff.proofState,'revocation_or_deletion_record');
  assert.equal(result.domains.ai_billing.status,'normal');
- assert.equal(result.domains.backup_restore.status,'normal');
+ assert.equal(result.domains.backup_restore.status,'unknown');
 });
 test('N1A6-P2-05 external witness changed OR rolled back must not be labelled certain rollback',()=>{
  const result=showFakeProofHandoff(base(),decision('external_witness_changed_or_rolled_back'));
