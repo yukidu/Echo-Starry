@@ -4,7 +4,7 @@
 export type SafeIntent = 'first'|'relisten';
 export type SafeRun = {
   runId:string;trackId:string;intent:SafeIntent;requestKey:string;state:string;
-  generation:number;sourceAudioKey:string;expectedActiveR2Key:string|null;
+  generation:number;sourceAudioKey:string;sourceAudioUrl:string;expectedActiveR2Key:string|null;
   approvedBy:string|null;approvedAt:number|null;approvedMaxSeconds:number;
   candidateVersionId:string|null;
 };
@@ -15,20 +15,20 @@ export const gate2Enabled=(env:any)=>String(env?.TRANSCRIPT_P0_ENABLED||'')==='1
 
 function fail(message:string):never {throw new Error('Gate2 safe transcript: '+message);}
 export async function requestSafeRun(db:Db,input:{
-  trackId:string;intent:SafeIntent;requestKey:string;sourceAudioKey:string;
+  trackId:string;intent:SafeIntent;requestKey:string;sourceAudioKey:string;sourceAudioUrl:string;
   approvedBy?:string;approvedMaxSeconds?:number
 }):Promise<SafeRun|null>{
   const now=Date.now(),id=crypto.randomUUID();
   const row=await db.prepare(
     "INSERT INTO transcript_runs(runId,trackId,intent,requestKey,state,generation,leaseUntil,"+
-    "sourceAudioKey,expectedActiveR2Key,approvedBy,approvedAt,approvedMaxSeconds,createdAt,updatedAt) "+
-    "SELECT ?,i.trackId,?,?,'pending',0,0,?,i.r2Key,?,?,?, ?,? "+
+    "sourceAudioKey,sourceAudioUrl,expectedActiveR2Key,approvedBy,approvedAt,approvedMaxSeconds,createdAt,updatedAt) "+
+    "SELECT ?,i.trackId,?,?,'pending',0,0,?,?,i.r2Key,?,?,?, ?,? "+
     "FROM transcript_index i WHERE i.trackId=? "+
     "AND ((?='first' AND i.status='pending' AND i.r2Key IS NULL) "+
     "OR (?='relisten' AND i.status='ready' AND i.r2Key IS NOT NULL AND ? IS NOT NULL)) "+
     "AND NOT EXISTS(SELECT 1 FROM transcript_runs r WHERE r.trackId=i.trackId AND r.state IN "+OPEN_STATES+") "+
     "ON CONFLICT DO NOTHING RETURNING *")
-    .bind(id,input.intent,input.requestKey,input.sourceAudioKey,
+    .bind(id,input.intent,input.requestKey,input.sourceAudioKey,input.sourceAudioUrl,
       input.approvedBy||null,input.approvedBy?now:null,
       Number(input.approvedMaxSeconds||0),now,now,
       input.trackId,input.intent,input.intent,input.approvedBy||null).first();
@@ -45,7 +45,7 @@ export async function claimSafeRun(db:Db,runId:string,trackId:string):Promise<Sa
     "WHERE runId=? AND trackId=? AND state='queued' AND EXISTS("+
     "SELECT 1 FROM transcript_index i JOIN tracks t ON t.id=i.trackId "+
     "WHERE i.trackId=transcript_runs.trackId "+
-    "AND t.audioUrl LIKE '%/api/r2/file/%' "+
+    "AND t.audioUrl=transcript_runs.sourceAudioUrl "+
     "AND ((transcript_runs.intent='first' AND i.status='queued' AND i.r2Key IS NULL) "+
     "OR (transcript_runs.intent='relisten' AND i.status='ready' "+
     "AND i.r2Key=transcript_runs.expectedActiveR2Key))) RETURNING *")
@@ -72,7 +72,7 @@ export async function assertLiveRun(db:Db,run:SafeRun):Promise<void>{
     "SELECT r.runId FROM transcript_runs r JOIN transcript_index i ON i.trackId=r.trackId "+
     "JOIN tracks t ON t.id=r.trackId "+
     "WHERE r.runId=? AND r.generation=? AND r.state='processing' AND r.leaseUntil>? "+
-    "AND t.audioUrl LIKE '%/api/r2/file/%' "+
+    "AND t.audioUrl=r.sourceAudioUrl "+
     "AND ((r.intent='first' AND i.workingRunId=r.runId AND i.r2Key IS NULL) "+
     "OR (r.intent='relisten' AND i.status='ready' "+
     "AND i.r2Key=r.expectedActiveR2Key)) LIMIT 1")
@@ -160,10 +160,10 @@ export async function publishSafeVersion(db:Db,runId:string,approvedBy:string|nu
   const query=run.intent==='first'
     ? "UPDATE transcript_index SET status='ready',r2Key=?,activeVersionId=?,workingRunId=NULL,error=NULL,updatedAt=? "+
       "WHERE trackId=? AND status='processing' AND workingRunId=? AND r2Key IS NULL "+
-      "AND EXISTS(SELECT 1 FROM transcript_runs r WHERE r.runId=? AND r.state='awaiting_review') RETURNING trackId"
+      "AND EXISTS(SELECT 1 FROM transcript_runs r JOIN tracks t ON t.id=r.trackId WHERE r.runId=? AND r.state='awaiting_review' AND t.audioUrl=r.sourceAudioUrl) RETURNING trackId"
     : "UPDATE transcript_index SET status='ready',r2Key=?,activeVersionId=?,error=NULL,updatedAt=? "+
       "WHERE trackId=? AND status='ready' AND r2Key=? "+
-      "AND EXISTS(SELECT 1 FROM transcript_runs r WHERE r.runId=? AND r.state='awaiting_review') RETURNING trackId";
+      "AND EXISTS(SELECT 1 FROM transcript_runs r JOIN tracks t ON t.id=r.trackId WHERE r.runId=? AND r.state='awaiting_review' AND t.audioUrl=r.sourceAudioUrl) RETURNING trackId";
   const swapped=await db.prepare(query)
     .bind(version.jsonKey,run.runId,now,run.trackId,
       run.intent==='first'?runId:run.expectedActiveR2Key,runId).first();
