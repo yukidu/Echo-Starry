@@ -134,24 +134,36 @@ export async function claimSafeRun(db:Db,runId:string,trackId:string):Promise<Sa
     .bind(runId).first() as SafeRun;
 }
 export async function quarantineExpiredRuns(db:Db):Promise<number>{
-  // Expired work is NEVER automatically resumed: a lost Whisper completion
-  // may still incur a bill, so the operator must authorize any new attempt.
+  // A queued Workflow can be dispatched just before a Worker crash. Never
+  // send a second instance when its outcome is unknown: quarantine for review.
+  // A processing Workflow may have finished a billable request after a timeout.
   const now=Date.now();
-  const expired=await db.prepare("SELECT runId,trackId,intent FROM transcript_runs "+
-    "WHERE state='processing' AND leaseUntil>0 AND leaseUntil<? LIMIT 10")
-    .bind(now).all();
+  const expired=await db.prepare(
+    "SELECT runId,trackId,intent,state,generation FROM transcript_runs "+
+    "WHERE state IN ('queued','processing') AND leaseUntil>0 AND leaseUntil<? "+
+    "ORDER BY leaseUntil LIMIT 10").bind(now).all();
   let total=0;
   for(const row of expired?.results||[]){
-    const mark=await db.prepare(
-      "UPDATE transcript_runs SET state='failed',error='lease_expired_manual_review',updatedAt=? "+
-      "WHERE runId=? AND state='processing' AND leaseUntil>0 AND leaseUntil<? RETURNING runId")
-      .bind(now,row.runId,now).first();
-    if(!mark)continue;
-    total++;
-    if(row.intent==='first')await db.prepare("UPDATE transcript_index SET status='failed',workingRunId=NULL,"+
-      "error='lease_expired_manual_review',updatedAt=? "+
-      "WHERE trackId=? AND workingRunId=? AND status='processing' AND r2Key IS NULL")
-      .bind(now,row.trackId,row.runId).run();
+    const queued=row.state==='queued';
+    const reason=queued?'dispatch_uncertain_manual_review':'lease_expired_manual_review';
+    const runStmt=db.prepare(
+      "UPDATE transcript_runs SET state='failed',error=?,updatedAt=? "+
+      "WHERE runId=? AND generation=? AND state=? AND leaseUntil>0 AND leaseUntil<?")
+      .bind(reason,now,row.runId,row.generation,row.state,now);
+    if(row.intent==='first'){
+      const indexStmt=queued
+        ? db.prepare("UPDATE transcript_index SET status='failed',error=?,updatedAt=? "+
+          "WHERE trackId=? AND status='queued' AND workingRunId IS NULL AND r2Key IS NULL")
+          .bind(reason,now,row.trackId)
+        : db.prepare("UPDATE transcript_index SET status='failed',workingRunId=NULL,error=?,updatedAt=? "+
+          "WHERE trackId=? AND status='processing' AND workingRunId=? AND r2Key IS NULL")
+          .bind(reason,now,row.trackId,row.runId);
+      await pairedTransition(db,runStmt,indexStmt);
+      total++;
+    }else{
+      const marked=await runStmt.run();
+      if(Number(marked?.meta?.changes)===1)total++;
+    }
   }
   return total;
 }
@@ -174,30 +186,46 @@ export async function assertLiveRun(db:Db,run:SafeRun):Promise<void>{
   }
 }
 export async function failSafeRun(db:Db,run:SafeRun|null,error:unknown){
-  if(!run)return;
+  if(!run || !['queued','processing'].includes(run.state))return;
   const message=error instanceof Error?error.message:String(error);
-  const now=Date.now();
-  const updated=await db.prepare(
+  const now=Date.now(),safeMessage=message.slice(0,300);
+  const runStmt=db.prepare(
     "UPDATE transcript_runs SET state='failed',error=?,updatedAt=? "+
-    "WHERE runId=? AND generation=? AND state IN ('queued','processing') RETURNING runId")
-    .bind(message.slice(0,300),now,run.runId,run.generation).first();
-  if(updated&&run.intent==='first'){
-    await db.prepare("UPDATE transcript_index SET status='failed',workingRunId=NULL,error=?,updatedAt=? "+
-      "WHERE trackId=? AND workingRunId=? AND r2Key IS NULL AND status='processing'")
-      .bind(message.slice(0,300),now,run.trackId,run.runId).run();
+    "WHERE runId=? AND generation=? AND state=?")
+    .bind(safeMessage,now,run.runId,run.generation,run.state);
+  if(run.intent==='first'){
+    const indexStmt=run.state==='queued'
+      ? db.prepare("UPDATE transcript_index SET status='failed',error=?,updatedAt=? "+
+        "WHERE trackId=? AND status='queued' AND workingRunId IS NULL AND r2Key IS NULL")
+        .bind(safeMessage,now,run.trackId)
+      : db.prepare("UPDATE transcript_index SET status='failed',workingRunId=NULL,error=?,updatedAt=? "+
+        "WHERE trackId=? AND workingRunId=? AND r2Key IS NULL AND status='processing'")
+        .bind(safeMessage,now,run.trackId,run.runId);
+    await pairedTransition(db,runStmt,indexStmt);
+  }else{
+    await runStmt.run();
   }
 }
 export async function failUnclaimedRun(db:Db,runId:string,trackId:string,error:unknown){
-  // A Workflow may fail before its run can be claimed. Quarantine that queued
-  // reservation without creating a new paid job or mutating existing ready.
+  // A Workflow can fail before claiming. The original ready pointer stays
+  // untouched; for new audio the index+run must fail in one D1 transaction.
+  const row=await db.prepare("SELECT intent FROM transcript_runs "+
+    "WHERE runId=? AND trackId=? AND state='queued' AND generation=0 LIMIT 1")
+    .bind(runId,trackId).first();
+  if(!row)return;
   const now=Date.now(),message=error instanceof Error?error.message:String(error);
-  const result=await db.prepare("UPDATE transcript_runs SET state='failed',error=?,updatedAt=? "+
-    "WHERE runId=? AND trackId=? AND state='queued' AND generation=0 RETURNING intent")
-    .bind(message.slice(0,300),now,runId,trackId).first();
-  if(result?.intent==='first')await db.prepare(
-    "UPDATE transcript_index SET status='failed',error=?,updatedAt=? "+
-    "WHERE trackId=? AND status='queued' AND r2Key IS NULL AND workingRunId IS NULL")
-    .bind('transcript task failed before starting',now,trackId).run();
+  const runStmt=db.prepare("UPDATE transcript_runs SET state='failed',error=?,updatedAt=? "+
+    "WHERE runId=? AND trackId=? AND state='queued' AND generation=0")
+    .bind(message.slice(0,300),now,runId,trackId);
+  if(row.intent==='first'){
+    const indexStmt=db.prepare(
+      "UPDATE transcript_index SET status='failed',error=?,updatedAt=? "+
+      "WHERE trackId=? AND status='queued' AND r2Key IS NULL AND workingRunId IS NULL")
+      .bind('transcript task failed before starting',now,trackId);
+    await pairedTransition(db,runStmt,indexStmt);
+  }else{
+    await runStmt.run();
+  }
 }
 export async function assertUnfundedWhisperBlocked(env:any,run:SafeRun){
   // Until B07 is integrated with a per-segment atomic provider-attempt
