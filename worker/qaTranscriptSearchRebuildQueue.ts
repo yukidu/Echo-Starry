@@ -9,7 +9,7 @@
  */
 import { rebuildQaSearchAfterMutation } from './qaTranscriptSearchIndex';
 
-type Env={DB:any;R2_BUCKET?:any;QA_CHINESE_SEARCH_WRITE_ENABLED?:string};
+type Env={DB:any;R2_BUCKET:any;QA_CHINESE_SEARCH_WRITE_ENABLED?:string};
 type Job={trackId:string;requestedRevision:number;attempts:number};
 const MAX_PER_TICK=2;
 const MAX_ATTEMPTS=5;
