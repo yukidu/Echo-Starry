@@ -79,7 +79,7 @@ with tempfile.TemporaryDirectory() as d:
     assert attempt(path,0,MODEL_FREE)==1, "confirmed free should work when money cap is zero"
     assert attempt(path,1,MODEL_PAID)==0, "paid request must fail at zero money budget"
     assert attempt(path,2,"unverified")==0, "unknown tariff must fail closed"
-    # 2,000 simultaneous unique requests; only 150 free allocations of 2 units each.
+    # 2,000 DISTINCT SUBMISSIONS through at most 12 concurrent worker threads.\n    # This is NOT a test of 2,000 simultaneously connected users or Cloudflare capacity.
     with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
       responses=list(pool.map(lambda i:attempt(path,i+1000),range(2000)))
     count,scope,events=counts(path)
@@ -89,7 +89,7 @@ with tempfile.TemporaryDirectory() as d:
     assert scope["free:"+MODEL_FREE][3]==300,scope
     assert scope["global"][1]==0,"zero paid costs may remain zero"
     assert events==150,"one reservation event per unique accepted request"
-    print("free_capacity: 2000 concurrent attempts, exactly 150 accepted, paid cap 0, no oversubscription")
+    print("free_capacity: 2000 submissions / <=12 threads; exactly 150 accepted, no oversubscription")
 
     # Duplicate requests should not create extra charges, even during concurrent calls.
     repeated="same-request-0001"
@@ -105,7 +105,7 @@ with tempfile.TemporaryDirectory() as d:
     assert events==151
     print("idempotency: 80 duplicate parallel calls create only 1 reservation")
 
-    # Paid request cap is hard even when more than 2000 clients try simultaneously.
+    # Paid cap stays safe for 2,000 submissions dispatched by up to 12 worker threads.
     paid=str(pathlib.Path(d)/"paid.sqlite")
     initialise(paid,free_units=300,global_calls=500,cap=5000)
     with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
@@ -114,7 +114,7 @@ with tempfile.TemporaryDirectory() as d:
     assert sum(accepted)==5 and n==5,(sum(accepted),n,scope)
     assert scope["global"][1]==5000
     assert scope["global"][2]==0
-    print("paid_cap: 2000 parallel attempts, only 5 accepted against 5000 micro-TWD")
+    print("paid_cap: 2000 submissions / <=12 threads; 5 accepted against 5000 micro-TWD")
 
     c=conn(paid)
     first=c.execute("SELECT id FROM starry_ai_b07_calls ORDER BY request_key LIMIT 1").fetchone()[0]
@@ -133,5 +133,54 @@ with tempfile.TemporaryDirectory() as d:
     assert c.execute("SELECT COUNT(*) FROM starry_ai_b07_events WHERE action='uncertain'").fetchone()[0]==1
     c.close()
     print("settlement: hold release, immutable settled state, uncertain hold preserved after policy tightening")
+
+
+    # A stricter 20-call MEMBER budget overrides a permissive 2,000-call app/global budget.
+    member_db=str(pathlib.Path(d)/"members.sqlite")
+    initialise(member_db,free_units=1000,global_calls=2000,cap=0)
+    same_person=hashlib.sha256(b"example-member").hexdigest()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
+      tries=list(pool.map(lambda i:attempt(member_db,i+30000,MODEL_FREE,1,member=same_person),range(200)))
+    n,scope,e=counts(member_db)
+    assert sum(tries)==20 and n==20,(sum(tries),n)
+    assert scope["member:"+same_person][0]==20
+    assert scope["task:echostars:echo.qa"][0]==20
+    assert scope["app:echostars"][0]==20
+    assert scope["global"][0]==20
+    assert e==20
+    print("four_scopes: 200 requests / <=12 threads, default member cap enforces 20")
+
+    # Model circuit-breaker must stop new reservations even with free units available.
+    circuit_db=str(pathlib.Path(d)/"circuit.sqlite")
+    initialise(circuit_db,free_units=1000,global_calls=2000,cap=0)
+    c=conn(circuit_db)
+    c.execute("INSERT INTO starry_ai_b07_circuits VALUES (?,?,?,?,?)",
+        (MODEL_FREE,3,NOW+3_600_000,"provider_error",NOW))
+    c.close()
+    assert attempt(circuit_db,80000,MODEL_FREE,1)==0
+    assert counts(circuit_db)[0]==0
+    print("circuit_breaker: blocked model cannot reserve even verified free units")
+
+    # Tampering may not alter price, request identity or history after a hold.
+    tamper_db=str(pathlib.Path(d)/"tamper.sqlite")
+    initialise(tamper_db,free_units=1000,global_calls=2000,cap=5000)
+    assert attempt(tamper_db,99000,MODEL_PAID,1)==1
+    c=conn(tamper_db)
+    rid=c.execute("SELECT id FROM starry_ai_b07_calls").fetchone()[0]
+    for sql in [
+      "UPDATE starry_ai_b07_calls SET held_micro_twd=0 WHERE id=?",
+      "UPDATE starry_ai_b07_calls SET request_key='replayed-id' WHERE id=?",
+      "DELETE FROM starry_ai_b07_calls WHERE id=?",
+      "UPDATE starry_ai_b07_calls SET status='settled',actual_units=1,actual_micro_twd=0 WHERE id=?"
+    ]:
+      try:
+        c.execute(sql,(rid,))
+        raise AssertionError("must reject tampering: "+sql)
+      except sqlite3.IntegrityError:
+        pass
+    assert c.execute("SELECT COUNT(*) FROM starry_ai_b07_calls").fetchone()[0]==1
+    assert c.execute("SELECT held_micro_twd FROM starry_ai_b07_usage WHERE scope_key='global'").fetchone()[0]==1000
+    c.close()
+    print("immutable_transactions: identity, reserved amounts and history cannot be rewritten/deleted")
 
 print("B07_SQLITE_SAFETY_OK")
