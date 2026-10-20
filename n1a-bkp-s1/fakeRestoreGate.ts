@@ -92,7 +92,8 @@ export async function fakeEventHash(e: Omit<MockEvent, 'hash'>): Promise<string>
 function validateRetentionTopology(backups: readonly MockBackup[]): boolean {
   const map = new Map<string,MockBackup>();
   for(const b of backups) {
-    if(!b.id || map.has(b.id) || !numeric(b.createdAtMs)) return false;
+    if(!b.id || map.has(b.id) || !numeric(b.createdAtMs) ||
+       b.state!=='verified-success'||!isCanonicalBkpVersion(b.securitySeq)) return false;
     map.set(b.id,b);
   }
   for(const b of backups) {
@@ -132,8 +133,9 @@ function safeRetention(backups:readonly MockBackup[],selectedId:string,now:numbe
   keep.add(selectedId);
   for(const id of [...keep]) {
     let cur:string|null=id;
-    while(cur!==null&&!keep.has(cur+'#walk')) {
-      keep.add(cur+'#walk');
+    const seen=new Set<string>();
+    while(cur!==null && !seen.has(cur)) {
+      seen.add(cur);
       keep.add(cur);
       cur=byId.get(cur)?.parentId??null;
     }
@@ -204,7 +206,9 @@ export async function simulateN1aBackupGate(x:SimulatedRestoreInput):Promise<Sim
     fail('STARRY_ID_ROLLBACK');
   if(beforeW&&x.lock.restoreEpoch!==beforeW.restoreEpoch)fail('LOCK_EPOCH_MISMATCH');
   if(beforeW){
-    if(!isCanonicalBkpVersion(beforeW.restoreEpoch)||!isCanonicalBkpVersion(chain.at(-1)?.securitySeq))
+    if(!isCanonicalBkpVersion(beforeW.restoreEpoch)||
+       !isCanonicalBkpVersion(beforeW.headSeq)||
+       !isCanonicalBkpVersion(chain.at(-1)?.securitySeq))
       fail('BACKUP_SECURITY_VERSION_INVALID');
     else if(BigInt(beforeW.headSeq)<BigInt(chain.at(-1)!.securitySeq))
       fail('WITNESS_BEHIND_BACKUP');
