@@ -31,15 +31,17 @@ const deny=(r:Awaited<ReturnType<typeof simulateProtectedQA>>)=>{
 };
 test('R3-P0-01 active ordinary member cannot cite a higher entitlement resource',async()=>{
  const a=new MutableFakeAuthority([ordinary,elite],[ordinary.trackId]);
- (a as unknown as {setEntitlement(trackId:string,allowed:boolean):void})
- .setEntitlement(elite.trackId,false);
+ // Active membership does not imply an entitled high-tier source.
+ assert.equal(a.entitlements.get(ordinary.trackId),true);
+ assert.equal(a.entitlements.get(elite.trackId),false);
  const r=await call(a,[metadata(a.resources.get(elite.trackId)!)]);
  deny(r);assert.equal(r.stage,'T0');assert.equal(a.bodyReadCount,0);
 });
 test('R3-P0-02 one forbidden resource blocks whole two-source result',async()=>{
  const a=new MutableFakeAuthority([ordinary,elite],[ordinary.trackId]);
- (a as unknown as {setEntitlement(trackId:string,allowed:boolean):void})
- .setEntitlement(elite.trackId,false);
+ // Active membership does not imply an entitled high-tier source.
+ assert.equal(a.entitlements.get(ordinary.trackId),true);
+ assert.equal(a.entitlements.get(elite.trackId),false);
  const r=await call(a,[metadata(ordinary),metadata(a.resources.get(elite.trackId)!)]);
  deny(r);assert.equal(r.stage,'T0');
 });
