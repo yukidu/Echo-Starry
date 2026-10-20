@@ -23,7 +23,7 @@ export async function queueNextTranscriptGate2P0(env:Env){
   for(const item of unstarted?.results||[]){
     const key=getKey(item.audioUrl);
     if(key)await requestSafeRun(env.DB,{trackId:String(item.trackId),intent:'first',
-      sourceAudioKey:key,requestKey:'first:'+String(item.trackId)+':'+key});
+      sourceAudioKey:key,sourceAudioUrl:String(item.audioUrl),requestKey:'first:'+String(item.trackId)+':'+key});
   }
   const all:any=await env.DB.prepare(
     "UPDATE transcript_runs SET state='queued',updatedAt=? "+
