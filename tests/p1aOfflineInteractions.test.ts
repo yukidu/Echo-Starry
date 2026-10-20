@@ -18,6 +18,7 @@ class FakeElement {
   classList = { toggle: (name: string, active: boolean) => { this.attributes.set('class:' + name, String(active)); } };
   constructor(readonly id = '') {}
   addEventListener(name: string, fn: (event: { target: FakeElement }) => void) { this.listeners.set(name, fn); }
+  scrollIntoView(_options?: { block?: string; inline?: string }) {}
   setAttribute(name: string, value: string) { this.attributes.set(name, value); }
   replaceChildren(...children: FakeElement[]) { this.children = children; }
   append(child: FakeElement) { this.children.push(child); }
