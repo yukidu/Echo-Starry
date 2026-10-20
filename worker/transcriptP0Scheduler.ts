@@ -1,4 +1,4 @@
-import { requestSafeRun, failSafeRun } from './transcriptP0Safety';
+import { requestSafeRun, failSafeRun, sourceRevision } from './transcriptP0Safety';
 import { transcriptTargetConcurrency } from './starryAiManagement';
 
 type Env={DB:any;TRANSCRIPT_WORKFLOW:any;[key:string]:any};
@@ -22,8 +22,13 @@ export async function queueNextTranscriptGate2P0(env:Env){
     "ORDER BY COALESCE(t.uploadDate,'') DESC,t.id LIMIT 5").all();
   for(const item of unstarted?.results||[]){
     const key=getKey(item.audioUrl);
-    if(key)await requestSafeRun(env.DB,{trackId:String(item.trackId),intent:'first',
-      sourceAudioKey:key,sourceAudioUrl:String(item.audioUrl),requestKey:'first:'+String(item.trackId)+':'+key});
+    if(key){
+      // A candidate is bound to the source object content revision, not URL alone.
+      const etag=await sourceRevision(env.R2_BUCKET,key).catch(()=>null);
+      if(etag)await requestSafeRun(env.DB,{trackId:String(item.trackId),intent:'first',
+        sourceAudioKey:key,sourceAudioUrl:String(item.audioUrl),sourceAudioEtag:etag,
+        requestKey:'first:'+String(item.trackId)+':'+key+':'+etag});
+    }
   }
   const all:any=await env.DB.prepare(
     "UPDATE transcript_runs SET state='queued',updatedAt=? "+
