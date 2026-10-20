@@ -1,0 +1,47 @@
+name: AI2 N1A S3A full offline five-team integration
+on:
+  pull_request:
+    paths:
+      - 'security-contract-v1/**'
+      - 'f22-n1a-s1/**'
+      - 'f22-n1a-s3a/**'
+      - 'n1a-ai4/**'
+      - 'n1a-bkp-s1/**'
+      - 'n1a-bkp-s3a/**'
+      - 'ops-s1/**'
+      - 'tests/*S3a*.test.ts'
+      - 'tests/ai3N1aS3aB07.test.ts'
+      - 'tests/n1a_s1_b07*.py'
+      - 'tests/test_n1a_s1_b07*.py'
+      - '.github/workflows/ai2-n1a-s3a-all-five.yml'
+permissions:
+  contents: read
+jobs:
+  integrated-mock-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install isolated local dependencies without executing install scripts
+        run: npm install --ignore-scripts --no-package-lock --no-audit --no-fund
+      - name: Shared SecurityProof and five actual S3A adapters, same checkout
+        run: |
+          node --import tsx --test \
+            tests/n1aS3aSharedEnvelope.test.ts \
+            tests/ai3N1aS3aB07.test.ts \
+            tests/n1aAi4S3aIntegrationFake.test.ts \
+            tests/f22N1AS3aSharedIntegration.test.ts \
+            tests/n1aS3aAi6SharedConsole.test.ts \
+            tests/n1aS3aAi7RestoreIntegration.test.ts
+      - name: B07 Python fake-only hold/replay regression
+        run: python3 -m unittest discover -s tests -p 'test_n1a_s1_b07*.py' -v
+      - name: TypeScript check with no generated output
+        run: npm run lint
+      - name: Baseline offline test suite
+        run: npm test

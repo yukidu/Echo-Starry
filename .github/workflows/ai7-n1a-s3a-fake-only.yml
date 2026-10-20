@@ -1,0 +1,31 @@
+name: AI7 N1A S3A offline backup integration
+on:
+  pull_request:
+    paths:
+      - 'n1a-bkp-s1/fakeRestoreGate.ts'
+      - 'n1a-bkp-s3a/**'
+      - 'tests/n1aBackupWitnessFake.test.ts'
+      - 'tests/n1aS3aAi7RestoreIntegration.test.ts'
+      - '.github/workflows/ai7-n1a-s3a-fake-only.yml'
+permissions:
+  contents: read
+jobs:
+  ai7-offline-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Draft mock-only branch
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install local test dependencies, no npm scripts
+        run: npm install --ignore-scripts --no-package-lock --no-audit --no-fund
+      - name: Run shared and AI7 S1/S3A Fake tests
+        run: |
+          node --import tsx --test tests/n1aS3aSharedEnvelope.test.ts tests/n1aBackupWitnessFake.test.ts tests/n1aS3aAi7RestoreIntegration.test.ts
+      - name: TypeScript no-emit validation
+        run: npm run lint
+      - name: Full repository offline regression
+        run: npm test
