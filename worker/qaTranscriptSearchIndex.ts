@@ -103,12 +103,15 @@ export async function replaceQaSearchGeneration(db:any,options:{
   // override that invalidation and expose an outdated paragraph.
   const published:any=await db.prepare(
     'INSERT INTO qa_search_state(trackId,activeGeneration,sourceKey,sourceUpdatedAt,segmentCount,updatedAt,invalidated,changeRevision) '+
-    'VALUES (?,?,?,?,?,?,0,?) ON CONFLICT(trackId) DO UPDATE SET '+
+    'SELECT ?,?,?,?,?,?,0,? FROM tracks t JOIN transcript_index i ON i.trackId=t.id '+
+    "WHERE t.id=? AND i.status='ready' AND i.r2Key=? AND i.updatedAt=? "+
+    'ON CONFLICT(trackId) DO UPDATE SET '+
     'activeGeneration=excluded.activeGeneration,sourceKey=excluded.sourceKey,'+
     'sourceUpdatedAt=excluded.sourceUpdatedAt,segmentCount=excluded.segmentCount,'+
     'updatedAt=excluded.updatedAt,invalidated=0 '+
     'WHERE qa_search_state.changeRevision=excluded.changeRevision RETURNING trackId'
-  ).bind(trackId,generation,sourceKey,sourceUpdatedAt,paragraphs.length,Date.now(),expectedRevision).first();
+  ).bind(trackId,generation,sourceKey,sourceUpdatedAt,paragraphs.length,Date.now(),expectedRevision,
+    trackId,sourceKey,sourceUpdatedAt).first();
   if(!published?.trackId)throw Error('索引期間來源已變更，取消舊版本發布');
   // Obsolete generations are never used, even if cleanup fails.
   await db.prepare('DELETE FROM qa_search_segments WHERE trackId=? AND generation<>?').bind(trackId,generation).run().catch(()=>null);
