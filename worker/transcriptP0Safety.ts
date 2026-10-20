@@ -18,6 +18,20 @@ export type SafeEnv = { DB:Db; R2_BUCKET:any; P0_AUTHORITY?:{
 const OPEN_STATES = "('pending','queued','processing','awaiting_review')";
 export const gate2Enabled=(env:any)=>String(env?.TRANSCRIPT_P0_ENABLED||'')==='1';
 
+// Both D1 writes must succeed *inside* the same transaction. A zero-row UPDATE
+// does not throw in SQLite, so checking batch meta.changes afterwards is unsafe.
+// The assertion INSERT/UPSERT violates the migration's CHECK constraint on 0
+// or >1 rows and makes D1.batch roll back both writes before committing.
+// Only one fixed guard row is stored; there is no per-job assertion log.
+async function pairedTransition(db:Db,first:any,second:any):Promise<void>{
+  if(!db.batch)fail('D1 atomic transition unavailable');
+  const exactlyOne=()=>db.prepare(
+    'INSERT INTO transcript_gate2_tx_guard(slot,exactOne) '+
+    'VALUES(1,CASE WHEN changes()=1 THEN 1 ELSE 0 END) '+
+    'ON CONFLICT(slot) DO UPDATE SET exactOne=excluded.exactOne');
+  await db.batch([first,exactlyOne(),second,exactlyOne()]);
+}
+
 function fail(message:string):never {throw new Error('Gate2 safe transcript: '+message);}
 export async function sourceRevision(r2:any,key:string):Promise<string>{
   if(!r2 || typeof r2.head!=='function')fail('R2 source revision verifier unavailable');
@@ -68,9 +82,9 @@ export async function queueSafeRun(db:Db,runId:string,concurrency:number):Promis
   if(!run)return null;
   const target=Math.max(0,Math.min(5,Math.floor(concurrency)));
   if(target===0)return null;
-  const now=Date.now();
+  const now=Date.now(),queuedUntil=now+30*60_000;
   const cap="(SELECT COUNT(*) FROM transcript_runs WHERE state IN ('queued','processing'))<?";
-  const sql="UPDATE transcript_runs SET state='queued',updatedAt=? "+
+  const sql="UPDATE transcript_runs SET state='queued',leaseUntil=?,updatedAt=? "+
     "WHERE runId=? AND state='pending' AND "+cap+
     " AND EXISTS(SELECT 1 FROM transcript_index i JOIN tracks t ON t.id=i.trackId "+
     "WHERE i.trackId=transcript_runs.trackId AND t.audioUrl=transcript_runs.sourceAudioUrl "+
@@ -78,54 +92,42 @@ export async function queueSafeRun(db:Db,runId:string,concurrency:number):Promis
     "OR (transcript_runs.intent='relisten' AND i.status='ready' "+
     "AND i.r2Key=transcript_runs.expectedActiveR2Key)))";
   if(run.intent==='first'){
-    if(!db.batch)fail('D1 atomic queue unavailable');
-    const stmts=[
-      db.prepare(sql).bind(now,runId,target),
+    await pairedTransition(db,
+      db.prepare(sql).bind(queuedUntil,now,runId,target),
       db.prepare("UPDATE transcript_index SET status='queued',updatedAt=? "+
         "WHERE trackId=? AND status='pending' AND r2Key IS NULL "+
         "AND EXISTS(SELECT 1 FROM transcript_runs r WHERE r.trackId=transcript_index.trackId "+
-        "AND r.runId=? AND r.state='queued')").bind(now,run.trackId,runId)
-    ];
-    const results=await db.batch(stmts);
-    if(Number(results?.[0]?.meta?.changes)!==1 || Number(results?.[1]?.meta?.changes)!==1){
-      // Both statements have the same predicate on the pre-queue state;
-      // a partial result indicates an invariant failure; never start Whisper.
-      return null;
-    }
+        "AND r.runId=? AND r.state='queued')").bind(now,run.trackId,runId));
   }else{
-    const queued=await db.prepare(sql+" RETURNING runId").bind(now,runId,target).first();
+    const queued=await db.prepare(sql+" RETURNING runId").bind(queuedUntil,now,runId,target).first();
     if(!queued)return null;
   }
   return await db.prepare("SELECT * FROM transcript_runs WHERE runId=? AND state='queued'")
     .bind(runId).first() as SafeRun|null;
 }
 export async function claimSafeRun(db:Db,runId:string,trackId:string):Promise<SafeRun>{
-  const candidate=await db.prepare(
-    "SELECT * FROM transcript_runs WHERE runId=? AND trackId=? AND state='queued' LIMIT 1")
-    .bind(runId,trackId).first() as SafeRun|null;
-  if(!candidate)fail('run not queued or already completed');
   const now=Date.now();
+  const candidate=await db.prepare(
+    "SELECT * FROM transcript_runs WHERE runId=? AND trackId=? AND state='queued' AND leaseUntil>? LIMIT 1")
+    .bind(runId,trackId,now).first() as SafeRun|null;
+  if(!candidate)fail('run not queued, dispatch lease expired, or already completed');
   const condition=" AND EXISTS(SELECT 1 FROM transcript_index i JOIN tracks t ON t.id=i.trackId "+
     "WHERE i.trackId=transcript_runs.trackId AND t.audioUrl=transcript_runs.sourceAudioUrl "+
     "AND ((transcript_runs.intent='first' AND i.status='queued' AND i.r2Key IS NULL "+
     "AND i.workingRunId IS NULL) OR (transcript_runs.intent='relisten' "+
     "AND i.status='ready' AND i.r2Key=transcript_runs.expectedActiveR2Key)))";
   const claimSql="UPDATE transcript_runs SET state='processing',generation=generation+1,"+
-    "leaseUntil=?,updatedAt=? WHERE runId=? AND trackId=? AND state='queued'"+condition;
+    "leaseUntil=?,updatedAt=? WHERE runId=? AND trackId=? AND state='queued' AND leaseUntil>?"+condition;
   if(candidate.intent==='first'){
-    if(!db.batch)fail('D1 atomic claim unavailable');
-    const results=await db.batch([
-      db.prepare(claimSql).bind(now+15*60_000,now,runId,trackId),
+    await pairedTransition(db,
+      db.prepare(claimSql).bind(now+15*60_000,now,runId,trackId,now),
       db.prepare("UPDATE transcript_index SET status='processing',workingRunId=?,updatedAt=? "+
         "WHERE trackId=? AND status='queued' AND r2Key IS NULL AND workingRunId IS NULL "+
         "AND EXISTS(SELECT 1 FROM transcript_runs r WHERE r.runId=? AND r.trackId=transcript_index.trackId "+
-        "AND r.state='processing')").bind(runId,now,trackId,runId)
-    ]);
-    if(Number(results?.[0]?.meta?.changes)!==1 || Number(results?.[1]?.meta?.changes)!==1)
-      fail('initial transcript atomic claim refused');
+        "AND r.state='processing')").bind(runId,now,trackId,runId));
   }else{
     const claimed=await db.prepare(claimSql+" RETURNING runId")
-      .bind(now+15*60_000,now,runId,trackId).first();
+      .bind(now+15*60_000,now,runId,trackId,now).first();
     if(!claimed)fail('relisten already claimed or source changed');
   }
   return await db.prepare("SELECT * FROM transcript_runs WHERE runId=? AND state='processing'")
@@ -385,9 +387,6 @@ export async function publishSafeVersion(env:SafeEnv,runId:string,approvedBy:str
     "WHERE trackId=transcript_runs.trackId AND status='ready' AND activeVersionId=?)")
     .bind(proof.epoch,proof.permissionRevision,proof.correctionRevision,now,
       runId,version.versionId,version.versionId);
-  const results=await db.batch([indexStmt,runStmt]);
-  if(results?.length!==2 || Number(results[0]?.meta?.changes)!==1 ||
-     Number(results[1]?.meta?.changes)!==1)
-    fail('atomic publication refused or inconsistent; manual investigation required');
+  await pairedTransition(db,indexStmt,runStmt);
   return {published:true,r2Key:version.jsonKey,versionId:version.versionId};
 }
