@@ -22,6 +22,13 @@ export type MockIndependentHead = Readonly<{
   sourceId: string; headSeq: Version; headHash: string;
   restoreEpoch: Version; observedAtMs: number;
 }>;
+/** Separate persisted minimum watermark outside both simulated head snapshots.
+ * This is still caller-injected Fake evidence, NOT a real WORM/cryptographic root.
+ */
+export type MockTrustedFloor = Readonly<{
+  sourceId: string; headSeq: Version; headHash: string;
+  restoreEpoch: Version; observedAtMs: number;
+}>;
 export type FakeIdRecord = Readonly<{
   id: string; active: boolean; centralSuperAdmin: boolean;
 }>;
@@ -52,8 +59,13 @@ export type MockLock = Readonly<{
 export type MockEnvironment = Readonly<{
   readWitness(stage: 'before' | 'after'): Promise<MockWitness | null>;
   readIndependentHead(stage: 'before' | 'after'): Promise<MockIndependentHead | null>;
+  readTrustedFloor(stage: 'before' | 'after'): Promise<MockTrustedFloor | null>;
   readStarryId(stage: 'before' | 'after'): Promise<MockStarryId | null>;
   readFakeR2(key: string): Promise<string | null>;
+  /** Must be atomic in an explicitly shared FAKE ledger, not local per-call state.
+   * Claim only after every fake validation succeeds; fail-closed if unavailable.
+   */
+  claimFakeReviewOnce(requestId: string): Promise<boolean>;
 }>;
 export type SimulatedRestoreInput = Readonly<{
   nowMs: number; freshnessMs: number; approvalAgeMs: number;
@@ -143,13 +155,24 @@ function safeRetention(backups:readonly MockBackup[],selectedId:string,now:numbe
   return backups.filter(b=>!keep.has(b.id)).map(b=>b.id).sort();
 }
 
-async function inspectWitness(w:MockWitness|null,h:MockIndependentHead|null,now:number,age:number,errors:Set<string>):Promise<void>{
+async function inspectWitness(w:MockWitness|null,h:MockIndependentHead|null,
+  floor:MockTrustedFloor|null,now:number,age:number,errors:Set<string>):Promise<void>{
   if(!w||!h){errors.add('AUTHORITY_MISSING');return;}
-  if(!w.sourceId||!h.sourceId||w.sourceId===h.sourceId)errors.add('WITNESS_NOT_INDEPENDENT');
-  if(!fresh(w.observedAtMs,now,age)||!fresh(h.observedAtMs,now,age))
+  if(!floor){errors.add('TRUST_FLOOR_MISSING');return;}
+  // Three independently retained fake records must agree about the latest HEAD;
+  // matching two mutually rolled-back records is insufficient.
+  if(!w.sourceId||!h.sourceId||!floor.sourceId||
+     new Set([w.sourceId,h.sourceId,floor.sourceId]).size!==3)
+    errors.add('WITNESS_NOT_INDEPENDENT');
+  if(!fresh(w.observedAtMs,now,age)||!fresh(h.observedAtMs,now,age)||
+     !fresh(floor.observedAtMs,now,age))
     errors.add('WITNESS_STALE');
-  for(const v of [w.headSeq,w.restoreEpoch,w.minStarryIdRevision,h.headSeq,h.restoreEpoch])
+  for(const v of [w.headSeq,w.restoreEpoch,w.minStarryIdRevision,
+     h.headSeq,h.restoreEpoch,floor.headSeq,floor.restoreEpoch])
     if(!isCanonicalBkpVersion(v)) errors.add('WITNESS_VERSION_INVALID');
+  if(w.headSeq!==floor.headSeq||w.headHash!==floor.headHash||
+     w.restoreEpoch!==floor.restoreEpoch)
+    errors.add('TRUST_FLOOR_MISMATCH');
   if(w.headSeq!==h.headSeq||w.headHash!==h.headHash||w.restoreEpoch!==h.restoreEpoch)
     errors.add('HEAD_DISAGREEMENT');
   if(!SHA.test(w.headHash)) errors.add('WITNESS_HASH_INVALID');
@@ -192,12 +215,14 @@ export async function simulateN1aBackupGate(x:SimulatedRestoreInput):Promise<Sim
   if(!SHA.test(x.manifestHash)||await sha256FakeText(JSON.stringify(x.backups))!==x.manifestHash)
     fail('MANIFEST_TAMPERED');
 
-  let beforeW:MockWitness|null=null,beforeH:MockIndependentHead|null=null,beforeId:MockStarryId|null=null;
+  let beforeW:MockWitness|null=null,beforeH:MockIndependentHead|null=null;
+  let beforeFloor:MockTrustedFloor|null=null,beforeId:MockStarryId|null=null;
   try {
-    [beforeW,beforeH,beforeId]=await Promise.all([
-      x.env.readWitness('before'),x.env.readIndependentHead('before'),x.env.readStarryId('before')]);
+    [beforeW,beforeH,beforeFloor,beforeId]=await Promise.all([
+      x.env.readWitness('before'),x.env.readIndependentHead('before'),
+      x.env.readTrustedFloor('before'),x.env.readStarryId('before')]);
   }catch{fail('AUTHORITY_READ_FAILURE')}
-  await inspectWitness(beforeW,beforeH,x.nowMs,x.freshnessMs,errors);
+  await inspectWitness(beforeW,beforeH,beforeFloor,x.nowMs,x.freshnessMs,errors);
   if(!beforeId||!fresh(beforeId.observedAtMs,x.nowMs,x.freshnessMs)||
      !isCanonicalBkpVersion(beforeId.revision))fail('STARRY_ID_UNKNOWN');
   if(beforeW&&beforeId&&isCanonicalBkpVersion(beforeId.revision)&&
@@ -235,9 +260,12 @@ export async function simulateN1aBackupGate(x:SimulatedRestoreInput):Promise<Sim
     }catch{fail('BACKUP_OBJECT_UNREADABLE')}
   }
   // A pending deletion/revocation must block even when old ID snapshots say active.
+  // This includes BOTH signers, not only members referenced by restored content.
+  const reviewerIds=new Set(x.approvals.map(a=>a.reviewerId));
   if(beforeW)for(const ev of beforeW.events){
     if(ev.kind==='member_deleted'||ev.kind==='member_revoke_pending') {
       if(allApprovedFiles.some(f=>f.memberIds.includes(ev.target)))fail('HISTORIC_MEMBER_TOMBSTONE');
+      if(reviewerIds.has(ev.target))fail('REVIEWER_REVOKED_AT_WITNESS');
     }
     if(ev.kind==='track_deleted'||ev.kind==='track_revoke_pending') {
       if(tracks.has(ev.target))fail('HISTORIC_TRACK_TOMBSTONE');
@@ -264,20 +292,30 @@ export async function simulateN1aBackupGate(x:SimulatedRestoreInput):Promise<Sim
       fail('APPROVAL_EXPIRED');
   }
 
-  let afterW:MockWitness|null=null,afterH:MockIndependentHead|null=null,afterId:MockStarryId|null=null;
+  let afterW:MockWitness|null=null,afterH:MockIndependentHead|null=null;
+  let afterFloor:MockTrustedFloor|null=null,afterId:MockStarryId|null=null;
   try{
-    [afterW,afterH,afterId]=await Promise.all([
-      x.env.readWitness('after'),x.env.readIndependentHead('after'),x.env.readStarryId('after')]);
+    [afterW,afterH,afterFloor,afterId]=await Promise.all([
+      x.env.readWitness('after'),x.env.readIndependentHead('after'),
+      x.env.readTrustedFloor('after'),x.env.readStarryId('after')]);
   }catch{fail('AUTHORITY_RECHECK_FAILED')}
-  await inspectWitness(afterW,afterH,x.nowMs,x.freshnessMs,errors);
+  await inspectWitness(afterW,afterH,afterFloor,x.nowMs,x.freshnessMs,errors);
   if(!afterId||!fresh(afterId.observedAtMs,x.nowMs,x.freshnessMs))fail('STARRY_ID_RECHECK_FAILED');
   if(!beforeW||!afterW||JSON.stringify(beforeW)!==JSON.stringify(afterW)||
-     !beforeH||!afterH||JSON.stringify(beforeH)!==JSON.stringify(afterH))
+     !beforeH||!afterH||JSON.stringify(beforeH)!==JSON.stringify(afterH)||
+     !beforeFloor||!afterFloor||JSON.stringify(beforeFloor)!==JSON.stringify(afterFloor))
     fail('WITNESS_CHANGED_DURING_REVIEW');
   if(!beforeId||!afterId||JSON.stringify(beforeId)!==JSON.stringify(afterId))
     fail('MEMBERSHIP_CHANGED_DURING_REVIEW');
   // In particular: if the witness is down, do NOT return actionable cleanup
   // candidates even if an unrelated expired backup looks removable.
+  if(errors.size)return denyResult(errors,verified);
+  // A durable, atomic FAKE claim is required for an eligible decision;
+  // replaying the identical approved request cannot return eligible twice.
+  // In production a real trusted ledger would be necessary; none is connected.
+  try {
+    if(!await x.env.claimFakeReviewOnce(x.requestId))fail('REVIEW_ALREADY_CONSUMED');
+  }catch {fail('REVIEW_CLAIM_UNVERIFIED')}
   if(errors.size)return denyResult(errors,verified);
   const candidates=safeRetention(x.backups,x.lastGoodId,x.nowMs,x.retentionDays);
   return {simulatedEligible:true,productionAuthorized:false,restoreLocked:true,
