@@ -77,6 +77,8 @@ export async function replaceQaSearchGeneration(db:any,options:{
 }):Promise<number>{
   const {trackId,sourceKey,sourceUpdatedAt,generation,speaker,subtitles,cleaned}=options;
   if(!trackId||!sourceKey||!generation||!Number.isFinite(sourceUpdatedAt))throw Error('逐字稿索引來源版本無效');
+  const prior:any=await db.prepare('SELECT changeRevision FROM qa_search_state WHERE trackId=?').bind(trackId).first();
+  const expectedRevision=Number(prior?.changeRevision||0);
   const paragraphs=buildQaSearchParagraphs(trackId,generation,speaker,subtitles,cleaned||[]);
   if(!paragraphs.length)throw Error('逐字稿沒有可索引的內容');
   // Guard expensive unbounded index jobs; long recordings can be handled in a later batch.
@@ -87,31 +89,46 @@ export async function replaceQaSearchGeneration(db:any,options:{
     ).bind(p.trackId,p.generation,p.segmentId,p.fromSegment,p.toSegment,p.startMs,p.endMs,p.speaker,p.content,p.searchTokens));
     await db.batch(batch);
   }
-  await db.prepare(
-    'INSERT INTO qa_search_state(trackId,activeGeneration,sourceKey,sourceUpdatedAt,segmentCount,updatedAt) VALUES (?,?,?,?,?,?) '+
-    'ON CONFLICT(trackId) DO UPDATE SET activeGeneration=excluded.activeGeneration,sourceKey=excluded.sourceKey,'+
-    'sourceUpdatedAt=excluded.sourceUpdatedAt,segmentCount=excluded.segmentCount,updatedAt=excluded.updatedAt'
-  ).bind(trackId,generation,sourceKey,sourceUpdatedAt,paragraphs.length,Date.now()).run();
+  // Compare-and-swap: a correction or permission mutation during indexing
+  // increments changeRevision in its own D1 transaction; stale builds cannot
+  // override that invalidation and expose an outdated paragraph.
+  const published:any=await db.prepare(
+    'INSERT INTO qa_search_state(trackId,activeGeneration,sourceKey,sourceUpdatedAt,segmentCount,updatedAt,invalidated,changeRevision) '+
+    'VALUES (?,?,?,?,?,?,0,?) ON CONFLICT(trackId) DO UPDATE SET '+
+    'activeGeneration=excluded.activeGeneration,sourceKey=excluded.sourceKey,'+
+    'sourceUpdatedAt=excluded.sourceUpdatedAt,segmentCount=excluded.segmentCount,'+
+    'updatedAt=excluded.updatedAt,invalidated=0 '+
+    'WHERE qa_search_state.changeRevision=excluded.changeRevision RETURNING trackId'
+  ).bind(trackId,generation,sourceKey,sourceUpdatedAt,paragraphs.length,Date.now(),expectedRevision).first();
+  if(!published?.trackId)throw Error('索引期間來源已變更，取消舊版本發布');
   // Obsolete generations are never used, even if cleanup fails.
   await db.prepare('DELETE FROM qa_search_segments WHERE trackId=? AND generation<>?').bind(trackId,generation).run().catch(()=>null);
   return paragraphs.length;
 }
 export async function findQaIndexedPassages(db:any,question:string,trackIds:string[]):Promise<{
-  covered:Set<string>;hits:{trackId:string;content:string;startMs:number;endMs:number;fromSegment:string;toSegment:string;score:number}[];
+  covered:Set<string>;blocked:Set<string>;hits:{trackId:string;content:string;startMs:number;endMs:number;fromSegment:string;toSegment:string;score:number}[];
 }>{
   const covered=new Set<string>();
   const ids=[...new Set(trackIds)].filter(Boolean).slice(0,70);
   const expression=qaSearchMatchExpression(question);
-  if(!ids.length||!expression)return {covered,hits:[]};
+  if(!ids.length||!expression)return {covered,blocked:new Set<string>(),hits:[]};
   const placeholders=ids.map(()=>'?').join(',');
+  // Permission/correction trigger sets invalidated synchronously with original
+  // mutation; never fall back to a stale R2-original for those tracks.
+  const blocked=new Set<string>();
+  const states=rows(await db.prepare(
+    'SELECT trackId,invalidated FROM qa_search_state WHERE trackId IN ('+placeholders+')'
+  ).bind(...ids).all());
+  for(const state of states)if(Number(state.invalidated))blocked.add(String(state.trackId));
   // A changed R2 key/status/version invalidates the index without modifying data.
   const usable=rows(await db.prepare(
     'SELECT s.trackId FROM qa_search_state s JOIN transcript_index i ON i.trackId=s.trackId '+
-    "WHERE i.status='ready' AND i.r2Key=s.sourceKey AND i.updatedAt=s.sourceUpdatedAt "+
+    'JOIN tracks t ON t.id=s.trackId '+
+    "WHERE i.status='ready' AND s.invalidated=0 AND i.r2Key=s.sourceKey AND i.updatedAt=s.sourceUpdatedAt "+
     'AND s.trackId IN ('+placeholders+')'
   ).bind(...ids).all());
   for(const r of usable)covered.add(String(r.trackId));
-  if(!covered.size)return {covered,hits:[]};
+  if(!covered.size)return {covered,blocked,hits:[]};
   const accepted=[...covered];
   const places=accepted.map(()=>'?').join(',');
   const entries=rows(await db.prepare(
@@ -123,5 +140,45 @@ export async function findQaIndexedPassages(db:any,question:string,trackIds:stri
   ).bind(expression,...accepted).all());
   const hits=entries.map(r=>({...r,score:qaSearchScore(question,String(r.content))}))
     .filter(r=>r.score>0).sort((a,b)=>b.score-a.score).slice(0,40);
-  return {covered,hits};
+  return {covered,blocked,hits};
+}
+
+/** Rebuild one changed recording; no bulk historical backfill or AI calls.
+ * Must only run with explicit search write flag and migrated D1 schema.
+ * Caller owns user permissions. Source transcript is read only, once.
+ */
+export async function rebuildQaSearchAfterMutation(env:{
+  DB:any;R2_BUCKET:any;QA_CHINESE_SEARCH_WRITE_ENABLED?:string
+},trackId:string):Promise<{indexed:boolean;reason?:string;count?:number}>{
+  if(env.QA_CHINESE_SEARCH_WRITE_ENABLED!=='true')return {indexed:false,reason:'disabled'};
+  const indexed:any=await env.DB.prepare(
+    "SELECT r2Key,updatedAt,status FROM transcript_index WHERE trackId=? LIMIT 1"
+  ).bind(trackId).first();
+  if(indexed?.status!=='ready'||!indexed.r2Key)return {indexed:false,reason:'missing_source'};
+  const track:any=await env.DB.prepare('SELECT speaker FROM tracks WHERE id=? LIMIT 1').bind(trackId).first();
+  if(!track)return {indexed:false,reason:'deleted_track'};
+  const object=await env.R2_BUCKET?.get(indexed.r2Key);
+  if(!object)return {indexed:false,reason:'missing_r2'};
+  const source:any=JSON.parse(await object.text());
+  if(!Array.isArray(source.segments))return {indexed:false,reason:'bad_source'};
+  const base=Number(source.createdAt||0);
+  const overrides=new Map<string,string>((Array.isArray(source.cleanedSegments)?source.cleanedSegments:[])
+    .map((x:any)=>[String(x.id),String(x.text||'')]));
+  // Earlier legacy corrections and current moderation events are both honoured.
+  const old=await env.DB.prepare(
+    'SELECT segmentId,newText FROM transcript_corrections WHERE trackId=? AND createdAt>=? ORDER BY createdAt,id'
+  ).bind(trackId,base).all();
+  for(const row of rows(old))overrides.set(String(row.segmentId),String(row.newText||''));
+  const moderations=await env.DB.prepare(
+    "SELECT segmentId,newText,adminText FROM transcript_correction_events WHERE trackId=? AND createdAt>=? AND status<>'revoked' ORDER BY createdAt,id"
+  ).bind(trackId,base).all();
+  for(const row of rows(moderations))overrides.set(String(row.segmentId),String(row.adminText||row.newText||''));
+  const cleaned=[...overrides].map(([id,text])=>({id,text}));
+  // New unique generation per real rebuild, but immutable original segments.
+  const generation='qa-'+crypto.randomUUID();
+  const count=await replaceQaSearchGeneration(env.DB,{
+    trackId,sourceKey:String(indexed.r2Key),sourceUpdatedAt:Number(indexed.updatedAt),
+    generation,speaker:String(track.speaker||''),subtitles:source.segments,cleaned
+  });
+  return {indexed:true,count};
 }
