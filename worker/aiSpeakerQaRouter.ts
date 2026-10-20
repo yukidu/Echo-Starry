@@ -244,7 +244,9 @@ export async function excerpts(env:Env,track:any,u:any,mode:string,question:stri
       }catch(error){
         // A broken index cannot bypass access checks or prevent the old reader.
         console.warn('C09 search index unavailable',error instanceof Error?error.name:'unknown');
-        indexed=null;
+        // Corrected or revoked content must NEVER silently fall back to the
+        // original R2 text if the index fails after explicit activation.
+        return {prompt:'',sources:[]};
       }
     }
   }
@@ -265,6 +267,7 @@ export async function excerpts(env:Env,track:any,u:any,mode:string,question:stri
     }
     // All-talk search must not reintroduce unreviewed multi-speaker recordings.
     if(mode==='all'&&splitSpeakerNames(row.speaker).length>1)continue;
+    if(indexed?.blocked.has(row.id))continue; // mutated source: no stale R2 fallback
     if(indexed?.covered.has(row.id))continue; // search directly from D1; no R2 read
     // In mixed-generation rollout, at most 2 R2 fallbacks per question once
     // some paragraphs are indexed; with zero coverage preserve legacy behaviour.
