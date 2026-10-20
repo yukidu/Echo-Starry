@@ -27,8 +27,8 @@ async function pairedTransition(db:Db,first:any,second:any):Promise<void>{
   if(!db.batch)fail('D1 atomic transition unavailable');
   const exactlyOne=()=>db.prepare(
     'INSERT INTO transcript_gate2_tx_guard(slot,exactOne) '+
-    'VALUES(1,CASE WHEN changes()=1 THEN 1 ELSE 0 END) '+
-    'ON CONFLICT(slot) DO UPDATE SET exactOne=excluded.exactOne');
+    'VALUES(?,CASE WHEN changes()=1 THEN 1 ELSE 0 END) '+
+    'ON CONFLICT(slot) DO UPDATE SET exactOne=excluded.exactOne').bind(1);
   await db.batch([first,exactlyOne(),second,exactlyOne()]);
 }
 
