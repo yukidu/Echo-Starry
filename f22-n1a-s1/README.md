@@ -29,3 +29,15 @@ node --experimental-strip-types --test tests/f22N1AS1Fake.test.ts
 
 ## 本批允許範圍及後續阻擋
 本批從 main 新建 AI5 專屬獨立 branch／Draft PR，**只新增本目錄兩個檔案（程式與本說明）及一份 tests**，不能覆寫 #459、#466、#461、AI3/4/6/7 的程式。CI／Preview 僅安全分支結果，**禁止 merge、Production、付費、真 D1、真人會員、真 AI、雲端資源建立**。後續接真服務須另經使用者明確同意，並先解決真正 N1A 權威事件 proof、原子帳號預算、撤銷水位、可靠多區負載與用量量測。
+## N1A-S1 最終安全修補 R3（隔離 Fake，非正式整合）
+
+經 GitHub CI **先跑預期失敗**：新測試 `tests/f22N1AS1R3Security.test.ts` 在原版首次執行確實 3/3 FAIL（未提供權威卻可讀私人統計、guest→registered 事件編號重播、registered→guest 重播），原始 commit `72dc8fb47eb8dd5b74e7ec75afb672b1f728120c`、Regression job `118622066060`。這是原型反例，不代表正式網站已受攻擊。
+
+**修正安全界線：**
+- `fakeStats()` 現在是**需即時檢查的私人假資料讀取介面**：缺 `FakePrivateStatsWitness`、有效的 Fake 管理員身分、可用假權威、原資料快照完整性或有最新撤權墓碑時，直接拒絕；查詢前與回傳前再檢查。外部假見證**刻意不存於**會被還原的 SQLite；舊備份與它最後核實的快照不一致就拒絕。見證只允許第一次封存，拒絕任意重封舊備份；會員撤銷後直到另外訂可信刪除/重建政策前，**全部私人統計仍鎖定**。
+- `fakeStatsFixtureOnly()` 只供同 PR 原有 SQL 正確性單元測試作**內部離線數學驗證**，**無權限保護、不允許當管理員 API**。過去直接呼叫 `fakeStats` 的離線統計測試已明確改用內部驗證函式。
+- `FakeStarryIdSource.firstAccept()` 鎖定原始接受的 `subject+identityKind`；若同一後端事件 ID 嘗試 guest→registered、registered→guest、registered→其他人、unknown→registered，或 Fake 會員被撤權後重放，拒絕身份漂移；身份真正變更要另外安全修訂／重新驗收，絕不偷偷回溯增加會員人數。
+- `reserveFakeBatch()` 僅模擬**同一 SQLite**內的原子配額，與 Cloudflare 帳號所有 App **無關**。`reserveFakeAcrossIsolatedDatabases(first,second)` 明確回 `UNKNOWN_LOCKED/UNSUPPORTED_CROSS_DATABASE`，**不會執行任何預留**；不能聲稱兩個 SQLite 或跨 Worker 已共用不可超支額度。禁止繞開此入口分別用兩庫的 `reserveFakeBatch` 假稱全球額度正確。
+- 上述 Fake witness 記憶體本身**沒有真持久化、不具不可回捲證據**，若所有相關程式及見證一起還原，模擬不能證明真實跨 Cloudflare 區域防回捲。真正 Starry ID、AI7 安全錨點、官方 Cloudflare 用量及實際 D1 交易都**未接**；正式 Gate 維持 OFF、#471 保持 Draft、**禁止正式部署/合併/付費**。
+
+**驗收:** 先確認上述原版 CI FAIL，修後由最新 HEAD 的 `regression-tests` 檢驗新 `tests/f22N1AS1R3Security.test.ts` 7 個情境和既有所有測試、CodeQL、建置；只有檢查全部完成才可記為 PASS。此輪修正不含任何正式業務 API。
