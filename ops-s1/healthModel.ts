@@ -24,6 +24,11 @@ export type Observation = {
 export type HealthCard = {
   service: Service;
   status: HealthStatus;
+  // Quota and health are independent: enough quota cannot prove service availability.
+  healthStatus: HealthStatus;
+  healthVerified: boolean;
+  conflict: boolean;
+  windowMinutes: number | null;
   observedAt: string | null;
   source: string;
   evidence: 'observed' | 'unverified';
@@ -56,14 +61,16 @@ export function evaluateService(obs: Observation | undefined, service: Service, 
     service, observedAt: Number.isFinite(when) ? new Date(when).toISOString() : null,
     source, evidence: (verified ? 'observed' : 'unverified') as HealthCard['evidence'],
     freshness: (!Number.isFinite(when) ? 'unknown' : inTime ? 'fresh' : 'stale') as HealthCard['freshness'],
+    windowMinutes: verified ? Number(obs!.windowMinutes) : null,
+    conflict: false,
     actionAllowed: false as const,
   };
-  const unknown: HealthCard = { ...base, status: 'unknown', reason: '無法驗證當前狀態', errorRatio: null,
-    sampleCount: null, quotaPercent: null, quotaState: 'unknown' };
+  const unknown: HealthCard = { ...base, status: 'unknown', healthStatus: 'unknown', healthVerified: false,
+    reason: '無法驗證當前狀態', errorRatio: null, sampleCount: null, quotaPercent: null, quotaState: 'unknown' };
   if (!verified || !obs) return unknown;
 
-  const hasRequests = Number.isInteger(obs.requests) && Number(obs.requests) >= 0 &&
-    Number.isInteger(obs.serverErrors) && Number(obs.serverErrors) >= 0 && Number(obs.serverErrors) <= Number(obs.requests);
+  const hasRequests = Number.isSafeInteger(obs.requests) && Number(obs.requests) >= 0 &&
+    Number.isSafeInteger(obs.serverErrors) && Number(obs.serverErrors) >= 0 && Number(obs.serverErrors) <= Number(obs.requests);
   const sampleCount = hasRequests ? Number(obs.requests) : null;
   const errorRatio = hasRequests && sampleCount! >= 100 ? Number(obs.serverErrors) / sampleCount! : null;
   const hasQuota = obs.quotaVerified === true && Number.isFinite(obs.quotaUsed) && Number(obs.quotaUsed) >= 0 &&
@@ -71,25 +78,77 @@ export function evaluateService(obs: Observation | undefined, service: Service, 
   const quotaPercent = hasQuota ? Number(obs.quotaUsed) / Number(obs.quotaLimit) * 100 : null;
   const quotaState: QuotaState = quotaPercent === null ? 'unknown' :
     quotaPercent >= 100 ? 'stop_new' : quotaPercent >= 80 ? 'warning' : 'none';
-  // A valid, timely observation must include real evidence: a sample, a quota or an explicit verified incident flag.
-  const evidencePresent = hasRequests && sampleCount! >= 100 || hasQuota || obs.confirmedFault === true || obs.warning === true;
-  if (!evidencePresent) return { ...unknown, evidence: 'unverified', freshness: 'fresh' };
-  let status: HealthStatus = 'normal';
-  let reason = '本時窗指標沒有觀察到異常';
+  // Only current *service* evidence can make health known; quotas are a different dimension.
+  const healthVerified = errorRatio !== null || obs.confirmedFault === true || obs.warning === true;
+  if (!healthVerified) return { ...unknown, evidence: 'observed', freshness: 'fresh',
+    reason: hasQuota ? '只確認了額度，服務健康仍未驗證' : '缺少足夠的服務健康證據',
+    sampleCount, quotaPercent, quotaState };
+
+  let healthStatus: HealthStatus = 'normal';
+  let reason = '本時窗已有有效健康觀測，沒有觀察到異常';
   if (obs.confirmedFault === true || errorRatio !== null && errorRatio >= 0.05) {
-    status = 'fault'; reason = '已驗證本時窗故障';
-  } else if (obs.warning === true || errorRatio !== null && errorRatio >= 0.01 || quotaState === 'warning' || quotaState === 'stop_new') {
-    status = 'warning'; reason = quotaState === 'stop_new' ? '已到用量界線，禁止啟動非必要新批次（建議）' : '已達警示門檻';
+    healthStatus = 'fault'; reason = '已驗證本時窗故障';
+  } else if (obs.warning === true || errorRatio !== null && errorRatio >= 0.01) {
+    healthStatus = 'warning'; reason = '已達服務健康警示門檻';
   }
-  return { ...base, status, reason, errorRatio, sampleCount, quotaPercent, quotaState };
+  const status: HealthStatus = healthStatus === 'normal' && (quotaState === 'warning' || quotaState === 'stop_new')
+    ? 'warning' : healthStatus;
+  if (status === 'warning' && healthStatus === 'normal') reason = quotaState === 'stop_new'
+    ? '已到用量界線，停止非必要新批次（建議）' : '已達用量預警門檻';
+  return { ...base, status, healthStatus, healthVerified, reason, errorRatio, sampleCount, quotaPercent, quotaState };
+}
+
+/** Review *all* observations: input order cannot suppress verified failures. */
+export function reconcileService(observations: readonly Observation[], service: Service, nowMs: number): HealthCard {
+  const matches = observations.filter(o => o.service === service);
+  if (matches.length === 0) return evaluateService(undefined, service, nowMs);
+  const cards = matches.map(o => evaluateService(o, service, nowMs));
+  // Stable tie-breaking: no arbitrary Array.find order when timestamps are equal.
+  const ranked = cards.slice().sort((a, b) =>
+    (Date.parse(b.observedAt || '') || 0) - (Date.parse(a.observedAt || '') || 0) ||
+    a.source.localeCompare(b.source) || String(a.windowMinutes).localeCompare(String(b.windowMinutes)) ||
+    a.status.localeCompare(b.status) || String(a.quotaPercent).localeCompare(String(b.quotaPercent)));
+  const verifiedCards = ranked.filter(c => c.evidence === 'observed' && c.freshness === 'fresh');
+  const health = verifiedCards.filter(c => c.healthVerified);
+  const chosen = health[0] || verifiedCards[0] || ranked[0];
+  const quotas = verifiedCards.filter(c => c.quotaPercent !== null);
+  // Conflicting independently verified quota values mean the quota is *unknown*.
+  const quotaConflict = quotas.some(c => c.quotaPercent !== quotas[0]?.quotaPercent);
+  const quotaPercent = !quotaConflict && quotas.length ? quotas[0].quotaPercent : null;
+  const quotaState: QuotaState = quotaPercent === null ? 'unknown' :
+    quotaPercent >= 100 ? 'stop_new' : quotaPercent >= 80 ? 'warning' : 'none';
+  const hasFault = health.some(c => c.healthStatus === 'fault');
+  const differingHealth = health.length > 1 && health.some(c =>
+    c.healthStatus !== health[0].healthStatus || c.source !== health[0].source || c.windowMinutes !== health[0].windowMinutes);
+  const incomplete = cards.some(c => c.evidence !== 'observed' || c.freshness !== 'fresh' || !c.healthVerified);
+  const conflict = quotaConflict || differingHealth || (cards.length > 1 && incomplete);
+  // Preserve an authenticated, fresh fault even if another valid or invalid report conflicts.
+  const healthStatus: HealthStatus = hasFault ? 'fault' : health.length === 0 || conflict ? 'unknown' : health[0].healthStatus;
+  const status: HealthStatus = healthStatus === 'normal' && (quotaState === 'warning' || quotaState === 'stop_new')
+    ? 'warning' : healthStatus;
+  const reason = conflict ? hasFault
+      ? '觀測證據互相矛盾，已有已確認故障，必須人工查證' : '同服務觀測時間窗、證據或額度衝突，健康未核實'
+    : healthStatus === 'unknown' ? quotaPercent !== null
+      ? '只確認了額度，服務健康仍未驗證' : '無法驗證當前服務健康'
+    : status === 'warning' && healthStatus === 'normal' ? '已達用量預警/上限，健康訊號另外驗證'
+    : chosen.reason;
+  return {
+    ...chosen, status, healthStatus, healthVerified: healthStatus !== 'unknown', conflict, reason,
+    // Use only contemporaneous, trusted quota data; never expose stale quota as current.
+    quotaPercent, quotaState,
+    // A confirmed failure remains observed even when other records conflict.
+    evidence: hasFault ? 'observed' : conflict ? 'unverified' : chosen.evidence,
+    sampleCount: healthStatus === 'unknown' ? null : chosen.sampleCount,
+    errorRatio: healthStatus === 'unknown' ? null : chosen.errorRatio,
+  };
 }
 
 export function buildDashboard(observations: readonly Observation[], nowMs: number): Dashboard {
-  const services = SERVICES.map(service => evaluateService(observations.find(o => o.service === service), service, nowMs));
+  const services = SERVICES.map(service => reconcileService(observations, service, nowMs));
   const overall = services.some(s => s.status === 'fault') ? 'fault' :
     services.some(s => s.status === 'warning') ? 'warning' :
     services.some(s => s.status === 'unknown') ? 'unknown' : 'normal';
-  return { mode: 'mock_only', overall, partialUnknown: services.some(s => s.status === 'unknown'),
+  return { mode: 'mock_only', overall, partialUnknown: services.some(s => s.status === 'unknown' || s.conflict),
     observedAt: new Date(nowMs).toISOString(), services, actionsAllowed: false };
 }
 
