@@ -18,6 +18,9 @@ CREATE TABLE transcript_runs (
   approvedBy TEXT,
   approvedAt INTEGER,
   approvedMaxSeconds REAL NOT NULL DEFAULT 0,
+  publishedEpoch TEXT,
+  publishedPermissionRevision TEXT,
+  publishedCorrectionRevision TEXT,
   error TEXT,
   createdAt INTEGER NOT NULL,
   updatedAt INTEGER NOT NULL
