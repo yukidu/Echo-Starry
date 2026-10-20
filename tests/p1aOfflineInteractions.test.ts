@@ -68,7 +68,7 @@ test('cost calculator never grants production budget', () => {
   assert.ok(nodes.estimate.textContent.includes('這不會改變正式 NT$0 預算'));
   nodes.budget.value = '0';
   nodes.budget.trigger('input');
-  assert.ok(nodes.estimate.textContent.includes('這不會改變正式 NT$0 預算'));
+  assert.ok(nodes.estimate.textContent.includes('正式支出仍禁止'));
 });
 
 test('offline search never invents a missing result', () => {
