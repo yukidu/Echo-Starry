@@ -250,7 +250,7 @@ export async function excerpts(env:Env,track:any,u:any,mode:string,question:stri
         console.warn('C09 search index unavailable',error instanceof Error?error.name:'unknown');
         // Corrected or revoked content must NEVER silently fall back to the
         // original R2 text if the index fails after explicit activation.
-        return {prompt:'',sources:[]};
+        return {prompt:'',sources:[],evidence:[]};
       }
     }
   }
@@ -391,7 +391,7 @@ export async function generateQaWithQuality(env:Env,model:string,messages:any[],
   }catch(e){console.warn('QA quality repair unavailable',e instanceof Error?e.name:'unknown');}
   return {...initial,reply:'',qualityIssues:issues,repaired:true};
 }
-async function insertReply(env:Env,comment:any,track:any,reply:string,selectedSpeaker='',evidence:QaSearchEvidence[]=[]){
+export async function insertReply(env:Env,comment:any,track:any,reply:string,selectedSpeaker='',evidence:QaSearchEvidence[]=[]){
   const createdAt=Date.now(),id='qa-'+crypto.randomUUID(),name=selectedSpeaker||txt(track.speaker)||'演講者';
   const guard=qaSearchEvidenceGuard(evidence);
   // When indexed evidence is used, the decisive version verification AND the
