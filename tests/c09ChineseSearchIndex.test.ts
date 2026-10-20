@@ -195,16 +195,22 @@ test('correction add/accept/supplement/revoke immediately blocks stale results, 
       createdAt:1,segments:[{id:'s000001',start:2,end:12,text:'感恩是重要的態度'}]
     });}};
   }}};
-  const rebuilt=await rebuildQaSearchAfterMutation(env,'edit');
-  assert.equal(rebuilt.indexed,true);
+  const pending=await rebuildQaSearchAfterMutation(env,'edit');
+  assert.equal(pending.indexed,true);
   assert.equal(reads,1);
+  assert.equal((await findQaIndexedPassages(s.d1,'有效陪伴',['edit'])).hits.length,0,
+    'unapproved member corrections cannot be cited as AI evidence');
+  assert.equal((await findQaIndexedPassages(s.d1,'感恩',['edit'])).hits.length,1);
+  s.db.prepare("UPDATE transcript_correction_events SET status='accepted',updatedAt=51 WHERE id='event1'").run();
+  assert.equal((await findQaIndexedPassages(s.d1,'感恩',['edit'])).blocked.has('edit'),true);
+  await rebuildQaSearchAfterMutation(env,'edit');
   assert.equal((await findQaIndexedPassages(s.d1,'有效陪伴',['edit'])).hits.length,1);
   assert.equal((await findQaIndexedPassages(s.d1,'感恩',['edit'])).hits.length,0);
-  s.db.prepare("UPDATE transcript_correction_events SET status='supplemented',adminText='補充修正合作技巧',updatedAt=51 WHERE id='event1'").run();
+  s.db.prepare("UPDATE transcript_correction_events SET status='supplemented',adminText='補充修正合作技巧',updatedAt=52 WHERE id='event1'").run();
   assert.equal((await findQaIndexedPassages(s.d1,'有效陪伴',['edit'])).blocked.has('edit'),true);
   await rebuildQaSearchAfterMutation(env,'edit');
   assert.equal((await findQaIndexedPassages(s.d1,'補充修正',['edit'])).hits.length,1);
-  s.db.prepare("UPDATE transcript_correction_events SET status='revoked',updatedAt=52 WHERE id='event1'").run();
+  s.db.prepare("UPDATE transcript_correction_events SET status='revoked',updatedAt=53 WHERE id='event1'").run();
   assert.equal((await findQaIndexedPassages(s.d1,'補充修正',['edit'])).blocked.has('edit'),true);
   await rebuildQaSearchAfterMutation(env,'edit');
   assert.equal((await findQaIndexedPassages(s.d1,'感恩',['edit'])).hits.length,1);
