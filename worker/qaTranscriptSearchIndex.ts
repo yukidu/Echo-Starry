@@ -170,13 +170,12 @@ export async function rebuildQaSearchAfterMutation(env:{
   const base=Number(source.createdAt||0);
   const overrides=new Map<string,string>((Array.isArray(source.cleanedSegments)?source.cleanedSegments:[])
     .map((x:any)=>[String(x.id),String(x.text||'')]));
-  // Earlier legacy corrections and current moderation events are both honoured.
-  const old=await env.DB.prepare(
-    'SELECT segmentId,newText FROM transcript_corrections WHERE trackId=? AND createdAt>=? ORDER BY createdAt,id'
-  ).bind(trackId,base).all();
-  for(const row of rows(old))overrides.set(String(row.segmentId),String(row.newText||''));
+  // QA only uses administrator-approved corrections. Pending and legacy
+  // unreviewed changes can appear in subtitle editing, but must never become
+  // authoritative evidence for AI responses or prompt injection.
   const moderations=await env.DB.prepare(
-    "SELECT segmentId,newText,adminText FROM transcript_correction_events WHERE trackId=? AND createdAt>=? AND status<>'revoked' ORDER BY createdAt,id"
+    "SELECT segmentId,newText,adminText FROM transcript_correction_events "+
+    "WHERE trackId=? AND createdAt>=? AND status IN ('accepted','supplemented') ORDER BY createdAt,id"
   ).bind(trackId,base).all();
   for(const row of rows(moderations))overrides.set(String(row.segmentId),String(row.adminText||row.newText||''));
   const cleaned=[...overrides].map(([id,text])=>({id,text}));
