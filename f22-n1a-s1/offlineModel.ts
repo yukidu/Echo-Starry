@@ -217,7 +217,7 @@ export function fakeStats(db:DatabaseSync,period:Period,asOfMs:number,
 }
 
 /** Two independent budget SQLite files cannot provide global atomicity. */
-export function reserveFakeAcrossIsolatedDatabases():ReserveDecision{
+export function reserveFakeAcrossIsolatedDatabases(_first:DatabaseSync,_second:DatabaseSync):ReserveDecision{
  return {state:'UNKNOWN_LOCKED',permitted:false,detail:'UNSUPPORTED_CROSS_DATABASE'};
 }
 
