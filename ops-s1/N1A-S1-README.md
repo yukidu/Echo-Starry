@@ -30,3 +30,7 @@ node --import tsx --test tests/opsS1.test.ts tests/opsI1.test.ts tests/n1aS1Ops6
 2. 沒有 Cloudflare 官方 metrics、真帳單、真 D1/R2/KV 或真會員，也沒有真 Backend 權限/跨 Worker/跨區硬限流；真正額度/成本未知，不可顯示「$0」。
 3. 模擬 2,000 並發只共用**同一個程式執行個體**的快照，不能承諾全球只查一次；管理頁禁背景輪詢，建議每中央管理員 60 秒內最多手動刷新一次且分頁≤25筆。
 4. 真 Workflow、Whisper、Provider、B07、備份／還原／刪除/付費完全保持關閉，未碰其他 AI 的 PR，不能單獨合併 main 或啟動任何正式部署。
+
+## PR / CI 注意
+
+本批為 AI6 Draft #472，開發仍保持關閉。因既有 GitHub CI 僅對目標 main 的 PR 觸發，驗收時先在 PR 指向 main 的情況提交此文件修訂以啟動測試，**完成後應將 PR base 恢復至 AI6 #462 安全分支**，免得重複顯示前置 PR 原型變更。CI/Preview 綠燈不能替代 N1A 真安全權威核准。
