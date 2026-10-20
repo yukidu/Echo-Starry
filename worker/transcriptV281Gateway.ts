@@ -371,7 +371,7 @@ export default {
         if(current?.status!=='ready'||!current?.r2Key)
           return json({error:'尚未有可安全保留的已完成原稿'},409);
         const run=await requestSafeRun(db,{
-          trackId,intent:'relisten',sourceAudioKey:key,
+          trackId,intent:'relisten',sourceAudioKey:key,sourceAudioUrl:audio,
           requestKey:'relisten:'+trackId+':'+current.r2Key,
           approvedBy:text(actor.id),approvedMaxSeconds:seconds
         });
