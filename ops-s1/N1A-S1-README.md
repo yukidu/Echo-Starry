@@ -60,3 +60,5 @@ node --import tsx --test tests/n1aS1Ops6.test.ts tests/n1aS1ProofHandoff6.test.t
 ```
 
 限制：此處的「撤權」、「回捲」僅**固定合成顯示狀態**，並未核對真會員/憑證或獨立防回捲高水位。絕對不可將 UI 可見字串、前端宣稱的 `simulatedAllowed:true` 接進真放行 API。AI2 的 `SecurityProofV1` 及其假 verifier 位於另個 Draft #469，未成為本 PR 的真程式相依，正式跨組共享**仍 BLOCKED**；這批新增測試僅檢查 AI6 的匿名 Fake 決策交接形狀，不是六組的跨分支整合執行。
+
+CI 驗收補充：第二輪只允許 GitHub 現有 Regression audit／CodeQL／建置／瀏覽器假資料檢查。若為觸發 main-based CI 暫時調整 PR base，工作流程結束後必須恢復 stacked Draft base=#462；CI 自動 Preview 非正式部署，不進行任何正式雲端資料驗證。
