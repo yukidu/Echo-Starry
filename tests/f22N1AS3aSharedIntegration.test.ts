@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import type {DatabaseSync} from 'node:sqlite';
+import {DatabaseSync} from 'node:sqlite';
+import {mkdtempSync,copyFileSync,rmSync} from 'node:fs';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
 import {
   evaluateS3aFakeEnvelope,N1A_S3A_PRODUCTION_GATE,
   type S3aEnvelope,type S3aExpected,type S3aFakeReaders,
@@ -28,8 +31,8 @@ const resource:S3aCurrentResource={
  entitled:true,revoked:false,deleted:false,revocationPending:false,
 };
 const readResourceProof=({entitled:_,revoked:__,deleted:___,revocationPending:____,...proof}:S3aCurrentResource)=>proof;
-function fixture(){
- const db=newFakeDatabase(),source=new FakeStarryIdSource('AI5-N1A-S3A-TEST-NO-REAL-KEY');
+function fixture(existingDb?:DatabaseSync){
+ const db=existingDb??newFakeDatabase(),source=new FakeStarryIdSource('AI5-N1A-S3A-TEST-NO-REAL-KEY');
  source.register('registered-1');source.register('registered-2');
  const e1=source.firstAccept({logicalSourceId:'same-logical-1',app:'echo',subject:'registered-1',
   acceptedAtUtcMs:NOW-3000,track:MOCK_STATS_RESOURCE_ID,state:'done'});
@@ -239,4 +242,29 @@ test('S3A-AI5-11 Cloudflare rows and AI hold are distinct, no paid provider exec
   assert.equal(answer.d1RowsWritten,null);
   assert.equal(answer.productionAuthorized,false);
  }finally{a.db.close();}
+});
+
+
+test('S3A-AI5-12 restored older SQLite cannot release stats through actual shared verifier path',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'ai5-s3a-restore-'));
+ const current=join(dir,'fake-events.sqlite'),old=join(dir,'before-events.sqlite');
+ let initial:DatabaseSync|null=null,restored:DatabaseSync|null=null;
+ try{
+  initial=newFakeDatabase(current);
+  initial.close();initial=null;
+  // Persist an older, empty-but-valid DB snapshot outside the verifier.
+  copyFileSync(current,old);
+  const after=new DatabaseSync(current);
+  const a=fixture(after); // seals independently after three fake events
+  assert.equal((await readSyntheticPrivateStatsWithS3a(a.options)).simulatedAllowed,true);
+  after.close();
+  copyFileSync(old,current);
+  restored=new DatabaseSync(current);
+  const denied=await readSyntheticPrivateStatsWithS3a({...a.options,db:restored});
+  assert.equal(denied.simulatedAllowed,false);
+  assert.equal(denied.report,null);
+  assert.equal(denied.reason,'FAKE_STATS_WITNESS_OR_READER_UNAVAILABLE');
+ }finally{
+  initial?.close();restored?.close();rmSync(dir,{recursive:true,force:true});
+ }
 });
