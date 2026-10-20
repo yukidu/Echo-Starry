@@ -48,3 +48,25 @@
 5. 此本機試驗不代表真實 Cloudflare D1 全球節點的延遲與資源額度。若需驗證真實 2,000 人同時使用，另取得**隔離且可核實免費額度的 Preview／測試帳號**授權；禁止使用正式會員資料、上傳音檔、AI 服務或正式部署。無法確認成本為零則停止，不執行。
 6. 無模型核准、價格憑證及真實帳單前，**第二道供應商付費停止沒有啟用**，所以目前不能說「AI 雙重費用保護已在正式站全面生效」。B07-01 始終只是中央 staging-only PR。
 
+
+## 第三輪：純本機假資料 2,000 虛擬用戶 HTTP 演練與 AI7 合併後驗收（2026-10-20）
+
+### 環境、成本與限制
+- Node.js、Python 3（含內建 SQLite），一台本機電腦，無須任何 Cloudflare/AI API key、AI Gateway 或付費服務。
+- tests/b07-offline-http-fake-users.mjs 只建立 127.0.0.1 隨機埠號的 HTTP 伺服器；tests/b07-offline-http-sqlite-worker.py 僅使用本機暫存 SQLite、原版 B07 schema 與假模型、假使用者身分。結束自動清除。
+- 直接執行：node tests/b07-offline-http-fake-users.mjs；同時已加入 npm test 的 B07 回歸檢查。
+- **2,000 個不同假用戶各自發起一筆 HTTP 請求，但最大真實並行本機 sockets 明確限制為 96。** 2,000 是模擬身分與總發出請求數，不是 2,000 位真人同時在線，也不是 Cloudflare Worker/D1 同時負載。
+- 本機演練不訪問正式域名、任何 Cloudflare Preview、正式資料庫、R2、外部模型或網路供應商；無真實 AI 請求、無付費測試，僅消耗本機 CPU/RAM。GitHub CI 可能消耗方案內執行額度，需按帳戶條件區分；本機無外部用量。
+- 實際可驗收：2000 假人送件 → 300 筆通過假免費池 300 units 限制；80 次重複請求不新增記帳；40 筆假付費請求在 NT$0 上限下全拒；未知模型拒絕；四層預留及事件均不超額；記錄 sockets 峰值、後端 SQLite 排隊數及 p50/p95/p99（不能事先保證 SLA）。
+- 既有 SQLite 測試仍是 2,000 筆提交、最多 12 個執行緒，與本地 HTTP 測試互補，不是線上 2,000 並發容量認證。
+- 如需 2,000 條真正同時打到 Cloudflare 的連線，必須另行確認雲端額度與隔離環境並取得使用者明確授權；目前一律不執行。
+
+### AI7 PR #457 → B07 PR #458 合併後的整合安全閘門
+- 目前兩 PR 都尚未合併。B07 與 AI7 唯一交叉修改路徑為 worker/starryIdCentralRouter.ts，必須在總指揮確定合併順序後由較後者重新比對最新 main，保留兩邊 imports、API、管理頁，不得覆蓋。
+- tests/b07Ai7PostmergeIntegration.test.ts 在 AI7 尚未合併時會明示 skipped；合併後強制驗證兩邊的中央超管授權、同源保護、預算及備份 API／頁面共存，沒有直接呼叫真 AI 或執行正式還原。
+- 在授權的本地整合 worktree 執行 B07_REQUIRE_AI7_MERGED=1 npm test。若應該存在的 AI7 原始檔消失，測試必須 FAIL，不能當作成功；並使用內存 SQLite 同時執行兩份 additive migration，驗證 B07 預算預設0、AI7 enabled=0。
+- 接續執行 npm run lint、npm run build、CodeQL、Preview 與全回歸，再由總指揮審核；本階段不進行任何正式 merge/main 修改/D1 更新/Production 部署。
+- AI5 PR #459 僅從現有 QA 請求統計，不把 B07 staging 成本當真實支出。AI7 後續同一時間點備份必須連 B07 request_key、預留、結算、事件、政策與費率一起保存，以免還原後重複計費。
+
+### 目前真正的防護上線範圍
+- B07 仍是獨立 staging 控制層，沒有接入既有 Echo 問答、Whisper、電池或 AI 提供商；舊功能程式未修改。因此「本地測試綠燈」不能被說成現有正式 AI 開支已受完整雙重保護。
