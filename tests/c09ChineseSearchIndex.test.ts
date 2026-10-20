@@ -265,3 +265,45 @@ test('simulated 112 recordings: competing searches report local SQLite storage, 
   assert.ok(Number.isFinite(p95)&&p95>=0);
  }finally{s.close();}
 });
+
+test('negative Chinese question never cites a contradictory positive-only passage',async()=>{
+ const s=store();
+ try {
+   await seed(s,'neg','反向內容','講者甲','他決定放棄進修，沒有繼續學習');
+   await seed(s,'affirm','否定說法','講者乙','他沒有放棄進修，始終堅持學習');
+   const ids=['neg','affirm'];
+   const a=await findQaIndexedPassages(s.d1,'他沒有放棄進修',ids);
+   assert.equal(a.hits.length,1);
+   assert.equal(a.hits[0].trackId,'affirm');
+   const b=await findQaIndexedPassages(s.d1,'他不曾放棄進修',ids);
+   assert.equal(b.hits.length,0,'absence of evidence must not be treated as positive answer');
+ }finally{s.close();}
+});
+test('concurrent source correction during indexing prevents stale publish (changeRevision CAS)',async()=>{
+ const s=store();
+ try{
+   await seed(s,'race','並行測試','講者','初始資料提到進修');
+   s.db.prepare("UPDATE qa_search_state SET invalidated=1 WHERE trackId='race'").run();
+   let mutate=true;
+   const db:any={
+     ...s.d1,
+     async batch(stmts:any[]){
+       await s.d1.batch(stmts);
+       if(mutate){
+         mutate=false;
+         s.db.prepare("INSERT INTO transcript_correction_events(id,trackId,segmentId,createdAt,updatedAt,status,newText) VALUES (?,?,?,?,?,'pending_review',?)")
+           .run('raced','race','s000001',100,100,'更正成另一種說法');
+       }
+     }
+   };
+   await assert.rejects(
+     replaceQaSearchGeneration(db,{trackId:'race',sourceKey:'transcripts/race/transcript.json',
+       sourceUpdatedAt:1,generation:'raced-old',speaker:'講者',
+       subtitles:[{id:'s000001',start:0,end:3,text:'早已過時的舊文字'}]}),
+     /來源已變更/
+   );
+   const out=await findQaIndexedPassages(s.d1,'早已過時',['race']);
+   assert.equal(out.blocked.has('race'),true);
+   assert.equal(out.hits.length,0);
+ }finally{s.close();}
+});
