@@ -35,7 +35,7 @@ test('N1A6-P2-01 no proof => App unknown despite six green demo Cloudflare servi
  assert.equal(result.domains.app_security.status,'unknown');
  assert.equal(result.proofHandoff.proofState,'unknown');
  assert.equal(result.domains.ai_billing.status,'normal');
- assert.equal(result.domains.backup_restore.status,'normal');
+ assert.equal(result.domains.backup_restore.status,'unknown');
 });
 test('N1A6-P2-02 revoked OR unavailable is ambiguous: do not claim confirmed revocation',()=>{
  const result=showFakeProofHandoff(base(),decision('membership_revoked_or_unavailable'));
@@ -52,7 +52,7 @@ test('N1A6-P2-03 a changed membership revision must deny without exposing identi
 test('N1A6-P2-04 verified fake witness revocation OR deletion record gives local warning, not platform fault',()=>{
  const result=showFakeProofHandoff(base(),decision('witness_records_revocation_or_deletion'));
  unchangedPlatform(result);locked(result);
- assert.equal(result.domains.app_security.status,'warning');
+ assert.equal(result.domains.app_security.status,'unknown');
  assert.equal(result.proofHandoff.proofState,'revocation_or_deletion_record');
  assert.equal(result.domains.ai_billing.status,'normal');
  assert.equal(result.domains.backup_restore.status,'normal');
@@ -106,8 +106,8 @@ test('N1A6-P2-10 existing backup fault remains RED despite witness mismatch',()=
 test('N1A6-P2-11 fake consistent proof never unlocks payment, backup or real access',()=>{
  const result=showFakeProofHandoff(base(),decision('fake_evidence_consistent',true));
  unchangedPlatform(result);locked(result);
- assert.equal(result.proofHandoff.proofState,'mock_consistent');
- assert.equal(result.domains.app_security.status,'normal'); // Only complete fake observations.
+ assert.equal(result.proofHandoff.proofState,'not_verified');
+ assert.equal(result.domains.app_security.status,'unknown'); // Client-claimed fake success is not trusted proof.
  assert.equal(result.proofHandoff.productionAuthorized,false);
 });
 test('N1A6-P2-12 even before_commit success is only a fake assessment, never authorization',()=>{
