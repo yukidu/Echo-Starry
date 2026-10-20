@@ -38,9 +38,19 @@ async function fixture():Promise<FakeInteropRequest>{
       trackId:'track-1',memberIds:['member-one'],review:'published'
     }]};
   const manifestHash=await sha256FakeText(JSON.stringify([backup]));
+  const fakeClaims=new Set<string>();
   const env:MockEnvironment={
     readWitness:async()=>witness,
     readIndependentHead:async()=>head,
+    readTrustedFloor:async()=>({
+      sourceId:'fake-offline-third-trust-floor',
+      headSeq:witness.headSeq,headHash:witness.headHash,
+      restoreEpoch:witness.restoreEpoch,observedAtMs:NOW-1000
+    }),
+    claimFakeReviewOnce:async requestId=>{
+      if(fakeClaims.has(requestId))return false;
+      fakeClaims.add(requestId);return true;
+    },
     readStarryId:async()=>id,
     readFakeR2:async()=>raw
   };
