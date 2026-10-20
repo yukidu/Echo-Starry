@@ -40,18 +40,6 @@ export async function queueNextTranscriptGate2P0(env:Env){
   }
   for(let i=0;i<claimed.length;i++){
     const run=claimed[i],trackId=String(run.trackId),runId=String(run.runId);
-    if(run.intent==='first'){
-      const index=await env.DB.prepare(
-        "UPDATE transcript_index SET status='queued',updatedAt=? "+
-        "WHERE trackId=? AND status='pending' AND r2Key IS NULL RETURNING trackId")
-        .bind(now,trackId).first();
-      if(!index){
-        await env.DB.prepare("UPDATE transcript_runs SET state='failed',error='queue_claim_lost',updatedAt=? "+
-          "WHERE runId=? AND state='queued'").bind(now,runId).run();
-        failures.push({trackId,error:'queue claim lost'});
-        continue;
-      }
-    }
     try{
       const safeId=trackId.replace(/[^A-Za-z0-9_-]/g,'_').slice(0,32);
       const instanceId='echo-gate2-'+safeId+'-'+runId.replace(/[^A-Za-z0-9_-]/g,'').slice(0,28);
