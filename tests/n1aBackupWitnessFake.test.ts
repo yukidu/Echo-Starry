@@ -250,3 +250,14 @@ test('2000 fake members, one historical revoked => no restoration',async()=>{
   assert.ok(result.reasons.includes('MEMBER_MISSING_OR_REVOKED'));
   assert.equal(result.productionAuthorized,false);
 });
+
+
+test('malformed head sequence fails closed without throwing',async()=>denied('BACKUP_SECURITY_VERSION_INVALID',f=>{
+  f.beforeW={...f.beforeW!,headSeq:'nonsense'};f.afterW=f.beforeW;
+  f.beforeH={...f.beforeH!,headSeq:'nonsense'};f.afterH=f.beforeH;
+}));
+test('unverified unrelated old backup never becomes an expiry-delete candidate',async()=>denied('BACKUP_GRAPH_INVALID',f=>{
+  const stale:MockBackup={id:'other-bad-full',parentId:null,kind:'full',
+    createdAtMs:NOW-120*DAY,securitySeq:'1',state:'failed',files:[]};
+  f.input={...f.input,backups:[...f.input.backups,stale]};
+}));
