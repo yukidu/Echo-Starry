@@ -31,3 +31,23 @@ npm run lint
 - 真正全量/差異備份、lastGood 持久化、隔離還原、稽核鏈與真清理系統。任何權威證據不完整，正式還原/公開仍保持**禁用**。
 
 **本次唯有 GitHub 安全分支、Draft PR、純假資料測試獲授權，不得合併 main 或 Production。**
+
+
+## N1A-S1 第二輪｜與 AI2 Draft #469 的 Fake SecurityProof 欄位互通驗收
+
+- 新增 `fakeSecurityProofInterop.ts` 與 `tests/n1aBackupSecurityProofInteropFake.test.ts`；依 [AI2 PR #469](https://github.com/yukidu/Echo-Starry/pull/469) 目前的 `SecurityProofV1` **欄位形狀**建立 AI7 自有的**離線相容性模型**。由於 #469 尚未合併 main，**沒有直接匯入 AI2 程式，也沒有聲稱跑過跨 PR 的實際連接測試**。
+- `securitySeq` 指 AI7 外部**事件鏈最高序號**（對應 `MockWitness.headSeq`）；`restoreEpoch` 是獨立的還原保護版本；`revocationWatermark`、`deletionWatermark` 是受信任事件來源的獨立水位，**不能從 `securitySeq` 或 `restoreEpoch` 猜出來**。四者均必須是 uint64 正規十進位字串，與兩份 Fake 外部來源逐項核對。
+- `membershipRevision` 是特定會員的權限版次；**不等於** Starry ID 整庫 `MockStarryId.revision`，也不等於 AI7 `headSeq` 或 restoreEpoch。整庫 revision 僅能與獨立 `minStarryIdRevision` 比較是否倒退。未來需要 Starry ID 提供**真實逐會員 revision**的可信證據。
+- `sourceRevision` 是內容來源字串（例如受信任 ETag），不是 AI5 統計 `sourceRevision:number`；`correctionRevision`、`permissionRevision` 亦是不同業務版本。AI7 還沒有可信真音檔來源/個別修訂證據，只能在 Fake 試驗中驗格式與變動，不得當正式證明。
+- 模擬 `precheck` 與 `before_commit` 必須**同 requestId + backupId + nonce + 最新 witness head + 權限水位**。審查期間任何權威/批准/水位變動，即使雙方 Fake 值能重新配對，也拒絕沿用舊批准；最終失聯及之前備份閘門拒絕時，`cleanupReviewOnly=[]`。
+- **任何情況都沒有** `executableRestore`、`executableDelete`、`executableCleanupCandidates`；就算 Fake 合法並顯示一個供討論的過期名稱，這不是可交給真刪除器的工作清單。
+- AI2 的 `fakeAttestation` 和 AI7 的 source ID/事件 hash 都不能驗證真正簽章、WORM 不可回捲或兩個實體帳戶隔離，真錨點的落點、簽章、最高水位與成本仍由 AI2／使用者決定。
+
+測試：
+```sh
+node --import tsx --test tests/n1aBackupWitnessFake.test.ts
+node --import tsx --test tests/n1aBackupSecurityProofInteropFake.test.ts
+npm run lint
+```
+
+**限制：** 這是「依照 #469 已讀的契約形狀作離線欄位核對」，不是 #469 與 #470 真正打通。兩個 PR 都是 Draft/OFF，正式 SecurityProof 合約版本、來源權限、真人雙審及後端整合必須由中央 AI2 另行凍結與授權。
