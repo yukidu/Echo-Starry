@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>繁星 Starry 安全總控｜N1A-S3A 離線示範</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;background:#0b1220;color:#e6ecf6}
+*{box-sizing:border-box}body{margin:0}main{max-width:1160px;margin:auto;padding:24px}
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+h1{font-size:clamp(1.5rem,3vw,2rem);margin:0 0 8px;letter-spacing:.02em}
+h2{font-size:1.15rem;margin:0}h3{font-size:1rem;margin:0}
+p{margin:7px 0;line-height:1.55}.sub{color:#b8c5d9;font-size:.88rem}
+.stamp{padding:7px 12px;border:1px solid #e2bf6c;color:#ffe1a0;border-radius:30px;font-size:.8rem;font-weight:700;white-space:nowrap}
+.banner{padding:14px 17px;border:1px solid #a37a35;border-radius:12px;background:#332b1d;margin:18px 0;color:#ffdfa3}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.legend span{border:1px solid #354765;border-radius:24px;padding:5px 10px;font-size:.8rem}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:16px 0}
+.toolbar button{appearance:none;border-radius:9px;border:1px solid #657fa8;background:#253a58;color:#fff;padding:10px 12px;cursor:pointer;font:inherit;font-size:.83rem}
+.toolbar button[aria-pressed="true"]{background:#547abb;border-color:#b5d2ff}
+.toolbar button:focus-visible{outline:3px solid #f0bf66;outline-offset:2px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.panel{background:#162239;border:1px solid #304360;border-radius:16px;padding:19px;min-width:0}
+.panel-head{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid #334560}
+.hint{font-size:.79rem;color:#a9bcd7}.service-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:14px}
+.service{padding:11px;background:#202e46;border-radius:10px;min-width:0}
+.service-name{font-size:.84rem;font-weight:700;margin-bottom:8px}
+.pill{display:inline-block;border-radius:99px;padding:4px 9px;font-size:.8rem;font-weight:750}
+.pill.unknown{background:#4b5567;color:#f0f3fa}
+.pill.normal{background:#13563e;color:#ccffdf}
+.pill.warning{background:#7a4c16;color:#ffdeae}
+.pill.fault{background:#812d41;color:#ffe0e7}
+.data-line{padding:10px 0;border-bottom:1px solid #2c3e58;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.data-line:last-child{border-bottom:0}
+.data-line strong{font-size:.9rem}.data-line small{display:block;color:#b1c1da;margin-top:4px}
+.lock{font-weight:700;color:#f9dba4}.domain-details{margin:13px 0 0;font-size:.82rem;color:#abbcd7}
+.events{margin-top:18px}.event{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 0;border-bottom:1px solid #30435e;font-size:.84rem}
+footer{margin:18px 0 0;color:#a5b7d1;font-size:.83rem;line-height:1.6}
+@media(max-width:750px){main{padding:14px}.grid{grid-template-columns:1fr}.service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.panel{padding:15px}header{display:block}.stamp{display:inline-block;margin-top:12px}}
+@media(max-width:380px){.service-grid{gap:6px}.service{padding:8px}.toolbar button{font-size:.78rem;padding:9px}}
+</style>
+</head>
+<body><main>
+<header><div><h1>✦ 繁星安全總控</h1><p class="sub">Starry.phd · N1A-S3A 共用假驗證 × 安全監控 · 手機／桌機介面</p></div><span class="stamp">離線假資料 / 非正式網站</span></header>
+<div class="banner"><strong>S3A：同進程 AI2 假驗證只在離線程式測試與假 REST 執行，這個靜態預覽不讀取任何證明；即使六平台模擬正常，App／費用／備份也不能憑假資料亮綠或解除安全鎖。</strong>沒有連接 Starry ID、Cloudflare、AI 帳單或備份。撤權或來源失聯時，不能直接認定已撤權；錨點版本不符也不代表已確證回捲。此頁不代表目前服務健康，也沒有付費、重試、還原或解鎖功能。</div>
+<div class="legend"><span>🟢 正常：有完整假證據</span><span>🟡 警示：需人工處理</span><span>🔴 故障：假事件已確證</span><span>⚪ 未知：不能判定正常</span><span>🔒 敏感操作一律鎖定</span></div>
+<div class="toolbar" aria-label="切換離線假資料情境">
+<button type="button" data-scenario="unknown" aria-pressed="true">證據未知</button>
+<button type="button" data-scenario="normal" aria-pressed="false">雲端假正常／安全仍未知</button>
+<button type="button" data-scenario="warning" aria-pressed="false">跨組警示</button>
+<button type="button" data-scenario="fault" aria-pressed="false">已確認故障</button>
+<button type="button" data-scenario="isolated" aria-pressed="false">平台正常／App 備份異常</button>
+<button type="button" data-scenario="proofUnknown" aria-pressed="false">安全證明未知</button>
+<button type="button" data-scenario="proofRevoked" aria-pressed="false">假撤權／刪除命中</button>
+<button type="button" data-scenario="proofRollback" aria-pressed="false">錨點版本不符</button>
+</div>
+<div class="grid">
+<section class="panel" aria-labelledby="cloud-heading">
+ <div class="panel-head"><div><h2 id="cloud-heading">A. Cloudflare 六服務健康</h2><p class="hint">只代表平台本身，不受 App、帳單或備份事件連動</p></div><span class="pill unknown" id="cloud-status">未知</span></div>
+ <div class="service-grid" id="cloud-services" aria-live="polite"></div>
+ <p class="domain-details">資料來源：離線假監控。正式指標未連接；任何綠色僅屬示範。</p>
+</section>
+<section class="panel" aria-labelledby="app-heading">
+ <div class="panel-head"><div><h2 id="app-heading">B. 會員／逐字稿安全</h2><p class="hint">中央 Starry ID 身份、撤權、排隊與內容引用</p></div><span class="pill unknown" id="app-status">未知</span></div>
+ <div class="data-line"><div><strong>中央管理權限</strong><small>正式權限不由這個示範頁授權</small></div><span class="lock">🔒 待核</span></div>
+ <div class="data-line"><div><strong>逐字稿工作</strong><small id="app-reason">來源與時間未核實</small></div><span class="pill unknown" id="app-detail">未知</span></div>
+ <div class="data-line"><div><strong>AI2 安全證明交接（假資料）</strong><small id="proof-description">尚無證明；不顯示身份資料</small></div><span class="pill unknown" id="proof-state">未知</span></div>
+ <p class="domain-details">不自動重跑 Whisper，不覆寫已完成稿。</p>
+</section>
+<section class="panel" aria-labelledby="billing-heading">
+ <div class="panel-head"><div><h2 id="billing-heading">C. AI 費用／待對帳</h2><p class="hint">費用不明與 Hold 只影響費控，不代表 Workers AI 當機</p></div><span class="pill unknown" id="billing-status">未知</span></div>
+ <div class="data-line"><div><strong>官方帳單資料</strong><small>真實用量／餘額未授權讀取</small></div><span class="pill unknown">未知</span></div>
+ <div class="data-line"><div><strong>新付費模型嘗試</strong><small id="billing-reason">沒有可信費用證明</small></div><span class="lock">🔒 停止</span></div>
+ <p class="domain-details">不解除 B07、Provider 或 Whisper 安全保護。</p>
+</section>
+<section class="panel" aria-labelledby="backup-heading">
+ <div class="panel-head"><div><h2 id="backup-heading">D. 備份還原／雙人批准</h2><p class="hint">備份完整性問題不能當作 R2 平台故障</p></div><span class="pill unknown" id="backup-status">未知</span></div>
+ <div class="data-line"><div><strong>N1A 外部安全版本</strong><small id="witness-description">見證保存服務尚未正式建立</small></div><span class="pill unknown" id="witness-state">未知</span></div>
+ <div class="data-line"><div><strong>兩位獨立中央超管</strong><small>必須同版本、當下仍有權限</small></div><span class="lock">🔒 待驗 0/2</span></div>
+ <div class="data-line"><div><strong>備份／還原</strong><small id="backup-reason">任何安全證據不明都禁止還原</small></div><span class="lock">🔒 已鎖定</span></div>
+</section>
+</div>
+<section class="panel events" aria-labelledby="events-heading"><div class="panel-head"><div><h2 id="events-heading">匿名安全事件</h2><p class="hint">僅示範固定事件代碼；不含真會員、音檔、原稿或金鑰</p></div><span class="pill unknown">≤25 筆／頁</span></div><div id="events-list" aria-live="polite"></div></section>
+<footer>本頁只提供固定場景切換，不發 HTTP／WebSocket 請求，也不使用定時輪詢。畫面刷新、超管身分核驗、Cloudflare 指標及安全版本見證皆尚未正式接線。</footer>
+</main><script>
+'use strict';
+// All text is fixed anonymous sample data. No fetch, WebSocket, timer or storage.
+const labels=['Workers','Workflows','D1','R2','KV','Workers AI'];
+const words={unknown:'未知',normal:'正常',warning:'警示',fault:'故障'};
+const scenarios={
+ unknown:{cloud:'unknown',app:'unknown',billing:'unknown',backup:'unknown',events:[],reason:['來源尚未驗證','帳單來源未知','沒有可信備份資料']},
+ normal:{cloud:'normal',app:'unknown',billing:'unknown',backup:'unknown',events:[],reason:['只有平台六項假觀測，沒有真 Starry ID 授權','沒有真帳單與付款權限，不能放行','沒有真獨立見證，還原永久鎖定']},
+ warning:{cloud:'unknown',app:'warning',billing:'warning',backup:'warning',events:[
+ ['app_security','APP_QUEUE_UNCONFIRMED','警示'],['ai_billing','BILLING_UNCERTAIN_HOLD','警示'],['backup_restore','RESTORE_LOCKED','警示']],
+ reason:['模擬：排隊失聯，人工核對','模擬：費用未決，禁止新支出','模擬：雙人資格待確認']},
+ fault:{cloud:'unknown',app:'fault',billing:'warning',backup:'fault',events:[
+ ['app_security','APP_TRANSCRIPT_FAILED','故障'],['ai_billing','BILLING_UNCERTAIN_HOLD','警示'],['backup_restore','BACKUP_INTEGRITY_FAILED','故障']],
+ reason:['模擬：逐字稿確證失敗','模擬：額度不明／費用 Hold','模擬：備份檔案驗證失敗']},
+ isolated:{cloud:'normal',app:'warning',billing:'warning',backup:'fault',events:[
+ ['app_security','APP_QUEUE_UNCONFIRMED','警示'],['ai_billing','BILLING_UNCERTAIN_HOLD','警示'],['backup_restore','BACKUP_INTEGRITY_FAILED','故障']],
+ reason:['模擬：逐字稿 queue 需確認','模擬：帳務不明持續 Hold','模擬：單一備份損毀；不等於 R2 故障']},
+ proofUnknown:{cloud:'normal',app:'unknown',billing:'unknown',backup:'unknown',events:[],
+ reason:['SecurityProof 無法驗證；不允許敏感操作','模擬：無帳務異常，但付費仍鎖定','安全版本來源未確立，禁止還原'],
+ proof:['unknown','沒有可信 AI2 判定：未知，仍鎖定','unknown','外部見證待查']},
+ proofRevoked:{cloud:'normal',app:'unknown',billing:'unknown',backup:'unknown',events:[
+ ['app_security','UNVERIFIED_FAKE_WITNESS_DENIAL','未知']],
+ reason:['自報撤權或刪除記錄，未經可信後端驗證；拒絕操作','模擬：帳務與權限分離，新付費仍禁止','版本無可信查證：未知，還原仍鎖定'],
+ proof:['unknown','自報假見證，不能證實真撤權或刪除','unknown','版本未經可信核對；保持鎖定']},
+ proofRollback:{cloud:'normal',app:'unknown',billing:'warning',backup:'unknown',events:[
+ ['app_security','WITNESS_VERSION_MISMATCH_UNVERIFIED','警示'],['ai_billing','BILLING_UNCERTAIN_HOLD','警示']],
+ reason:['外部見證版本不一致／可能回捲；不得宣稱已確證回捲','模擬：未知帳單獨立鎖定','外部安全版本未核實；禁止還原'],
+ proof:['unknown','AI2 回覆：版本不一致或可能回捲，沒有確認真實回捲','unknown','外部錨點版本不符，保持鎖定']}
+};
+function badge(value){const e=document.createElement('span');e.className='pill '+value;e.textContent=words[value];return e;}
+function status(id,value){const n=document.getElementById(id);n.replaceWith(Object.assign(badge(value),{id}));}
+function show(which){
+ const s=scenarios[which]||scenarios.unknown;
+ const container=document.getElementById('cloud-services');
+ container.replaceChildren();
+ for(const label of labels){const box=document.createElement('div');box.className='service';
+ const name=document.createElement('div');name.className='service-name';name.textContent=label;
+ box.append(name,badge(s.cloud));container.appendChild(box);}
+ for(const [id,value] of [['cloud-status',s.cloud],['app-status',s.app],['billing-status',s.billing],['backup-status',s.backup],['app-detail',s.app]])status(id,value);
+ document.getElementById('app-reason').textContent=s.reason[0];
+ document.getElementById('billing-reason').textContent=s.reason[1];
+ document.getElementById('backup-reason').textContent=s.reason[2];
+ const proof=s.proof||['unknown','沒有可信 AI2 SecurityProof；保持鎖定','unknown','外部見證尚未正式建立'];
+ status('proof-state',proof[0]);status('witness-state',proof[2]);
+ document.getElementById('proof-description').textContent=proof[1];
+ document.getElementById('witness-description').textContent=proof[3];
+ const list=document.getElementById('events-list');list.replaceChildren();
+ if(!s.events.length){const p=document.createElement('p');p.className='sub';p.textContent='本假資料場景無異常事件；這不代表真實系統無事件。';list.appendChild(p);}
+ for(const item of s.events){const line=document.createElement('div');line.className='event';const tag=document.createElement('strong');
+ tag.textContent=item[0]+' · '+item[1]+'（假資料）';line.append(tag,badge(item[2]==='故障'?'fault':item[2]==='未知'?'unknown':'warning'));list.appendChild(line);}
+ for(const button of document.querySelectorAll('[data-scenario]'))button.setAttribute('aria-pressed',String(button.dataset.scenario===which));
+}
+for(const button of document.querySelectorAll('[data-scenario]'))button.addEventListener('click',()=>show(button.dataset.scenario));
+show('unknown');
+</script></body></html>

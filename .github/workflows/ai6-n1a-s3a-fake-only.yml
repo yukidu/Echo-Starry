@@ -1,0 +1,36 @@
+name: AI6 N1A S3A offline interop checks
+on:
+  push:
+    branches:
+      - safety/ai6-n1a-s3a-shared-console-20261020
+  pull_request:
+    paths:
+      - 'ops-s1/**'
+      - 'tests/n1aS3aAi6SharedConsole.test.ts'
+      - '.github/workflows/ai6-n1a-s3a-fake-only.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ai6-s3a-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  offline-ai6-s3a:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout fake-only branch
+        uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dev dependencies without lifecycle scripts
+        run: npm install --ignore-scripts --no-package-lock --no-audit --no-fund
+      - name: Run shared AI2 verifier and actual AI6 model in one process
+        run: node --import tsx --test tests/n1aS3aSharedEnvelope.test.ts tests/n1aS3aAi6SharedConsole.test.ts
+      - name: Run existing repository test suite
+        run: npm test
+      - name: Check TypeScript
+        run: npm run lint
+      - name: Build without deploy
+        run: npm run build
