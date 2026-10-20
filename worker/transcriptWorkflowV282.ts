@@ -169,9 +169,10 @@ async function traditionalizeBatchRobust(env: Env, values: string[]): Promise<st
   }
 }
 
-async function traditionalizeSegments(env: Env, step: WorkflowStep, segments: Segment[]) {
+async function traditionalizeSegments(env: Env, step: WorkflowStep, segments: Segment[], safeRun?: SafeRun | null) {
   const batchSize = 12;
   for (let offset = 0; offset < segments.length; offset += batchSize) {
+    if (safeRun) await assertLiveRun(env.DB, safeRun);
     const batch = segments.slice(offset, offset + batchSize);
     const normalized: string[] = await step.do(
       `traditionalize-${String(Math.floor(offset / batchSize) + 1).padStart(3, '0')}`,
@@ -330,7 +331,7 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
 
       const rawWhisper = JSON.stringify({trackId,model:MODEL,segments:segments.map(part => ({...part}))});
       const isChinese = likelyChineseTranscript(segments);
-      if (isChinese) await traditionalizeSegments(this.env, step, segments);
+      if (isChinese) await traditionalizeSegments(this.env, step, segments, gate2 ? safeRun : null);
       const storedLanguage = isChinese ? 'zh-Hant-TW' : 'original';
       // Preserve raw segments and timecodes; store separate C1 display text only.
       // Snapshot one policy version for this entire recording, without reading D1 during playback.
@@ -340,7 +341,10 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
         const part = await step.do(
           'c1-cleanup-part-' + String(Math.floor(offset/20)+1).padStart(4,'0'),
           { retries: { limit: 2, delay: '5 seconds', backoff: 'exponential' }, timeout: '10 minutes' },
-          async () => cleanTranscriptSegmentsOnce(this.env, segments.slice(offset,offset+20), cleanupSnapshot)
+          async () => {
+            if (gate2 && safeRun) await assertLiveRun(this.env.DB,safeRun);
+            return cleanTranscriptSegmentsOnce(this.env, segments.slice(offset,offset+20), cleanupSnapshot);
+          }
         );
         cleanedSegments.push(...part.cleanedSegments);
       }
