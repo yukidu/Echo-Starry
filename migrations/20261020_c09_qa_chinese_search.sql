@@ -65,7 +65,7 @@ CREATE TRIGGER IF NOT EXISTS qa_search_moderation_insert AFTER INSERT ON transcr
     ON CONFLICT(trackId) DO UPDATE SET requestedRevision=excluded.requestedRevision,status='pending',
       attempts=0,nextAttemptAt=0,leaseUntil=0,updatedAt=0,lastError=NULL;
 END;
-CREATE TRIGGER IF NOT EXISTS qa_search_moderation_update AFTER UPDATE ON transcript_correction_events BEGIN
+CREATE TRIGGER IF NOT EXISTS qa_search_moderation_update AFTER UPDATE OF status,newText,adminText,segmentId,trackId ON transcript_correction_events BEGIN
   -- Only previously indexed tracks are eligible. A correction to an old,
   -- not-yet-indexed transcript must NOT initiate an implicit backfill.
   UPDATE qa_search_state SET invalidated=1,changeRevision=changeRevision+1 WHERE trackId=NEW.trackId;
