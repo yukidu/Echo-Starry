@@ -100,7 +100,7 @@ test('R05 false timecode checksum REJECT',rejected('timecode_hash_mismatch',(f)=
   f.manifest={...f.manifest,versions};
 }));
 test('R06 delta without full base REJECT',rejected('chain_missing_parent',(f,r)=>{
-  (r as {manifests:BackupManifest[]}).manifests=[f.manifest];
+  (r as unknown as {manifests:BackupManifest[]}).manifests=[f.manifest];
 }));
 test('R07 legacy missing raw correctly marked remains ACCEPT',async()=>{
   const result=await run(); assert.equal(result.eligible,true);
