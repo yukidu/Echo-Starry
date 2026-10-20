@@ -61,6 +61,12 @@ export function qaSearchMatchExpression(question:string):string{
 export function qaSearchScore(question:string,content:string):number{
   const terms=qaQuestionTerms(question);
   const normalized=String(content||'').normalize('NFKC').toLowerCase();
+  // A lexical search is not capable of inferring the opposite of a negative
+  // statement. For explicit negation, require the actual negative phrase to
+  // occur in evidence; otherwise treat it as insufficient source material.
+  const input=String(question||'').normalize('NFKC').toLowerCase();
+  const negative=input.match(/(沒有|不曾|從未|不能|不會|不要)([\p{Script=Han}]{2,4})/u);
+  if(negative&&!normalized.includes(negative[1]+negative[2]))return 0;
   let score=terms.reduce((n,t)=>n+(normalized.includes(t)?1:0),0);
   const original=String(question||'').normalize('NFKC').toLowerCase().replace(/[？?!！。\s，、]/g,'');
   if(original.length>=3&&normalized.includes(original))score+=3;
