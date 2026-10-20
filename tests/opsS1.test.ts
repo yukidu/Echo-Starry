@@ -184,7 +184,7 @@ test('OPS-R4 unknown health and another confirmed fault preserve the fault', () 
 
 test('OPS-R5 stale first and current fault second are order-independent', () => {
   const observations=[good('r2',{observedAt:new Date(NOW-3600000).toISOString()}),good('r2',{confirmedFault:true})];
-  for(const items of [observations,observations.toReversed()]) {
+  for(const items of [observations,[...observations].reverse()]) {
     const card=reconcileService(items,'r2',NOW);
     assert.equal(card.status,'fault');assert.equal(card.conflict,true);
   }
@@ -192,7 +192,7 @@ test('OPS-R5 stale first and current fault second are order-independent', () => 
 
 test('OPS-R6 old normal and newer confirmed fault cannot become green when reversed', () => {
   const observations=[good('workflows'),good('workflows',{confirmedFault:true,observedAt:new Date(NOW-10_000).toISOString()})];
-  for(const items of [observations,observations.toReversed()]) {
+  for(const items of [observations,[...observations].reverse()]) {
     const card=reconcileService(items,'workflows',NOW);
     assert.equal(card.status,'fault');assert.equal(card.conflict,true);
     assert.match(card.reason,/互相矛盾/);
