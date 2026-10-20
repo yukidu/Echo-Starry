@@ -1,0 +1,50 @@
+name: AI3 N1A-S1 B07 fake-only tests
+
+# Restricted to ONE AI3 safety branch. No production environment, cloud CLI,
+# Workflow/API secrets, migrations, model invocation or external metrics.
+on:
+  push:
+    branches:
+      - safety/ai3-n1a-s1-b07-fake-20261020
+    paths:
+      - tests/n1a_s1_b07_fake.py
+      - tests/test_n1a_s1_b07.py
+      - tests/test_n1a_s1_b07_round2.py
+      - tests/test_n1a_s1_b07_round3.py
+      - tests/n1a_s1_b07_proof_bridge_fake.py
+      - docs/STARRY_AI3_N1A_S1_FAKE_COST_CONTRACT.md
+      - .github/workflows/ai3-n1a-s1-fake-only.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai3-n1a-s1-fake-cost
+  cancel-in-progress: true
+
+jobs:
+  fake-b07-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile offline-only fake files
+        run: python3 -m py_compile tests/n1a_s1_b07_fake.py tests/n1a_s1_b07_proof_bridge_fake.py tests/test_n1a_s1_b07.py tests/test_n1a_s1_b07_round2.py tests/test_n1a_s1_b07_round3.py
+      - name: Run S1 rounds 1-3 adversarial fake SQLite tests (no cloud)
+        run: python3 -m unittest discover -s tests -p 'test_n1a_s1_b07*.py' -v
+
+  codeql-python-fake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: python
+      - uses: github/codeql-action/analyze@v3
