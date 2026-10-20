@@ -123,6 +123,25 @@ export async function failSafeRun(db:Db,run:SafeRun|null,error:unknown){
       .bind(message.slice(0,300),now,run.trackId,run.runId).run();
   }
 }
+export async function failUnclaimedRun(db:Db,runId:string,trackId:string,error:unknown){
+  // A Workflow may fail before its run can be claimed. Quarantine that queued
+  // reservation without creating a new paid job or mutating existing ready.
+  const now=Date.now(),message=error instanceof Error?error.message:String(error);
+  const result=await db.prepare("UPDATE transcript_runs SET state='failed',error=?,updatedAt=? "+
+    "WHERE runId=? AND trackId=? AND state='queued' AND generation=0 RETURNING intent")
+    .bind(message.slice(0,300),now,runId,trackId).first();
+  if(result?.intent==='first')await db.prepare(
+    "UPDATE transcript_index SET status='failed',error=?,updatedAt=? "+
+    "WHERE trackId=? AND status='queued' AND r2Key IS NULL AND workingRunId IS NULL")
+    .bind('transcript task failed before starting',now,trackId).run();
+}
+export async function assertUnfundedWhisperBlocked(env:any,run:SafeRun){
+  // Until B07 is integrated with a per-segment atomic provider-attempt
+  // reservation, a UI confirmation is NOT authorization for billable AI.
+  // This intentionally prevents ALL Gate2 Workflow Whisper requests.
+  if(!env || !run)fail('cost gate prerequisites missing');
+  fail('B07 per-segment hard-budget authority is not integrated; Whisper refused');
+}
 export async function sha256(value:string):Promise<string>{
   const bytes=new TextEncoder().encode(value);
   const digest=await crypto.subtle.digest('SHA-256',bytes);
