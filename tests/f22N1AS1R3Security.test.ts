@@ -93,7 +93,7 @@ test('R3 P1: distinct independent budget DBs are UNSUPPORTED, never assert globa
  assert.equal(F22_N1A_S1_GATE_ENABLED,false);
  const a=newFakeDatabase(),b=newFakeDatabase();
  try{
-  const result=reserveFakeAcrossIsolatedDatabases();
+  const result=reserveFakeAcrossIsolatedDatabases(a,b);
   assert.deepEqual(result,{state:'UNKNOWN_LOCKED',permitted:false,detail:'UNSUPPORTED_CROSS_DATABASE'});
  }finally{a.close();b.close();}
 });
