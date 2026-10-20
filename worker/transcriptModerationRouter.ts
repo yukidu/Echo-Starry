@@ -1,5 +1,5 @@
 import transcriptWorker, { TranscriptWorkflow } from './transcriptRouter';
-import { rebuildQaSearchAfterMutation } from './qaTranscriptSearchIndex';
+import { drainQaSearchRebuildQueue } from './qaTranscriptSearchRebuildQueue';
 
 export { TranscriptWorkflow };
 
@@ -247,9 +247,13 @@ function syncQaSearchAfterCorrection(env:Env,ctx:ExecutionContext,trackId:string
   // Mutation-time D1 triggers immediately mark all existing indexed paragraphs
   // invalid. Background rebuild is optional and never blocks correction/rewards.
   if((env as any).QA_CHINESE_SEARCH_WRITE_ENABLED!=='true')return;
-  ctx.waitUntil(rebuildQaSearchAfterMutation(env as any,trackId).catch(error=>{
-    console.warn('C09 correction index sync deferred',error instanceof Error?error.name:'unknown');
-  }));
+  // D1 mutation triggers already recorded a durable rebuild job. Attempt
+  // once promptly, then let the existing 5-minute cron retry after failures.
+  if(ctx && typeof ctx.waitUntil==='function'){
+    ctx.waitUntil(drainQaSearchRebuildQueue(env as any,1).catch(error=>{
+      console.warn('C09 correction index rebuild deferred',error instanceof Error?error.name:'unknown');
+    }));
+  }
 }
 async function createCorrection(request: Request, env: Env, ctx: ExecutionContext, trackId: string, segmentId: string) {
   await ensureSchema(env);
