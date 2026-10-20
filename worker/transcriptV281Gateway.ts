@@ -2,6 +2,7 @@ import type { Env } from './index';
 import transcriptWorker from './transcriptMemberNotificationsRouter';
 import { queueAllPendingTranscripts, transcriptBulkStatus } from './transcriptBulkScheduler';
 import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
+import { gate2Enabled, requestSafeRun } from './transcriptP0Safety';
 import { handleCleanupAdmin } from './transcriptCleanupService';
 import { batteriesToUnits, unitsToBatteries } from '../shared/battery';
 
@@ -353,6 +354,32 @@ export default {
       const db = (env as any).DB;
       const track: any = await db.prepare('SELECT id,audioUrl,durationSeconds FROM tracks WHERE id=? LIMIT 1').bind(trackId).first();
       if (!track || !text(track.audioUrl)) return json({ error: '找不到可重聽的原始音檔' }, 404);
+      if (gate2Enabled(env)) {
+        const actor = await superAdmin(request, env);
+        if (!actor) return json({error:'請重新驗證管理員身分'},403);
+        const body:any = await request.clone().json().catch(() => ({}));
+        const seconds=Number(track.durationSeconds||0);
+        if(body.confirm!==true || !Number.isFinite(seconds) || seconds<=0 ||
+           Number(body.approvedMaxSeconds||0)<seconds)
+          return json({error:'請先確認音檔、長度及可能消耗的 AI 額度'},428);
+        const audio=text(track.audioUrl),marker='/api/r2/file/';
+        const pos=audio.indexOf(marker);
+        if(pos<0)return json({error:'找不到 R2 原音檔來源'},400);
+        const key=decodeURIComponent(audio.slice(pos+marker.length));
+        const current:any=await db.prepare(
+          "SELECT status,r2Key FROM transcript_index WHERE trackId=? LIMIT 1").bind(trackId).first();
+        if(current?.status!=='ready'||!current?.r2Key)
+          return json({error:'尚未有可安全保留的已完成原稿'},409);
+        const run=await requestSafeRun(db,{
+          trackId,intent:'relisten',sourceAudioKey:key,
+          requestKey:'relisten:'+trackId+':'+current.r2Key,
+          approvedBy:text(actor.id),approvedMaxSeconds:seconds
+        });
+        if(!run)return json({error:'已存在候選工作或狀態已變更'},409);
+        ctx.waitUntil(queueNextTranscriptV293(env as any,{includeFailed:false}).catch(()=>null));
+        return json({success:true,trackId,status:'ready',activePreserved:true,
+          candidateStatus:run.state,message:'已申請新版本，舊逐字稿保持可用'},202);
+      }
       const now = Date.now();
       // Single atomic D1 statement: pending/queued/processing cannot be queued twice.
       // Preserve the old R2 key, corrections and reward history until the replacement finishes.
