@@ -51,3 +51,19 @@ npm run lint
 ```
 
 **限制：** 這是「依照 #469 已讀的契約形狀作離線欄位核對」，不是 #469 與 #470 真正打通。兩個 PR 都是 Draft/OFF，正式 SecurityProof 合約版本、來源權限、真人雙審及後端整合必須由中央 AI2 另行凍結與授權。
+
+
+## N1A-S1 R3 最後定向安全修復（僅 Fake）
+依 [中央AI2 #455 派工 #6290549782](https://github.com/yukidu/Echo-Starry/issues/455#issuecomment-6290549782) 與 [AI3 對 #470 互評](https://github.com/yukidu/Echo-Starry/issues/455#issuecomment-6290486546)；維持原 Draft、沒有開新分支或更動別組代碼。本批先把四個負面反例寫入 `tests/n1aBackupWitnessFake.test.ts`，並確認原版 regression job **4 個 RED FAIL** 才修正，不把故障紅燈誤當既有真實 Production 事故。
+
+- **簽核者被撤權（P1）**：即使 Fake Starry ID 還表示「active super-admin」，WORM 事件鏈存在 `member_revoke_pending` 或 `member_deleted` 指向任一 reviewer 就 `REVIEWER_REVOKED_AT_WITNESS`，拒絕簽核與清理候選；會員內容本身的撤權檢查不變。
+- **同 request 雙審重放（P1）**：本模擬必須注入跨相同模擬工作者**共用**的原子 Fake `claimFakeReviewOnce(requestId)`；全部檢查通過後才 claim。第一筆可取得 `simulatedEligible`，同一 request 的任何再次使用一律 `REVIEW_ALREADY_CONSUMED`。無 claim reader、原子性無法確認或例外 → `REVIEW_CLAIM_UNVERIFIED` 並 fail-closed。Fake ledger 的記憶體寫入不會修改真實系統，決策 `sideEffects:0` 表示 **0 正式/雲端副作用**。
+- **兩份見證一起回捲（P1）**：新增第三份注入的 `MockTrustedFloor`（與 ledger、checkpoint 不同模擬來源），於批准前後都讀；只要最新最高 seq／hash／epoch 跟兩份見證不一致、缺件、過期或來源同名，即拒絕，不再相信兩份*一起回到舊版且自身 hash 有效*的資料。**關鍵限制**：三份來源都是本機呼叫者造假的，若三份全被同步回捲，Fake 模組仍無法證明真最新高度；`simulatedEligible` 永遠不是實際信任證明，任何正式授權仍始終 `productionAuthorized:false`。
+- **正式阻擋不變**：真 Starry ID、不可回捲雲端錨點／獨立金鑰、持久雙人 approval nonce 原子帳本及跨服務重驗尚不存在。**沒真權威就不得真還原、公開或 DELETE**。 `N1A_BKP_RUNTIME_ENABLED=false`，沒有改正式 Workers Router、DB、Cloudflare、費用或 Production。
+
+### 本批專屬回歸
+```sh
+node --import tsx --test tests/n1aBackupWitnessFake.test.ts
+node --import tsx --test tests/n1aBackupSecurityProofInteropFake.test.ts
+```
+整 repo 的 CI 只驗 Fake 合成行為。PR 的 Preview 建置成功不等於 Production；最後 CI 當次 SHA 的 PASS 才可報告。
