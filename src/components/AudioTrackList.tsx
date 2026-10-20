@@ -8,6 +8,7 @@ type TranscriptProgressItem = {
   trackId: string;
   status: string;
   error?: string | null;
+  candidateState?: string | null;
   updatedAt?: number;
 };
 
@@ -107,6 +108,7 @@ export function AudioTrackList({mode,currentUser,onEditTrack,onDeleted}:{
   const [relisteningId, setRelisteningId] = useState<string | null>(null);
   const [transcriptStatuses, setTranscriptStatuses] = useState<Record<string, TranscriptProgressItem>>({});
   const [transcriptStatusesReady, setTranscriptStatusesReady] = useState(false);
+  const [safeTranscriptMode, setSafeTranscriptMode] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,12 +144,14 @@ export function AudioTrackList({mode,currentUser,onEditTrack,onDeleted}:{
           next[trackId] = {
             trackId,
             status: normalize(item?.status) || 'pending',
+            candidateState:normalize(item?.candidateState) || null,
             error: normalize(item?.error) || null,
             updatedAt: Number(item?.updatedAt || 0)
           };
         }
         if (!cancelled) {
           setTranscriptStatuses(next);
+          setSafeTranscriptMode(data?.gate2SafeMode === true);
           setTranscriptStatusesReady(true);
         }
       } catch {}
@@ -222,19 +226,41 @@ export function AudioTrackList({mode,currentUser,onEditTrack,onDeleted}:{
 
   const relistenTrack = async (track: Track) => {
     if (!superAdmin || relisteningId || ['pending','queued','processing'].includes(transcriptStatuses[track.id]?.status)) return;
+    const seconds=Number(track.durationSeconds||0);
+    if(safeTranscriptMode){
+      if(!Number.isFinite(seconds)||seconds<=0){
+        setError('無法確認音檔長度與 AI 使用量，請先補充音檔長度');
+        return;
+      }
+      if(!window.confirm('將為「'+(track.title||'此音檔')+'」建立新逐字稿候選，舊稿與會員訂正保留。這可能消耗 AI 額度，確定繼續？'))return;
+      if(!window.confirm('最後確認：只重新辨識這一份約 '+Math.ceil(seconds/60)+' 分鐘的音檔。候選須審核才會取代舊稿。確定送出？'))return;
+    }else{
+      // Existing v281 backend resets a ready item to pending; do not
+      // misrepresent the legacy behavior as the safe candidate flow.
+      if(!window.confirm('目前使用舊版逐字稿流程，重新辨識期間原稿可能暫時無法顯示。確定繼續？'))return;
+    }
     setError('');
     setRelisteningId(track.id);
     try {
-      const response = await fetch(`/api/v281/transcript-management/relisten/${encodeURIComponent(track.id)}`, {
-        method: 'POST',
-        credentials: 'same-origin'
+      const response = await fetch('/api/v281/transcript-management/relisten/'+encodeURIComponent(track.id),{
+        method:'POST',
+        credentials:'same-origin',
+        ...(safeTranscriptMode?{
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({confirm:true,approvedMaxSeconds:seconds,approvalNonce:crypto.randomUUID()})
+        }:{})
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.error || '重聽逐字稿失敗');
-      setTranscriptStatuses(previous => ({
-        ...previous,
-        [track.id]: { trackId: track.id, status: 'pending', error: null, updatedAt: Date.now() }
-      }));
+      // G31 candidate works separately from the existing ready transcript.
+      if (!data.activePreserved) {
+        setTranscriptStatuses(previous => ({
+          ...previous,
+          [track.id]: {trackId:track.id,status:'pending',error:null,updatedAt:Date.now()}
+        }));
+      } else {
+        setError('新版候選已申請，目前已完成的逐字稿仍可使用。');
+      }
       setTranscriptStatusesReady(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : '無法啟動逐字稿重聽');
@@ -276,7 +302,8 @@ export function AudioTrackList({mode,currentUser,onEditTrack,onDeleted}:{
             const permission = !track.requiredRank || track.requiredRank === '無' ? '公開' : track.requiredRank;
             const speakerRank = normalize(track.speakerRank) && track.speakerRank !== '無' ? ` ${track.speakerRank}` : '';
             const transcriptItem = transcriptStatuses[track.id];
-            const relistenBusy = relisteningId === track.id || ['pending','queued','processing'].includes(transcriptItem?.status || '');
+            const relistenBusy = relisteningId === track.id || ['pending','queued','processing'].includes(transcriptItem?.status || '') ||
+              ['pending','queued','processing','awaiting_review'].includes(transcriptItem?.candidateState || '');
             const transcriptBadge = superAdmin && transcriptStatusesReady && normalize(track.audioUrl)
               ? transcriptProgressPresentation(transcriptItem)
               : null;
@@ -293,6 +320,7 @@ export function AudioTrackList({mode,currentUser,onEditTrack,onDeleted}:{
                       {transcriptBadge.label}
                     </div>
                   )}
+                  {transcriptItem?.candidateState && <div className="v161-track-meta" role="status">候選新版：{transcriptItem.candidateState==='awaiting_review'?'待管理員逐段審核（舊稿持續有效）':transcriptItem.candidateState==='failed'?'候選失敗（舊稿不受影響）':transcriptItem.candidateState==='processing'?'重新辨識中（舊稿持續有效）':'候選排隊中（舊稿持續有效）'}</div>}
                   {superAdmin && mode === 'community' && <div className="v161-track-meta inline-flex items-center gap-1"><UserRound className="h-3 w-3" />網友：{memberNameFor(track)}</div>}
                 </div>
                 <div className="v161-actions">

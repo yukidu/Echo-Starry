@@ -4,6 +4,8 @@ import type { WorkflowEvent, WorkflowStep } from 'cloudflare:workers';
 import { queueNextTranscriptV293 } from './transcriptSequentialSchedulerV293';
 import { markSpeakerBiosDirty } from './aiSpeakerProfileRouter';
 import { cleanTranscriptSegmentsOnce, loadCleanupSettings } from './transcriptCleanupService';
+import { gate2Enabled, claimSafeRun, assertLiveRun, stageSafeVersion, publishSafeVersion, failSafeRun, failUnclaimedRun, assertSourceRevision, assertUnfundedWhisperBlocked } from './transcriptP0Safety';
+import type { SafeRun } from './transcriptP0Safety';
 
 const MODEL = '@cf/openai/whisper-large-v3-turbo';
 const TRADITIONAL_MODEL = '@cf/openai/gpt-oss-20b';
@@ -167,9 +169,10 @@ async function traditionalizeBatchRobust(env: Env, values: string[]): Promise<st
   }
 }
 
-async function traditionalizeSegments(env: Env, step: WorkflowStep, segments: Segment[]) {
+async function traditionalizeSegments(env: Env, step: WorkflowStep, segments: Segment[], safeRun?: SafeRun | null) {
   const batchSize = 12;
   for (let offset = 0; offset < segments.length; offset += batchSize) {
+    if (safeRun) await assertLiveRun(env.DB, safeRun);
     const batch = segments.slice(offset, offset + batchSize);
     const normalized: string[] = await step.do(
       `traditionalize-${String(Math.floor(offset / batchSize) + 1).padStart(3, '0')}`,
@@ -243,6 +246,10 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
   async run(event: WorkflowEvent<{ trackId: string }>, step: WorkflowStep) {
     const trackId = eventTrackId(event.payload);
     if (!trackId) throw new Error('Missing trackId');
+    const gate2 = gate2Enabled(this.env);
+    const runId = text((event.payload as any)?.runId);
+    let safeRun: SafeRun | null = null;
+    if (gate2 && !runId) throw new Error('Gate2: missing authorized run ID');
     await ensureIndex(this.env);
 
     let info: any = null;
@@ -255,21 +262,31 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
         if (!key) throw new Error('Audio R2 key not found');
         // Avoid R2.head here: it previously hit Cloudflare subrequest-depth 10034.
         // prepare-audio-container will GET and validate the actual source before transcribing.
+        if (gate2) {
+          safeRun = await claimSafeRun(this.env.DB, runId, trackId);
+          if (safeRun.sourceAudioKey !== key) throw new Error('Gate2: source audio revision changed');
+        } else {
         const now = Date.now();
         await this.env.DB.prepare(`INSERT INTO transcript_index(trackId,status,r2Key,model,chunkCount,segmentCount,wordCount,durationSeconds,error,createdAt,updatedAt)
           VALUES (?,'processing',NULL,?,0,0,0,?,NULL,?,?)
           ON CONFLICT(trackId) DO UPDATE SET status='processing',error=NULL,updatedAt=excluded.updatedAt`)
           .bind(trackId, MODEL, Number(track.durationSeconds || 0), now, now).run();
+        }
         const hintRow: any = await this.env.DB.prepare('SELECT languageHint FROM transcript_language_hints WHERE trackId=? LIMIT 1')
           .bind(trackId).first().catch(() => null);
-        return { track, key, size: 0, ext: audioExtension(key), languageHint: text(hintRow?.languageHint) || 'auto' };
+        return { track, key, safeRun, size: 0, ext: audioExtension(key), languageHint: text(hintRow?.languageHint) || 'auto' };
       });
 
+      safeRun = info.safeRun || null;
       const duration = Math.max(1, Number(info.track.durationSeconds || 1));
       const chunks = Math.max(1, Math.ceil(duration / SEGMENT_SECONDS));
       const segments: Segment[] = [];
 
       await step.do('prepare-audio-container', { retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' } }, async () => {
+        if (gate2 && safeRun) {
+          await assertLiveRun(this.env.DB,safeRun);
+          await assertSourceRevision(this.env,safeRun);
+        }
         await loadAudio(this.env, trackId, info.key, info.ext);
         return { ok: true, bytes: info.size };
       });
@@ -281,7 +298,10 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
           `transcribe-${String(index + 1).padStart(3, '0')}`,
           { retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' }, timeout: '10 minutes' },
           async () => {
+            if (gate2 && safeRun) await assertLiveRun(this.env.DB, safeRun);
             const buffer = await getAudioSegment(this.env, trackId, info.key, info.ext, start, seconds);
+            if (gate2 && safeRun) await assertLiveRun(this.env.DB, safeRun);
+            if (gate2 && safeRun) await assertUnfundedWhisperBlocked(this.env,safeRun);
             const audio = Buffer.from(buffer).toString('base64');
             return this.env.AI.run(MODEL, {
               audio,
@@ -313,8 +333,9 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
         seg.end = Number(Math.min(duration, Math.max(seg.start + 0.2, seg.end)).toFixed(3));
       });
 
+      const rawWhisper = JSON.stringify({trackId,model:MODEL,segments:segments.map(part => ({...part}))});
       const isChinese = likelyChineseTranscript(segments);
-      if (isChinese) await traditionalizeSegments(this.env, step, segments);
+      if (isChinese) await traditionalizeSegments(this.env, step, segments, gate2 ? safeRun : null);
       const storedLanguage = isChinese ? 'zh-Hant-TW' : 'original';
       // Preserve raw segments and timecodes; store separate C1 display text only.
       // Snapshot one policy version for this entire recording, without reading D1 during playback.
@@ -324,7 +345,10 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
         const part = await step.do(
           'c1-cleanup-part-' + String(Math.floor(offset/20)+1).padStart(4,'0'),
           { retries: { limit: 2, delay: '5 seconds', backoff: 'exponential' }, timeout: '10 minutes' },
-          async () => cleanTranscriptSegmentsOnce(this.env, segments.slice(offset,offset+20), cleanupSnapshot)
+          async () => {
+            if (gate2 && safeRun) await assertLiveRun(this.env.DB,safeRun);
+            return cleanTranscriptSegmentsOnce(this.env, segments.slice(offset,offset+20), cleanupSnapshot);
+          }
         );
         cleanedSegments.push(...part.cleanedSegments);
       }
@@ -341,12 +365,20 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
         cleanupVersion: cleanupSnapshot.version,
         cleanedSegments
       };
-      const base = folder(trackId);
+      const base = gate2 && safeRun ? folder(trackId)+'/versions/'+encodeURIComponent(safeRun.runId) : folder(trackId);
       const jsonKey = `${base}/transcript.json`;
       const txtKey = `${base}/transcript.txt`;
       const vttKey = `${base}/transcript.vtt`;
 
+      let publishedKeys: {jsonKey:string;txtKey:string;vttKey:string}|null=null;
       await step.do('store-transcript-formats', async () => {
+        if (gate2 && safeRun) {
+          publishedKeys=await stageSafeVersion(this.env, safeRun, {
+            json:JSON.stringify(file),txt:fullText,vtt:toVtt(segments),raw:rawWhisper,language:storedLanguage
+          });
+          if (safeRun.intent==='first') await publishSafeVersion(this.env,safeRun.runId,null);
+          return;
+        }
         await Promise.all([
           this.env.R2_BUCKET.put(jsonKey, JSON.stringify(file), {
             httpMetadata: { contentType: 'application/json; charset=utf-8' },
@@ -366,14 +398,20 @@ export class TranscriptWorkflow extends WorkflowEntrypoint<Env, { trackId: strin
       });
 
       // Successful new transcripts queue a speaker biography refresh without making the recording fail on bio errors.
-      await markSpeakerBiosDirty(this.env, trackId).catch(() => null);
+      if (!gate2 || safeRun?.intent==='first') await markSpeakerBiosDirty(this.env, trackId).catch(() => null);
       await cleanupAudio(this.env, trackId, info.ext);
       const next = await queueFollowingTranscript(this.env, step, 'queue-next-transcript');
-      return { trackId, chunks, segments: segments.length, language: storedLanguage, jsonKey, txtKey, vttKey, next };
+      const resultKeys=publishedKeys||{jsonKey,txtKey,vttKey};
+      return {trackId,chunks,segments:segments.length,language:storedLanguage,...resultKeys,next};
     } catch (error) {
       if (info?.ext) await cleanupAudio(this.env, trackId, info.ext);
-      await this.env.DB.prepare("UPDATE transcript_index SET status='failed',error=?,updatedAt=? WHERE trackId=?")
-        .bind(error instanceof Error ? error.message.slice(0,1000) : String(error).slice(0,1000), Date.now(), trackId).run().catch(() => null);
+      if (gate2) {
+        if(safeRun)await failSafeRun(this.env.DB,safeRun,error).catch(() => null);
+        else if(runId)await failUnclaimedRun(this.env.DB,runId,trackId,error).catch(() => null);
+      } else {
+        await this.env.DB.prepare("UPDATE transcript_index SET status='failed',error=?,updatedAt=? WHERE trackId=?")
+          .bind(error instanceof Error ? error.message.slice(0,1000) : String(error).slice(0,1000), Date.now(), trackId).run().catch(() => null);
+      }
       await queueFollowingTranscript(this.env, step, 'queue-next-after-failure');
       throw error;
     }

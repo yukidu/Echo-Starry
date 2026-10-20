@@ -1,4 +1,6 @@
 import { transcriptTargetConcurrency } from './starryAiManagement';
+import { gate2Enabled } from './transcriptP0Safety';
+import { queueNextTranscriptGate2P0 } from './transcriptP0Scheduler';
 const TRANSCRIPT_MODEL = '@cf/openai/whisper-large-v3-turbo';
 const STALE_ACTIVE_MS = 3 * 60 * 60 * 1000;
 const MAX_CONCURRENT_TRANSCRIPTS = 5;
@@ -25,6 +27,7 @@ async function ensureIndex(env: SchedulerEnv) {
 
 export async function queueNextTranscriptV293(env: SchedulerEnv, options: QueueNextOptions = {}) {
   await ensureIndex(env);
+  if (gate2Enabled(env)) return queueNextTranscriptGate2P0(env);
   const now = Date.now();
   // Never retry failed recordings automatically. Only an explicit admin recovery action may opt in.
   const includeFailed = options.includeFailed === true;
