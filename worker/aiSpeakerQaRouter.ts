@@ -273,8 +273,12 @@ export async function excerpts(env:Env,track:any,u:any,mode:string,question:stri
     if(mode==='all'&&splitSpeakerNames(row.speaker).length>1)continue;
     if(indexed?.blocked.has(row.id))continue; // mutated source: no stale R2 fallback
     if(indexed?.covered.has(row.id))continue; // search directly from D1; no R2 read
-    // In mixed-generation rollout, at most 2 R2 fallbacks per question once
-    // some paragraphs are indexed; with zero coverage preserve legacy behaviour.
+    // Safety gate: an unindexed R2 original has no revision evidence that can
+    // be checked atomically at AI publication. While opt-in indexed QA is ON,
+    // fail closed rather than cite an older original after a concurrent edit.
+    // When the flag is OFF the original QA path stays exactly unchanged.
+    if(env.QA_CHINESE_SEARCH_ENABLED==='true')continue;
+    // Legacy, flag-OFF only: retain the existing bounded R2 reader.
     if(indexed?.covered.size && fallbackReads>=2)continue;
     fallbackReads++;
     const idx:any=await env.DB.prepare("SELECT r2Key FROM transcript_index WHERE trackId=? AND status='ready' LIMIT 1").bind(row.id).first();
