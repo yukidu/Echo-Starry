@@ -53,8 +53,8 @@ test('N1A-S1: original eventID stable across devices, state corrections and canc
   assert.equal(fakeStats(db,'all',NOW,'t1').calls,0);
   assert.equal(fakeStats(db,'all',NOW,'t2').registeredMembers,1);
   assert.equal(applyFakeEvent(db,s,a),'STALE_IGNORED');
-  assert.equal(applyFakeEvent(db,s,{...v2,state:'failed'}),'UNTRUSTED_FAKE_SOURCE');
-  assert.equal(applyFakeEvent(db,s,{...v2,acceptedAtUtcMs:v2.acceptedAtUtcMs+1000}),'UNTRUSTED_FAKE_SOURCE');
+  assert.throws(()=>applyFakeEvent(db,s,{...v2,state:'failed'}),/UNTRUSTED_FAKE_SOURCE/);
+  assert.throws(()=>applyFakeEvent(db,s,{...v2,acceptedAtUtcMs:v2.acceptedAtUtcMs+1000}),/UNTRUSTED_FAKE_SOURCE/);
   const v3=s.revise('echo','accepted-on-server',{active:false});
   assert.equal(applyFakeEvent(db,s,v3),'APPLIED');
   assert.equal(fakeStats(db,'all',NOW).calls,0);
