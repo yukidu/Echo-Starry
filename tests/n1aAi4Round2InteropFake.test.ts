@@ -30,7 +30,7 @@ function setup(){
   const auth=new MutableFakeAuthority([one,other]);
   const run=(hooks?:FakeHooks,sources:readonly FakeSource[]=[one])=>
     simulateProtectedQA({subjectId:auth.subjectId,requestId:'request-22',
-      authority:auth,candidates:sources,nowMs:()=>auth.clock,hooks});
+      authority:auth,candidates:sources.map(({text:_neverT0,...ref})=>ref),nowMs:()=>auth.clock,hooks});
   return {auth,run};
 }
 function ai2Snapshot(ai4:FakeProof):Ai2FakeProofShape {
