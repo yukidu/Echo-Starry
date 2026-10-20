@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import {
-  FakeStarryIdSource, applyFakeEvent, fakeStats, newFakeDatabase,
+  FakeStarryIdSource, applyFakeEvent, fakeStatsFixtureOnly, newFakeDatabase,
   setupFakeAccount, reserveFakeBatch, fakeBudgetTotals, markFakeUncertain,
   TEST_ONLY, productionAuthorized, F22_N1A_S1_GATE_ENABLED,
   type FakeEnvelope,
@@ -110,8 +110,8 @@ test('N1A-R2-02 membership revoked after precheck: second fake gate denies (core
   assert.equal(applyFakeEvent(db,s,e),'APPLIED');
   v.memberActive=false;
   assert.equal(fakeShapeGate(p,v),'BLOCKED');
-  // NEGATIVE PROOF: existing F22 fakeStats has no live membership-proof port.
-  assert.equal(fakeStats(db,'all',NOW).registeredMembers,1);
+  // NEGATIVE PROOF: existing F22 fakeStatsFixtureOnly has no live membership-proof port.
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW).registeredMembers,1);
   console.log('N1A_R2_BLOCKER: PRIVATE_STATS_NEEDS_FRESH_AUTH_AND_REVOCATION_POLICY');
  }finally{db.close();}
 });
@@ -138,22 +138,22 @@ test('N1A-R2-04 event correction increments EVENT version; CONTENT version uncha
  try{
   const first=makeEvent(s,'status-change'),p=proof();
   assert.equal(applyFakeEvent(db,s,first),'APPLIED');
-  assert.equal(fakeStats(db,'all',NOW).pending,1);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW).pending,1);
   const corrected=s.revise('echo','status-change',{state:'done',track:'talk-2'});
   assert.equal(corrected.sourceRevision,2);
   assert.equal(p.sourceRevision,'ETag.content.v2');
   assert.equal(fakeShapeGate(p,live()),'FAKE_SHAPE_OK');
   assert.equal(applyFakeEvent(db,s,corrected),'APPLIED');
-  assert.equal(fakeStats(db,'all',NOW).calls,1);
-  assert.equal(fakeStats(db,'all',NOW).done,1);
-  assert.equal(fakeStats(db,'all',NOW,'talk-1').calls,0);
-  assert.equal(fakeStats(db,'all',NOW,'talk-2').calls,1);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW).calls,1);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW).done,1);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW,'talk-1').calls,0);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW,'talk-2').calls,1);
   assert.equal(applyFakeEvent(db,s,first),'STALE_IGNORED');
   assert.equal(applyFakeEvent(db,s,corrected),'DUPLICATE_NOOP');
   const withdrawn=s.revise('echo','status-change',{active:false});
   assert.equal(applyFakeEvent(db,s,withdrawn),'APPLIED');
-  assert.equal(fakeStats(db,'all',NOW).calls,0);
-  assert.equal(fakeStats(db,'all',NOW).registeredMembers,0);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW).calls,0);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW).registeredMembers,0);
  }finally{db.close();}
 });
 
@@ -165,7 +165,7 @@ test('N1A-R2-05 content source correction DOES NOT authorize event status correc
   assert.equal(fakeShapeGate(p,{...live(),sourceRevision:'ETag.content.v3'}),'BLOCKED');
   // Negative boundary: event version remains 1 and accepted request still counted;
   // no automatic projection invalidation has been integrated in original Fake model.
-  assert.equal(fakeStats(db,'all',NOW).calls,1);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW).calls,1);
   assert.equal((db.prepare('SELECT revision AS v FROM fake_f22_events WHERE event_id=?')
     .get(first.globalEventId) as any).v,1);
   console.log('N1A_R2_BLOCKER: EXTERNAL_CONTENT_PROOF_CHANGE_REQUIRES_SEPARATE_POLICY');
@@ -179,12 +179,12 @@ test('N1A-R2-06 AI spending hold is NOT a confirmed provider charge nor a comple
   const p=proof();const spend={approvalGrantId:p.approvalGrantId,state:'held' as const,amountEstimatedTwd:100};
   assert.equal(fakeShapeGate(p,live()),'FAKE_SHAPE_OK');
   assert.equal(spend.state,'held');
-  assert.equal(fakeStats(db,'all',NOW).calls,1);
-  assert.equal(fakeStats(db,'all',NOW).pending,1);
-  assert.equal(fakeStats(db,'all',NOW).done,0);
-  assert.equal(fakeStats(db,'all',NOW).actualTwd,null);
-  assert.equal(fakeStats(db,'all',NOW).estimatedTwd,null);
-  assert.notEqual(spend.amountEstimatedTwd,fakeStats(db,'all',NOW).actualTwd);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW).calls,1);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW).pending,1);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW).done,0);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW).actualTwd,null);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW).estimatedTwd,null);
+  assert.notEqual(spend.amountEstimatedTwd,fakeStatsFixtureOnly(db,'all',NOW).actualTwd);
   console.log('N1A_R2_BLOCKER: B07_HELD_IS_NOT_SETTLED_COST');
  }finally{db.close();}
 });
@@ -202,7 +202,7 @@ test('N1A-R2-07 new AI hold while membership revoked/unknown must be blocked; D1
   // Negative proof: D1 quota reservation has no B07 grant, no provider claim,
   // no current Starry-ID or witness; it cannot authorize AI spending.
   assert.equal(fakeBudgetTotals(db,'one-account').pendingWrite,1);
-  assert.equal(fakeStats(db,'all',NOW).calls,0);
+  assert.equal(fakeStatsFixtureOnly(db,'all',NOW).calls,0);
   console.log('N1A_R2_BLOCKER: SPEND_HOLD_REQUIRES_INDEPENDENT_B07_GRANT_AND_FRESH_PROOF');
  }finally{db.close();}
 });
