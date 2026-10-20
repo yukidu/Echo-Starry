@@ -39,8 +39,9 @@ test('R3 P0 FAIL->PASS: old SQLite backup restored after independently sealed ne
   assert.equal(fakeStats(db,'all',NOW,null,grant).calls,2);
   db.close();db=null;copyFileSync(old,current);
   db=new DatabaseSync(current);
-  assert.throws(()=>fakeStats(db,'all',NOW,null,grant),/FAKE_PRIVATE_AUTH_REJECTED/);
-  assert.throws(()=>witness.sealInitialFakeSnapshot(db),/FAKE_WITNESS_CANNOT_SEAL/);
+  const restoredDb=db;
+  assert.throws(()=>fakeStats(restoredDb,'all',NOW,null,grant),/FAKE_PRIVATE_AUTH_REJECTED/);
+  assert.throws(()=>witness.sealInitialFakeSnapshot(restoredDb),/FAKE_WITNESS_CANNOT_SEAL/);
  }finally{db?.close();rmSync(dir,{recursive:true,force:true});}
 });
 test('R3 P0 FAIL->PASS: newest member revocation tombstone stays outside restored old SQLite',()=>{
