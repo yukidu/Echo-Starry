@@ -1,0 +1,27 @@
+name: AI2 N1A S3A fake-only contract
+on:
+  pull_request:
+    paths:
+      - 'security-contract-v1/s3aEnvelope.ts'
+      - 'security-contract-v1/S3A-README.md'
+      - 'tests/n1aS3aSharedEnvelope.test.ts'
+      - '.github/workflows/ai2-n1a-s3a-fake-only.yml'
+permissions:
+  contents: read
+jobs:
+  fake-s3a-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout mock-only PR
+        uses: actions/checkout@v4
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install local test dependencies
+        run: npm install --ignore-scripts --no-package-lock --no-audit --no-fund
+      - name: Run 14 offline S3A test scenarios
+        run: node --import tsx --test tests/n1aS3aSharedEnvelope.test.ts
+      - name: Check TypeScript without emitting assets
+        run: npm run lint
