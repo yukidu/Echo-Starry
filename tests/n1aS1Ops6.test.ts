@@ -216,7 +216,7 @@ test('N1A6-27 2000 concurrent fake admins share one local snapshot read per sour
  });
  const outputs=await Promise.all(Array.from({length:2000},()=>handler(req())));
  assert.ok(outputs.every(x=>x.status===200));
- assert.deepEqual([cloud,events,positive],[1,1,1]);
+ assert.deepEqual([cloud,events,positive],[1,1,0]); // no trusted positive adapter; do not query caller's all-clear
 });
 test('N1A6-28 repeated manual refresh blocked for 60 seconds in one fake isolate',async()=>{
  let now=NOW;const limiter=createMockRateLimiter(60000);
