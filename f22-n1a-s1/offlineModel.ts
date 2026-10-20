@@ -3,7 +3,7 @@
  * This file MUST NOT be imported by real Workers, routers, D1 or Starry ID.
  * No public rankings, cloud API, provider calls, production migrations or billing.
  */
-import {createHmac} from 'node:crypto';
+import {createHash,createHmac} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 
 export type IdentityKind='registered'|'guest'|'unknown';
@@ -41,20 +41,25 @@ export class FakeStarryIdSource{
  private readonly membership=new Set<string>();
  private readonly actions=new Map<string,Omit<FakeEnvelope,'testOnlySignature'>>();
  private readonly eventsById=new Map<string,string>();
+ private readonly ownersByAction=new Map<string,string>();
  constructor(private readonly fakeSigningSecret:string){if(!fakeSigningSecret)throw Error('FAKE_SECRET_REQUIRED');}
  register(subject:string){if(!KEY.test(subject))throw Error('BAD_FAKE_SUBJECT');this.membership.add(subject);}
+ revoke(subject:string){this.membership.delete(subject);}
  /** First server receipt freezes the original identity and accepted-at time. */
  firstAccept(a:{logicalSourceId:string;app:string;subject:string|null;
    acceptedAtUtcMs:number;track:string;state:State}):FakeEnvelope{
   if(!KEY.test(a.logicalSourceId)||!KEY.test(a.app)||!KEY.test(a.track))throw Error('BAD_FAKE_KEY');
   checkTime(a.acceptedAtUtcMs);
   const k=a.app+':'+a.logicalSourceId,prev=this.actions.get(k);
-  if(prev){if(prev.identityKind==='registered'&&a.subject!==null&&
-    prev.registeredMemberHandle!==H(this.fakeSigningSecret,'member:'+a.subject))
-    throw Error('ACTION_OWNER_CONFLICT');
+  // Fake source-side owner binding. A logical event cannot silently change
+  // from guest to registered (or impersonate a different subject).
+  const kind:IdentityKind=a.subject===null?'guest':this.membership.has(a.subject)?'registered':'unknown';
+  const owner=H(this.fakeSigningSecret,'owner:'+JSON.stringify([a.subject,kind]));
+  if(prev){
+   if(this.ownersByAction.get(k)!==owner||prev.identityKind!==kind)
+    throw Error('ACTION_IDENTITY_CONFLICT');
    return this.sign(prev);
   }
-  const kind:IdentityKind=a.subject===null?'guest':this.membership.has(a.subject)?'registered':'unknown';
   const m:Omit<FakeEnvelope,'testOnlySignature'>={
    schemaVersion:'f22-n1a-fake-v1',originAppId:a.app,
    globalEventId:H(this.fakeSigningSecret,'event:'+k),sourceRevision:1,
@@ -62,7 +67,7 @@ export class FakeStarryIdSource{
    identityKind:kind,registeredMemberHandle:kind==='registered'?H(this.fakeSigningSecret,'member:'+a.subject):null,
    acceptedAtUtcMs:a.acceptedAtUtcMs,trackId:a.track,state:a.state,active:true
   };
-  this.actions.set(k,m);this.eventsById.set(m.globalEventId,k);return this.sign(m);
+  this.actions.set(k,m);this.ownersByAction.set(k,owner);this.eventsById.set(m.globalEventId,k);return this.sign(m);
  }
  revise(app:string,logicalSourceId:string,update:{track?:string;state?:State;active?:boolean}):FakeEnvelope{
   const k=app+':'+logicalSourceId,old=this.actions.get(k);
@@ -138,8 +143,11 @@ export function applyFakeEvent(db:DatabaseSync,source:FakeStarryIdSource,e:FakeE
   db.exec('COMMIT');return 'APPLIED' as const;
  }catch(err){db.exec('ROLLBACK');throw err;}
 }
-/** Exact as-of-instant statistics. ONLY aggregated counts, never member handles. */
-export function fakeStats(db:DatabaseSync,period:Period,asOfMs:number,track:string|null=null){
+/**
+ * Offline SQL oracle for existing Fake tests ONLY. This is NOT a private API;
+ * the only simulated private read entry point is fakeStats() below.
+ */
+export function fakeStatsFixtureOnly(db:DatabaseSync,period:Period,asOfMs:number,track:string|null=null){
  const w=reportWindow(period,asOfMs);
  if(track!==null&&!KEY.test(track))throw Error('BAD_TRACK');
  const filter=track===null?'':' AND track_id=?';
@@ -155,6 +163,62 @@ export function fakeStats(db:DatabaseSync,period:Period,asOfMs:number,track:stri
    guestCalls:x.guestCalls??0,unknownCalls:x.unknownCalls??0,
    done:x.done??0,failed:x.failed??0,pending:x.pending??0,
    actualTwd:null,tokenCount:null,estimatedTwd:null,repeat5:null,repeat30:null,repeat60:null};
+}
+
+/**
+ * Independent in-memory TEST witness. It is deliberately NOT in the SQLite
+ * backup; a restored old SQLite cannot change its sealed snapshot/tombstones.
+ * This fixture is NOT a real non-rollback anchor, authenticator or signer.
+ */
+export class FakePrivateStatsWitness{
+ private available=true;
+ private readonly fakeActiveAdmins=new Set<string>();
+ private readonly revokedMembers=new Set<string>();
+ private sealedDigest:string|null=null;
+ enrollFakeSuperAdmin(subject:string){
+  if(!KEY.test(subject))throw Error('BAD_FAKE_ADMIN');
+  this.fakeActiveAdmins.add(subject);
+ }
+ revokeFakeSuperAdmin(subject:string){this.fakeActiveAdmins.delete(subject);}
+ setFakeAuthorityAvailable(value:boolean){this.available=value;}
+ revokeFakeMember(memberHandle:string){
+  if(!HEX.test(memberHandle))throw Error('BAD_FAKE_MEMBER_HANDLE');
+  this.revokedMembers.add(memberHandle);
+ }
+ /**
+  * One-time trust boundary: only the fixture issuer may seal a fresh known
+  * snapshot. No automatic re-seal of a restored DB or after any tombstone.
+  */
+ sealInitialFakeSnapshot(db:DatabaseSync){
+  if(!this.available||this.revokedMembers.size||this.sealedDigest!==null)
+   throw Error('FAKE_WITNESS_CANNOT_SEAL');
+  this.sealedDigest=fakeStatsDbFingerprint(db);
+ }
+ assertCurrentFakeAuthority(db:DatabaseSync,admin:string){
+  if(!this.available||!this.fakeActiveAdmins.has(admin)||this.revokedMembers.size||
+     this.sealedDigest===null||this.sealedDigest!==fakeStatsDbFingerprint(db))
+   throw Error('FAKE_PRIVATE_AUTH_REJECTED');
+ }
+}
+function fakeStatsDbFingerprint(db:DatabaseSync){
+ const rows=db.prepare('SELECT event_id,revision,payload_digest,identity_kind,member_handle,accepted_ms,track_id,state,active FROM fake_f22_events ORDER BY event_id').all();
+ return createHash('sha256').update(JSON.stringify(rows)).digest('hex');
+}
+/** Simulated PRIVATE read: no witness/admin → default deny, including restored DB. */
+export function fakeStats(db:DatabaseSync,period:Period,asOfMs:number,
+ track:string|null=null,authorization?:{witness:FakePrivateStatsWitness;admin:string}){
+ if(!authorization||!(authorization.witness instanceof FakePrivateStatsWitness)||
+   !KEY.test(authorization.admin))throw Error('FAKE_PRIVATE_AUTH_REQUIRED');
+ authorization.witness.assertCurrentFakeAuthority(db,authorization.admin);
+ const result=fakeStatsFixtureOnly(db,period,asOfMs,track);
+ // A second witness check before private output; this remains offline only.
+ authorization.witness.assertCurrentFakeAuthority(db,authorization.admin);
+ return result;
+}
+
+/** Two independent budget SQLite files cannot provide global atomicity. */
+export function reserveFakeAcrossIsolatedDatabases():ReserveDecision{
+ return {state:'UNKNOWN_LOCKED',permitted:false,detail:'UNSUPPORTED_CROSS_DATABASE'};
 }
 
 /** Synthetic centralized account quota: ONE SQLite file for all fake workers. */
