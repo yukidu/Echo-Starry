@@ -238,7 +238,7 @@ export function AudioTrackList({mode,currentUser,onEditTrack,onDeleted}:{
         method:'POST',
         credentials:'same-origin',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({confirm:true,approvedMaxSeconds:seconds})
+        body:JSON.stringify({confirm:true,approvedMaxSeconds:seconds,approvalNonce:crypto.randomUUID()})
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.error || '重聽逐字稿失敗');
