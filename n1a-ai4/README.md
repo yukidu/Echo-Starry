@@ -20,3 +20,15 @@ N1A_AI4_PRODUCTION_ENABLED=false，所有測試決定 productionAuthorized=false
 2. T2到實際首個回應位元組的跨服務發送柵欄仍無真實證明；不可拿三次權限讀取冒稱零外洩。
 3. 2,000 真會員負載、Cloudflare 帳號費用、實際 D1/R2 和真 AI 答覆皆未驗證。
 4. 不建立 Cloudflare 資源、不呼叫真 AI、不合併、不付費、不 Production Deploy；所有正式功能 OFF。
+
+## 第三輪 R3｜P0 每份音檔授權、P1 原文取用時序與完整性（2026-10-20）
+
+中央AI2 [#455 #6290549782](https://github.com/yukidu/Echo-Starry/issues/455#issuecomment-6290549782) 限定修復 AI4 自己的三個問題：
+
+1. **每份音檔預設拒絕**：單純會員存活不代表可讀 VIP 音檔。Fake constructor 現在要求在測試明列 `grantedTrackIds`；每次 T0/T1/T2/SEND 的假權威均以 per-track `entitled:true` 加版本比對。任何一份未獲准，一整份多來源答覆拒絕。
+2. **先證明再取原文**：`simulateProtectedQA` 只接受**不含 text**的 `FakeSourceRef`；即使呼叫者直接帶入 `text`，也在 T0 原地拒絕。私密文字由假權威在 T0、T1 都證實有效後，從私有 `resources` 一次取到緩衝；沒有原文預先進入搜尋請求。
+3. **內文變動但版本未加一律拒絕**：可信**假資料來源內部**計算 SHA-256 `contentDigest`，T0/T1/T2 與最後 SEND 均連同 permission/source/correction 版次比對；若 T2 後正文被偷換，即使版本沒改，也拒釋出舊稿。雜湊**不是**真 R2 ETag 或加密簽章，不能代替真內容來源證明。
+
+紅燈證據：新 `tests/n1aAi4R3RegressionFake.test.ts` 在原 Fake 模組上，GitHub Regression [#39421056131](https://github.com/yukidu/Echo-Starry/actions/runs/39421056131) 的**9 項全失敗**；修復後復測需在最新 SHA 的綠燈 CI 證明。原第一輪與第二輪各20項均保持，未修改原中文搜尋演算法、#468凍結盲題或別組 PR。
+
+**不可高估**：這只是一個在記憶體同執行緒內執行的 Fake mock，沒有真會員授權分級、真 ID/內容資料、分散式撤權 SEND fence、跨多 Worker 的可證原子順序或獨立不回捲錨點。正式資料、真 Cloudflare 成本及 AI 呼叫全部未測，所有 OFF、Draft、未合併、未部署。
