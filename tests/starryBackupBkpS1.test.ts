@@ -193,3 +193,111 @@ test('SQLite zero-row UPDATE is not automatically a failed transaction',()=>{
   assert.equal(p.status,0,p.stderr);const r=JSON.parse(p.stdout);
   assert.deepEqual(r,{rows:[1,0],pointer:'new',run:'awaiting_review'});
 });
+
+
+/** AI2 P0-1: authoritative deletion/revocation revisions must match exactly.
+ * A stale but otherwise "available" authority is not a proof of no revocation. */
+test('S76 P0-1 stale external deletion watermark cannot approve restore',rejected(
+  'authority_watermark_older',(f)=>{
+    f.authority={...f.authority,deletionWatermark:10,epoch:18};
+  }));
+test('S76 P0-1 stale external revocation watermark cannot approve restore',rejected(
+  'authority_watermark_older',(f)=>{
+    f.authority={...f.authority,revocationWatermark:10,epoch:18};
+  }));
+test('S76 P0-1 watermark ahead of snapshot rejects even with higher epoch',rejected(
+  'snapshot_outdated_authority',(f)=>{
+    f.authority={...f.authority,revocationWatermark:12,epoch:19};
+  }));
+test('S76 P0-1 same watermark and epoch revision with live revoke rejects',rejected(
+  'active_track_deleted_or_revoked',(f)=>{
+    f.authority={...f.authority,revocationWatermark:11,epoch:18,
+      currentRevokedTrackIds:['synthetic-track']};
+  }));
+test('S76 P0-1 invalid external authority revision number fails closed',rejected(
+  'authority_watermark_invalid',(f)=>{
+    f.authority={...f.authority,deletionWatermark:Number.NaN};
+  }));
+
+/** A parent-only history object is a restore dependency despite the leaf
+ * containing all its own objects and a valid signed leaf manifest. */
+function addBaseOnlyApprovedHistory(f:MutableFixture):string{
+  const source=f.base.versions.find(v=>v.id==='legacy')!;
+  const objects=source.objects.map(o=>{
+    const key=o.key.replace('synthetic/legacy/','synthetic/parent-only/');
+    f.files.set(key,f.files.get(o.key)!);
+    return {...o,key};
+  });
+  f.base={...f.base,versions:[...f.base.versions,{
+    ...source,id:'parent-only',active:false,status:'approved-history',objects
+  }]};
+  f.snapshot={...f.snapshot,approvedHistoryIds:[...f.snapshot.approvedHistoryIds,'parent-only']};
+  return objects.find(o=>o.format==='txt')!.key;
+}
+test('S76 P0-2 parent-only approved-history object is verified even if absent from leaf',async()=>{
+  const f=await fixture();
+  addBaseOnlyApprovedHistory(f);
+  const r=await f.refresh();
+  const result=await bkpS1Preflight(r);
+  assert.equal(result.eligible,true,JSON.stringify(result.reasons));
+  assert.deepEqual(result.chain,['full-1','delta-2']);
+});
+test('S76 P0-2 missing parent-only R2 dependency rejects an intact delta leaf',async()=>{
+  const f=await fixture();
+  const parentKey=addBaseOnlyApprovedHistory(f);
+  f.files.delete(parentKey);
+  const result=await bkpS1Preflight(await f.refresh());
+  assert.equal(result.eligible,false);
+  assert.ok(result.reasons.includes('object_not_found'),JSON.stringify(result.reasons));
+});
+test('S76 P0-2 parent-only R2 corruption rejects an intact delta leaf',async()=>{
+  const f=await fixture();
+  const parentKey=addBaseOnlyApprovedHistory(f);
+  f.files.set(parentKey,'tampered after signed manifest');
+  const result=await bkpS1Preflight(await f.refresh());
+  assert.equal(result.eligible,false);
+  assert.ok(result.reasons.includes('object_hash_mismatch'),JSON.stringify(result.reasons));
+});
+test('S76 P0-2 conflicting immutable ID across base and delta is forbidden',rejected(
+  'version_immutability_conflict',(f)=>{
+    const versions=[...f.manifest.versions];
+    versions[1]={...versions[1],sourceAudioRevision:'changed-old-source'};
+    f.manifest={...f.manifest,versions};
+  }));
+
+/** AI2 P1: validate every record before suggesting any expiry cleanup. */
+test('S76 P1 duplicate backup IDs block all retention cleanup suggestions',async()=>{
+  const f=await fixture();
+  const duplicated={...f.base,createdAt:50};
+  const p=bkpS1PlanRetention({manifests:[f.base,duplicated,f.manifest],
+    lastGoodId:'delta-2',retentionDays:7,now:200+90*86400000});
+  assert.equal(p.blocked,true);
+  assert.deepEqual(p.candidates,[]);
+});
+test('S76 P1 expired orphan delta with missing parent blocks every cleanup suggestion',async()=>{
+  const f=await fixture();
+  const orphan:BackupManifest={...f.manifest,id:'expired-orphan',baseId:'missing-full',
+    parentId:'missing-full',createdAt:20};
+  const p=bkpS1PlanRetention({manifests:[f.base,f.manifest,orphan],
+    lastGoodId:'delta-2',retentionDays:7,now:200+90*86400000});
+  assert.equal(p.blocked,true);
+  assert.deepEqual(p.candidates,[]);
+});
+test('S76 P1 old cyclic delta pair blocks all cleanup suggestions',async()=>{
+  const f=await fixture();
+  const a:BackupManifest={...f.manifest,id:'cycle-a',parentId:'cycle-b',createdAt:30};
+  const b:BackupManifest={...f.manifest,id:'cycle-b',parentId:'cycle-a',createdAt:30};
+  const p=bkpS1PlanRetention({manifests:[f.base,f.manifest,a,b],
+    lastGoodId:'delta-2',retentionDays:7,now:200+90*86400000});
+  assert.equal(p.blocked,true);
+  assert.deepEqual(p.candidates,[]);
+});
+test('S76 P1 delta with unrelated base cannot become expired cleanup candidate',async()=>{
+  const f=await fixture();
+  const alien:BackupManifest={...f.manifest,id:'alien-delta',
+    parentId:'full-1',baseId:'wrong-base',createdAt:30};
+  const p=bkpS1PlanRetention({manifests:[f.base,f.manifest,alien],
+    lastGoodId:'delta-2',retentionDays:7,now:200+90*86400000});
+  assert.equal(p.blocked,true);
+  assert.deepEqual(p.candidates,[]);
+});
