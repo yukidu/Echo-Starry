@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>繁星 Starry 安全總控｜N1A-S1 離線示範</title>
+<title>繁星 Starry 安全總控｜N1A-S3A 離線示範</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;background:#0b1220;color:#e6ecf6}
 *{box-sizing:border-box}body{margin:0}main{max-width:1160px;margin:auto;padding:24px}
@@ -42,12 +42,12 @@ footer{margin:18px 0 0;color:#a5b7d1;font-size:.83rem;line-height:1.6}
 </style>
 </head>
 <body><main>
-<header><div><h1>✦ 繁星安全總控</h1><p class="sub">Starry.phd · N1A-S1 雙重安全規劃 · 手機／桌機介面</p></div><span class="stamp">離線假資料 / 非正式網站</span></header>
-<div class="banner"><strong>全部資料都是虛構示範；沒有可信後端核驗，任何「假一致」都未獲正式證實。</strong>沒有連接 Starry ID、Cloudflare、AI 帳單或備份。撤權或來源失聯時，不能直接認定已撤權；錨點版本不符也不代表已確證回捲。此頁不代表目前服務健康，也沒有付費、重試、還原或解鎖功能。</div>
+<header><div><h1>✦ 繁星安全總控</h1><p class="sub">Starry.phd · N1A-S3A 共用假驗證 × 安全監控 · 手機／桌機介面</p></div><span class="stamp">離線假資料 / 非正式網站</span></header>
+<div class="banner"><strong>S3A：同進程 AI2 假驗證只在離線程式測試與假 REST 執行，這個靜態預覽不讀取任何證明；即使六平台模擬正常，App／費用／備份也不能憑假資料亮綠或解除安全鎖。</strong>沒有連接 Starry ID、Cloudflare、AI 帳單或備份。撤權或來源失聯時，不能直接認定已撤權；錨點版本不符也不代表已確證回捲。此頁不代表目前服務健康，也沒有付費、重試、還原或解鎖功能。</div>
 <div class="legend"><span>🟢 正常：有完整假證據</span><span>🟡 警示：需人工處理</span><span>🔴 故障：假事件已確證</span><span>⚪ 未知：不能判定正常</span><span>🔒 敏感操作一律鎖定</span></div>
 <div class="toolbar" aria-label="切換離線假資料情境">
 <button type="button" data-scenario="unknown" aria-pressed="true">證據未知</button>
-<button type="button" data-scenario="normal" aria-pressed="false">完整正常假資料</button>
+<button type="button" data-scenario="normal" aria-pressed="false">雲端假正常／安全仍未知</button>
 <button type="button" data-scenario="warning" aria-pressed="false">跨組警示</button>
 <button type="button" data-scenario="fault" aria-pressed="false">已確認故障</button>
 <button type="button" data-scenario="isolated" aria-pressed="false">平台正常／App 備份異常</button>
@@ -90,7 +90,7 @@ const labels=['Workers','Workflows','D1','R2','KV','Workers AI'];
 const words={unknown:'未知',normal:'正常',warning:'警示',fault:'故障'};
 const scenarios={
  unknown:{cloud:'unknown',app:'unknown',billing:'unknown',backup:'unknown',events:[],reason:['來源尚未驗證','帳單來源未知','沒有可信備份資料']},
- normal:{cloud:'normal',app:'normal',billing:'normal',backup:'normal',events:[],reason:['完整假資料：未見逐字稿異常','完整假資料：無待對帳事件（不代表可花費）','完整假資料：無備份異常（仍不能還原）']},
+ normal:{cloud:'normal',app:'unknown',billing:'unknown',backup:'unknown',events:[],reason:['只有平台六項假觀測，沒有真 Starry ID 授權','沒有真帳單與付款權限，不能放行','沒有真獨立見證，還原永久鎖定']},
  warning:{cloud:'unknown',app:'warning',billing:'warning',backup:'warning',events:[
  ['app_security','APP_QUEUE_UNCONFIRMED','警示'],['ai_billing','BILLING_UNCERTAIN_HOLD','警示'],['backup_restore','RESTORE_LOCKED','警示']],
  reason:['模擬：排隊失聯，人工核對','模擬：費用未決，禁止新支出','模擬：雙人資格待確認']},
@@ -100,10 +100,10 @@ const scenarios={
  isolated:{cloud:'normal',app:'warning',billing:'warning',backup:'fault',events:[
  ['app_security','APP_QUEUE_UNCONFIRMED','警示'],['ai_billing','BILLING_UNCERTAIN_HOLD','警示'],['backup_restore','BACKUP_INTEGRITY_FAILED','故障']],
  reason:['模擬：逐字稿 queue 需確認','模擬：帳務不明持續 Hold','模擬：單一備份損毀；不等於 R2 故障']},
- proofUnknown:{cloud:'normal',app:'unknown',billing:'normal',backup:'unknown',events:[],
+ proofUnknown:{cloud:'normal',app:'unknown',billing:'unknown',backup:'unknown',events:[],
  reason:['SecurityProof 無法驗證；不允許敏感操作','模擬：無帳務異常，但付費仍鎖定','安全版本來源未確立，禁止還原'],
  proof:['unknown','沒有可信 AI2 判定：未知，仍鎖定','unknown','外部見證待查']},
- proofRevoked:{cloud:'normal',app:'unknown',billing:'normal',backup:'unknown',events:[
+ proofRevoked:{cloud:'normal',app:'unknown',billing:'unknown',backup:'unknown',events:[
  ['app_security','UNVERIFIED_FAKE_WITNESS_DENIAL','未知']],
  reason:['自報撤權或刪除記錄，未經可信後端驗證；拒絕操作','模擬：帳務與權限分離，新付費仍禁止','版本無可信查證：未知，還原仍鎖定'],
  proof:['unknown','自報假見證，不能證實真撤權或刪除','unknown','版本未經可信核對；保持鎖定']},
