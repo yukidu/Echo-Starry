@@ -69,7 +69,7 @@ export async function claimSafeRun(db:Db,runId:string,trackId:string):Promise<Sa
 }
 export async function assertLiveRun(db:Db,run:SafeRun):Promise<void>{
   const live=await db.prepare(
-    "SELECT r.runId FROM transcript_runs r JOIN transcript_index i ON i.trackId=r.trackId "+
+    "SELECT r.runId,r.leaseUntil FROM transcript_runs r JOIN transcript_index i ON i.trackId=r.trackId "+
     "JOIN tracks t ON t.id=r.trackId "+
     "WHERE r.runId=? AND r.generation=? AND r.state='processing' AND r.leaseUntil>? "+
     "AND t.audioUrl=r.sourceAudioUrl "+
@@ -78,6 +78,12 @@ export async function assertLiveRun(db:Db,run:SafeRun):Promise<void>{
     "AND i.r2Key=r.expectedActiveR2Key)) LIMIT 1")
     .bind(run.runId,run.generation,Date.now()).first();
   if(!live)fail('lease lost, source changed, or active transcript protected');
+  if(Number(live.leaseUntil||0)<Date.now()+5*60_000){
+    const renewed=await db.prepare("UPDATE transcript_runs SET leaseUntil=?,updatedAt=? "+
+      "WHERE runId=? AND generation=? AND state='processing' AND leaseUntil>? RETURNING runId")
+      .bind(Date.now()+15*60_000,Date.now(),run.runId,run.generation,Date.now()).first();
+    if(!renewed)fail('lease expired while renewing');
+  }
 }
 export async function failSafeRun(db:Db,run:SafeRun|null,error:unknown){
   if(!run)return;
