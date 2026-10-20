@@ -267,7 +267,7 @@ export async function stageSafeVersion(env:SafeEnv,run:SafeRun,items:{
     "WHERE runId=? AND generation=? AND state='processing' AND leaseUntil>? RETURNING runId")
     .bind(versionId,Date.now(),run.runId,run.generation,Date.now()).first();
   if(!changed)fail('candidate lost ownership before review');
-  return {versionId,...version};
+  return version;
 }
 export async function publishSafeVersion(env:SafeEnv,runId:string,approvedBy:string|null){
   const db=env.DB;
