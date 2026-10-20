@@ -1,0 +1,29 @@
+name: AI4 N1A S3A offline citation integration
+on:
+  push:
+    branches:
+      - safety/ai4-n1a-s3a-citation-bridge-20261020
+  pull_request:
+    branches:
+      - safety/ai2-n1a-s3a-shared-envelope-20261020
+    paths:
+      - 'n1a-ai4/**'
+      - 'tests/n1aAi4S3aIntegrationFake.test.ts'
+      - '.github/workflows/ai4-n1a-s3a-fake-only.yml'
+permissions:
+  contents: read
+jobs:
+  fake-ai4-s3a:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked-down local test dependencies
+        run: npm install --ignore-scripts --no-package-lock --no-audit --no-fund
+      - name: Direct common verifier and AI4 S1 fake integration
+        run: node --import tsx --test tests/n1aS3aSharedEnvelope.test.ts tests/n1aAi4S3aIntegrationFake.test.ts
+      - name: Static TypeScript checks
+        run: npm run lint
