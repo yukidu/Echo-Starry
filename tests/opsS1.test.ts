@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildDashboard, evaluateService, sanitizeIncident, HISTORICAL_EXAMPLE, SERVICES } from '../ops-s1/healthModel.ts';
+import { buildDashboard, evaluateService, reconcileService, sanitizeIncident, HISTORICAL_EXAMPLE, SERVICES } from '../ops-s1/healthModel.ts';
 import type { Observation } from '../ops-s1/healthModel.ts';
 import { createReadOnlyOpsHandler, createMockRateLimiter } from '../ops-s1/readOnlyHandler.ts';
 
@@ -88,9 +88,10 @@ test('OPS-09 separate app failures do not turn all services red', () => {
 
 test('OPS-10 account quota boundary 79.9, 80.0, 100.0 and absent quota', () => {
   const mk=(used:number)=>evaluateService(good('d1',{requests:undefined,serverErrors:undefined,quotaUsed:used,quotaLimit:100000,quotaVerified:true}),'d1',NOW);
-  assert.equal(mk(79900).status,'normal');
-  assert.equal(mk(80000).quotaState,'warning'); assert.equal(mk(80000).status,'warning');
-  assert.equal(mk(100000).quotaState,'stop_new'); assert.equal(mk(100000).status,'warning');
+  assert.equal(mk(79900).status,'unknown');
+  assert.equal(mk(80000).quotaState,'warning'); assert.equal(mk(80000).status,'unknown');
+  assert.equal(mk(100000).quotaState,'stop_new'); assert.equal(mk(100000).status,'unknown');
+  assert.equal(evaluateService(good('d1',{quotaUsed:80000,quotaLimit:100000,quotaVerified:true}),'d1',NOW).status,'warning');
   assert.equal(evaluateService(good('d1',{requests:undefined,serverErrors:undefined,quotaUsed:0,quotaLimit:100000,quotaVerified:false}),'d1',NOW).status,'unknown');
 });
 
@@ -146,4 +147,101 @@ test('OPS-16 incidents are paginated (max 25), redacted and GET only; preview is
   const html=readFileSync(new URL('../ops-s1/mockPreview.html',import.meta.url),'utf8');
   assert.match(html,/viewport/);assert.match(html,/data-mode="unknown"/);
   assert.doesNotMatch(html,/<script\s+src|<iframe|\bfetch\s*\(|\bsetInterval\s*\(|new\s+WebSocket/);
+});
+ // CentralAI2 PR #462 S76 review: two independent safety regressions.
+test('OPS-R1 quota-only low usage never manufactures green service health', () => {
+  const card=evaluateService(good('d1',{requests:undefined,serverErrors:undefined,quotaUsed:1,quotaLimit:100000,quotaVerified:true}),'d1',NOW);
+  assert.equal(card.status,'unknown'); assert.equal(card.healthVerified,false);
+  assert.equal(card.healthStatus,'unknown');assert.equal(card.quotaState,'none');assert.equal(card.quotaPercent,0.001);
+});
+
+test('OPS-R2 quota-only >=80% and >=100% retain quota warnings without declaring service healthy', () => {
+  for (const [used,expected] of [[79900,'none'],[80000,'warning'],[100000,'stop_new']] as const) {
+    const c=evaluateService(good('d1',{requests:undefined,serverErrors:undefined,quotaUsed:used,quotaLimit:100000,quotaVerified:true}),'d1',NOW);
+    assert.equal(c.status,'unknown'); assert.equal(c.healthStatus,'unknown');assert.equal(c.quotaState,expected);
+    assert.equal(c.quotaPercent,used/1000);
+  }
+});
+
+test('OPS-R3 trustworthy confirmed fault outranks quota normal and quota stop', () => {
+  for (const used of [1,100000]) {
+    const c=evaluateService(good('d1',{requests:undefined,serverErrors:undefined,confirmedFault:true,quotaUsed:used,quotaLimit:100000,quotaVerified:true}),'d1',NOW);
+    assert.equal(c.status,'fault');assert.equal(c.quotaPercent,used/1000);
+  }
+});
+
+test('OPS-R4 unknown health and another confirmed fault preserve the fault', () => {
+  for(const observations of [
+    [good('workers',{requests:undefined,serverErrors:undefined,quotaUsed:1,quotaLimit:100,quotaVerified:true}),good('workers',{confirmedFault:true})],
+    [good('workers',{confirmedFault:true}),good('workers',{requests:undefined,serverErrors:undefined,quotaUsed:1,quotaLimit:100,quotaVerified:true})],
+  ]) {
+    const d=buildDashboard(observations,NOW);
+    const card=d.services.find(c=>c.service==='workers')!;
+    assert.equal(card.status,'fault');assert.equal(card.conflict,true);
+    assert.equal(card.evidence,'observed');assert.equal(d.partialUnknown,true);
+  }
+});
+
+test('OPS-R5 stale first and current fault second are order-independent', () => {
+  const observations=[good('r2',{observedAt:new Date(NOW-3600000).toISOString()}),good('r2',{confirmedFault:true})];
+  for(const items of [observations,observations.toReversed()]) {
+    const card=reconcileService(items,'r2',NOW);
+    assert.equal(card.status,'fault');assert.equal(card.conflict,true);
+  }
+});
+
+test('OPS-R6 old normal and newer confirmed fault cannot become green when reversed', () => {
+  const observations=[good('workflows'),good('workflows',{confirmedFault:true,observedAt:new Date(NOW-10_000).toISOString()})];
+  for(const items of [observations,observations.toReversed()]) {
+    const card=reconcileService(items,'workflows',NOW);
+    assert.equal(card.status,'fault');assert.equal(card.conflict,true);
+    assert.match(card.reason,/互相矛盾/);
+  }
+});
+
+test('OPS-R7 same timestamp simultaneous normal and fault chooses fault in either order', () => {
+  const normal=good('workers'); const fault=good('workers',{confirmedFault:true});
+  for(const items of [[normal,fault],[fault,normal]]) {
+    const card=reconcileService(items,'workers',NOW);
+    assert.equal(card.status,'fault'); assert.equal(card.conflict,true);
+  }
+});
+
+test('OPS-R8 contradictory credible status without confirmed fault is unknown, not green', () => {
+  const normal=good('kv');const warning=good('kv',{warning:true});
+  for(const items of [[normal,warning],[warning,normal]]) {
+    const card=reconcileService(items,'kv',NOW);
+    assert.equal(card.status,'unknown');assert.equal(card.conflict,true);
+  }
+});
+
+test('OPS-R9 different sources and observation windows require independent verification', () => {
+  const normal=good('workers');
+  const fromOtherSource=good('workers',{source:'workers_metrics'});
+  const fromOtherWindow=good('workers',{windowMinutes:5});
+  assert.equal(reconcileService([normal,fromOtherSource],'workers',NOW).status,'unknown');
+  assert.equal(reconcileService([normal,fromOtherWindow],'workers',NOW).status,'unknown');
+});
+
+test('OPS-R10 duplicate stable valid evidence remains normal, independent of input order', () => {
+  const normal=good('workers');
+  const x=reconcileService([normal,{...normal}],'workers',NOW);
+  assert.equal(x.status,'normal');assert.equal(x.conflict,false);
+  const y=reconcileService([{...normal},normal],'workers',NOW);
+  assert.deepEqual(x,y);
+});
+
+test('OPS-R11 conflicting verified quota values are unknown, not an arbitrary first', () => {
+  const x=good('d1',{quotaUsed:10,quotaLimit:100,quotaVerified:true});
+  const y=good('d1',{quotaUsed:95,quotaLimit:100,quotaVerified:true});
+  for(const items of [[x,y],[y,x]]) {
+    const card=reconcileService(items,'d1',NOW);
+    assert.equal(card.status,'unknown');assert.equal(card.conflict,true);
+    assert.equal(card.quotaPercent,null);assert.equal(card.quotaState,'unknown');
+  }
+});
+
+test('OPS-R12 low-health-sample plus quota never manufactures a normal state', () => {
+  const c=reconcileService([good('workers',{requests:3,serverErrors:0,quotaUsed:1,quotaLimit:100,quotaVerified:true})],'workers',NOW);
+  assert.equal(c.status,'unknown'); assert.equal(c.quotaState,'none');
 });
