@@ -35,8 +35,13 @@ export async function queueNextTranscriptGate2P0(env:Env){
   const waiting:any=await env.DB.prepare("SELECT runId FROM transcript_runs WHERE state='pending' ORDER BY createdAt LIMIT 5").all();
   const claimed:any[]=[],started:any[]=[],failures:any[]=[];
   for(const entry of waiting?.results||[]){
-    const queued=await queueSafeRun(env.DB,String(entry.runId),target);
-    if(queued)claimed.push(queued);
+    try{
+      const queued=await queueSafeRun(env.DB,String(entry.runId),target);
+      if(queued)claimed.push(queued);
+    }catch{
+      // A conflicting transition must roll back, not stop unrelated tracks.
+      failures.push({runId:String(entry.runId),error:'Queue reservation refused; review state'});
+    }
   }
   for(let i=0;i<claimed.length;i++){
     const run=claimed[i],trackId=String(run.trackId),runId=String(run.runId);
@@ -49,12 +54,14 @@ export async function queueNextTranscriptGate2P0(env:Env){
       if(result?.errors?.length)throw new Error(String(result.errors[0]?.message||'queue error'));
       started.push({trackId,instanceId});
     }catch(error){
-      await failSafeRun(env.DB,{...run,state:'queued'} as any,error);
-      if(run.intent==='first')await env.DB.prepare(
-        "UPDATE transcript_index SET status='failed',error='Workflow could not start',updatedAt=? "+
-        "WHERE trackId=? AND status='queued' AND workingRunId IS NULL AND r2Key IS NULL")
-        .bind(Date.now(),trackId).run();
-      failures.push({trackId,error:'Workflow could not start'});
+      // Both new-audio failure states transition atomically in failSafeRun.
+      // If that transaction fails, leave the queued lease for manual quarantine.
+      try{
+        await failSafeRun(env.DB,{...run,state:'queued'} as any,error);
+        failures.push({trackId,error:'Workflow could not start; manual review required'});
+      }catch{
+        failures.push({trackId,error:'Workflow dispatch outcome uncertain; manual review required'});
+      }
     }
   }
   const active=await env.DB.prepare("SELECT COUNT(*) AS n FROM transcript_runs WHERE state IN ('queued','processing')").first();
