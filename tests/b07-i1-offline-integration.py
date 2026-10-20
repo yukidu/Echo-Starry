@@ -7,6 +7,7 @@ a proposed production migration; a real integration needs another approval.
 """
 from __future__ import annotations
 import concurrent.futures
+from contextlib import closing
 import datetime
 import hashlib
 import json
@@ -83,7 +84,7 @@ class FakeEnvironment:
 
     def put_run(self,run,track,etag,grant,segments=1,generation=1,state="processing",
                 permission_ok=1,restore_ok=1,source_matches=1,lease_until=None):
-        with open_db(self.echo) as db:
+        with closing(open_db(self.echo)) as db:
             db.execute("INSERT OR REPLACE INTO fake_transcript_runs VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                        (run,track,etag,grant,generation,state,
                         NOW+600000 if lease_until is None else lease_until,
@@ -131,7 +132,7 @@ class FakeEnvironment:
                  id,request_key,fingerprint,day,app_id,task_id,member_key,model_id,
                  billing_class,status,max_units,unit_micro_twd,held_micro_twd,created_at,updated_at)
                  VALUES(?,?,?,?,?,?,?,?,?,'reserved',?,?,?,?,?)""",(
-                 reservation,request_key,h("fake-i1",key)," "+day.strip() if False else day,
+                 reservation,request_key,h("fake-i1",key),day,
                  "echostars","echo.qa",hashlib.sha256(track.encode()).hexdigest(),model,
                  "free_verified" if model==FREE_MODEL else "priced",
                  units,rate,units*rate,NOW,NOW))
@@ -194,15 +195,18 @@ class FakeEnvironment:
             if not planned or len(rows)!=planned[0] or not all(s=="settled" for s,_ in rows):
                 db.execute("ROLLBACK")
                 return False
-            db.execute("""UPDATE starry_ai_b07_calls SET status='settled',actual_units=?,
+            updated=db.execute("""UPDATE starry_ai_b07_calls SET status='settled',actual_units=?,
                          actual_micro_twd=?,updated_at=? WHERE id=? AND status='reserved'""",(
                          sum(u for _,u in rows),sum(u for _,u in rows)*2,NOW,reservation))
+            if updated.rowcount != 1:
+                db.execute("ROLLBACK")
+                return False
             db.execute("COMMIT")
             return True
         finally:db.close()
 
     def usage(self):
-        with open_db(self.central) as db:
+        with closing(open_db(self.central)) as db:
             return db.execute("SELECT calls,held_micro_twd,settled_micro_twd FROM starry_ai_b07_usage WHERE day=? AND scope_key='global'",(DAY,)).fetchone()
 
     def count(self,table):
@@ -220,7 +224,7 @@ def verified(cond,label):
 
 with tempfile.TemporaryDirectory(prefix="b07-i1-FULLY-OFFLINE-") as root:
     # 1. Source identity from approved version, not merely requestKey or runId.
-    f=FakeEnvironment(Path(root)/"a" if False else root,cap=50)
+    f=FakeEnvironment(root,cap=50)
     audio="1"*64;grant="2"*64
     f.put_run("safe-run-01","track-alpha",audio,grant,segments=2)
     a=f.request("safe-run-01","track-alpha",audio,grant,0,"new-key-one")
