@@ -31,7 +31,7 @@ const PY = [
 'except Exception as exc:',
 ' conn.rollback(); print(json.dumps({"error":str(exc)}));sys.exit(1)',
 'finally: conn.close()'
-].join('\\n');
+].join('\n');
 class FakeD1 {
   failSecond=false;
   constructor(public path:string){}
