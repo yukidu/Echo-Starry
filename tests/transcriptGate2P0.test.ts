@@ -86,13 +86,13 @@ test('SAFE-01/02 original ready cannot enter first-run and duplicate claim is re
   const {db,cleanup}=await fixture(true);
   try{
     assert.equal(await requestSafeRun(db,{trackId:'synthetic-a',intent:'first',
-      requestKey:'first:synthetic-a',sourceAudioKey:'audio/demo.mp3'}),null);
+      requestKey:'first:synthetic-a',sourceAudioKey:'audio/demo.mp3',sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3'}),null);
     const relisten=await requestSafeRun(db,{trackId:'synthetic-a',intent:'relisten',
-      requestKey:'relisten:synthetic-a:legacy',sourceAudioKey:'audio/demo.mp3',
+      requestKey:'relisten:synthetic-a:legacy',sourceAudioKey:'audio/demo.mp3',sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',
       approvedBy:'fake-admin',approvedMaxSeconds:80});
     assert.ok(relisten);
     const duplicate=await requestSafeRun(db,{trackId:'synthetic-a',intent:'relisten',
-      requestKey:'relisten:synthetic-a:legacy',sourceAudioKey:'audio/demo.mp3',
+      requestKey:'relisten:synthetic-a:legacy',sourceAudioKey:'audio/demo.mp3',sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',
       approvedBy:'fake-admin',approvedMaxSeconds:80});
     assert.equal(duplicate?.runId,relisten?.runId);
     await db.prepare("UPDATE transcript_runs SET state='queued' WHERE runId=?").bind(relisten!.runId).run();
@@ -109,7 +109,7 @@ test('SAFE-03 partial R2 candidate writes never change active published transcri
   try{
     r2.files.set('transcripts/synthetic-a/legacy.json','immutable original');
     const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'relisten',
-      requestKey:'relisten:failed',sourceAudioKey:'audio/demo.mp3',
+      requestKey:'relisten:failed',sourceAudioKey:'audio/demo.mp3',sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',
       approvedBy:'fake-admin',approvedMaxSeconds:80}))!;
     await db.prepare("UPDATE transcript_runs SET state='queued' WHERE runId=?").bind(run.runId).run();
     const claimed=await claimSafeRun(db,run.runId,'synthetic-a');
@@ -126,7 +126,7 @@ test('SAFE-04/05 new first-run only publishes once and stale callbacks cannot re
   const {db,r2,cleanup}=await fixture(false);
   try{
     const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'first',
-      requestKey:'first:synthetic-a:audio/demo.mp3',sourceAudioKey:'audio/demo.mp3'}))!;
+      requestKey:'first:synthetic-a:audio/demo.mp3',sourceAudioKey:'audio/demo.mp3',sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3'}))!;
     await db.prepare("UPDATE transcript_runs SET state='queued' WHERE runId=?").bind(run.runId).run();
     await db.prepare("UPDATE transcript_index SET status='queued' WHERE trackId='synthetic-a'").run();
     const claimed=await claimSafeRun(db,run.runId,'synthetic-a');
@@ -146,7 +146,7 @@ test('member correction requires a separate review and keeps the prior ready poi
   const {db,r2,cleanup}=await fixture(true);
   try{
     const run=(await requestSafeRun(db,{trackId:'synthetic-a',intent:'relisten',
-      requestKey:'relisten:review',sourceAudioKey:'audio/demo.mp3',
+      requestKey:'relisten:review',sourceAudioKey:'audio/demo.mp3',sourceAudioUrl:'https://fake.invalid/api/r2/file/audio/demo.mp3',
       approvedBy:'fake-admin',approvedMaxSeconds:80}))!;
     await db.prepare("UPDATE transcript_runs SET state='queued' WHERE runId=?").bind(run.runId).run();
     const claimed=await claimSafeRun(db,run.runId,'synthetic-a');
