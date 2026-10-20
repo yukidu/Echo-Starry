@@ -57,6 +57,7 @@ export async function transcriptBulkStatus(env: SchedulerEnv) {
     candidateRunId:candidateByTrack.get(text(item.trackId))?.runId||null
   }));
   return {
+    gate2SafeMode:gate2Enabled(env),
     audioTracks: Number(allTracks?.n || 0),
     indexed: Number(row?.total || 0),
     ready: Number(row?.ready || 0),
