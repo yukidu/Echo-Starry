@@ -157,7 +157,9 @@ function canonicalSegments(json:string,txt:string,vtt:string){
   for(let i=0;i<cues.length;i++){
     const expected=time(Number(segments[i].start))+' --> '+time(Number(segments[i].end));
     const parts=cues[i].trim().split('\n');
-    if(parts[0]!==expected || parts.slice(1).join('\n').trim()!==lines[i].trim())
+    const stamp=parts[0]===String(i+1)?parts[1]:parts[0];
+    const content=parts[0]===String(i+1)?parts.slice(2):parts.slice(1);
+    if(stamp!==expected || content.join('\n').trim()!==lines[i].trim())
       fail('JSON/VTT timecodes or recognized text mismatch');
   }
   return {segmentCount:segments.length,timecodeChecksum:JSON.stringify(
