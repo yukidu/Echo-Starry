@@ -40,6 +40,7 @@ export function reportWindow(period:Period,asOfMs:number){
 export class FakeStarryIdSource{
  private readonly membership=new Set<string>();
  private readonly actions=new Map<string,Omit<FakeEnvelope,'testOnlySignature'>>();
+ private readonly eventsById=new Map<string,string>();
  constructor(private readonly fakeSigningSecret:string){if(!fakeSigningSecret)throw Error('FAKE_SECRET_REQUIRED');}
  register(subject:string){if(!KEY.test(subject))throw Error('BAD_FAKE_SUBJECT');this.membership.add(subject);}
  /** First server receipt freezes the original identity and accepted-at time. */
@@ -61,7 +62,7 @@ export class FakeStarryIdSource{
    identityKind:kind,registeredMemberHandle:kind==='registered'?H(this.fakeSigningSecret,'member:'+a.subject):null,
    acceptedAtUtcMs:a.acceptedAtUtcMs,trackId:a.track,state:a.state,active:true
   };
-  this.actions.set(k,m);return this.sign(m);
+  this.actions.set(k,m);this.eventsById.set(m.globalEventId,k);return this.sign(m);
  }
  revise(app:string,logicalSourceId:string,update:{track?:string;state?:State;active?:boolean}):FakeEnvelope{
   const k=app+':'+logicalSourceId,old=this.actions.get(k);
@@ -77,7 +78,8 @@ export class FakeStarryIdSource{
   return{...v,testOnlySignature:H(this.fakeSigningSecret,body(v))};
  }
  verify(e:FakeEnvelope):boolean{
-  const stored=[...this.actions.values()].find(x=>x.globalEventId===e.globalEventId);
+  const actionKey=this.eventsById.get(e.globalEventId);
+  const stored=actionKey===undefined?undefined:this.actions.get(actionKey);
   // Fake issuer validates signature; old signed versions still eligible for STALE checks.
   return !!stored && e.originAppId===stored.originAppId &&
     HEX.test(e.globalEventId) &&
