@@ -1,0 +1,27 @@
+name: AI3 A01 isolated synthetic Node evidence
+on:
+  push:
+    branches:
+      - ai3/s-next-a01-offline-cost-safety
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-ai3-node-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run exactly AI3 30 synthetic cases with Node
+        shell: bash
+        run: |
+          set -o pipefail
+          node --version
+          node --test --test-reporter=tap tests/ai3-s-next-a01-offline.test.mjs 2>&1 | tee ai3-a01-node-tap.log
+      - name: Save full test stdout and stderr
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai3-a01-node-test-evidence
+          path: ai3-a01-node-tap.log
+          if-no-files-found: warn
