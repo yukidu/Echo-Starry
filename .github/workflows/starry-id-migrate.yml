@@ -17,12 +17,23 @@ jobs:
   migrate:
     if: ${{ github.ref == 'refs/heads/main' && inputs.approval_phrase == 'MIGRATE_STARRY_ID_PRODUCTION' }}
     runs-on: ubuntu-latest
+    environment: starry-production-write
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       ECHOSTARS_D1_ID: e0a696a9-0233-4186-be4d-229435b19a27
       STARRY_ID_D1_ID: 01195c92-555e-4816-bddc-5b8cb2e795db
     steps:
+      - name: Verify independent production approval gate
+        shell: bash
+        env:
+          STARRY_PRODUCTION_WRITE_APPROVAL_KEY: ${{ secrets.STARRY_PRODUCTION_WRITE_APPROVAL_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${STARRY_PRODUCTION_WRITE_APPROVAL_KEY:-}" ]; then
+            echo 'Production access disabled: configure protected environment and approval secret.' >&2
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
