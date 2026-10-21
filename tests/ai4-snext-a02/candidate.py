@@ -29,9 +29,17 @@ def clean(text):
 def grams(text):
     return {text[i:i+2] for i in range(max(0, len(text)-1))}
 
+# Reproduce the exact unmodified A01 lexical baseline without converting Chinese
+# or omitting transcript segments. The submitted A02 had double-escaped regex
+# character classes and indexed only the first segment; its before-score 0/0
+# was not comparable to A01's independent 54/66.
+def legacy_clean(s):
+    return re.sub(r"[^\w\u3400-\u9fff]", "", unicodedata.normalize("NFKC", s).lower())
+
 def baseline(query, track):
-    q = grams(re.sub(r"[^\\w\\u3400-\\u9fff]", "", unicodedata.normalize("NFKC", query).lower()))
-    t = grams(re.sub(r"[^\\w\\u3400-\\u9fff]", "", unicodedata.normalize("NFKC", track["segments"][0]["text"]).lower()))
+    q = grams(legacy_clean(query))
+    transcript = " ".join(segment["text"] for segment in track["segments"])
+    t = grams(legacy_clean(transcript))
     return len(q & t) / max(1, len(q))
 
 def candidate(query, track):
