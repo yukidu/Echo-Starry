@@ -95,7 +95,8 @@ class Lab {
     while(cursor){
       if(!safeId(cursor)||seen.has(cursor))reject('CHAIN_CYCLE');seen.add(cursor);
       const r=byId.get(cursor);
-      if(!r||r.app!=='echo'||r.seq>=previous)reject('CHAIN_MISSING');
+      if(!r)throw new Error('CHAIN_MISSING');
+      if(r.app!=='echo'||r.seq>=previous)reject('CHAIN_MISSING');
       if(r.epoch!==this.fence('epoch'))reject('EPOCH');
       if(r.del<this.fence('deletion')||r.rev<this.fence('revocation'))reject('REVOCATION');
       ancestors.push(r);previous=r.seq;
