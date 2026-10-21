@@ -91,14 +91,14 @@ test('positive lexical hit is insufficient without independent support',async()=
     questionDigest:await sha(q),evidenceTextDigest:await sha(t),quote:''}));
   DENY(await run(h));assert.equal(h.reads(),1);h.db.close();
 });
-test('only signed-current synthetic quote creates PREPARED_OFFLINE, never SEND permit',async()=>{
+test('only hash-verified current synthetic quote creates PREPARED_OFFLINE, never SEND permit',async()=>{
   const h=await fixture();const result=await run(h);
   assert.equal(result.status,'PREPARED_OFFLINE');
   assert.equal(result.canSend,false);
   if(result.status==='PREPARED_OFFLINE') {
     assert.equal(result.quote,ANSWER);
     assert.deepEqual(result.citations,[h.snapshot.citation]);
-    assert.ok(result.prompt.includes(ANSWER));
+    assert.equal(result.prompt,ANSWER);
   }
   assert.equal(h.reads(),2);assert.equal(h.assessments(),1);h.db.close();
 });
