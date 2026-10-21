@@ -24,8 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: starry-production-write
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       ECHOSTARS_D1_ID: e0a696a9-0233-4186-be4d-229435b19a27
       STARRY_ID_D1_ID: 01195c92-555e-4816-bddc-5b8cb2e795db
     steps:
@@ -48,23 +46,35 @@ jobs:
       - name: Verify migration code
         run: npm run lint
       - name: Verify Cloudflare credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
           test -n "${CLOUDFLARE_API_TOKEN:-}"
           test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
       - name: Migrate EchoStars member profiles to Starry ID
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p starry-id/audit-output
           npx tsx starry-id/remoteMigrate.ts | tee starry-id/audit-output/member-migration.json
       - name: Migrate EchoStars sticker ledger to central battery ledger
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
           npx tsx starry-id/migrateBatteries.ts | tee starry-id/audit-output/battery-migration.json
       - name: Retire verified legacy sticker ledger
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
