@@ -1,0 +1,34 @@
+name: ai7-s-next-a01-offline-only
+on:
+  push:
+    branches:
+      - safety/ai7-s-next-a01-backup-chain-20261021
+  pull_request:
+    paths:
+      - tests/ai7SNextA01BackupSafety.test.mjs
+      - .github/workflows/ai7-s-next-a01-offline-only.yml
+permissions:
+  contents: read
+jobs:
+  ai7-synthetic-node-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Execute AI7 isolated fake-only test and preserve full runner log
+        shell: bash
+        run: |
+          set +e
+          node --version
+          node --test tests/ai7SNextA01BackupSafety.test.mjs > ai7-a01-runner.log 2>&1
+          code=$?
+          cat ai7-a01-runner.log
+          echo "AI7_NODE_EXIT_CODE=$code"
+          exit "$code"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai7-a01-node-runner-log
+          path: ai7-a01-runner.log
