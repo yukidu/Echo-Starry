@@ -25,7 +25,8 @@ const TICKET_APPS = {
   downloadstarry: { origin: 'https://download.starry.phd', label: '繁星捕手' },
   boxstarry: { origin: 'https://eye.starry.phd', label: '繁星視界' },
   'starry-sync': { origin: 'https://sync.starry.phd', label: '繁星共振' },
-  'starry-ai': { origin: 'https://ai.starry.phd', label: '繁星副官' }
+  'starry-ai': { origin: 'https://ai.starry.phd', label: '繁星副官' },
+  hglobal: { origin: 'https://hglobal1985.com', label: '寰宇全球' }
 } as const;
 
 type TicketAppId = keyof typeof TICKET_APPS;
@@ -192,7 +193,7 @@ async function ensureTicketSchema(env: Env) {
 }
 
 function ticketAppId(pathname: string): TicketAppId | null {
-  const match = pathname.match(/^\/api\/apps\/(echostars|gostarry|downloadstarry|boxstarry|starry-sync|starry-ai)\/ticket$/);
+  const match = pathname.match(/^\/api\/apps\/(echostars|gostarry|downloadstarry|boxstarry|starry-sync|starry-ai|hglobal)\/ticket$/);
   return match ? match[1] as TicketAppId : null;
 }
 
@@ -203,6 +204,10 @@ function ticketOriginAllowed(request: Request, appId: TicketAppId) {
 
 async function issueTicket(request: Request, env: Env, appId: TicketAppId) {
   if (!ticketOriginAllowed(request, appId)) return json(request, { error: 'Origin not allowed' }, 403);
+  const state = appId === 'hglobal' ? new URL(request.url).searchParams.get('state') : null;
+  if (appId === 'hglobal' && (!state || !/^[A-Za-z0-9_-]{43}$/.test(state))) {
+    return json(request, { error: 'invalid_hglobal_oauth_state' }, 400);
+  }
   const identity = await centralIdentityFromRequest(request, env);
   if (!identity) return json(request, { authenticated: false, error: '請先登入繁星通行證' }, 401);
   if (!await ensureTargetMembership(env, identity.userId, appId)) {
@@ -221,9 +226,55 @@ async function issueTicket(request: Request, env: Env, appId: TicketAppId) {
   return json(request, {
     authenticated: true,
     code,
-    redirect: `${TICKET_APPS[appId].origin}/auth/callback?code=${encodeURIComponent(code)}`,
+    redirect: `${appId === 'hglobal' && new URL(request.url).searchParams.get('preview') === '1'
+      ? 'https://feat-test-environment-founda.hglobal-preview.pages.dev'
+      : TICKET_APPS[appId].origin}/auth/callback?code=${encodeURIComponent(code)}${appId === 'hglobal' ? '&state=' + encodeURIComponent(state || '') : ''}`,
     user: { id: identity.userId, email: identity.email, name: identity.name, avatar: identity.avatar, rank: identity.rank }
   });
+}
+
+// H-Global private back-channel token exchange. Only an authorized server with
+// the independently provisioned HGLOBAL_SSO_EXCHANGE_SECRET can consume a ticket.
+// A code is deleted atomically, preventing replays. No central cookies leave Starry ID.
+async function exchangeHGlobalTicket(request: Request, env: Env) {
+  const configured = String((env as any).HGLOBAL_SSO_EXCHANGE_SECRET || '');
+  if (configured.length < 32) return json(request, { error: 'hglobal_sso_not_configured' }, 503);
+  const time = request.headers.get('X-HGlobal-Timestamp') || '';
+  const signature = request.headers.get('X-HGlobal-Signature') || '';
+  if (!/^\d{13}$/.test(time) || !/^[a-f0-9]{64}$/.test(signature) ||
+      Math.abs(Date.now() - Number(time)) > 60000) {
+    return json(request, { error: 'invalid_hglobal_exchange' }, 401);
+  }
+  const raw = await request.text();
+  if (raw.length > 1024) return json(request, { error: 'invalid_hglobal_exchange' }, 400);
+  let body: any;
+  try { body = JSON.parse(raw); } catch { return json(request, { error: 'invalid_hglobal_exchange' }, 400); }
+  const code = String(body?.code || '');
+  if (!TOKEN_RE.test(code) || code.length > 128) return json(request, { error: 'invalid_hglobal_exchange' }, 400);
+  try {
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(configured),
+      {name: 'HMAC', hash: 'SHA-256'}, false, ['verify']);
+    const bytes = Uint8Array.from(signature.match(/../g) || [], pair => parseInt(pair, 16));
+    const valid = await crypto.subtle.verify('HMAC', key, bytes,
+      new TextEncoder().encode('hglobal-v1\n' + time + '\n' + code));
+    if (!valid) return json(request, { error: 'invalid_hglobal_exchange' }, 401);
+  } catch { return json(request, { error: 'invalid_hglobal_exchange' }, 401); }
+  const db = (env as any).STARRY_ID_DB;
+  if (!db) return json(request, { error: 'central_database_unavailable' }, 503);
+  await ensureTicketSchema(env);
+  const codeHash = await hashToken(code);
+  const claimed: any = await db.prepare(`DELETE FROM starry_app_auth_codes
+    WHERE codeHash=? AND appId='hglobal' AND expiresAt>?
+    RETURNING userId`).bind(codeHash, Date.now()).first();
+  if (!claimed?.userId) return json(request, { error: 'hglobal_ticket_consumed_or_expired' }, 401);
+  const member: any = await db.prepare(
+    "SELECT status FROM app_memberships WHERE userId=? AND appId='hglobal' LIMIT 1"
+  ).bind(String(claimed.userId)).first();
+  if (!member || member.status !== 'active') return json(request, { error: 'app_membership_inactive' }, 403);
+  const identity = await centralIdentityByUserId(env, String(claimed.userId));
+  if (!identity) return json(request, { error: 'member_inactive' }, 403);
+  return json(request, { authenticated: true, subject: identity.userId,
+    name: identity.name, rank: identity.rank, avatar: identity.avatar });
 }
 
 async function consumeEchoTicket(request: Request, env: Env) {
@@ -363,6 +414,10 @@ export async function handleStarryEcosystemSso(
       return ticketOriginAllowed(request, appId) ? new Response(null, { status: 204, headers: corsHeaders(request) }) : json(request, { error: 'Origin not allowed' }, 403);
     }
     if (appId && method === 'POST') return issueTicket(request, env, appId);
+    if (url.pathname === '/api/apps/hglobal/exchange') {
+      if (method !== 'POST') return json(request, { error: 'Method not allowed' }, 405);
+      return exchangeHGlobalTicket(request, env);
+    }
 
     if (url.pathname === '/api/ecosystem/session') {
       if (method === 'OPTIONS') return preflight(request);
