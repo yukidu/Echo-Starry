@@ -193,7 +193,7 @@ async function ensureTicketSchema(env: Env) {
 }
 
 function ticketAppId(pathname: string): TicketAppId | null {
-  const match = pathname.match(/^\/api\/apps\/(echostars|gostarry|downloadstarry|boxstarry|starry-sync|starry-ai)\/ticket$/);
+  const match = pathname.match(/^\/api\/apps\/(echostars|gostarry|downloadstarry|boxstarry|starry-sync|starry-ai|hglobal)\/ticket$/);
   return match ? match[1] as TicketAppId : null;
 }
 
@@ -237,7 +237,7 @@ async function exchangeHGlobalTicket(request: Request, env: Env) {
   if (configured.length < 32) return json(request, { error: 'hglobal_sso_not_configured' }, 503);
   const time = request.headers.get('X-HGlobal-Timestamp') || '';
   const signature = request.headers.get('X-HGlobal-Signature') || '';
-  if (!/^\\d{13}$/.test(time) || !/^[a-f0-9]{64}$/.test(signature) ||
+  if (!/^\d{13}$/.test(time) || !/^[a-f0-9]{64}$/.test(signature) ||
       Math.abs(Date.now() - Number(time)) > 60000) {
     return json(request, { error: 'invalid_hglobal_exchange' }, 401);
   }
@@ -252,7 +252,7 @@ async function exchangeHGlobalTicket(request: Request, env: Env) {
       {name: 'HMAC', hash: 'SHA-256'}, false, ['verify']);
     const bytes = Uint8Array.from(signature.match(/../g) || [], pair => parseInt(pair, 16));
     const valid = await crypto.subtle.verify('HMAC', key, bytes,
-      new TextEncoder().encode('hglobal-v1\\n' + time + '\\n' + code));
+      new TextEncoder().encode('hglobal-v1\n' + time + '\n' + code));
     if (!valid) return json(request, { error: 'invalid_hglobal_exchange' }, 401);
   } catch { return json(request, { error: 'invalid_hglobal_exchange' }, 401); }
   const db = (env as any).STARRY_ID_DB;
