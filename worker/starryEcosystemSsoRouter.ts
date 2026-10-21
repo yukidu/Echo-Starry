@@ -204,6 +204,10 @@ function ticketOriginAllowed(request: Request, appId: TicketAppId) {
 
 async function issueTicket(request: Request, env: Env, appId: TicketAppId) {
   if (!ticketOriginAllowed(request, appId)) return json(request, { error: 'Origin not allowed' }, 403);
+  const state = appId === 'hglobal' ? new URL(request.url).searchParams.get('state') : null;
+  if (appId === 'hglobal' && (!state || !/^[A-Za-z0-9_-]{43}$/.test(state))) {
+    return json(request, { error: 'invalid_hglobal_oauth_state' }, 400);
+  }
   const identity = await centralIdentityFromRequest(request, env);
   if (!identity) return json(request, { authenticated: false, error: '請先登入繁星通行證' }, 401);
   if (!await ensureTargetMembership(env, identity.userId, appId)) {
@@ -224,7 +228,7 @@ async function issueTicket(request: Request, env: Env, appId: TicketAppId) {
     code,
     redirect: `${appId === 'hglobal' && new URL(request.url).searchParams.get('preview') === '1'
       ? 'https://feat-test-environment-founda.hglobal-preview.pages.dev'
-      : TICKET_APPS[appId].origin}/auth/callback?code=${encodeURIComponent(code)}`,
+      : TICKET_APPS[appId].origin}/auth/callback?code=${encodeURIComponent(code)}${appId === 'hglobal' ? '&state=' + encodeURIComponent(state || '') : ''}`,
     user: { id: identity.userId, email: identity.email, name: identity.name, avatar: identity.avatar, rank: identity.rank }
   });
 }
