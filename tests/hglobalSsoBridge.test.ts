@@ -6,7 +6,7 @@ import {handleStarryEcosystemSso} from '../worker/starryEcosystemSsoRouter';
 const c=globalThis.crypto??webcrypto;
 const secret='hglobal-test-only-bridge-secret-please-rotate-0001';
 const code='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-async function request(bodyCode=code,{timestamp=Date.now(),key=secret,signature}={}){
+async function request(bodyCode=code,{timestamp=Date.now(),key=secret,signature}:{timestamp?:number;key?:string;signature?:string}={}){
  const t=String(timestamp);
  let sig=signature;
  if(!sig){
