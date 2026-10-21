@@ -12,6 +12,11 @@ on:
 permissions:
   contents: read
 
+# Serialize all privileged workflows across this repository.
+concurrency:
+  group: starry-production-write
+  cancel-in-progress: false
+
 env:
   STARRY_ID_D1_ID: 01195c92-555e-4816-bddc-5b8cb2e795db
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
