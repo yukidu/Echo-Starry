@@ -198,6 +198,9 @@ jobs:
             sleep 2
             node scripts/verifyV174CrownTruePage.mjs
           fi
+      - name: Verify P1-A offline browser on phone and desktop
+        run: node scripts/verifyP1aOfflineBrowser.mjs
+
       - name: Upload browser UI failure evidence
         if: failure()
         uses: actions/upload-artifact@v4
