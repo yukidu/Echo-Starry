@@ -20,6 +20,8 @@ for (const [filename, approval] of productionWorkflows) {
     assert.match(source, /github\.ref == 'refs\/heads\/main'/, 'only main can be used');
     assert.ok(source.includes(`inputs.approval_phrase == '${approval}'`), 'exact typed phrase required');
     assert.match(source, /^    environment: starry-production-write$/m, 'protected environment required');
+    assert.match(source, /^  group: starry-production-write$/m, 'privileged workflows must serialize');
+    assert.match(source, /^  cancel-in-progress: false$/m, 'running migrations must never be cancelled by another run');
     assert.match(source, /secrets\.STARRY_PRODUCTION_WRITE_APPROVAL_KEY/, 'separate approval secret required');
     assert.match(source, /if \[ -z "\$\{STARRY_PRODUCTION_WRITE_APPROVAL_KEY:-\}" \]/, 'missing key must fail closed');
     const approvalStep = source.indexOf('Verify independent production approval gate');
