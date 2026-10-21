@@ -9,7 +9,10 @@ const workflow = readFileSync('.github/workflows/starry-id-health-repair.yml','u
 const provision = readFileSync('starry-id/provision-and-audit.sh','utf8');
 
 test('v271 repair is gated to main and captures a D1 recovery point first', () => {
-  assert.match(workflow, /branches: \[main\]/);
+  assert.doesNotMatch(workflow, /^  push:/m);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /inputs\.approval_phrase == 'REPAIR_STARRY_ID_PRODUCTION'/);
   const backup = workflow.indexOf('Capture immediate pre-repair D1 recovery point');
   const repairStep = workflow.indexOf('Execute controlled central health repair');
   assert.ok(backup >= 0 && repairStep > backup);
