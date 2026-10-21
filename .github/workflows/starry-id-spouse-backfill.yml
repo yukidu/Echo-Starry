@@ -1,18 +1,20 @@
 name: Backfill Starry ID Duplicate Distributor Spouses
 
+# Production D1 changes must never be triggered by main pushes.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/v273BackfillDuplicateSpouses.mjs'
-      - '.github/workflows/starry-id-spouse-backfill.yml'
   workflow_dispatch:
+    inputs:
+      approval_phrase:
+        description: 'Type BACKFILL_STARRY_ID_PRODUCTION to authorize production D1 changes'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   backfill-and-verify:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.approval_phrase == 'BACKFILL_STARRY_ID_PRODUCTION' }}
     runs-on: ubuntu-latest
     env:
       STARRY_ID_D1_ID: 01195c92-555e-4816-bddc-5b8cb2e795db
