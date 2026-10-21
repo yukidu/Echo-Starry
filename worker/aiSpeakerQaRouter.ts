@@ -9,6 +9,7 @@ import { pilotReady,selectQaSpeaker } from '../shared/storyAttribution';
 import { formatCommentTimestamp } from '../shared/commentTime';
 import { requestOpenAiSpeakerQa, OPENAI_SPEAKER_QA_MODEL } from './aiSpeakerQaOpenaiProvider';
 import {parseQaRules,validateQaRules,buildQaSystemInstructions,checkQaAnswer,qaRepairMessages,type QaRuleOptions} from '../shared/qaAnswerRules';
+import { selectRelevantQaEvidence } from '../shared/qaEvidenceSelection';
 
 type Env = { DB:any; STARRY_ID_DB?:any; R2_BUCKET?:any; AI?:any; OPENAI_API_KEY?:string; [key:string]:any };
 type Policy = { daily:number; free:number; cost:number };
@@ -287,8 +288,9 @@ export async function excerpts(env:Env,track:any,u:any,mode:string,question:stri
       found.push({score,part:'【'+txt(row.title)+'｜'+txt(row.speaker)+'】'+text,title:txt(row.title)});
     }
   }
-  const ranked=found.sort((a,b)=>b.score-a.score).slice(0,mode==='all'?9:7);
-  return {prompt:ranked.map(x=>x.part).join('\n').slice(0,9000),sources:[...new Set(ranked.map(x=>x.title))].filter(Boolean).slice(0,3)};
+  // Never pass unrelated transcript fragments to an AI model simply because
+  // they were the first available excerpts. No evidence => no provider call.
+  return selectRelevantQaEvidence(found,terms,mode==='all'?9:7);
 }
 /** Reply body and model metadata stay separate: show no references but keep
  * internal track evidence and permission checks unchanged.
