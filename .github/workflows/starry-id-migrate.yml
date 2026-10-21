@@ -1,22 +1,21 @@
 name: Migrate Starry ID Members
 
+# Never run production D1 mutations on a main push.
+# Manual execution additionally requires the exact typed approval phrase.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'starry-id/remoteMigrate.ts'
-      - 'starry-id/migrateBatteries.ts'
-      - 'starry-id/retireLegacyStickerLedger.ts'
-      - 'starry-id/migrations/20261015_battery_ledger.sql'
-      - 'starry-id/node-globals.d.ts'
-      - '.github/workflows/starry-id-migrate.yml'
   workflow_dispatch:
+    inputs:
+      approval_phrase:
+        description: 'Type MIGRATE_STARRY_ID_PRODUCTION to authorize production D1 changes'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   migrate:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.approval_phrase == 'MIGRATE_STARRY_ID_PRODUCTION' }}
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
