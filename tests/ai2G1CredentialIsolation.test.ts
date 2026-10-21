@@ -78,7 +78,8 @@ function inspectWorkflow(source: string, definition: Definition): string[] {
     if (actualKeys.length && !expected.has(name)) errors.push('unapproved credential step: ' + name);
     if (expected.has(name)) {
       const wanted = expected.get(name) ?? [];
-      if (actualKeys.slice().sort().join(',') !== wanted.slice().sort().join(','))
+      if (!step.includes('        env:\n') ||
+          actualKeys.slice().sort().join(',') !== wanted.slice().sort().join(','))
         errors.push('missing or extra scoped credentials: ' + name);
     }
   }
