@@ -12,6 +12,11 @@ on:
 permissions:
   contents: read
 
+# Serialize all privileged workflows across this repository.
+concurrency:
+  group: starry-production-write
+  cancel-in-progress: false
+
 jobs:
   backfill-and-verify:
     if: ${{ github.ref == 'refs/heads/main' && inputs.approval_phrase == 'BACKFILL_STARRY_ID_PRODUCTION' }}
