@@ -20,8 +20,6 @@ concurrency:
 
 env:
   STARRY_ID_D1_ID: 01195c92-555e-4816-bddc-5b8cb2e795db
-  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
 jobs:
   repair-and-verify:
@@ -54,6 +52,9 @@ jobs:
           node --check starry-id/verifyCentralHealth.mjs
           node --check starry-id/capture-time-travel-bookmark.mjs
       - name: Verify Cloudflare credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
@@ -61,23 +62,35 @@ jobs:
           test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
           test -n "${STARRY_ID_D1_ID:-}"
       - name: Capture immediate pre-repair D1 recovery point
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p starry-id/audit-output
           node starry-id/capture-time-travel-bookmark.mjs | tee starry-id/audit-output/pre-repair-backup-bookmark.json
       - name: Execute controlled central health repair
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
           node starry-id/repairCentralHealth.mjs | tee starry-id/audit-output/repair-console.json
       - name: Install central database protections
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
           npx wrangler d1 execute starry_id_db --remote --file=starry-id/migrations/20261016_central_health_guards.sql --yes
           npx wrangler d1 execute starry_id_db --remote --file=starry-id/migrations/20261017_profile_semantic_guards.sql --yes
       - name: Deep verify repaired central database
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
