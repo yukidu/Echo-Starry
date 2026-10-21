@@ -1,0 +1,379 @@
+{
+  "dataset": "AI2-B-A04-INDEPENDENT-SYNTHETIC-HOLDOUT",
+  "synthetic": true,
+  "limitations": "Manually authored by central AI2 without reusing A01 questions; same A01 synthetic 20-track corpus; not real member audio and not external third-party blind. Must not tune ranker on this holdout after initial score.",
+  "answerable": 40,
+  "noSource": 10,
+  "cases": [
+    {
+      "caseId": "H001",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T01"
+      ],
+      "question": "參與活動之前要如何確認日期與完成資料表？"
+    },
+    {
+      "caseId": "H002",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T01"
+      ],
+      "question": "報名以前需要做哪兩件準備？"
+    },
+    {
+      "caseId": "H003",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T02"
+      ],
+      "question": "報名截止時間過了之後可以自己取消嗎？"
+    },
+    {
+      "caseId": "H004",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T02"
+      ],
+      "question": "哪種情況不能自行辦理報名取消？"
+    },
+    {
+      "caseId": "H005",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T03"
+      ],
+      "question": "完成報名是不是就代表款項已經支付？"
+    },
+    {
+      "caseId": "H006",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T03"
+      ],
+      "question": "報名成功和繳費完成是否相同？"
+    },
+    {
+      "caseId": "H007",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T04"
+      ],
+      "question": "收到兩次通知，先查詢什麼紀錄比較妥當？"
+    },
+    {
+      "caseId": "H008",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T04"
+      ],
+      "question": "提醒重複出現時是不是需要再送出一次？"
+    },
+    {
+      "caseId": "H009",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T05"
+      ],
+      "question": "開始下載音檔之前應先查看手機的哪個資源？"
+    },
+    {
+      "caseId": "H010",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T05"
+      ],
+      "question": "手機剩餘儲存量不足時該先確認什麼？"
+    },
+    {
+      "caseId": "H011",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T06"
+      ],
+      "question": "系統更新的時候還可以閱讀先前的公告嗎？"
+    },
+    {
+      "caseId": "H012",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T06"
+      ],
+      "question": "版本更新中能不能再提交新的報名？"
+    },
+    {
+      "caseId": "H013",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T07"
+      ],
+      "question": "整理好疑問後再討論，是誰轉述他人的建議？"
+    },
+    {
+      "caseId": "H014",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T07"
+      ],
+      "question": "陳風轉述哪一位講者的討論方法？"
+    },
+    {
+      "caseId": "H015",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T08"
+      ],
+      "question": "王山主張每個星期哪一天進行進度盤點？"
+    },
+    {
+      "caseId": "H016",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T08"
+      ],
+      "question": "週三的例行工作是檢查什麼？"
+    },
+    {
+      "caseId": "H017",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T09"
+      ],
+      "question": "原定六月十日的課程活動延期到哪天？"
+    },
+    {
+      "caseId": "H018",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T09"
+      ],
+      "question": "六月的講座原來十號，最後改成幾號？"
+    },
+    {
+      "caseId": "H019",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T10"
+      ],
+      "question": "報名表中的電話與會員編號哪些可以修改？"
+    },
+    {
+      "caseId": "H020",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T10"
+      ],
+      "question": "可以改電話，但哪一種身份編號不可直接更動？"
+    },
+    {
+      "caseId": "H021",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T11"
+      ],
+      "question": "我可以刪除下載的歷史資料嗎，需誰確認？"
+    },
+    {
+      "caseId": "H022",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T11"
+      ],
+      "question": "要刪掉下載紀錄須取得什麼確認？"
+    },
+    {
+      "caseId": "H023",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T12"
+      ],
+      "question": "通知訊息分別有哪些收取管道？"
+    },
+    {
+      "caseId": "H024",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T12"
+      ],
+      "question": "除了寄信，還會用什麼方式提供站內提醒？"
+    },
+    {
+      "caseId": "H025",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T13"
+      ],
+      "question": "活動人數滿了以後還能登記什麼？"
+    },
+    {
+      "caseId": "H026",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T13"
+      ],
+      "question": "沒有剩餘名額時可以排哪一種等待名單？"
+    },
+    {
+      "caseId": "H027",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T14"
+      ],
+      "question": "請問週五與週六分別進行哪些通知和報名安排？"
+    },
+    {
+      "caseId": "H028",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T14"
+      ],
+      "question": "先發布通知再開放報名，兩步是哪兩天？"
+    },
+    {
+      "caseId": "H029",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T15"
+      ],
+      "question": "學習練習包括閱讀及討論，第三項是什麼？"
+    },
+    {
+      "caseId": "H030",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T15"
+      ],
+      "question": "請列出練習安排的三個環節。"
+    },
+    {
+      "caseId": "H031",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T16"
+      ],
+      "question": "公告中能否公開尚未公開的會員個資？"
+    },
+    {
+      "caseId": "H032",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T16"
+      ],
+      "question": "還沒有公開的會員資訊可不可以貼上公告？"
+    },
+    {
+      "caseId": "H033",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T17"
+      ],
+      "question": "資料備份完成以後還需要再核實哪項性質？"
+    },
+    {
+      "caseId": "H034",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T17"
+      ],
+      "question": "怎樣確認備份檔案內容沒有缺損？"
+    },
+    {
+      "caseId": "H035",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T18"
+      ],
+      "question": "我要查課程時間表，第一步先挑選哪裡？"
+    },
+    {
+      "caseId": "H036",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T18"
+      ],
+      "question": "要查看課表時先選什麼中心？"
+    },
+    {
+      "caseId": "H037",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T19"
+      ],
+      "question": "忘記帳戶密碼應該從哪個介面開始恢復？"
+    },
+    {
+      "caseId": "H038",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T19"
+      ],
+      "question": "忘記密碼時登入畫面提供什麼找回辦法？"
+    },
+    {
+      "caseId": "H039",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T20"
+      ],
+      "question": "音檔按下暫停再恢復會從頭重播嗎？"
+    },
+    {
+      "caseId": "H040",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T20"
+      ],
+      "question": "聽到一半中斷，下次是否能從原位置接續？"
+    },
+    {
+      "caseId": "N001",
+      "expectedAction": "ABSTAIN",
+      "question": "目前台灣地震速報是多少級？"
+    },
+    {
+      "caseId": "N002",
+      "expectedAction": "ABSTAIN",
+      "question": "今日新竹的降雨機率是多少？"
+    },
+    {
+      "caseId": "N003",
+      "expectedAction": "ABSTAIN",
+      "question": "誰得到今年奧斯卡最佳影片？"
+    },
+    {
+      "caseId": "N004",
+      "expectedAction": "ABSTAIN",
+      "question": "這段音檔說了關於癌症治療的什麼處方？"
+    },
+    {
+      "caseId": "N005",
+      "expectedAction": "ABSTAIN",
+      "question": "請告訴我會員的身分證號和完整住址。"
+    },
+    {
+      "caseId": "N006",
+      "expectedAction": "ABSTAIN",
+      "question": "下週台北捷運是否有罷工？"
+    },
+    {
+      "caseId": "N007",
+      "expectedAction": "ABSTAIN",
+      "question": "最新股價哪檔股票保證會漲？"
+    },
+    {
+      "caseId": "N008",
+      "expectedAction": "ABSTAIN",
+      "question": "這份紀錄顯示哪些學員患有糖尿病？"
+    },
+    {
+      "caseId": "N009",
+      "expectedAction": "ABSTAIN",
+      "question": "哪一段演講揭露銀行帳戶登入密碼？"
+    },
+    {
+      "caseId": "N010",
+      "expectedAction": "ABSTAIN",
+      "question": "今天晚上的世界杯足球比分是多少？"
+    }
+  ]
+}
