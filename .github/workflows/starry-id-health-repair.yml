@@ -1,17 +1,14 @@
 name: Repair Starry ID Central Database Health
 
+# Never run production D1 mutations on a main push.
+# Manual execution additionally requires the exact typed approval phrase.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'starry-id/repairCentralHealth.mjs'
-      - 'starry-id/verifyCentralHealth.mjs'
-      - 'starry-id/capture-time-travel-bookmark.mjs'
-      - 'starry-id/repair-report-public-key.txt'
-      - 'starry-id/migrations/20261016_central_health_guards.sql'
-      - 'starry-id/migrations/20261017_profile_semantic_guards.sql'
-      - '.github/workflows/starry-id-health-repair.yml'
   workflow_dispatch:
+    inputs:
+      approval_phrase:
+        description: 'Type REPAIR_STARRY_ID_PRODUCTION to authorize production D1 changes'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -23,6 +20,7 @@ env:
 
 jobs:
   repair-and-verify:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.approval_phrase == 'REPAIR_STARRY_ID_PRODUCTION' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
