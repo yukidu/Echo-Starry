@@ -12,6 +12,11 @@ on:
 permissions:
   contents: read
 
+# Serialize all privileged workflows across this repository.
+concurrency:
+  group: starry-production-write
+  cancel-in-progress: false
+
 jobs:
   deploy:
     if: ${{ github.ref == 'refs/heads/main' && inputs.approval_phrase == 'DEPLOY_STARBEAUTY_PRODUCTION' }}
