@@ -18,7 +18,8 @@ test('ecosystem apps have a real central Starry Pass login entry', () => {
 
 test('central login keeps Google credential verification server-side', () => {
   assert.match(authEntry, /accounts\.google\.com\/gsi\/client/);
-  assert.match(authEntry, /credential,appId:APP_ID/);
+  assert.match(authEntry, /credential,appId:SYNC_APP_ID/);
+  assert.match(authEntry, /hglobal: \{ appId: 'hglobal'/);
   assert.doesNotMatch(authEntry, /client_secret/i);
 });
 
