@@ -1,0 +1,25 @@
+AI4 A02 LOCAL OFFLINE RUN (reconstructed local script, behaviorally matching submitted candidate)
+Command: python3 tests/ai4-snext-a02/candidate.py
+Runner: isolated Linux Python 3; no network, paid provider, product API or database
+Exit code: 0
+Frozen A01 fixture Git blob SHA: 93bf9fcb0b793a7d9904b85ce5ed699b0a906549 (locally reconstructed and independently git-hash-object verified)
+Local candidate script Git blob SHA: 2bd8d16571b4b433d6558b2f03a2bb3b34f8782c
+GitHub submitted candidate blob SHA: 9c029ff6a130aa18a58423a83271c53e6cf8d481
+IMPORTANT: local candidate is reconstructed and not byte-identical to GitHub submitted script; this local output does NOT replace GitHub CI verification.
+
+RUN=AI4 A02 isolated candidate; frozen A01 fixture; not product or independent blind
+CATEGORY | N | BEFORE_TOP1 | BEFORE_TOP5 | AFTER_TOP1 | AFTER_TOP5
+traditional | 20 | 17 | 20 | 19 | 20
+simplified | 20 | 4 | 6 | 10 | 19
+colloquial | 20 | 16 | 19 | 17 | 19
+typo | 20 | 0 | 1 | 8 | 18
+context | 20 | 17 | 20 | 20 | 20
+TOTAL | 100 | 54 | 66 | 74 | 96
+AFTER_TOP5_TARGET_90=PASS
+AFTER_TOP5_MISSES=P023,P054,P072,P074
+NO_SOURCE=10 ABSTENTION_NOT_IMPLEMENTED_NOT_VERIFIED
+REVOKED_EXCLUDED=10/10 CORPUS_ONLY_NOT_AUTHORIZATION
+WRONG_CITATION=NOT_VERIFIED; PERMISSION_SEND=NOT_VERIFIED
+PRODUCT_SEARCH=NOT_TESTED; THIRD_PARTY_BLIND=NOT_VERIFIED
+
+GitHub Actions workflow execution of submitted exact candidate: NOT OBSERVED / UNKNOWN.
