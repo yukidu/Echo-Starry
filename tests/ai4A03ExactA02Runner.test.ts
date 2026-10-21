@@ -6,7 +6,8 @@ import { spawnSync } from 'node:child_process';
 
 const A02_SOURCE = 'tests/ai4-snext-a02/candidate.py';
 const FROZEN_CASES = 'tests/ai4-snext-a01/synthetic-120.json';
-const SOURCE_BLOB = '9c029ff6a130aa18a58423a83271c53e6cf8d481';
+// AI2-only baseline correctness repair; original AI4 A02 blob was 9c029ff6a130aa18a58423a83271c53e6cf8d481.
+const SOURCE_BLOB = '3c83e2c9bf42fb353b220ff59da6c4f0edb7a92f';
 const CASES_BLOB = '93bf9fcb0b793a7d9904b85ce5ed699b0a906549';
 
 function gitBlobSha(path: string) {
@@ -14,8 +15,8 @@ function gitBlobSha(path: string) {
   return createHash('sha1').update(`blob ${bytes.byteLength}\0`).update(bytes).digest('hex');
 }
 
-test('AI4 A03: execute exact frozen A02 candidate and A01 data on GitHub runner', { timeout: 360_000 }, () => {
-  assert.equal(gitBlobSha(A02_SOURCE), SOURCE_BLOB, 'the A02 Python source MUST be byte-identical to the submitted GitHub blob');
+test('AI4 A03: execute exact AI2 repaired-baseline A02 candidate and frozen A01 data on GitHub runner', { timeout: 360_000 }, () => {
+  assert.equal(gitBlobSha(A02_SOURCE), SOURCE_BLOB, 'the integrated Python source MUST be byte-identical to the AI2 reviewed GitHub blob');
   assert.equal(gitBlobSha(FROZEN_CASES), CASES_BLOB, 'the A01 synthetic fixture MUST be byte-identical to its frozen GitHub blob');
 
   const proc = spawnSync('python3', [A02_SOURCE], {
@@ -33,7 +34,7 @@ test('AI4 A03: execute exact frozen A02 candidate and A01 data on GitHub runner'
   console.log(proc.stderr ?? '');
   console.log('AI4_A03_CHILD_PYTHON_STDERR_END');
   console.log('AI4_A03_CHILD_PYTHON_EXIT_CODE', proc.status, 'signal', proc.signal, 'error', proc.error?.message ?? '(none)');
-  assert.equal(proc.status, 0, 'the exact frozen A02 candidate Python runner must succeed');
+  assert.equal(proc.status, 0, 'the integrated AI2 candidate runner must succeed');
 
   const row = /TOTAL \| (\d+) \| (\d+) \| (\d+) \| (\d+) \| (\d+)/.exec(proc.stdout ?? '');
   assert.ok(row, 'required before/after totals must actually be printed by Python');
