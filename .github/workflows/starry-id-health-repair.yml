@@ -1,17 +1,13 @@
 name: Repair Starry ID Central Database Health
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'starry-id/repairCentralHealth.mjs'
-      - 'starry-id/verifyCentralHealth.mjs'
-      - 'starry-id/capture-time-travel-bookmark.mjs'
-      - 'starry-id/repair-report-public-key.txt'
-      - 'starry-id/migrations/20261016_central_health_guards.sql'
-      - 'starry-id/migrations/20261017_profile_semantic_guards.sql'
-      - '.github/workflows/starry-id-health-repair.yml'
+  # Production mutations must never start from a source-code push.
   workflow_dispatch:
+    inputs:
+      confirm_production_write:
+        description: 'Type APPROVE_PRODUCTION_WRITE after independent approval and recovery-point verification'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -23,8 +19,12 @@ env:
 
 jobs:
   repair-and-verify:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm_production_write == 'APPROVE_PRODUCTION_WRITE' }}
     runs-on: ubuntu-latest
+    environment: starry-production-write
     steps:
+      # Configure starry-production-write with required reviewers and environment-scoped
+      # credentials before ever authorizing a production run. The input is not approval.
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
