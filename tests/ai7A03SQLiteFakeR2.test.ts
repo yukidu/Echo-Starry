@@ -71,7 +71,7 @@ class Lab {
   }
   approve(human:string):Approval {
     const x={human,request:this.request,target:this.target,headHash:this.head.sha,epoch:4,scope:this.scope,expires:Date.now()+3600000,active:true};
-    return {...x,signature:sign(humanKeys[human]||'INVALID',x)};
+    return {...x,signature:sign(humanKeys[human]||'INVALID',{human:x.human,request:x.request,target:x.target,headHash:x.headHash,epoch:x.epoch,scope:x.scope,expires:x.expires})};
   }
   fence(k:string):number {return Number((this.safety.prepare('SELECT value FROM fences WHERE name=?').get(k) as {value:number}|undefined)?.value??-1);}
   setFence(k:string,value:number){this.safety.prepare('UPDATE fences SET value=? WHERE name=?').run(value,k);}
