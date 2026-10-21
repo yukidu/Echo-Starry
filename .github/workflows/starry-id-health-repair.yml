@@ -22,7 +22,18 @@ jobs:
   repair-and-verify:
     if: ${{ github.ref == 'refs/heads/main' && inputs.approval_phrase == 'REPAIR_STARRY_ID_PRODUCTION' }}
     runs-on: ubuntu-latest
+    environment: starry-production-write
     steps:
+      - name: Verify independent production approval gate
+        shell: bash
+        env:
+          STARRY_PRODUCTION_WRITE_APPROVAL_KEY: ${{ secrets.STARRY_PRODUCTION_WRITE_APPROVAL_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${STARRY_PRODUCTION_WRITE_APPROVAL_KEY:-}" ]; then
+            echo 'Production access disabled: configure protected environment and approval secret.' >&2
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
