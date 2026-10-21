@@ -9,7 +9,7 @@ test('AI3 A01: execute 30 synthetic Node tests with complete TAP stdout/stderr',
   const file = fileURLToPath(new URL('./ai3-s-next-a01-offline.test.mjs', import.meta.url));
   const result = spawnSync(process.execPath, ['--test', '--test-reporter=tap', file], {
     encoding: 'utf8', timeout: 120_000, maxBuffer: 4 * 1024 * 1024,
-    env: { ...process.env, NODE_OPTIONS: '' },
+    env: Object.fromEntries(Object.entries({ ...process.env, NODE_OPTIONS: '' }).filter(([key]) => !key.startsWith('NODE_TEST_'))),
   });
   process.stdout.write('\nAI3_A01_CHILD_NODE_STDOUT_BEGIN\n' + (result.stdout ?? '') + '\nAI3_A01_CHILD_NODE_STDOUT_END\n');
   process.stderr.write('\nAI3_A01_CHILD_NODE_STDERR_BEGIN\n' + (result.stderr ?? '') + '\nAI3_A01_CHILD_NODE_STDERR_END\n');
