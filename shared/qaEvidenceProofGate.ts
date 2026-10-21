@@ -181,7 +181,7 @@ export async function prepareQaEvidenceOffline(
 
     return {
       status: 'PREPARED_OFFLINE', reason: 'UNFENCED_SEND',
-      prompt: lexical.prompt, citations: [second!.citation], quote: verdict.quote,
+      prompt: verdict.quote, citations: [second!.citation], quote: verdict.quote,
       canSend: false,
     };
   } catch {
