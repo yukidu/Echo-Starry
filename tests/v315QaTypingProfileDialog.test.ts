@@ -13,7 +13,7 @@ const sw=read('public/sw.js');
 test('super administrators are unlimited without negative counters',async()=>{
   const request=new Request('https://echo.starry.phd/api/qa/status');
   const env:any={DB:{prepare:()=>({bind:()=>({first:async()=>null})})}};
-  const admin={id:'super-id',email:'super@example.com',role:'超級管理員'};
+  const admin={id:'qa-admin-fixture',email:'verified-admin@example.test',role:'member',verifiedCentralSuperAdmin:true};
   const cfg={enabled:true,policies:Array.from({length:5},()=>({daily:1,free:0,cost:10})),globalDaily:1};
   const q=await quota(request,env,admin,cfg);
   assert.equal(q.unlimited,true);
