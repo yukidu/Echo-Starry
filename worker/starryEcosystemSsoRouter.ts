@@ -1,4 +1,5 @@
 import type { Env } from './index';
+import { checkStarryAppAccess } from './starryAppAccess';
 
 const ID_HOST = 'id.starry.phd';
 const ECHO_HOST = 'echo.starry.phd';
@@ -16,7 +17,8 @@ const ECOSYSTEM_ORIGINS = new Set([
   'https://eye.starry.phd',
   'https://ai.starry.phd',
   'https://sync.starry.phd',
-  'https://mirror.starry.phd'
+  'https://mirror.starry.phd',
+  'https://gratitude.starry.phd'
 ]);
 
 const TICKET_APPS = {
@@ -25,7 +27,8 @@ const TICKET_APPS = {
   downloadstarry: { origin: 'https://download.starry.phd', label: '繁星捕手' },
   boxstarry: { origin: 'https://eye.starry.phd', label: '繁星視界' },
   'starry-sync': { origin: 'https://sync.starry.phd', label: '繁星共振' },
-  'starry-ai': { origin: 'https://ai.starry.phd', label: '繁星副官' }
+  'starry-ai': { origin: 'https://ai.starry.phd', label: '繁星副官' },
+  'gratitude-starry': { origin: 'https://gratitude.starry.phd', label: '繁星感恩日記' }
 } as const;
 
 type TicketAppId = keyof typeof TICKET_APPS;
@@ -192,7 +195,7 @@ async function ensureTicketSchema(env: Env) {
 }
 
 function ticketAppId(pathname: string): TicketAppId | null {
-  const match = pathname.match(/^\/api\/apps\/(echostars|gostarry|downloadstarry|boxstarry|starry-sync|starry-ai)\/ticket$/);
+  const match = pathname.match(/^\/api\/apps\/(echostars|gostarry|downloadstarry|boxstarry|starry-sync|starry-ai|gratitude-starry)\/ticket$/);
   return match ? match[1] as TicketAppId : null;
 }
 
@@ -205,6 +208,11 @@ async function issueTicket(request: Request, env: Env, appId: TicketAppId) {
   if (!ticketOriginAllowed(request, appId)) return json(request, { error: 'Origin not allowed' }, 403);
   const identity = await centralIdentityFromRequest(request, env);
   if (!identity) return json(request, { authenticated: false, error: '請先登入繁星通行證' }, 401);
+  // Gratitude is a new private-data App: central grant/revocation policy is mandatory.
+  if (appId === 'gratitude-starry') {
+    const access = await checkStarryAppAccess((env as any).STARRY_ID_DB, identity.userId, appId);
+    if (!access.allowed) return json(request, { authenticated: false, error: '尚未取得繁星感恩日記的使用權限' }, 403);
+  }
   if (!await ensureTargetMembership(env, identity.userId, appId)) {
     return json(request, { authenticated: false, error: `${TICKET_APPS[appId].label}會員資格不可用` }, 403);
   }
