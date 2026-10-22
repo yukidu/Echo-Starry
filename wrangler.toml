@@ -94,5 +94,5 @@ ENVIRONMENT = "production"
 STARRY_ID_GOOGLE_CLIENT_ID = "661055525630-ndcq5gtr16h7rqqprlqqkkvineea87lc.apps.googleusercontent.com"
 # App 必須先在繁星通行證登記，不能由瀏覽器任意宣稱 appId 自行取得會員資格。
 # 舊 appId 暫時保留，確保既有會員資料與已上線 App 不會中斷；新 App 一律使用 starry-* 正式名稱。
-STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry,starry-mirror,starry-eye,starry-ai,starry-sync"
+STARRY_ID_ALLOWED_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry,starry-mirror,starry-eye,starry-ai,starry-sync,gratitude-starry"
 STARRY_ID_SELF_ENROLL_APPS = "starry-id,starryphd,echostars,downloadstarry,gostarry,quotes,boxstarry,starry-mirror,starry-eye,starry-ai,starry-sync"
