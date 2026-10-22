@@ -10,7 +10,8 @@ const AUTH_APPS = {
   boxstarry: { appId: 'boxstarry', label: '繁星視界' },
   'starry-eye': { appId: 'boxstarry', label: '繁星視界' },
   'starry-sync': { appId: 'starry-sync', label: '繁星共振' },
-  'starry-ai': { appId: 'starry-ai', label: '繁星副官' }
+  'starry-ai': { appId: 'starry-ai', label: '繁星副官' },
+  gratitude: { appId: 'gratitude-starry', label: '繁星感恩日記' }
 } as const;
 
 type AuthAlias = keyof typeof AUTH_APPS;
@@ -34,7 +35,7 @@ const APP_ID=${JSON.stringify(config.appId)},APP_LABEL=${JSON.stringify(config.l
 function status(text,error=false){statusEl.textContent=text;statusEl.className=error?'status error':'status'}
 async function openTarget(){statusEl.innerHTML='<span class="spinner"></span>正在進入'+APP_LABEL+'…';const response=await fetch('/api/apps/'+encodeURIComponent(APP_ID)+'/ticket',{method:'POST',credentials:'include',cache:'no-store',headers:{'Content-Type':'application/json'},body:'{}'});const data=await response.json().catch(()=>({}));if(!response.ok||!data.redirect)throw new Error(data.error||'無法開啟應用');location.replace(String(data.redirect))}
 async function centralSession(){const response=await fetch('/api/session',{credentials:'include',cache:'no-store'});return response.ok?await response.json().catch(()=>({authenticated:false})):{authenticated:false}}
-async function onCredential(result){const credential=String(result&&result.credential||'');if(!credential){status('沒有取得 Google 登入資料，請再試一次。',true);return}statusEl.innerHTML='<span class="spinner"></span>正在登入繁星通行證…';try{const response=await fetch('/api/google-sync',{method:'POST',credentials:'include',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential,appId:APP_ID})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error(data.error||'登入失敗');await openTarget()}catch(error){status(error instanceof Error?error.message:'登入失敗，請再試一次。',true)}}
+async function onCredential(result){const credential=String(result&&result.credential||'');if(!credential){status('沒有取得 Google 登入資料，請再試一次。',true);return}statusEl.innerHTML='<span class="spinner"></span>正在登入繁星通行證…';try{const response=await fetch('/api/google-sync',{method:'POST',credentials:'include',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential,appId:APP_ID==='gratitude-starry'?'starry-id':APP_ID})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error(data.error||'登入失敗');await openTarget()}catch(error){status(error instanceof Error?error.message:'登入失敗，請再試一次。',true)}}
 function showGoogle(){if(!window.google?.accounts?.id){setTimeout(showGoogle,80);return}google.accounts.id.initialize({client_id:CLIENT_ID,callback:onCredential,ux_mode:'popup',auto_select:false,cancel_on_tap_outside:false,itp_support:true});google.accounts.id.renderButton(document.getElementById('googleButton'),{type:'standard',theme:'filled_black',size:'large',shape:'pill',text:'continue_with',width:300,locale:'zh_TW'});status('請選擇 Google 帳號')}
 async function boot(){try{if(!FORCE_CHOOSE){const current=await centralSession();if(current&&current.authenticated){await openTarget();return}}}catch(_){}showGoogle()}addEventListener('load',boot,{once:true});
 </script></body></html>`;

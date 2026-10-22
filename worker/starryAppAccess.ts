@@ -24,7 +24,8 @@ const APP_LABELS: Record<string, string> = {
   downloadstarry: '繁星下載', gostarry: '繁星任意門',
   quotes: '繁星雞湯', boxstarry: '繁星膠囊',
   'starry-mirror': '繁星心鏡', 'starry-eye': '繁星視界',
-  'starry-ai': '繁星 AI', 'starry-sync': '繁星同步'
+  'starry-ai': '繁星 AI', 'starry-sync': '繁星同步',
+  'gratitude-starry': '繁星感恩日記'
 };
 const ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
 const APP_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
