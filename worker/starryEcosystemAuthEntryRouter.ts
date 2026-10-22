@@ -10,7 +10,8 @@ const AUTH_APPS = {
   boxstarry: { appId: 'boxstarry', label: '繁星視界' },
   'starry-eye': { appId: 'boxstarry', label: '繁星視界' },
   'starry-sync': { appId: 'starry-sync', label: '繁星共振' },
-  'starry-ai': { appId: 'starry-ai', label: '繁星副官' }
+  'starry-ai': { appId: 'starry-ai', label: '繁星副官' },
+  gratitude: { appId: 'gratitude-starry', label: '繁星感恩日記' }
 } as const;
 
 type AuthAlias = keyof typeof AUTH_APPS;
