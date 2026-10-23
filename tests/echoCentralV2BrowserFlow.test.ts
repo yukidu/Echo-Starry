@@ -41,7 +41,7 @@ async function runBrowserCallback(options: {
   const html = await page!.text();
   const script = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)?.[1];
   assert.ok(script, 'must execute the exact callback script sent to the browser');
-  const pending = options.pending === false ? {} : {
+  const pending: Record<string, string> = options.pending === false ? {} : {
     echo_central_v2_pending: JSON.stringify({ state: STATE, expires: Date.now() + 100000 })
   };
   const sessionStorage = storage(pending);
