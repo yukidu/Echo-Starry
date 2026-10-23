@@ -73,3 +73,30 @@ export async function redeemCentralEchoTicket(
     scope: 'legacy_echo_only'
   };
 }
+
+
+/** Read-only production-preflight; this cannot switch off any release gate. */
+export async function centralEchoV2Ready(
+  options: { fetcher?: typeof fetch; timeoutMs?: number } = {}
+): Promise<boolean> {
+  const fetcher = options.fetcher ?? fetch;
+  try {
+    const response = await fetcher(CENTRAL_ECHO_V2_BASE + '/api/v1/compat/readiness', {
+      method: 'GET',
+      cache: 'no-store',
+      redirect: 'error',
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(options.timeoutMs ?? 4500)
+    });
+    if (!response.ok) return false;
+    const text = await response.text();
+    if (text.length > MAX_RESPONSE_LENGTH) return false;
+    const status: any = JSON.parse(text);
+    return status?.status === 'ok' &&
+      status?.storage === 'connected' &&
+      status?.live_legacy_auth === 'read_only_live_checked' &&
+      status?.ticket_exchange_enabled === true;
+  } catch {
+    return false;
+  }
+}
