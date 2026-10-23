@@ -1,20 +1,22 @@
 name: Repair Starry ID Central Database Health
 
+# Never run production D1 mutations on a main push.
+# Manual execution additionally requires the exact typed approval phrase.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'starry-id/repairCentralHealth.mjs'
-      - 'starry-id/verifyCentralHealth.mjs'
-      - 'starry-id/capture-time-travel-bookmark.mjs'
-      - 'starry-id/repair-report-public-key.txt'
-      - 'starry-id/migrations/20261016_central_health_guards.sql'
-      - 'starry-id/migrations/20261017_profile_semantic_guards.sql'
-      - '.github/workflows/starry-id-health-repair.yml'
   workflow_dispatch:
+    inputs:
+      approval_phrase:
+        description: 'Type REPAIR_STARRY_ID_PRODUCTION to authorize production D1 changes'
+        required: true
+        type: string
 
 permissions:
   contents: read
+
+# Serialize all privileged workflows across this repository.
+concurrency:
+  group: starry-production-write
+  cancel-in-progress: false
 
 env:
   STARRY_ID_D1_ID: 01195c92-555e-4816-bddc-5b8cb2e795db
@@ -23,8 +25,20 @@ env:
 
 jobs:
   repair-and-verify:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.approval_phrase == 'REPAIR_STARRY_ID_PRODUCTION' }}
     runs-on: ubuntu-latest
+    environment: starry-production-write
     steps:
+      - name: Verify independent production approval gate
+        shell: bash
+        env:
+          STARRY_PRODUCTION_WRITE_APPROVAL_KEY: ${{ secrets.STARRY_PRODUCTION_WRITE_APPROVAL_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${STARRY_PRODUCTION_WRITE_APPROVAL_KEY:-}" ]; then
+            echo 'Production access disabled: configure protected environment and approval secret.' >&2
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
