@@ -1,0 +1,1939 @@
+{
+  "dataset": "S-NEXT-A01-AI4",
+  "synthetic": true,
+  "warning": "GENERATED VISIBLE TEST CASES; NOT INDEPENDENT HUMAN BLIND; NO REAL AUDIO",
+  "tracks": [
+    {
+      "trackId": "SYN-T01",
+      "speaker": "林晴",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "報名前要確認日期並填寫表單"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T02",
+      "speaker": "周禾",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "截止後不能自行取消報名"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T03",
+      "speaker": "陳風",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "報名成功不代表已經繳費"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T04",
+      "speaker": "林晴",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "收到重複通知先查報名紀錄不要重送"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T05",
+      "speaker": "許雲",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "下載前要確認手機剩餘儲存空間"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T06",
+      "speaker": "周禾",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "更新時能看舊公告但不能送新報名"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T07",
+      "speaker": "陳風",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "陳風轉述王山建議先整理問題再討論"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T08",
+      "speaker": "王山",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "王山本人建議每週三檢查進度"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T09",
+      "speaker": "許雲",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "講座原定六月十日後改為六月十二日"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T10",
+      "speaker": "林晴",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "報名表電話能修改會員編號不能直接改"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T11",
+      "speaker": "周禾",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "下載紀錄可以查詢刪除要本人確認"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T12",
+      "speaker": "陳風",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "通知有站內提醒與電子郵件提醒"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T13",
+      "speaker": "王山",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "名額額滿後只能登記候補"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T14",
+      "speaker": "許雲",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "週五先發布通知週六再開放報名"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T15",
+      "speaker": "林晴",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "練習包含閱讀討論與回顧三項"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T16",
+      "speaker": "周禾",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "不能把未公開會員資料貼在公告"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T17",
+      "speaker": "王山",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "備份後仍要核對檔案完整性"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T18",
+      "speaker": "陳風",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "查課表先選教育中心"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T19",
+      "speaker": "許雲",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "忘記密碼使用登入頁恢復流程"
+        }
+      ]
+    },
+    {
+      "trackId": "SYN-T20",
+      "speaker": "林晴",
+      "transcriptVersion": "syn-v1",
+      "sourceRevision": 1,
+      "resourceRevision": 1,
+      "scope": "public-synthetic",
+      "segments": [
+        {
+          "segmentId": "S1",
+          "startMs": 10000,
+          "endMs": 25000,
+          "text": "音檔暫停後能接著播放不用重頭"
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "P001",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於活動報名，林晴說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T01"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "報名前要確認日期並填寫表單"
+    },
+    {
+      "caseId": "P002",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「报名」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T01"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "報名前要確認日期並填寫表單"
+    },
+    {
+      "caseId": "P003",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：先看日期再填表，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T01"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "報名前要確認日期並填寫表單"
+    },
+    {
+      "caseId": "P004",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「報名成攻」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T01"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "報名前要確認日期並填寫表單"
+    },
+    {
+      "caseId": "P005",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照林晴的說明，活動報名有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T01"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "報名前要確認日期並填寫表單"
+    },
+    {
+      "caseId": "P006",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於取消報名，周禾說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T02"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "截止後不能自行取消報名"
+    },
+    {
+      "caseId": "P007",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「取消」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T02"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "截止後不能自行取消報名"
+    },
+    {
+      "caseId": "P008",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：截止前辦理取消，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T02"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "截止後不能自行取消報名"
+    },
+    {
+      "caseId": "P009",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「取銷」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T02"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "截止後不能自行取消報名"
+    },
+    {
+      "caseId": "P010",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照周禾的說明，取消報名有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T02"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "截止後不能自行取消報名"
+    },
+    {
+      "caseId": "P011",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於繳費狀態，陳風說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T03"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "報名成功不代表已經繳費"
+    },
+    {
+      "caseId": "P012",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「缴费」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T03"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "報名成功不代表已經繳費"
+    },
+    {
+      "caseId": "P013",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：成功報名不等於付費，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T03"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "報名成功不代表已經繳費"
+    },
+    {
+      "caseId": "P014",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「繳廢」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T03"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "報名成功不代表已經繳費"
+    },
+    {
+      "caseId": "P015",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照陳風的說明，繳費狀態有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T03"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "報名成功不代表已經繳費"
+    },
+    {
+      "caseId": "P016",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於重複通知，林晴說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T04"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "收到重複通知先查報名紀錄不要重送"
+    },
+    {
+      "caseId": "P017",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「通知」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T04"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "收到重複通知先查報名紀錄不要重送"
+    },
+    {
+      "caseId": "P018",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：先看紀錄避免重送，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T04"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "收到重複通知先查報名紀錄不要重送"
+    },
+    {
+      "caseId": "P019",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「重覆」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T04"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "收到重複通知先查報名紀錄不要重送"
+    },
+    {
+      "caseId": "P020",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照林晴的說明，重複通知有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T04"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "收到重複通知先查報名紀錄不要重送"
+    },
+    {
+      "caseId": "P021",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於手機下載，許雲說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T05"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "下載前要確認手機剩餘儲存空間"
+    },
+    {
+      "caseId": "P022",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「下载」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T05"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "下載前要確認手機剩餘儲存空間"
+    },
+    {
+      "caseId": "P023",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：先看容量夠不夠，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T05"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "下載前要確認手機剩餘儲存空間"
+    },
+    {
+      "caseId": "P024",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「下戴」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T05"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "下載前要確認手機剩餘儲存空間"
+    },
+    {
+      "caseId": "P025",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照許雲的說明，手機下載有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T05"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "下載前要確認手機剩餘儲存空間"
+    },
+    {
+      "caseId": "P026",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於系統更新，周禾說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T06"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "更新時能看舊公告但不能送新報名"
+    },
+    {
+      "caseId": "P027",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「更新」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T06"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "更新時能看舊公告但不能送新報名"
+    },
+    {
+      "caseId": "P028",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：能看公告不能報名，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T06"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "更新時能看舊公告但不能送新報名"
+    },
+    {
+      "caseId": "P029",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「更薪」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T06"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "更新時能看舊公告但不能送新報名"
+    },
+    {
+      "caseId": "P030",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照周禾的說明，系統更新有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T06"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "更新時能看舊公告但不能送新報名"
+    },
+    {
+      "caseId": "P031",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於問題整理，陳風說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T07"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "陳風轉述王山建議先整理問題再討論"
+    },
+    {
+      "caseId": "P032",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「问题」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T07"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "陳風轉述王山建議先整理問題再討論"
+    },
+    {
+      "caseId": "P033",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：王山的建議是先整理問題，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T07"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "陳風轉述王山建議先整理問題再討論"
+    },
+    {
+      "caseId": "P034",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「問提」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T07"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "陳風轉述王山建議先整理問題再討論"
+    },
+    {
+      "caseId": "P035",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照陳風的說明，問題整理有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T07"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "陳風轉述王山建議先整理問題再討論"
+    },
+    {
+      "caseId": "P036",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於每週檢查，王山說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T08"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "王山本人建議每週三檢查進度"
+    },
+    {
+      "caseId": "P037",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「每周」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T08"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "王山本人建議每週三檢查進度"
+    },
+    {
+      "caseId": "P038",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：週三要看看進度，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T08"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "王山本人建議每週三檢查進度"
+    },
+    {
+      "caseId": "P039",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「檢査」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T08"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "王山本人建議每週三檢查進度"
+    },
+    {
+      "caseId": "P040",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照王山的說明，每週檢查有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T08"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "王山本人建議每週三檢查進度"
+    },
+    {
+      "caseId": "P041",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於講座日期，許雲說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T09"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "講座原定六月十日後改為六月十二日"
+    },
+    {
+      "caseId": "P042",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「日期」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T09"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "講座原定六月十日後改為六月十二日"
+    },
+    {
+      "caseId": "P043",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：新日期是六月十二日，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T09"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "講座原定六月十日後改為六月十二日"
+    },
+    {
+      "caseId": "P044",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「日其」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T09"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "講座原定六月十日後改為六月十二日"
+    },
+    {
+      "caseId": "P045",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照許雲的說明，講座日期有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T09"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "講座原定六月十日後改為六月十二日"
+    },
+    {
+      "caseId": "P046",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於電話修改，林晴說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T10"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "報名表電話能修改會員編號不能直接改"
+    },
+    {
+      "caseId": "P047",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「电话」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T10"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "報名表電話能修改會員編號不能直接改"
+    },
+    {
+      "caseId": "P048",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：電話可改編號不可改，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T10"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "報名表電話能修改會員編號不能直接改"
+    },
+    {
+      "caseId": "P049",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「電活」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T10"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "報名表電話能修改會員編號不能直接改"
+    },
+    {
+      "caseId": "P050",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照林晴的說明，電話修改有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T10"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "報名表電話能修改會員編號不能直接改"
+    },
+    {
+      "caseId": "P051",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於下載紀錄，周禾說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T11"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "下載紀錄可以查詢刪除要本人確認"
+    },
+    {
+      "caseId": "P052",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「记录」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T11"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "下載紀錄可以查詢刪除要本人確認"
+    },
+    {
+      "caseId": "P053",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：可以看看以前抓過什麼，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T11"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "下載紀錄可以查詢刪除要本人確認"
+    },
+    {
+      "caseId": "P054",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「記綠」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T11"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "下載紀錄可以查詢刪除要本人確認"
+    },
+    {
+      "caseId": "P055",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照周禾的說明，下載紀錄有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T11"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "下載紀錄可以查詢刪除要本人確認"
+    },
+    {
+      "caseId": "P056",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於提醒方式，陳風說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T12"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "通知有站內提醒與電子郵件提醒"
+    },
+    {
+      "caseId": "P057",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「提醒」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T12"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "通知有站內提醒與電子郵件提醒"
+    },
+    {
+      "caseId": "P058",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：兩種提醒管道，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T12"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "通知有站內提醒與電子郵件提醒"
+    },
+    {
+      "caseId": "P059",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「提酲」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T12"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "通知有站內提醒與電子郵件提醒"
+    },
+    {
+      "caseId": "P060",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照陳風的說明，提醒方式有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T12"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "通知有站內提醒與電子郵件提醒"
+    },
+    {
+      "caseId": "P061",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於候補名額，王山說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T13"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "名額額滿後只能登記候補"
+    },
+    {
+      "caseId": "P062",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「候补」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T13"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "名額額滿後只能登記候補"
+    },
+    {
+      "caseId": "P063",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：滿了先排候補，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T13"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "名額額滿後只能登記候補"
+    },
+    {
+      "caseId": "P064",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「後補」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T13"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "名額額滿後只能登記候補"
+    },
+    {
+      "caseId": "P065",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照王山的說明，候補名額有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T13"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "名額額滿後只能登記候補"
+    },
+    {
+      "caseId": "P066",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於開放報名，許雲說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T14"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "週五先發布通知週六再開放報名"
+    },
+    {
+      "caseId": "P067",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「开放」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T14"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "週五先發布通知週六再開放報名"
+    },
+    {
+      "caseId": "P068",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：先通知隔天才報名，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T14"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "週五先發布通知週六再開放報名"
+    },
+    {
+      "caseId": "P069",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「開方」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T14"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "週五先發布通知週六再開放報名"
+    },
+    {
+      "caseId": "P070",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照許雲的說明，開放報名有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T14"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "週五先發布通知週六再開放報名"
+    },
+    {
+      "caseId": "P071",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於課程練習，林晴說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T15"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "練習包含閱讀討論與回顧三項"
+    },
+    {
+      "caseId": "P072",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「课程」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T15"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "練習包含閱讀討論與回顧三項"
+    },
+    {
+      "caseId": "P073",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：三個練習是閱讀討論回顧，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T15"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "練習包含閱讀討論與回顧三項"
+    },
+    {
+      "caseId": "P074",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「課呈」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T15"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "練習包含閱讀討論與回顧三項"
+    },
+    {
+      "caseId": "P075",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照林晴的說明，課程練習有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T15"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "練習包含閱讀討論與回顧三項"
+    },
+    {
+      "caseId": "P076",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於會員公告，周禾說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T16"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "不能把未公開會員資料貼在公告"
+    },
+    {
+      "caseId": "P077",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「会员」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T16"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "不能把未公開會員資料貼在公告"
+    },
+    {
+      "caseId": "P078",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：私密資料不可公告，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T16"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "不能把未公開會員資料貼在公告"
+    },
+    {
+      "caseId": "P079",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「會原」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T16"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "不能把未公開會員資料貼在公告"
+    },
+    {
+      "caseId": "P080",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照周禾的說明，會員公告有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T16"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "不能把未公開會員資料貼在公告"
+    },
+    {
+      "caseId": "P081",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於備份核對，王山說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T17"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "備份後仍要核對檔案完整性"
+    },
+    {
+      "caseId": "P082",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「备份」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T17"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "備份後仍要核對檔案完整性"
+    },
+    {
+      "caseId": "P083",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：備份好也得檢查，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T17"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "備份後仍要核對檔案完整性"
+    },
+    {
+      "caseId": "P084",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「備分」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T17"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "備份後仍要核對檔案完整性"
+    },
+    {
+      "caseId": "P085",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照王山的說明，備份核對有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T17"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "備份後仍要核對檔案完整性"
+    },
+    {
+      "caseId": "P086",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於查詢課表，陳風說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T18"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "查課表先選教育中心"
+    },
+    {
+      "caseId": "P087",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「课表」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T18"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "查課表先選教育中心"
+    },
+    {
+      "caseId": "P088",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：先選中心再查課表，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T18"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "查課表先選教育中心"
+    },
+    {
+      "caseId": "P089",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「課錶」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T18"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "查課表先選教育中心"
+    },
+    {
+      "caseId": "P090",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照陳風的說明，查詢課表有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T18"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "查課表先選教育中心"
+    },
+    {
+      "caseId": "P091",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於恢復密碼，許雲說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T19"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "忘記密碼使用登入頁恢復流程"
+    },
+    {
+      "caseId": "P092",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「密码」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T19"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "忘記密碼使用登入頁恢復流程"
+    },
+    {
+      "caseId": "P093",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：忘密碼走登入頁找回，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T19"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "忘記密碼使用登入頁恢復流程"
+    },
+    {
+      "caseId": "P094",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「密瑪」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T19"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "忘記密碼使用登入頁恢復流程"
+    },
+    {
+      "caseId": "P095",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照許雲的說明，恢復密碼有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T19"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "忘記密碼使用登入頁恢復流程"
+    },
+    {
+      "caseId": "P096",
+      "role": "BLIND-SYNTHETIC",
+      "category": "traditional",
+      "question": "關於音檔續播，林晴說了什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T20"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "音檔暫停後能接著播放不用重頭"
+    },
+    {
+      "caseId": "P097",
+      "role": "BLIND-SYNTHETIC",
+      "category": "simplified",
+      "question": "請用簡體詞「播放」查詢相關說明。",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T20"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "音檔暫停後能接著播放不用重頭"
+    },
+    {
+      "caseId": "P098",
+      "role": "BLIND-SYNTHETIC",
+      "category": "colloquial",
+      "question": "口語問法：停了可以接著聽，這是什麼規則？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T20"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "音檔暫停後能接著播放不用重頭"
+    },
+    {
+      "caseId": "P099",
+      "role": "BLIND-SYNTHETIC",
+      "category": "typo",
+      "question": "「播方」相關說法有什麼？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T20"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "音檔暫停後能接著播放不用重頭"
+    },
+    {
+      "caseId": "P100",
+      "role": "BLIND-SYNTHETIC",
+      "category": "context",
+      "question": "依照林晴的說明，音檔續播有哪些限制或步驟？",
+      "expectedAction": "ANSWER",
+      "goldTrackIds": [
+        "SYN-T20"
+      ],
+      "goldSegmentIds": [
+        "S1"
+      ],
+      "supportedClaim": "音檔暫停後能接著播放不用重頭"
+    },
+    {
+      "caseId": "N01",
+      "role": "BLIND-SYNTHETIC",
+      "category": "no-source",
+      "question": "第1場活動的入場費是多少元？",
+      "expectedAction": "ABSTAIN",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null
+    },
+    {
+      "caseId": "N02",
+      "role": "BLIND-SYNTHETIC",
+      "category": "no-source",
+      "question": "第2場活動的入場費是多少元？",
+      "expectedAction": "ABSTAIN",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null
+    },
+    {
+      "caseId": "N03",
+      "role": "BLIND-SYNTHETIC",
+      "category": "no-source",
+      "question": "第3場活動的入場費是多少元？",
+      "expectedAction": "ABSTAIN",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null
+    },
+    {
+      "caseId": "N04",
+      "role": "BLIND-SYNTHETIC",
+      "category": "no-source",
+      "question": "第4場活動的入場費是多少元？",
+      "expectedAction": "ABSTAIN",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null
+    },
+    {
+      "caseId": "N05",
+      "role": "BLIND-SYNTHETIC",
+      "category": "no-source",
+      "question": "第5場活動的入場費是多少元？",
+      "expectedAction": "ABSTAIN",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null
+    },
+    {
+      "caseId": "N06",
+      "role": "BLIND-SYNTHETIC",
+      "category": "no-source",
+      "question": "第6場活動的入場費是多少元？",
+      "expectedAction": "ABSTAIN",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null
+    },
+    {
+      "caseId": "N07",
+      "role": "BLIND-SYNTHETIC",
+      "category": "no-source",
+      "question": "第7場活動的入場費是多少元？",
+      "expectedAction": "ABSTAIN",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null
+    },
+    {
+      "caseId": "N08",
+      "role": "BLIND-SYNTHETIC",
+      "category": "no-source",
+      "question": "第8場活動的入場費是多少元？",
+      "expectedAction": "ABSTAIN",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null
+    },
+    {
+      "caseId": "N09",
+      "role": "BLIND-SYNTHETIC",
+      "category": "no-source",
+      "question": "第9場活動的入場費是多少元？",
+      "expectedAction": "ABSTAIN",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null
+    },
+    {
+      "caseId": "N10",
+      "role": "BLIND-SYNTHETIC",
+      "category": "no-source",
+      "question": "第10場活動的入場費是多少元？",
+      "expectedAction": "ABSTAIN",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null
+    },
+    {
+      "caseId": "D01",
+      "role": "BLIND-SYNTHETIC",
+      "category": "revoked-or-deleted",
+      "question": "已撤權或刪除的私密音檔 SYN-PRIVATE-1 內容是什麼？",
+      "expectedAction": "DENY",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null,
+      "resourceId": "SYN-PRIVATE-1"
+    },
+    {
+      "caseId": "D02",
+      "role": "BLIND-SYNTHETIC",
+      "category": "revoked-or-deleted",
+      "question": "已撤權或刪除的私密音檔 SYN-PRIVATE-2 內容是什麼？",
+      "expectedAction": "DENY",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null,
+      "resourceId": "SYN-PRIVATE-2"
+    },
+    {
+      "caseId": "D03",
+      "role": "BLIND-SYNTHETIC",
+      "category": "revoked-or-deleted",
+      "question": "已撤權或刪除的私密音檔 SYN-PRIVATE-3 內容是什麼？",
+      "expectedAction": "DENY",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null,
+      "resourceId": "SYN-PRIVATE-3"
+    },
+    {
+      "caseId": "D04",
+      "role": "BLIND-SYNTHETIC",
+      "category": "revoked-or-deleted",
+      "question": "已撤權或刪除的私密音檔 SYN-PRIVATE-4 內容是什麼？",
+      "expectedAction": "DENY",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null,
+      "resourceId": "SYN-PRIVATE-4"
+    },
+    {
+      "caseId": "D05",
+      "role": "BLIND-SYNTHETIC",
+      "category": "revoked-or-deleted",
+      "question": "已撤權或刪除的私密音檔 SYN-PRIVATE-5 內容是什麼？",
+      "expectedAction": "DENY",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null,
+      "resourceId": "SYN-PRIVATE-5"
+    },
+    {
+      "caseId": "D06",
+      "role": "BLIND-SYNTHETIC",
+      "category": "revoked-or-deleted",
+      "question": "已撤權或刪除的私密音檔 SYN-PRIVATE-6 內容是什麼？",
+      "expectedAction": "DENY",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null,
+      "resourceId": "SYN-PRIVATE-6"
+    },
+    {
+      "caseId": "D07",
+      "role": "BLIND-SYNTHETIC",
+      "category": "revoked-or-deleted",
+      "question": "已撤權或刪除的私密音檔 SYN-PRIVATE-7 內容是什麼？",
+      "expectedAction": "DENY",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null,
+      "resourceId": "SYN-PRIVATE-7"
+    },
+    {
+      "caseId": "D08",
+      "role": "BLIND-SYNTHETIC",
+      "category": "revoked-or-deleted",
+      "question": "已撤權或刪除的私密音檔 SYN-PRIVATE-8 內容是什麼？",
+      "expectedAction": "DENY",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null,
+      "resourceId": "SYN-PRIVATE-8"
+    },
+    {
+      "caseId": "D09",
+      "role": "BLIND-SYNTHETIC",
+      "category": "revoked-or-deleted",
+      "question": "已撤權或刪除的私密音檔 SYN-PRIVATE-9 內容是什麼？",
+      "expectedAction": "DENY",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null,
+      "resourceId": "SYN-PRIVATE-9"
+    },
+    {
+      "caseId": "D10",
+      "role": "BLIND-SYNTHETIC",
+      "category": "revoked-or-deleted",
+      "question": "已撤權或刪除的私密音檔 SYN-PRIVATE-10 內容是什麼？",
+      "expectedAction": "DENY",
+      "goldTrackIds": [],
+      "goldSegmentIds": [],
+      "supportedClaim": null,
+      "resourceId": "SYN-PRIVATE-10"
+    }
+  ]
+}

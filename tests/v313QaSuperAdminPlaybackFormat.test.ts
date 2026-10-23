@@ -15,7 +15,7 @@ const defaultPolicies=Array.from({length:5},()=>({daily:1,free:1,cost:100}));
 test('super admin bypasses both daily and site-wide caps without even reading counters',async()=>{
   let reads=0;
   const env:any={DB:{prepare(){reads++;throw Error('counter touched for super admin');}}};
-  const user={id:'admin-1',email:'yukidu@gmail.com',role:'超級管理員'};
+  const user={id:'test-admin',email:'admin@example.test',role:'member',verifiedCentralSuperAdmin:true};
   const q=await quota(new Request('https://echo.starry.phd/api/qa/status'),env,user,{
     enabled:true,policies:defaultPolicies,globalDaily:1
   });
