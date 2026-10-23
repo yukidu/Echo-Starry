@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { redeemCentralEchoTicket, CENTRAL_ECHO_V2_BASE } from '../worker/echoCentralV2Ticket';
+import { redeemCentralEchoTicket, centralEchoV2Ready, CENTRAL_ECHO_V2_BASE } from '../worker/echoCentralV2Ticket';
 import {
   echoCentralV2CanaryEnabled,
   echoCentralV2CanaryPage,
@@ -10,6 +10,7 @@ import {
 
 const CODE = 'T'.repeat(43);
 const STATE = 'S'.repeat(43);
+const READINESS = { status: 'ok', storage: 'connected', live_legacy_auth: 'read_only_live_checked', ticket_exchange_enabled: true };
 const USER_ID = 'central-test-001';
 const LEGACY_ID = 'echo-test-001';
 const SITE = 'https://echo.starry.phd';
@@ -95,10 +96,10 @@ test('canary defaults OFF and requires exactly one server-configured central sub
 test('canary opt-in is an isolated login page; legacy callbacks are not captured', async () => {
   const active = env().value;
   const disabled = env({ ECHO_CENTRAL_V2_SSO: 'false' }).value;
-  assert.equal(echoCentralV2CanaryPage(new Request(SITE + '/auth/central-v2'), disabled)?.status, 404);
-  assert.equal(echoCentralV2CanaryPage(new Request(SITE + '/auth/callback?code=' + CODE), active), null);
-  assert.equal(echoCentralV2CanaryPage(new Request('https://id.starry.phd/auth/central-v2'), active), null);
-  const page = echoCentralV2CanaryPage(new Request(SITE + '/auth/central-v2'), active);
+  assert.equal((await echoCentralV2CanaryPage(new Request(SITE + '/auth/central-v2'), disabled))?.status, 404);
+  assert.equal(await echoCentralV2CanaryPage(new Request(SITE + '/auth/callback?code=' + CODE), active), null);
+  assert.equal(await echoCentralV2CanaryPage(new Request('https://id.starry.phd/auth/central-v2'), active), null);
+  const page = await echoCentralV2CanaryPage(new Request(SITE + '/auth/central-v2'), active, makeFetcher(READINESS).fetcher);
   assert.equal(page?.status, 200);
   assert.match(page?.headers.get('Set-Cookie') ?? '', /^__Host-echo_v2_canary=[A-Za-z0-9_-]{43}; Path=\/; Secure; HttpOnly; SameSite=Lax; Max-Age=180$/);
   const html = await page!.text();
@@ -114,7 +115,7 @@ test('first-party callback is used only with an active pending cookie and always
   const request = new Request(SITE + '/auth/callback?code=' + CODE, {
     headers: { Cookie: '__Host-echo_v2_canary=' + STATE }
   });
-  const page = echoCentralV2CanaryPage(request, env().value);
+  const page = await echoCentralV2CanaryPage(request, env().value);
   assert.equal(page?.status, 200);
   assert.equal(page?.headers.get('Referrer-Policy'), 'no-referrer');
   assert.equal(page?.headers.get('Cache-Control')?.includes('no-store'), true);
@@ -123,7 +124,7 @@ test('first-party callback is used only with an active pending cookie and always
   assert.match(html, /history\.replaceState/);
   assert.match(html, /_centralV2Canary:true/);
   assert.match(html, /source:"central_v2"/);
-  const inactive = echoCentralV2CanaryPage(request, env({ ECHO_CENTRAL_V2_SSO: 'false' }).value);
+  const inactive = await echoCentralV2CanaryPage(request, env({ ECHO_CENTRAL_V2_SSO: 'false' }).value);
   assert.equal(inactive?.status, 503);
   assert.match(inactive?.headers.get('Set-Cookie') ?? '', /Max-Age=0/);
 });
@@ -282,4 +283,28 @@ test('legacy Echo APIs and automatic background sync remain isolated from v2 can
   assert.match(browser, /https:\/\/id\.starry\.phd\/api\/ecosystem\/session/);
   assert.match(login, /https:\/\/id\.starry\.phd\/api\/google-sync/);
   assert.doesNotMatch(route, /https:\/\/id\.hglobal1985\.com\/api\/tracks/);
+});
+
+
+test('readiness must confirm live old-member rights, D1 health and enabled tickets', async () => {
+  const ready = makeFetcher(READINESS);
+  assert.equal(await centralEchoV2Ready({ fetcher: ready.fetcher }), true);
+  assert.equal(ready.calls[0].input, CENTRAL_ECHO_V2_BASE + '/api/v1/compat/readiness');
+  assert.equal(ready.calls[0].init?.method, 'GET');
+  for (const broken of [
+    { ...READINESS, ticket_exchange_enabled: false },
+    { ...READINESS, live_legacy_auth: 'snapshot_only' },
+    { ...READINESS, storage: 'unknown' },
+    { ...READINESS, status: 'degraded' }
+  ]) {
+    assert.equal(await centralEchoV2Ready({ fetcher: makeFetcher(broken).fetcher }), false);
+    const page = await echoCentralV2CanaryPage(
+      new Request(SITE + '/auth/central-v2'), env().value, makeFetcher(broken).fetcher
+    );
+    assert.equal(page?.status, 503);
+    assert.equal(page?.headers.get('Set-Cookie'), null);
+  }
+  assert.equal(await centralEchoV2Ready({
+    fetcher: (async () => { throw Error('offline'); }) as typeof fetch
+  }), false);
 });
