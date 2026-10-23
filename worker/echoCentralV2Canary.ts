@@ -85,7 +85,8 @@ function scriptForLogin(state: string, clientId: string): string {
     'window.location.assign(next.href);',
     '}catch{sessionStorage.removeItem("echo_central_v2_pending");say("測試登入目前無法完成，請使用原本 Google 登入。");}',
     '}',
-    'function render(){if(!window.google?.accounts?.id){setTimeout(render,100);return;}',
+    'function render(){if(localStorage.getItem("sq_current_user_v1")){say("請先登出目前 Echo 帳號，再進行新版測試登入");return;}',
+    'if(!window.google?.accounts?.id){setTimeout(render,100);return;}',
     'window.google.accounts.id.initialize({client_id:CLIENT,callback:onCredential,auto_select:false,ux_mode:"popup"});',
     'window.google.accounts.id.renderButton(document.getElementById("google"),',
     '{type:"standard",size:"large",theme:"outline",shape:"pill",text:"continue_with",width:300,locale:"zh_TW"});',
@@ -233,6 +234,24 @@ export async function exchangeCentralV2CanaryTicket(
     return respond({ authenticated: false, error: 'local_member_blocked' }, 403);
   }
 
+  // Prevent a v2 test login from silently replacing a different existing Echo
+  // member's first-party session on a shared device.
+  const cookie = request.headers.get('Cookie') || '';
+  if (/(?:^|;\s*)echostars_session=/.test(cookie)) {
+    const currentUrl = new URL(request.url);
+    currentUrl.pathname = '/api/auth/session';
+    currentUrl.search = '';
+    const currentHeaders = new Headers({ Cookie: cookie, Accept: 'application/json' });
+    const existingResponse = await next(new Request(currentUrl.toString(), {
+      method: 'GET', headers: currentHeaders
+    })).catch(() => null);
+    const existingData: any = await existingResponse?.clone().json().catch(() => null);
+    if (!existingResponse?.ok || existingData?.authenticated !== true ||
+      String(existingData?.user?.id || '') !== ticket.echoLegacyUserId) {
+      return respond({ authenticated: false, error: 'existing_echo_session_conflict' }, 409);
+    }
+  }
+
   const session = await createEchoSession(env, String(local.id)).catch(() => null);
   if (!session) return respond({ authenticated: false, error: 'local_session_unavailable' }, 503);
 
@@ -263,12 +282,9 @@ export async function exchangeCentralV2CanaryTicket(
     sessionExpiresAt: session.expiresAt,
     starryUserId: ticket.centralUserId
   }, 200);
-  // Preserve the first-party Echo cookie from the existing session middleware,
-  // rather than inventing another auth/session implementation.
-  const responseHeaders = new Headers(result.headers);
-  const echoSessionCookie = response.headers.get('Set-Cookie') || '';
-  if (echoSessionCookie.startsWith('echostars_session=')) {
-    responseHeaders.append('Set-Cookie', echoSessionCookie);
-  }
-  return new Response(result.body, { status: result.status, headers: responseHeaders });
+  // Do not issue a first-party member cookie before the browser has confirmed
+  // that its previous local account matches this exact mapped Echo identity.
+  // The established /api/auth/session middleware can set its cookie on the
+  // next normal authenticated session check after the browser commits login.
+  return result;
 }
