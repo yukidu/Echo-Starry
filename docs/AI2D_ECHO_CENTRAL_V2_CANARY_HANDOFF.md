@@ -31,6 +31,7 @@
 - Google GIS ID Token 由瀏覽器 POST \`https://id.hglobal1985.com/api/google-sync\`，驗證成功只接受 URL origin 恰為 \`https://id.hglobal1985.com\`、path 恰為 \`/auth/echo/continue\` 的 \`continueUrl\`；再用頂層導轉（非第三方 Cookie）完成 Google/第一方 session 與一次性票據。
 - 新中央以 HTTP 303 回到 Echo \`/auth/callback?code=...\`；Echo 只有持有先前產生的 host-only、HttpOnly、Secure、SameSite=Lax 180 秒 cookie 才啟動 v2 callback UI。Callback 用一次性 \`sessionStorage\` state，清除 URL ticket 後同站 POST \`/api/auth/ecosystem-exchange\`，並附 \`source:'central_v2'\`。
 - Echo Worker 必須有同一 state Cookie 和明確 Origin、後端雙開關；服務端向固定新中央 API 兌換，再核對 \`starryUserId\` **等於唯一測試會員**，\`echoLegacyUserId\` **存在且精確對應** \`env.DB.users.id\`，且 \`isBlocked!==1\`；最後才建立**舊有 Echo 本地 session**、從原 Echo \`/api/auth/session\` 取得本地原始個人資料及權限。
+- 共用裝置保護：測試登入頁不允許在已有 Echo 快取會員時直接更換身分；若瀏覽器有舊 Echo HttpOnly session Cookie，必須先驗證當前帳號與新票據的精準 Echo ID 完全相同。新票據回應先不寫入新的 Echo Cookie，等瀏覽器確認並儲存正確帳號後，再依原 Echo /api/auth/session 機制建立第一方 Cookie。
 - **絕不**用 Email 或姓名自動比對、建立新的 Echo users、搬移電池、認證獎銜、建立任何新的管理員權限；無映射統一 \`identity_link_missing\`。
 - 任何拒絕與故障**只給使用者返回原登入的連結**，不拿新 code 呼叫舊 consume、不自動重送票據，不寫私密資料到 log。
 
