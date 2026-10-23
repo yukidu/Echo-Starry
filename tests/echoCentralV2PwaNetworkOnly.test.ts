@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import vm from 'node:vm';
+import { runInNewContext } from 'node:vm';
 
 /** Execute the actual Echo PWA service-worker code with isolated fake browser APIs. */
 function newServiceWorker() {
@@ -30,7 +30,7 @@ function newServiceWorker() {
     return new Response('<html>normal echo app shell</html>', { status: 200 });
   };
   const source = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
-  vm.runInNewContext(source, { self, caches, fetch: fetcher, URL, Response });
+  runInNewContext(source, { self, caches, fetch: fetcher, URL, Response });
   const intercept = async (path: string, mode: string = 'navigate') => {
     const replies: Promise<Response>[] = [];
     handlers.get('fetch')!({
