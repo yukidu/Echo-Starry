@@ -38,7 +38,10 @@ self.addEventListener('fetch', event => {
   if (
     event.request.method !== 'GET' ||
     url.origin !== self.location.origin ||
-    url.pathname.startsWith('/api/')
+    url.pathname.startsWith('/api/') ||
+    // Login redirects and one-time codes must NEVER be served from the cached PWA shell.
+    // Always leave /auth/* to the live network and the Worker; offline must fail closed.
+    url.pathname.startsWith('/auth/')
   ) return;
 
   const navigation = event.request.mode === 'navigate';

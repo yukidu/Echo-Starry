@@ -106,6 +106,9 @@ async function performSync() {
   const generation = interactiveLoginGeneration;
   const interruptedByLogin = () => interactiveGoogleLoginActive || generation !== interactiveLoginGeneration;
   const cached = readCachedUser();
+  // V2 canary authenticates through a separate top-level first-party bridge.
+  // Old central session checks must not overwrite or sign out this login.
+  if (cached?._centralV2Canary === true) return;
   let state: any;
   try {
     state = await centralState();
@@ -157,9 +160,14 @@ function syncEcosystemSession(force = false) {
   return syncInFlight;
 }
 
-async function logoutCentralSession() {
+async function logoutCentralSession(wasCanaryLogin = readCachedUser()?._centralV2Canary === true) {
+  // A v2 canary session must never log out an unrelated legacy central account.
+  // Cross-site SameSite=Lax may prevent the v2 cookie from being sent; the
+  // Echo local session is still independently invalidated on logout.
+  const target = wasCanaryLogin
+    ? 'https://id.hglobal1985.com/api/logout' : CENTRAL_LOGOUT_URL;
   try {
-    await nativeFetch(CENTRAL_LOGOUT_URL, {
+    await nativeFetch(target, {
       method: 'POST',
       credentials: 'include',
       cache: 'no-store',
@@ -174,13 +182,14 @@ async function logoutCentralSession() {
 function installLogoutBridge() {
   const previousFetch = window.fetch.bind(window);
   window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const wasCanaryLogin = readCachedUser()?._centralV2Canary === true;
     const response = await previousFetch(input, init);
     try {
       const raw = input instanceof Request ? input.url : String(input);
       const url = new URL(raw, window.location.href);
       const method = String(init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
       if (url.origin === window.location.origin && url.pathname === LOCAL_LOGOUT_URL && method === 'POST' && response.ok) {
-        void logoutCentralSession();
+        void logoutCentralSession(wasCanaryLogin);
       }
     } catch {}
     return response;

@@ -1,5 +1,6 @@
 import type { Env } from './index';
 import { checkStarryAppAccess } from './starryAppAccess';
+import { echoCentralV2CanaryPage, exchangeCentralV2CanaryTicket } from './echoCentralV2Canary';
 
 const ID_HOST = 'id.starry.phd';
 const ECHO_HOST = 'echo.starry.phd';
@@ -363,6 +364,10 @@ export async function handleStarryEcosystemSso(
   const url = new URL(request.url);
   const method = request.method.toUpperCase();
 
+  // Opt-in Echo-only testing. Does not touch old id.starry.phd or business APIs.
+  const v2CanaryPage = await echoCentralV2CanaryPage(request, env);
+  if (v2CanaryPage) return v2CanaryPage;
+
   if (url.hostname === ID_HOST) {
     const origin = request.headers.get('Origin') || '';
     const appId = ticketAppId(url.pathname);
@@ -385,6 +390,14 @@ export async function handleStarryEcosystemSso(
   }
 
   if (url.hostname === ECHO_HOST && url.pathname === '/api/auth/ecosystem-exchange' && method === 'POST') {
+    const exchangeInput: any = await request.clone().json().catch(() => null);
+    if (exchangeInput && Object.prototype.hasOwnProperty.call(exchangeInput, 'source')) {
+      if (exchangeInput.source !== 'central_v2') {
+        return json(request, { authenticated: false, error: 'unsupported_ticket_source' }, 400);
+      }
+      // A new central v2 code is NEVER sent to old starry_app_auth_codes.
+      return exchangeCentralV2CanaryTicket(request, env, next, createEchoSession);
+    }
     return exchangeEchoTicket(request, env, next);
   }
 
