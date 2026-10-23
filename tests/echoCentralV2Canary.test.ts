@@ -22,7 +22,7 @@ const responseBody = (overrides: Record<string, unknown> = {}) => ({
   echoLegacyUserId: LEGACY_ID,
   ...overrides
 });
-const makeFetcher = (json = responseBody(), status = 200) => {
+const makeFetcher = (json: Record<string, unknown> = responseBody(), status = 200) => {
   const calls: { input: string; init: RequestInit | undefined }[] = [];
   const fetcher = (async (input: string | URL | Request, init?: RequestInit) => {
     calls.push({ input: String(input), init });
