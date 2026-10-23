@@ -28,6 +28,7 @@
 
 未啟用時，原登入完全不變。開啟後指定測試人員由 \`https://echo.starry.phd/auth/central-v2\` 進入**專屬** Google 登入；一般首頁、一般 Google 按鈕及背景 SSO **不會自動走 v2**。
 
+- 在發出測試登入頁前，Echo Worker 對固定新版中央 `GET /api/v1/compat/readiness` 做唯讀檢查：`status:ok`、`storage:connected`、`live_legacy_auth:read_only_live_checked`、`ticket_exchange_enabled:true` 缺一就拒絕且不給待登入 Cookie。這不是完整 E2E 切換核准，`echo_cutover_ready` 仍須維持受控狀態。
 - Google GIS ID Token 由瀏覽器 POST \`https://id.hglobal1985.com/api/google-sync\`，驗證成功只接受 URL origin 恰為 \`https://id.hglobal1985.com\`、path 恰為 \`/auth/echo/continue\` 的 \`continueUrl\`；再用頂層導轉（非第三方 Cookie）完成 Google/第一方 session 與一次性票據。
 - 新中央以 HTTP 303 回到 Echo \`/auth/callback?code=...\`；Echo 只有持有先前產生的 host-only、HttpOnly、Secure、SameSite=Lax 180 秒 cookie 才啟動 v2 callback UI。Callback 用一次性 \`sessionStorage\` state，清除 URL ticket 後同站 POST \`/api/auth/ecosystem-exchange\`，並附 \`source:'central_v2'\`。
 - Echo Worker 必須有同一 state Cookie 和明確 Origin、後端雙開關；服務端向固定新中央 API 兌換，再核對 \`starryUserId\` **等於唯一測試會員**，\`echoLegacyUserId\` **存在且精確對應** \`env.DB.users.id\`，且 \`isBlocked!==1\`；最後才建立**舊有 Echo 本地 session**、從原 Echo \`/api/auth/session\` 取得本地原始個人資料及權限。
