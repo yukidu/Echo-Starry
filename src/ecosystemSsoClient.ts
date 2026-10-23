@@ -106,6 +106,9 @@ async function performSync() {
   const generation = interactiveLoginGeneration;
   const interruptedByLogin = () => interactiveGoogleLoginActive || generation !== interactiveLoginGeneration;
   const cached = readCachedUser();
+  // V2 canary authenticates through a separate top-level first-party bridge.
+  // Old central session checks must not overwrite or sign out this login.
+  if (cached?._centralV2Canary === true) return;
   let state: any;
   try {
     state = await centralState();
@@ -158,8 +161,14 @@ function syncEcosystemSession(force = false) {
 }
 
 async function logoutCentralSession() {
+  const cached = readCachedUser();
+  // A v2 canary session must never log out an unrelated legacy central account.
+  // Cross-site SameSite=Lax may prevent the v2 cookie from being sent; the
+  // Echo local session is still independently invalidated on logout.
+  const target = cached?._centralV2Canary === true
+    ? 'https://id.hglobal1985.com/api/logout' : CENTRAL_LOGOUT_URL;
   try {
-    await nativeFetch(CENTRAL_LOGOUT_URL, {
+    await nativeFetch(target, {
       method: 'POST',
       credentials: 'include',
       cache: 'no-store',
