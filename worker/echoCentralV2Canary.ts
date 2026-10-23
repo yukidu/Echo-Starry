@@ -1,5 +1,5 @@
 import type { Env } from './index';
-import { redeemCentralEchoTicket, CENTRAL_ECHO_V2_BASE } from './echoCentralV2Ticket';
+import { redeemCentralEchoTicket, centralEchoV2Ready, CENTRAL_ECHO_V2_BASE } from './echoCentralV2Ticket';
 
 const ECHO_ORIGIN = 'https://echo.starry.phd';
 const COOKIE_NAME = '__Host-echo_v2_canary';
@@ -166,12 +166,21 @@ function htmlPage(kind: 'login' | 'callback', state: string, clientId: string): 
  * Separate, explicit canary entry. Callback is claimed only for a browser with
  * the HttpOnly pending cookie; all normal/legacy callbacks remain untouched.
  */
-export function echoCentralV2CanaryPage(request: Request, env: Env): Response | null {
+export async function echoCentralV2CanaryPage(
+  request: Request,
+  env: Env,
+  fetcher: typeof fetch = fetch
+): Promise<Response | null> {
   const url = new URL(request.url);
   if (url.origin !== ECHO_ORIGIN) return null;
   if (url.pathname === '/auth/central-v2') {
     if (request.method !== 'GET') return new Response('Method not allowed', { status: 405 });
     if (!echoCentralV2CanaryEnabled(env)) return new Response('Not found', { status: 404 });
+    if (!await centralEchoV2Ready({ fetcher })) {
+      return new Response('新版中央登入尚未通過就緒檢查，請使用原登入。', {
+        status: 503, headers: securityHeaders()
+      });
+    }
     return htmlPage('login', makeState(), safeGoogleClientId(env));
   }
   if (url.pathname !== '/auth/callback' || !STATE_RE.test(cookieValue(request))) return null;
