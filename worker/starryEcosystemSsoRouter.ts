@@ -365,7 +365,7 @@ export async function handleStarryEcosystemSso(
   const method = request.method.toUpperCase();
 
   // Opt-in Echo-only testing. Does not touch old id.starry.phd or business APIs.
-  const v2CanaryPage = echoCentralV2CanaryPage(request, env);
+  const v2CanaryPage = await echoCentralV2CanaryPage(request, env);
   if (v2CanaryPage) return v2CanaryPage;
 
   if (url.hostname === ID_HOST) {
