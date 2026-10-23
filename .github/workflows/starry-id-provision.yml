@@ -1,23 +1,38 @@
 name: Provision Starry ID
 
+# Production D1 changes must never be triggered by main pushes.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'starry-id/**'
-      - '.github/workflows/starry-id-provision.yml'
   workflow_dispatch:
+    inputs:
+      approval_phrase:
+        description: 'Type PROVISION_STARRY_ID_PRODUCTION to authorize production D1 changes'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
+# Serialize all privileged workflows across this repository.
+concurrency:
+  group: starry-production-write
+  cancel-in-progress: false
+
 jobs:
   provision-and-audit:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.approval_phrase == 'PROVISION_STARRY_ID_PRODUCTION' }}
     runs-on: ubuntu-latest
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    environment: starry-production-write
     steps:
+      - name: Verify independent production approval gate
+        shell: bash
+        env:
+          STARRY_PRODUCTION_WRITE_APPROVAL_KEY: ${{ secrets.STARRY_PRODUCTION_WRITE_APPROVAL_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${STARRY_PRODUCTION_WRITE_APPROVAL_KEY:-}" ]; then
+            echo 'Production access disabled: configure protected environment and approval secret.' >&2
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -25,6 +40,9 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Detect Cloudflare credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         id: cloudflare
         shell: bash
         run: |
@@ -36,6 +54,9 @@ jobs:
             echo "Cloudflare provisioning credentials are not configured for GitHub Actions; skipping D1 creation and remote audit safely."
           fi
       - name: Provision central D1 and audit source members
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         if: steps.cloudflare.outputs.available == 'true'
         run: bash starry-id/provision-and-audit.sh
       - name: Upload non-PII audit report

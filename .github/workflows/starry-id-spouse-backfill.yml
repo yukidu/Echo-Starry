@@ -1,30 +1,49 @@
 name: Backfill Starry ID Duplicate Distributor Spouses
 
+# Production D1 changes must never be triggered by main pushes.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/v273BackfillDuplicateSpouses.mjs'
-      - '.github/workflows/starry-id-spouse-backfill.yml'
   workflow_dispatch:
+    inputs:
+      approval_phrase:
+        description: 'Type BACKFILL_STARRY_ID_PRODUCTION to authorize production D1 changes'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
+# Serialize all privileged workflows across this repository.
+concurrency:
+  group: starry-production-write
+  cancel-in-progress: false
+
 jobs:
   backfill-and-verify:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.approval_phrase == 'BACKFILL_STARRY_ID_PRODUCTION' }}
     runs-on: ubuntu-latest
+    environment: starry-production-write
     env:
       STARRY_ID_D1_ID: 01195c92-555e-4816-bddc-5b8cb2e795db
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
+      - name: Verify independent production approval gate
+        shell: bash
+        env:
+          STARRY_PRODUCTION_WRITE_APPROVAL_KEY: ${{ secrets.STARRY_PRODUCTION_WRITE_APPROVAL_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${STARRY_PRODUCTION_WRITE_APPROVAL_KEY:-}" ]; then
+            echo 'Production access disabled: configure protected environment and approval secret.' >&2
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
       - name: Validate one-time backfill before production access
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
@@ -34,6 +53,9 @@ jobs:
           test -n "${STARRY_ID_D1_ID:-}"
 
       - name: Capture immediate pre-backfill D1 recovery point
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
@@ -41,6 +63,9 @@ jobs:
           node starry-id/capture-time-travel-bookmark.mjs > starry-id/audit-output/pre-spouse-backfill-bookmark.json
 
       - name: Backfill exactly three approved spouse groups and verify
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail

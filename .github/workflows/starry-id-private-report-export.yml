@@ -1,30 +1,49 @@
 name: Export Starry ID Duplicate Distributor Report
 
+# No unattended production access.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'starry-id/exportDuplicateAmwayReport.mjs'
-      - '.github/workflows/starry-id-private-report-export.yml'
   workflow_dispatch:
+    inputs:
+      approval_phrase:
+        description: 'Type EXPORT_STARRY_ID_PRIVATE_REPORT after protected environment approval'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
+# Serialize all privileged workflows across this repository.
+concurrency:
+  group: starry-production-write
+  cancel-in-progress: false
+
 env:
   STARRY_ID_D1_ID: 01195c92-555e-4816-bddc-5b8cb2e795db
-  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
 jobs:
   export-encrypted-report:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.approval_phrase == 'EXPORT_STARRY_ID_PRIVATE_REPORT' }}
     runs-on: ubuntu-latest
+    environment: starry-production-write
     steps:
+      - name: Verify independent production approval gate
+        shell: bash
+        env:
+          STARRY_PRODUCTION_WRITE_APPROVAL_KEY: ${{ secrets.STARRY_PRODUCTION_WRITE_APPROVAL_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${STARRY_PRODUCTION_WRITE_APPROVAL_KEY:-}" ]; then
+            echo 'Production access disabled: configure protected environment and approval secret.' >&2
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Validate read-only exporter
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
@@ -32,6 +51,9 @@ jobs:
           test -n "${CLOUDFLARE_API_TOKEN:-}"
           test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
       - name: Read duplicate distributor groups only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
