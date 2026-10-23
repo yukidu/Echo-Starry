@@ -182,7 +182,7 @@ test('valid canary ticket resolves EXACT Echo ID, preserves Echo permissions and
   assert.equal(active.calls(), 1);
   assert.equal(calls.length, 1);
   assert.equal(sessionCalls, 1);
-  assert.match(response.headers.get('Set-Cookie') ?? '', /echostars_session=/);
+  assert.doesNotMatch(response.headers.get('Set-Cookie') ?? '', /echostars_session=/);
   assert.match(response.headers.get('Set-Cookie') ?? '', /__Host-echo_v2_canary=.*Max-Age=0/);
 });
 
@@ -235,6 +235,20 @@ test('missing mapping refuses, never matches email or creates a member', async (
     assert.equal((await result.json() as any).error, 'identity_link_missing');
     assert.equal(sessionCalls, 0);
   }
+});
+
+test('shared device with an existing different Echo session cannot be switched', async () => {
+  const { fetcher } = makeFetcher();
+  const active = env();
+  let created = 0;
+  const request = v2Request({ cookie: '__Host-echo_v2_canary=' + STATE + '; echostars_session=OLD' });
+  const response = await exchangeCentralV2CanaryTicket(request, active.value,
+    async () => new Response(JSON.stringify({
+      authenticated: true, user: { id: 'another-local-account' }
+    })), async (...args) => { created++; return createSession(...args); }, fetcher);
+  assert.equal(response.status, 409);
+  assert.equal((await response.json() as any).error, 'existing_echo_session_conflict');
+  assert.equal(created, 0);
 });
 
 test('blocked local member is denied after precise ID lookup', async () => {
