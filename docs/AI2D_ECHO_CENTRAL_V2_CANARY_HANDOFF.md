@@ -32,9 +32,16 @@
 - Google GIS ID Token 由瀏覽器 POST \`https://id.hglobal1985.com/api/google-sync\`，驗證成功只接受 URL origin 恰為 \`https://id.hglobal1985.com\`、path 恰為 \`/auth/echo/continue\` 的 \`continueUrl\`；再用頂層導轉（非第三方 Cookie）完成 Google/第一方 session 與一次性票據。
 - 新中央以 HTTP 303 回到 Echo \`/auth/callback?code=...\`；Echo 只有持有先前產生的 host-only、HttpOnly、Secure、SameSite=Lax 180 秒 cookie 才啟動 v2 callback UI。Callback 用一次性 \`sessionStorage\` state，清除 URL ticket 後同站 POST \`/api/auth/ecosystem-exchange\`，並附 \`source:'central_v2'\`。
 - Echo Worker 必須有同一 state Cookie 和明確 Origin、後端雙開關；服務端向固定新中央 API 兌換，再核對 \`starryUserId\` **等於唯一測試會員**，\`echoLegacyUserId\` **存在且精確對應** \`env.DB.users.id\`，且 \`isBlocked!==1\`；最後才建立**舊有 Echo 本地 session**、從原 Echo \`/api/auth/session\` 取得本地原始個人資料及權限。
-- 共用裝置保護：測試登入頁不允許在已有 Echo 快取會員時直接更換身分；若瀏覽器有舊 Echo HttpOnly session Cookie，必須先驗證當前帳號與新票據的精準 Echo ID 完全相同。新票據回應先不寫入新的 Echo Cookie，等瀏覽器確認並儲存正確帳號後，再依原 Echo /api/auth/session 機制建立第一方 Cookie。
+- 共用裝置保護：測試登入頁不允許在已有 Echo 快取會員時直接更換身分；若瀏覽器有舊 Echo HttpOnly session Cookie，必須先驗證當前帳號與新票據的精準 Echo ID 完全相同。新票據回應不直接下發 Echo Cookie；瀏覽器先比對現有帳號，再使用新 Echo token 呼叫原 `/api/auth/session`，核對原會員 ID 並立即透過既有中介層建立 HttpOnly 第一方 Cookie；驗證成功後才儲存登入狀態並進首頁。
 - **絕不**用 Email 或姓名自動比對、建立新的 Echo users、搬移電池、認證獎銜、建立任何新的管理員權限；無映射統一 \`identity_link_missing\`。
 - 任何拒絕與故障**只給使用者返回原登入的連結**，不拿新 code 呼叫舊 consume、不自動重送票據，不寫私密資料到 log。
+
+## PWA 安全與跨裝置補強
+
+- `public/sw.js` 對所有 `/auth/*` 登入頁、跨網域回呼、一次性票據網址，全部繞過 PWA Service Worker 導航快取與離線首頁 fallback；網路中斷時不能顯示過期快取登入頁或把含票據的登入路徑錯當首頁。
+- `tests/echoCentralV2PwaNetworkOnly.test.ts` 直接執行現有 Service Worker，驗證 `/auth/central-v2`、`/auth/callback?code=...` 與其他 `/auth/*` 不受離線快取攔截，首頁仍可正常快取。
+- `tests/echoCentralV2BrowserFlow.test.ts` 執行 Worker 回給瀏覽器的真實 Callback JavaScript，以假會員與假網路檢查一次性 state、清除網址票據、Echo 本地授權、HttpOnly Cookie 核對、儲存資料、登入失敗與共享裝置異帳衝突。
+- 以上都是程式層隔離測試，尚非真 iOS/Android/PWA Google Browser E2E，仍不得切換正式登入。
 
 ## 一鍵關閉與回退
 
