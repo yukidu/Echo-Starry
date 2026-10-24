@@ -11,8 +11,11 @@ const comments=source('src/components/CommentsSection.tsx');
 
 test('only the specified authenticated super administrator can access private tests',()=>{
   assert.equal(isQaTestOwner(null),false);
-  assert.equal(isQaTestOwner({email:'other@example.com',role:'超級管理員'}),false);
-  assert.equal(isQaTestOwner({email:'yukidu@gmail.com',role:'會員'}),true);
+  const ownerEmail = /text\(user\?\.email\)\.toLowerCase\(\)==='([^']+)'/.exec(privateRouter)?.[1];
+  assert.ok(ownerEmail,'owner account must remain pinned');
+  assert.equal(isQaTestOwner({email:'unrelated@example.test',role:'super-admin',verifiedCentralSuperAdmin:true}),false);
+  assert.equal(isQaTestOwner({email:ownerEmail,role:'member'}),false,'email alone cannot grant private test access');
+  assert.equal(isQaTestOwner({email:ownerEmail,role:'member',verifiedCentralSuperAdmin:true}),true);
   assert.match(privateRouter,/await actor\(req,env\)/);
   assert.match(privateRouter,/if\(!isQaTestOwner\(user\)\)return json/);
   assert.match(privateRouter,/req\.headers\.get\('Origin'\)!==url\.origin/);

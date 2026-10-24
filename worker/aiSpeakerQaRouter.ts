@@ -96,15 +96,56 @@ function cookieToken(req:Request){
   const t=item?.split('=').slice(1).join('=')||'';
   return TOKEN_RE.test(t)?t:'';
 }
+/**
+ * Live central administrator proof for the Echo QA console.
+ * Echo-local role/email MUST NOT grant central administrative privileges.
+ * Always start at the D1 primary so a recent Starry ID revocation cannot be
+ * hidden by asynchronous read replicas. Missing authority => deny.
+ *
+ * This is read-only. It does not grant or modify any membership or session.
+ */
+export async function resolveQaCentralSuperAdmin(env:Env,echoUser:any):Promise<boolean>{
+  if(!echoUser?.id || !echoUser?.email || typeof env.STARRY_ID_DB?.withSession!=='function')return false;
+  try{
+    const primary=env.STARRY_ID_DB.withSession('first-primary');
+    if(!primary?.prepare)return false;
+    const legacy:any=await primary.prepare(
+      "SELECT userId FROM legacy_links WHERE sourceApp='echostars' AND sourceUserId=? LIMIT 1"
+    ).bind(echoUser.id).first();
+    const userId=txt(legacy?.userId||echoUser.id);
+    if(!/^[a-zA-Z0-9:_-]{1,128}$/.test(userId))return false;
+    const central:any=await primary.prepare(`SELECT
+      u.status AS userStatus,u.primaryEmail AS centralEmail,
+      cm.status AS centralMembershipStatus,cm.role AS centralRole,
+      em.status AS echoMembershipStatus,
+      a.decision AS echoAccessDecision
+      FROM users u
+      LEFT JOIN app_memberships cm ON cm.userId=u.id AND cm.appId='starry-id'
+      LEFT JOIN app_memberships em ON em.userId=u.id AND em.appId='echostars'
+      LEFT JOIN starry_app_access_decisions a ON a.userId=u.id AND a.appId='echostars'
+      WHERE u.id=? LIMIT 1`).bind(userId).first();
+    return central?.userStatus==='active' &&
+      central?.centralMembershipStatus==='active' &&
+      central?.centralRole==='super-admin' &&
+      central?.echoMembershipStatus==='active' &&
+      central?.echoAccessDecision!=='deny' &&
+      txt(central?.centralEmail).toLowerCase()===txt(echoUser.email).toLowerCase();
+  }catch{
+    // Includes missing central schema, network failures and denied DB sessions.
+    // Never fall back to local super-admin role or a hard-coded email.
+    return false;
+  }
+}
 export async function actor(req:Request,env:Env){
   const token=cookieToken(req);
   if(!token)return null;
   const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token));
   const hash=Array.from(new Uint8Array(digest)).map(n=>n.toString(16).padStart(2,'0')).join('');
   const row:any=await env.DB.prepare("SELECT u.id,u.email,u.role,u.rank,u.approvedRank,u.rankApproved,u.isAdminUser,u.isBlocked,s.expiresAt FROM auth_sessions s JOIN users u ON u.id=s.userId WHERE s.tokenHash=? LIMIT 1").bind(hash).first();
-  return row&&!row.isBlocked&&Number(row.expiresAt)>Date.now()?row:null;
+  if(!row||row.isBlocked||Number(row.expiresAt)<=Date.now())return null;
+  return {...row,verifiedCentralSuperAdmin:await resolveQaCentralSuperAdmin(env,row)};
 }
-export const isSuper=(u:any)=>Boolean(u&&(txt(u.email).toLowerCase()==='yukidu@gmail.com'||u.role==='超級管理員'));
+export const isSuper=(u:any)=>u?.verifiedCentralSuperAdmin===true;
 export function tier(u:any){
   if(!u)return 0;
   if(!u.rankApproved)return 1;
