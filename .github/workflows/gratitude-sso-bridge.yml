@@ -16,6 +16,12 @@ on:
       - 'worker/starryAppAccess.ts'
       - 'wrangler.toml'
       - '.github/workflows/gratitude-sso-bridge.yml'
+# PR-only supersession: cancel outdated SSO verification on the same PR.
+# Main production deploy runs use a separate per-commit group and NEVER cancel.
+concurrency:
+  group: gratitude-sso-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 jobs:
