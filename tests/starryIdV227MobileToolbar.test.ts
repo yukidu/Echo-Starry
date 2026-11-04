@@ -25,11 +25,12 @@ test('v227 final override removes viewport translation overflow and preserves ac
   assert.match(enhancer, /@media\(max-width:760px\)/);
 });
 
-test('wrangler keeps the established privacy crawler chain and production Starry ID route', () => {
+test('wrangler keeps the privacy crawler chain on legacy workers.dev without claiming v2 domains', () => {
   assert.match(wrangler, /name = "echostars"/);
   assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
   assert.match(inlineLoginRouter, /import appWorker from '\.\/starryMainBatteryGameRouter'/);
   assert.match(batteryRouter, /import appWorker from '\.\/privacyCrawlerRouter'/);
-  assert.match(wrangler, /pattern = "id\.starry\.phd"/);
+  assert.match(wrangler, /workers_dev = true/);
+  assert.doesNotMatch(wrangler, /^\[\[routes\]\]/m);
   assert.match(wrangler, /binding = "STARRY_ID_DB"/);
 });
