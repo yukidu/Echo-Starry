@@ -47,23 +47,24 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Build existing frontend
         run: npm run build
-      - name: Deploy Echo + Starry ID Worker without modifying other services
+      - name: Deploy only legacy EchoStars Worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.151.0"
           command: deploy
-      - name: Verify central login and existing Echo health
+      - name: Verify legacy EchoStars and separate v2 Starry ID health
         shell: bash
         run: |
           set -euo pipefail
           for attempt in $(seq 1 12); do
-            if curl -fsS --connect-timeout 10 --max-time 20 https://id.starry.phd/auth/gratitude | grep -F '繁星通行證'               && curl -fsS --connect-timeout 10 --max-time 20 https://echo.starry.phd/ | grep -F '<html'; then
-              echo 'Starry ID + Echo production checked.'
+            if curl -fsS --connect-timeout 10 --max-time 20 https://echostars.yukidu.workers.dev/api/cloudflare/status | grep -F '"status":"online"' \
+              && curl -fsS --connect-timeout 10 --max-time 20 https://id.starry.phd/v1/health | grep -F '"status":"ok"'; then
+              echo 'Legacy EchoStars and independent v2 Starry ID verified.'
               exit 0
             fi
             sleep 10
           done
-          echo 'Central login production smoke failed.'
+          echo 'Split-domain production smoke failed.'
           exit 1

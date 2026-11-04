@@ -198,7 +198,12 @@ function installLogoutBridge() {
   }, true);
 }
 
-if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+// Legacy EchoStars uses its own Starry ID D1 database. Never query the newer
+// account's session, overwrite a legacy login, or log out the newer account.
+const legacyStandaloneHost = typeof window !== 'undefined' &&
+  window.location.hostname === 'echostars.yukidu.workers.dev';
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && !legacyStandaloneHost) {
   window.setTimeout(() => {
     installLogoutBridge();
     void syncEcosystemSession(true);

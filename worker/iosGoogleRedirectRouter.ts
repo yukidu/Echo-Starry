@@ -162,10 +162,36 @@ async function handleGoogleRedirect(request: Request, env: Env) {
     body: JSON.stringify({ credential })
   });
 
+  // The workers.dev fallback belongs to the legacy EchoStars account, whose
+  // Starry ID D1 binding is the authoritative member profile store.
+  // Reject a partial login if that legacy central database is unavailable.
+  const legacyStandaloneHost = new URL(request.url).hostname === 'echostars.yukidu.workers.dev';
+  if (legacyStandaloneHost && !(env as any).STARRY_ID_DB) {
+    return failurePage('舊版中央會員資料庫尚未連線，請稍後重試。', 503);
+  }
+
   const response = await sessionWorker.fetch(verifiedRequest, env);
   const data: any = await response.clone().json().catch(() => ({}));
   if (!response.ok || !data?.user || !data?.authToken) {
     return failurePage(data?.error || 'Google 登入驗證失敗，請重新選擇 Google 帳號。', response.status || 401);
+  }
+
+  if (legacyStandaloneHost) {
+    // Google has POSTed a verified credential to our own domain. The server
+    // already created and synchronized the legacy member. Set only the
+    // same-origin secure HttpOnly session cookie; never expose bearer tokens
+    // in HTML or send them to the unrelated v2 Starry ID service.
+    const cookie = response.headers.get('Set-Cookie');
+    if (!cookie) return failurePage('登入工作階段尚未建立，請稍後重試。', 503);
+    return new Response(null, {
+      status: 303,
+      headers: {
+        Location: '/',
+        'Set-Cookie': cookie,
+        'Cache-Control': 'no-store',
+        'Referrer-Policy': 'no-referrer'
+      }
+    });
   }
 
   // No Echo-only cookie should be published on a half-completed login.

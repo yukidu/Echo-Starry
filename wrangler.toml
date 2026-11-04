@@ -13,15 +13,10 @@ preview_urls = true
 # Storage bindings are omitted here so preview branches cannot read/write production D1, KV or R2.
 previews = { }
 
-# 正式自訂網域：Cloudflare Workers Custom Domain。
-# 繁星回聲與繁星通行證暫時共用同一 Worker，但由 hostname 完全分流。
-[[routes]]
-pattern = "echo.starry.phd"
-custom_domain = true
-
-[[routes]]
-pattern = "id.starry.phd"
-custom_domain = true
+# 2026-11-04: 舊版 echostars 僅提供 yukidu.workers.dev 入口。
+# echo.starry.phd 目前由另一個 Cloudflare 帳號的 302 暫時轉址指向這裡；
+# id.starry.phd 由新版 Starry ID 專案管理。
+# 不在此跨帳號聲明 Custom Domains，避免部署時重新綁定或覆蓋它們。
 
 # 保留原本 Cloudflare 建置流程；回歸測試由 GitHub Actions額外把關。
 [build]

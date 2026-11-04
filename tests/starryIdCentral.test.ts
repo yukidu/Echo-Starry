@@ -15,12 +15,12 @@ const verifySchema = readFileSync(join(root, 'starry-id/verify-schema.mjs'), 'ut
 const STARRY_CLIENT = '661055525630-ndcq5gtr16h7rqqprlqqkkvineea87lc.apps.googleusercontent.com';
 const LEGACY_ECHO_CLIENT = '400699489182-lb412nhvj4s6t1qr5ovkg40hc646dq79.apps.googleusercontent.com';
 
-test('Starry ID keeps the existing EchoStars worker chain and adds id.starry.phd', () => {
+test('legacy EchoStars keeps the existing Worker chain without claiming v2 domains', () => {
   assert.match(wrangler, /main = "worker\/starryMainInlineLoginRouter\.ts"/);
   assert.match(inlineLoginRouter, /import appWorker from '\.\/starryMainBatteryGameRouter'/);
   assert.match(batteryRouter, /import appWorker from '\.\/privacyCrawlerRouter'/);
-  assert.match(wrangler, /pattern = "echo\.starry\.phd"/);
-  assert.match(wrangler, /pattern = "id\.starry\.phd"/);
+  assert.match(wrangler, /workers_dev = true/);
+  assert.doesNotMatch(wrangler, /^\[\[routes\]\]/m);
   assert.match(privacyRouter, /handleStarryIdCentral/);
 });
 

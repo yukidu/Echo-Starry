@@ -53,7 +53,8 @@ test('public rename preserves legacy internal identity keys and Cloudflare resou
   assert.match(navbar, /echostars_user_font_zoom_v1/);
   assert.match(googleUx, /echostars_auth_return_v1/);
   assert.match(wrangler, /name = \"echostars\"/);
-  assert.match(wrangler, /pattern = \"echo\.starry\.phd\"/);
+  assert.match(wrangler, /workers_dev = true/);
+  assert.doesNotMatch(wrangler, /^\[\[routes\]\]/m);
 });
 
 test('production build keeps the canonical Chinese public brand without runtime rewriting', () => {
