@@ -175,8 +175,9 @@ async function handleGoogleLogin(request: Request, env: Env) {
     const data = await syncVerifiedMember(env.DB, identity);
     stage = 'central-profile';
     let canonicalUser = data.user;
+    let centralUserId = '';
     if ((env as any).STARRY_ID_DB) {
-      await ensureCentralEchoMember(env, { ...data.user, googleSubject: identity.subject });
+      centralUserId = await ensureCentralEchoMember(env, { ...data.user, googleSubject: identity.subject });
       canonicalUser = await overlayEchoMemberWithCentral(env, { ...data.user, googleSubject: identity.subject });
     }
 
@@ -186,6 +187,7 @@ async function handleGoogleLogin(request: Request, env: Env) {
       ...data,
       user: canonicalUser,
       profileSource: (env as any).STARRY_ID_DB ? 'starry-id-central' : 'echo-local-compat',
+      starryUserId: centralUserId,
       authToken: session.token,
       sessionExpiresAt: session.expiresAt
     });
