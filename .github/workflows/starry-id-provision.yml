@@ -18,8 +18,8 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Install dependencies
@@ -40,7 +40,7 @@ jobs:
         run: bash starry-id/provision-and-audit.sh
       - name: Upload non-PII audit report
         if: steps.cloudflare.outputs.available == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: starry-id-member-audit
           path: starry-id/audit-output/member-audit.json
